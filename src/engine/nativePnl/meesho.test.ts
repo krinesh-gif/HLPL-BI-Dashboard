@@ -16,6 +16,7 @@ const facts: MeeshoPnlFacts = {
   goldFee: 200,
   mallFee: 0,
   otherSettlementCharge: 300,
+  ads: 1200,
   gst: 4000,
   tcs: 500,
   tds: 100,
@@ -39,9 +40,9 @@ describe('computeMeeshoPnl', () => {
     expect(computed.cm2).toBeCloseTo(computed.cm1 - totalFees)
   })
 
-  it('adds compensation/claims/recovery as CM3 addbacks', () => {
+  it('deducts ads and adds compensation/claims/recovery to get CM3', () => {
     const computed = computeMeeshoPnl(facts)
-    expect(computed.cm3).toBeCloseTo(computed.cm2 + 200 + 150 + 0)
+    expect(computed.cm3).toBeCloseTo(computed.cm2 - 1200 + 200 + 150 + 0)
   })
 
   it('treats GST/TCS/TDS as memo lines that do not affect CM3', () => {
@@ -66,5 +67,6 @@ describe('meeshoToCanonicalBuckets', () => {
     expect(buckets.grossSales).toBe(100000)
     expect(buckets.cogs).toBe(35000)
     expect(buckets.marketplaceCommission).toBe(9000)
+    expect(buckets.ads).toBe(1200)
   })
 })

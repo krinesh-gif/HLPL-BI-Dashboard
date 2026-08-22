@@ -196,6 +196,7 @@ export interface MeeshoPnlFacts {
   goldFee: number
   mallFee: number
   otherSettlementCharge: number
+  ads: number
   gst: number
   tcs: number
   tds: number

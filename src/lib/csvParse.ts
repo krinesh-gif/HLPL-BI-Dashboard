@@ -34,3 +34,51 @@ export function parseSpreadsheetFile(file: File): Promise<ParsedFile> {
   if (name.endsWith('.xlsx') || name.endsWith('.xls')) return parseXlsxFile(file)
   return Promise.reject(new Error(`Unsupported file type: ${file.name}. Upload a .csv, .xlsx, or .xls file.`))
 }
+
+export type RawSheet = (string | number)[][]
+
+/**
+ * Reads every sheet of an .xlsx/.xls workbook as raw rows-of-cells, with no
+ * assumption about which row is the header. Real marketplace exports (the
+ * Flipkart P&L workbook, Meesho's aggregated payment file) are multi-sheet
+ * workbooks whose sheets need looking up by name, and some have header
+ * information split across more than one row — both are impossible to
+ * express as a single flat header row the way `parseSpreadsheetFile` assumes.
+ */
+export async function readWorkbookSheetsRaw(file: File): Promise<Record<string, RawSheet>> {
+  const buffer = await file.arrayBuffer()
+  const workbook = XLSX.read(buffer, { type: 'array' })
+  const result: Record<string, RawSheet> = {}
+  for (const sheetName of workbook.SheetNames) {
+    result[sheetName] = XLSX.utils.sheet_to_json<(string | number)[]>(workbook.Sheets[sheetName], { header: 1, defval: '' })
+  }
+  return result
+}
+
+/**
+ * Merges two stacked header rows into one flat header list: for each column,
+ * the lower row's label wins when present (it's the more specific one — a
+ * fee breakdown column name), falling back to the upper row's label (a
+ * column whose only label sits on the group-summary row above).
+ */
+export function mergeHeaderRows(upper: (string | number | undefined)[], lower: (string | number | undefined)[]): string[] {
+  const width = Math.max(upper.length, lower.length)
+  const merged: string[] = []
+  for (let i = 0; i < width; i++) {
+    const lowerVal = String(lower[i] ?? '').trim()
+    const upperVal = String(upper[i] ?? '').trim()
+    merged.push(lowerVal || upperVal)
+  }
+  return merged
+}
+
+/** Converts raw rows (with a known header row index) into the Record<string,string> shape the normalizers expect. */
+export function rowsToRecords(headers: string[], rawRows: RawSheet, dataStartIndex: number): Record<string, string>[] {
+  return rawRows.slice(dataStartIndex).map((row) => {
+    const record: Record<string, string> = {}
+    headers.forEach((h, i) => {
+      if (h) record[h] = row[i] === undefined || row[i] === null ? '' : String(row[i])
+    })
+    return record
+  })
+}

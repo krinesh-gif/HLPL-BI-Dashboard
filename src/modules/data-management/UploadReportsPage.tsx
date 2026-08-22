@@ -1,32 +1,49 @@
 import { useState } from 'react'
 import { PageShell } from '@/components/layout/PageShell'
-import { parseSpreadsheetFile, type ParsedFile } from '@/lib/csvParse'
+import { parseSpreadsheetFile, readWorkbookSheetsRaw, type ParsedFile } from '@/lib/csvParse'
 import { detectAmazonSellerCentralReport, normalizeAmazonSellerCentralRows } from '@/data/normalize/amazonSellerCentral'
 import { detectFlipkartSkuPnlReport, normalizeFlipkartSkuPnl } from '@/data/normalize/flipkartSkuPnl'
+import { detectFlipkartWorkbook, normalizeFlipkartWorkbook } from '@/data/normalize/flipkartWorkbook'
 import { detectAmazonUsaProductProfitabilityReport, normalizeAmazonUsaProductProfitability } from '@/data/normalize/amazonUsaProductProfitability'
 import { detectMeeshoOrderSummaryReport, normalizeMeeshoOrderSummary } from '@/data/normalize/meeshoOrderSummary'
+import { detectMeeshoOrderPaymentsSheet, normalizeMeeshoOrderPayments } from '@/data/normalize/meeshoOrderPayments'
 import { isMeeshoSettlementJson, normalizeMeeshoSettlementJson, type MeeshoSettlementJson } from '@/data/normalize/meeshoSettlementJson'
+import { detectAmazonAdsSponsoredProductsReport, normalizeAmazonAdsSponsoredProductsReport } from '@/data/normalize/amazonAdsSponsoredProducts'
 import { checkForDuplicates } from '@/data/normalize/duplicates'
 import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
-import type { AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, MeeshoPnlFacts } from '@/data/models'
+import type { AdsRecord, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, MeeshoPnlFacts } from '@/data/models'
 
-type ReportKind = 'amazon_seller_central' | 'flipkart_sku_pnl' | 'amazon_usa_product_profitability' | 'meesho_order_summary' | 'meesho_settlement_json'
+type ReportKind =
+  | 'amazon_seller_central'
+  | 'flipkart_sku_pnl'
+  | 'flipkart_workbook'
+  | 'amazon_usa_product_profitability'
+  | 'meesho_order_summary'
+  | 'meesho_order_payments'
+  | 'meesho_settlement_json'
+  | 'amazon_ads_sponsored_products'
 
 const REPORT_LABELS: Record<ReportKind, string> = {
   amazon_seller_central: 'Amazon India — Seller Central Order Report',
   flipkart_sku_pnl: 'Flipkart — SKU-Level P&L Report',
+  flipkart_workbook: 'Flipkart — Full P&L Workbook (Overall Summary + Orders P&L)',
   amazon_usa_product_profitability: 'Amazon USA — Product Profitability Report',
   meesho_order_summary: 'Meesho — Order Summary Report',
+  meesho_order_payments: 'Meesho — Aggregated Payment File (Order Payments + Ads Cost)',
   meesho_settlement_json: 'Meesho — Settlement Data (JSON)',
+  amazon_ads_sponsored_products: 'Amazon Ads — Sponsored Products Campaign Report',
 }
 const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   amazon_seller_central: 'amazon_in_seller',
   flipkart_sku_pnl: 'flipkart',
+  flipkart_workbook: 'flipkart',
   amazon_usa_product_profitability: 'amazon_us',
   meesho_order_summary: 'meesho',
+  meesho_order_payments: 'meesho',
   meesho_settlement_json: 'meesho',
+  amazon_ads_sponsored_products: 'amazon_in_seller', // overridden per-preview when ads records exist
 }
 
 type Stage = 'idle' | 'needs-month' | 'parsed' | 'error'
@@ -36,6 +53,7 @@ interface PreviewState {
   reportKind: ReportKind
   totalRows: number
   validRecords: CanonicalSalesRecord[]
+  adsRecords: AdsRecord[]
   invalidCount: number
   warnings: string[]
   duplicateCount: number
@@ -46,7 +64,10 @@ interface PreviewState {
 }
 
 export function UploadReportsPage() {
-  const { skuMaster, salesRecords, addImportedSales, setFlipkartFacts, setAmazonUsaFacts, setMeeshoFacts } = useDataStore()
+  const {
+    skuMaster, salesRecords, addImportedSales, addImportedAds,
+    setFlipkartFacts, setAmazonUsaFacts, setMeeshoFacts,
+  } = useDataStore()
   const { month: filterMonth } = useFilterStore()
   const [stage, setStage] = useState<Stage>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -54,40 +75,39 @@ export function UploadReportsPage() {
   const [pendingFile, setPendingFile] = useState<{ fileName: string; parsed: ParsedFile } | null>(null)
   const [flipkartMonth, setFlipkartMonth] = useState(filterMonth)
 
-  function buildPreview(kind: ReportKind, fileName: string, parsed: ParsedFile, month: string) {
+  function showPreview(partial: Omit<PreviewState, 'duplicateCount' | 'isLikelyReupload' | 'adsRecords'> & { adsRecords?: AdsRecord[] }) {
+    const dup = checkForDuplicates(partial.validRecords, salesRecords)
+    setPreview({ ...partial, adsRecords: partial.adsRecords ?? [], duplicateCount: dup.duplicateCount, isLikelyReupload: dup.isLikelyReupload })
+    setStage('parsed')
+  }
+
+  function buildSimplePreview(kind: ReportKind, fileName: string, parsed: ParsedFile, month: string) {
     const importId = `import-${Date.now()}`
-    let result: { validRecords: CanonicalSalesRecord[]; totalRows: number; invalidRows: { reason: string }[]; warnings: string[] }
-    let flipkartFacts: FlipkartPnlFacts | undefined
-    let amazonUsaFacts: AmazonUsaPnlFacts | undefined
 
     if (kind === 'amazon_seller_central') {
-      result = normalizeAmazonSellerCentralRows(parsed.rows, skuMaster, importId)
+      const r = normalizeAmazonSellerCentralRows(parsed.rows, skuMaster, importId)
+      showPreview({ fileName, reportKind: kind, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
     } else if (kind === 'flipkart_sku_pnl') {
       const r = normalizeFlipkartSkuPnl(parsed.rows, skuMaster, month, importId)
-      result = r
-      flipkartFacts = r.facts
+      showPreview({ fileName, reportKind: kind, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings, flipkartFacts: r.facts })
     } else if (kind === 'amazon_usa_product_profitability') {
       const r = normalizeAmazonUsaProductProfitability(parsed.headers, parsed.rows, skuMaster, importId)
-      result = r
-      amazonUsaFacts = r.facts
-    } else {
-      result = normalizeMeeshoOrderSummary(parsed.rows, skuMaster, importId)
+      showPreview({ fileName, reportKind: kind, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings, amazonUsaFacts: r.facts })
+    } else if (kind === 'meesho_order_summary') {
+      const r = normalizeMeeshoOrderSummary(parsed.rows, skuMaster, importId)
+      showPreview({ fileName, reportKind: kind, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
+    } else if (kind === 'amazon_ads_sponsored_products') {
+      const r = normalizeAmazonAdsSponsoredProductsReport(parsed.rows, importId)
+      showPreview({ fileName, reportKind: kind, totalRows: r.totalRows, validRecords: [], adsRecords: r.adsRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
     }
-
-    const dup = checkForDuplicates(result.validRecords, salesRecords)
-    setPreview({
-      fileName, reportKind: kind, totalRows: result.totalRows, validRecords: result.validRecords,
-      invalidCount: result.invalidRows.length, warnings: result.warnings,
-      duplicateCount: dup.duplicateCount, isLikelyReupload: dup.isLikelyReupload,
-      flipkartFacts, amazonUsaFacts,
-    })
-    setStage('parsed')
   }
 
   async function handleFile(file: File) {
     setError(null)
     try {
-      if (file.name.toLowerCase().endsWith('.json')) {
+      const lowerName = file.name.toLowerCase()
+
+      if (lowerName.endsWith('.json')) {
         const text = await file.text()
         const data = JSON.parse(text) as unknown
         if (!isMeeshoSettlementJson(data)) {
@@ -96,16 +116,38 @@ export function UploadReportsPage() {
           return
         }
         const importId = `import-${Date.now()}`
-        const result = normalizeMeeshoSettlementJson(data as MeeshoSettlementJson, skuMaster, importId)
-        const dup = checkForDuplicates(result.validRecords, salesRecords)
-        setPreview({
-          fileName: file.name, reportKind: 'meesho_settlement_json', totalRows: result.totalRows,
-          validRecords: result.validRecords, invalidCount: result.invalidRows.length, warnings: result.warnings,
-          duplicateCount: dup.duplicateCount, isLikelyReupload: dup.isLikelyReupload,
-          meeshoFactsByMonth: result.factsByMonth,
+        const r = normalizeMeeshoSettlementJson(data as MeeshoSettlementJson, skuMaster, importId)
+        showPreview({
+          fileName: file.name, reportKind: 'meesho_settlement_json', totalRows: r.totalRows,
+          validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings,
+          meeshoFactsByMonth: r.factsByMonth,
         })
-        setStage('parsed')
         return
+      }
+
+      if (lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls')) {
+        const sheets = await readWorkbookSheetsRaw(file)
+        const sheetNames = Object.keys(sheets)
+        const importId = `import-${Date.now()}`
+
+        if (detectFlipkartWorkbook(sheetNames)) {
+          const r = normalizeFlipkartWorkbook(sheets, skuMaster, importId)
+          showPreview({
+            fileName: file.name, reportKind: 'flipkart_workbook', totalRows: r.totalRows,
+            validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings, flipkartFacts: r.facts,
+          })
+          return
+        }
+
+        if (detectMeeshoOrderPaymentsSheet(sheets['Order Payments'])) {
+          const r = normalizeMeeshoOrderPayments(sheets['Order Payments'], sheets['Ads Cost'], skuMaster, importId)
+          showPreview({
+            fileName: file.name, reportKind: 'meesho_order_payments', totalRows: r.totalRows,
+            validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings, meeshoFactsByMonth: r.factsByMonth,
+          })
+          return
+        }
+        // Not a recognized multi-sheet workbook — fall through to the single-sheet path below.
       }
 
       const parsed = await parseSpreadsheetFile(file)
@@ -114,11 +156,12 @@ export function UploadReportsPage() {
       else if (detectFlipkartSkuPnlReport(parsed.headers)) kind = 'flipkart_sku_pnl'
       else if (detectAmazonUsaProductProfitabilityReport(parsed.headers)) kind = 'amazon_usa_product_profitability'
       else if (detectMeeshoOrderSummaryReport(parsed.headers)) kind = 'meesho_order_summary'
+      else if (detectAmazonAdsSponsoredProductsReport(parsed.headers)) kind = 'amazon_ads_sponsored_products'
 
       if (!kind) {
         setStage('error')
         setError(
-          'Upload failed. Existing data has NOT been changed. Reason: this file did not match any supported report format (Amazon India Seller Central, Flipkart SKU-level P&L, Amazon USA Product Profitability, or Meesho Order Summary).',
+          'Upload failed. Existing data has NOT been changed. Reason: this file did not match any supported report format.',
         )
         return
       }
@@ -130,7 +173,7 @@ export function UploadReportsPage() {
         return
       }
 
-      buildPreview(kind, file.name, parsed, filterMonth)
+      buildSimplePreview(kind, file.name, parsed, filterMonth)
     } catch (e) {
       setStage('error')
       setError(`Upload failed. Existing data has NOT been changed. Reason: ${e instanceof Error ? e.message : String(e)}`)
@@ -139,24 +182,27 @@ export function UploadReportsPage() {
 
   function confirmFlipkartMonth() {
     if (!pendingFile) return
-    buildPreview('flipkart_sku_pnl', pendingFile.fileName, pendingFile.parsed, flipkartMonth)
+    buildSimplePreview('flipkart_sku_pnl', pendingFile.fileName, pendingFile.parsed, flipkartMonth)
     setPendingFile(null)
   }
 
   function confirmImport() {
     if (!preview) return
+    const channel = preview.adsRecords[0]?.channel ?? REPORT_CHANNEL[preview.reportKind]
     const importRecord: ImportRecord = {
       id: `import-${Date.now()}`,
       fileName: preview.fileName,
-      channel: REPORT_CHANNEL[preview.reportKind],
+      channel,
       reportType: REPORT_LABELS[preview.reportKind],
       uploadedAt: new Date().toISOString(),
       recordCount: preview.totalRows,
-      validRecordCount: preview.validRecords.length,
+      validRecordCount: preview.validRecords.length + preview.adsRecords.length,
       status: preview.invalidCount > 0 ? 'partial' : 'success',
       warnings: preview.warnings,
     }
-    addImportedSales(preview.validRecords, importRecord)
+    if (preview.validRecords.length > 0) addImportedSales(preview.validRecords, importRecord)
+    else if (preview.adsRecords.length === 0) addImportedSales([], importRecord) // still record the import even if nothing came through
+    if (preview.adsRecords.length > 0) addImportedAds(preview.adsRecords)
     if (preview.flipkartFacts) setFlipkartFacts(preview.flipkartFacts)
     if (preview.amazonUsaFacts) setAmazonUsaFacts(preview.amazonUsaFacts)
     if (preview.meeshoFactsByMonth) for (const f of preview.meeshoFactsByMonth) setMeeshoFacts(f)
@@ -169,6 +215,8 @@ export function UploadReportsPage() {
     setPendingFile(null)
     setStage('idle')
   }
+
+  const totalValid = preview ? preview.validRecords.length + preview.adsRecords.length : 0
 
   return (
     <PageShell title="Upload Reports" subtitle="Upload marketplace reports for normalization and import" showFilters={false}>
@@ -184,8 +232,9 @@ export function UploadReportsPage() {
           className="mx-auto block text-sm text-slate-600"
         />
         <p className="mt-3 text-xs text-slate-400">
-          Supported: Amazon India Seller Central order reports, Flipkart SKU-level P&L exports, Amazon USA Product
-          Profitability exports, Meesho Order Summary reports (.csv/.xlsx/.xls), and Meesho Settlement Data (.json).
+          Supported: Amazon India Seller Central order reports, Flipkart SKU-level P&L exports (or the full P&L
+          workbook), Amazon USA Product Profitability exports, Amazon Ads Sponsored Products campaign reports, Meesho
+          Order Summary reports, the Meesho aggregated payment file, and Meesho Settlement Data (.json).
         </p>
       </div>
 
@@ -221,12 +270,13 @@ export function UploadReportsPage() {
         <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
           <div className="text-sm font-semibold text-slate-800">{preview.fileName}</div>
           <div className="text-sm text-slate-600">
-            {REPORT_LABELS[preview.reportKind]} — {CHANNEL_MAP[REPORT_CHANNEL[preview.reportKind]].label}
+            {REPORT_LABELS[preview.reportKind]}
+            {preview.adsRecords.length === 0 && ` — ${CHANNEL_MAP[REPORT_CHANNEL[preview.reportKind]].label}`}
           </div>
 
           <ul className="space-y-1 text-sm">
             <li className="text-slate-700">✓ {preview.totalRows.toLocaleString()} records detected</li>
-            <li className="text-emerald-700">✓ {preview.validRecords.length.toLocaleString()} valid</li>
+            <li className="text-emerald-700">✓ {totalValid.toLocaleString()} valid</li>
             {preview.invalidCount > 0 && <li className="text-amber-700">⚠ {preview.invalidCount.toLocaleString()} records failed validation and will be skipped</li>}
             {preview.duplicateCount > 0 && <li className="text-amber-700">⚠ {preview.duplicateCount.toLocaleString()} duplicate record(s) already imported previously</li>}
             {preview.warnings.map((w, i) => (
@@ -247,10 +297,10 @@ export function UploadReportsPage() {
             <button
               type="button"
               onClick={confirmImport}
-              disabled={preview.validRecords.length === 0}
+              disabled={totalValid === 0}
               className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
             >
-              Import {preview.validRecords.length.toLocaleString()} Records
+              Import {totalValid.toLocaleString()} Records
             </button>
             <button type="button" onClick={cancel} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
               Cancel

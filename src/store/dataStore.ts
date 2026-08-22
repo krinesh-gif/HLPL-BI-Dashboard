@@ -30,6 +30,7 @@ interface DataState {
   meeshoFacts: MeeshoPnlFacts[]
   /** Appends newly imported sales records + import metadata; never overwrites existing rows. */
   addImportedSales: (records: CanonicalSalesRecord[], importRecord: ImportRecord) => void
+  addImportedAds: (records: AdsRecord[]) => void
   updateSkuMaster: (sku: string, patch: Partial<SkuMaster>) => void
   /** Re-uploading the same month's native P&L facts replaces that month only. */
   setFlipkartFacts: (facts: FlipkartPnlFacts) => void
@@ -66,6 +67,11 @@ export const useDataStore = create<DataState>((set) => ({
       inventorySnapshots: state.isDemo ? [] : state.inventorySnapshots,
       fixedExpenses: state.isDemo ? [] : state.fixedExpenses,
       imports: [importRecord, ...state.imports],
+    })),
+  addImportedAds: (records) =>
+    set((state) => ({
+      isDemo: false,
+      adsRecords: state.isDemo ? records : [...state.adsRecords, ...records],
     })),
   updateSkuMaster: (sku, patch) =>
     set((state) => ({

@@ -34,11 +34,12 @@ export const MEESHO_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm2', label: 'CHANNEL MARGIN (CM2)', section: 'MARKETPLACE FEES', kind: 'subtotal' },
   { key: 'cm2Pct', label: 'CM2 %', section: 'MARKETPLACE FEES', kind: 'percent' },
 
-  { key: 'compensation', label: 'Add: Compensation', section: 'ADJUSTMENTS', kind: 'input' },
-  { key: 'claims', label: 'Add: Claims', section: 'ADJUSTMENTS', kind: 'input' },
-  { key: 'recovery', label: 'Add: Recovery', section: 'ADJUSTMENTS', kind: 'input' },
-  { key: 'cm3', label: 'CONTRIBUTION MARGIN (CM3)', section: 'ADJUSTMENTS', kind: 'subtotal' },
-  { key: 'cm3Pct', label: 'CM3 %', section: 'ADJUSTMENTS', kind: 'percent' },
+  { key: 'ads', label: 'Less: Ads', section: 'ADVERTISING', kind: 'input' },
+  { key: 'compensation', label: 'Add: Compensation', section: 'ADVERTISING', kind: 'input' },
+  { key: 'claims', label: 'Add: Claims', section: 'ADVERTISING', kind: 'input' },
+  { key: 'recovery', label: 'Add: Recovery', section: 'ADVERTISING', kind: 'input' },
+  { key: 'cm3', label: 'CONTRIBUTION MARGIN (CM3)', section: 'ADVERTISING', kind: 'subtotal' },
+  { key: 'cm3Pct', label: 'CM3 %', section: 'ADVERTISING', kind: 'percent' },
 
   { key: 'otherCosts', label: 'Less: Other Costs (allocated fixed expenses)', section: 'YOUR OTHER COSTS', kind: 'input' },
   { key: 'cm4', label: 'NET PROFIT (CM4)', section: 'YOUR OTHER COSTS', kind: 'subtotal' },
@@ -59,7 +60,7 @@ export function computeMeeshoPnl(facts: MeeshoPnlFacts): NativeLineValues {
     facts.commission + facts.fixedFee + facts.warehousing + facts.goldFee + facts.mallFee + facts.otherSettlementCharge
   const cm2 = cm1 - totalFees
 
-  const cm3 = cm2 + facts.compensation + facts.claims + facts.recovery
+  const cm3 = cm2 - facts.ads + facts.compensation + facts.claims + facts.recovery
 
   return {
     grossSale: facts.grossSale,
@@ -81,6 +82,7 @@ export function computeMeeshoPnl(facts: MeeshoPnlFacts): NativeLineValues {
     totalFees: -totalFees,
     cm2,
     cm2Pct: netSale !== 0 ? (cm2 / netSale) * 100 : 0,
+    ads: -facts.ads,
     compensation: facts.compensation,
     claims: facts.claims,
     recovery: facts.recovery,
@@ -116,7 +118,7 @@ export function meeshoToCanonicalBuckets(facts: MeeshoPnlFacts): PnlLineValues {
     rtoCharges: facts.returnPremium - facts.returnPremiumRecovered,
     returnCharges: 0,
     otherMarketplaceCharges: facts.fixedFee + facts.goldFee + facts.mallFee + facts.otherSettlementCharge - facts.compensation - facts.claims - facts.recovery,
-    ads: 0,
+    ads: facts.ads,
     performanceMarketing: 0,
     otherMarketing: 0,
   }

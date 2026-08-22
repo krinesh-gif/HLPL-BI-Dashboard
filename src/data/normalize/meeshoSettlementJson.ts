@@ -13,6 +13,8 @@ export interface MeeshoSettlementJson {
   ROWF: string[]
   orders: (string | number)[][]
   map?: Record<string, { c1?: string; q1?: number; c2?: string; q2?: number }>
+  /** [compositeKey, month, campaignId, adCost, credits, gst, totalAdsCost][] */
+  ads?: (string | number)[][]
 }
 
 const REQUIRED_FIELDS = ['om', 'sku', 'status', 'qty', 'sale'] as const
@@ -67,7 +69,7 @@ export function normalizeMeeshoSettlementJson(data: MeeshoSettlementJson, skuMas
       f = {
         month, grossSale: 0, returns: 0, forwardShipping: 0, reverseShipping: 0, returnPremium: 0,
         returnPremiumRecovered: 0, commission: 0, fixedFee: 0, warehousing: 0, goldFee: 0, mallFee: 0,
-        otherSettlementCharge: 0, gst: 0, tcs: 0, tds: 0, compensation: 0, claims: 0, recovery: 0,
+        otherSettlementCharge: 0, ads: 0, gst: 0, tcs: 0, tds: 0, compensation: 0, claims: 0, recovery: 0,
         settlementAmount: 0, cogs: 0,
       }
       factsByMonth.set(month, f)
@@ -158,6 +160,12 @@ export function normalizeMeeshoSettlementJson(data: MeeshoSettlementJson, skuMas
       importId,
     })
   })
+
+  for (const adRow of data.ads ?? []) {
+    const month = String(adRow[1] ?? '')
+    if (!month) continue
+    factsFor(month).ads += Math.abs(Number(adRow[6]) || 0)
+  }
 
   const warnings: string[] = []
   if (unpricedCount > 0) {
