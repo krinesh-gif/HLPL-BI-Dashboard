@@ -1,0 +1,161 @@
+import { useMemo } from 'react'
+import { useDataStore } from '@/store/dataStore'
+import { useFilterStore } from '@/store/filterStore'
+import { CHANNELS, CHANNEL_MAP } from '@/config/channels'
+import { addMonths, ytdMonthKeys } from '@/lib/format'
+import { buildAllChannelPnls, buildMasterPnl } from '@/engine/pnl'
+import { marketingFromAds } from '@/engine/marketing'
+import { filterByMonth, groupBySku, growthPct, sumFacts } from '@/engine/sales'
+import { forecastDemand } from '@/engine/forecast'
+import { INVENTORY_THRESHOLDS } from '@/config/thresholds'
+import {
+  inventoryInsight,
+  marginDeclineInsight,
+  revenueInsight,
+  rtoInsight,
+  skuGrowthInsights,
+  type Insight,
+} from '@/engine/insight'
+
+export function useOverviewData() {
+  const { salesRecords, adsRecords, skuMaster, inventorySnapshots, fixedExpenses } = useDataStore()
+  const { month } = useFilterStore()
+
+  return useMemo(() => {
+    const previousMonth = addMonths(month, -1)
+
+    const currentMarketing = marketingFromAds(adsRecords, month)
+    const previousMarketing = marketingFromAds(adsRecords, previousMonth)
+
+    const currentChannelPnls = buildAllChannelPnls(salesRecords, skuMaster, fixedExpenses, month, currentMarketing)
+    const previousChannelPnls = buildAllChannelPnls(salesRecords, skuMaster, fixedExpenses, previousMonth, previousMarketing)
+    const masterCurrent = buildMasterPnl(currentChannelPnls, month)
+    const masterPrevious = buildMasterPnl(previousChannelPnls, previousMonth)
+
+    const ytdMonths = ytdMonthKeys(month)
+    const ytdNetSales = ytdMonths.reduce((sum, m) => {
+      const marketing = marketingFromAds(adsRecords, m)
+      const pnls = buildAllChannelPnls(salesRecords, skuMaster, fixedExpenses, m, marketing)
+      return sum + (buildMasterPnl(pnls, m).lines.netSales ?? 0)
+    }, 0)
+    const previousYearYtdMonths = ytdMonths.map((m) => addMonths(m, -12))
+    const previousYtdNetSales = previousYearYtdMonths.reduce((sum, m) => {
+      const marketing = marketingFromAds(adsRecords, m)
+      const pnls = buildAllChannelPnls(salesRecords, skuMaster, fixedExpenses, m, marketing)
+      return sum + (buildMasterPnl(pnls, m).lines.netSales ?? 0)
+    }, 0)
+
+    const currentFacts = sumFacts(filterByMonth(salesRecords, month))
+    const previousFacts = sumFacts(filterByMonth(salesRecords, previousMonth))
+
+    const currentAdsMonth = adsRecords.filter((r) => r.date.slice(0, 7) === month)
+    const totalAdSpend = currentAdsMonth.reduce((s, r) => s + r.spend, 0)
+    const totalAdSales = currentAdsMonth.reduce((s, r) => s + r.adSales, 0)
+    const acos = totalAdSales > 0 ? (totalAdSpend / totalAdSales) * 100 : 0
+    const tacos = (masterCurrent.lines.netSales ?? 0) > 0 ? (totalAdSpend / (masterCurrent.lines.netSales ?? 1)) * 100 : 0
+    const roas = totalAdSpend > 0 ? totalAdSales / totalAdSpend : 0
+
+    // Channel performance
+    const channelSummaries = CHANNELS.map((c) => {
+      const cur = currentChannelPnls.find((p) => p.channel === c.id)!
+      const prev = previousChannelPnls.find((p) => p.channel === c.id)!
+      const g = growthPct(cur.lines.netSales ?? 0, prev.lines.netSales ?? 0)
+      return { channel: c.id, label: c.label, netSales: cur.lines.netSales ?? 0, growth: g, contribution: cur.lines.contributionProfit ?? 0 }
+    }).filter((c) => c.netSales > 0 || (c.growth !== null && c.growth !== 0))
+
+    const bestChannel = [...channelSummaries].sort((a, b) => b.netSales - a.netSales)[0]
+    const fastestGrowing = [...channelSummaries].filter((c) => c.growth !== null).sort((a, b) => (b.growth ?? 0) - (a.growth ?? 0))[0]
+    const mostProfitable = [...channelSummaries].sort((a, b) => b.contribution - a.contribution)[0]
+    const weakest = [...channelSummaries].filter((c) => c.growth !== null).sort((a, b) => (a.growth ?? 0) - (b.growth ?? 0))[0]
+
+    // SKU performance
+    const currentBySku = groupBySku(filterByMonth(salesRecords, month))
+    const previousBySku = groupBySku(filterByMonth(salesRecords, previousMonth))
+    const skuRows = skuMaster.map((s) => {
+      const curUnits = sumFacts(currentBySku.get(s.sku) ?? []).quantity
+      const prevUnits = sumFacts(previousBySku.get(s.sku) ?? []).quantity
+      const curNet = sumFacts(currentBySku.get(s.sku) ?? []).netSales
+      return { sku: s.sku, productName: s.productName, curUnits, prevUnits, curNet, growth: growthPct(curUnits, prevUnits) }
+    })
+    const topSku = [...skuRows].sort((a, b) => b.curNet - a.curNet)[0]
+    const fastestGrowingSku = [...skuRows].filter((r) => r.growth !== null && r.prevUnits > 0).sort((a, b) => (b.growth ?? 0) - (a.growth ?? 0))[0]
+    const decliningSku = [...skuRows].filter((r) => r.growth !== null && r.prevUnits > 0).sort((a, b) => (a.growth ?? 0) - (b.growth ?? 0))[0]
+
+    // Inventory
+    const inventoryRows = skuMaster.map((s) => {
+      const snapshot = inventorySnapshots.find((i) => i.sku === s.sku)
+      const trailingDaily = salesRecords
+        .filter((r) => r.sku === s.sku && r.orderDate <= (snapshot?.asOfDate ?? month))
+        .slice(-90)
+      const series = Object.entries(
+        trailingDaily.reduce<Record<string, number>>((acc, r) => {
+          acc[r.orderDate] = (acc[r.orderDate] ?? 0) + r.quantity
+          return acc
+        }, {}),
+      ).map(([date, units]) => ({ date, units }))
+      const forecast = forecastDemand(series)
+      const coverageDays = forecast.avgDailyUnits > 0 ? (snapshot?.currentStock ?? 0) / forecast.avgDailyUnits : Infinity
+      return { sku: s.sku, productName: s.productName, coverageDays, currentStock: snapshot?.currentStock ?? 0, cogs: s.cogs }
+    })
+    const stockOutRiskSkus = inventoryRows.filter((r) => r.coverageDays <= INVENTORY_THRESHOLDS.buyNowCoverageDays)
+    const excessInventorySkus = inventoryRows.filter((r) => r.coverageDays >= INVENTORY_THRESHOLDS.excessInventoryCoverageDays)
+    const inventoryValue = inventoryRows.reduce((sum, r) => sum + r.currentStock * r.cogs, 0)
+    const avgCoverageDays =
+      inventoryRows.length > 0 ? inventoryRows.reduce((s, r) => s + (Number.isFinite(r.coverageDays) ? r.coverageDays : 0), 0) / inventoryRows.length : 0
+
+    // Insights (Action Required)
+    const insights: Insight[] = []
+    const revIns = revenueInsight(masterCurrent.lines.netSales ?? 0, masterPrevious.lines.netSales ?? 0)
+    if (revIns) insights.push(revIns)
+    const marginIns = marginDeclineInsight(masterCurrent.lines, masterPrevious.lines)
+    if (marginIns) insights.push(marginIns)
+    insights.push(...skuGrowthInsights(skuRows.map((r) => ({ sku: r.sku, productName: r.productName, currentUnits: r.curUnits, previousUnits: r.prevUnits }))))
+    for (const row of inventoryRows) {
+      const ins = inventoryInsight(row.sku, row.productName, row.coverageDays)
+      if (ins) insights.push(ins)
+    }
+    for (const c of CHANNELS) {
+      const facts = sumFacts(filterByMonth(salesRecords, month).filter((r) => r.channel === c.id))
+      const ins = rtoInsight(c.id, facts.rtoUnits, facts.quantity)
+      if (ins) insights.push(ins)
+    }
+    if (channelSummaries.length > 0) {
+      for (const c of channelSummaries) {
+        if (c.growth !== null && c.growth >= 20) {
+          insights.push({ severity: 'green', category: 'channel', message: `${CHANNEL_MAP[c.channel].label} revenue increased ${c.growth.toFixed(0)}% MoM.` })
+        }
+      }
+    }
+
+    return {
+      month,
+      currentFacts,
+      previousFacts,
+      masterCurrent,
+      masterPrevious,
+      ytdNetSales,
+      previousYtdNetSales,
+      ytdGrowth: growthPct(ytdNetSales, previousYtdNetSales),
+      revenueGrowthMoM: growthPct(masterCurrent.lines.netSales ?? 0, masterPrevious.lines.netSales ?? 0),
+      ordersGrowthMoM: growthPct(currentFacts.orders, previousFacts.orders),
+      aov: currentFacts.orders > 0 ? (masterCurrent.lines.netSales ?? 0) / currentFacts.orders : 0,
+      asp: currentFacts.quantity > 0 ? (masterCurrent.lines.grossSales ?? 0) / currentFacts.quantity : 0,
+      totalAdSpend,
+      roas,
+      acos,
+      tacos,
+      bestChannel,
+      fastestGrowing,
+      mostProfitable,
+      weakest,
+      topSku,
+      fastestGrowingSku,
+      decliningSku,
+      stockOutRiskSkus,
+      excessInventorySkus,
+      inventoryValue,
+      avgCoverageDays,
+      insights,
+    }
+  }, [salesRecords, adsRecords, skuMaster, inventorySnapshots, fixedExpenses, month])
+}
