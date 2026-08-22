@@ -9,6 +9,10 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Relative base so the built assets resolve correctly under any subpath
+  // (e.g. a GitHub Pages project site at /HLPL-BI-Dashboard/). Combined with
+  // the hash router, this makes the build portable to any static host.
+  base: './',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
