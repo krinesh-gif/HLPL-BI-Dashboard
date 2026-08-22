@@ -121,6 +121,92 @@ export interface ChannelPnl extends PnlResult {
 }
 
 // ---------------------------------------------------------------------------
+// Channel-native P&L facts — Flipkart, Amazon USA and Meesho each compute
+// their real P&L with a genuinely different waterfall (not just different
+// numbers in one template), matched from the actual monthly reports these
+// channels produce. These facts are the raw, aggregated monthly inputs to
+// each channel's native compute function in engine/nativePnl/*; they are
+// separate from `PnlLineValues` (the generic bucket structure every channel
+// also rolls up into, for the Master P&L / MIS).
+// ---------------------------------------------------------------------------
+
+export interface FlipkartPnlFacts {
+  month: string
+  grossSales: number
+  estimatedNetSales: number
+  cogsPriced: number
+  cogsUnpriced: number
+  commissionFee: number
+  collectionFee: number
+  fixedFee: number
+  pickPackFee: number
+  forwardShippingFee: number
+  reverseShippingFee: number
+  storageFee: number
+  recallFee: number
+  otherMarketplaceFees: number
+  rewardsSpf: number
+  flipkartAds: number
+  /** Manual monthly entries — not present in the SKU-level P&L export. */
+  sellerFundedDiscount: number
+  customerAddOns: number
+  outputGst: number
+  googleAds: number
+}
+
+export interface AmazonUsaPnlFacts {
+  month: string
+  grossSalesUsd: number
+  netSalesUsd: number
+  referralFeeUsd: number
+  fbaFulfilmentFeeUsd: number
+  storageAgedDisposalUsd: number
+  couponDealFeesUsd: number
+  refundAdminFeeUsd: number
+  fbaReimbursementsUsd: number
+  otherAmazonFeesUsd: number
+  sponsoredProductsUsd: number
+  cogsUsd: number
+  freightUsd: number
+  /** Manual monthly entries — from the Assumptions-style form. */
+  sponsoredBrandsUsd: number
+  sponsoredDisplayDspUsd: number
+  offAmazonAdsUsd: number
+  exportDocsUsd: number
+  usImportDutyUsd: number
+  amazonSellingPlanUsd: number
+  productLiabilityInsuranceUsd: number
+  fdaLegalUsd: number
+  agencySoftwareUsd: number
+  otherOverheadUsd: number
+  fxConversionCostPct: number
+}
+
+export interface MeeshoPnlFacts {
+  month: string
+  grossSale: number
+  returns: number
+  forwardShipping: number
+  reverseShipping: number
+  returnPremium: number
+  returnPremiumRecovered: number
+  commission: number
+  fixedFee: number
+  warehousing: number
+  goldFee: number
+  mallFee: number
+  otherSettlementCharge: number
+  gst: number
+  tcs: number
+  tds: number
+  compensation: number
+  claims: number
+  recovery: number
+  settlementAmount: number
+  cogs: number
+}
+
+// ---------------------------------------------------------------------------
 // Import metadata / audit trail
 // ---------------------------------------------------------------------------
 export interface ImportRecord {

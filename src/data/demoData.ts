@@ -2,6 +2,7 @@ import { createRng, randFloat, randInt } from '@/lib/rng'
 import { toMonthKey } from '@/lib/format'
 import { DEFAULT_CHANNEL_FEE_RATES } from '@/config/marketplaceFees'
 import type { ChannelId } from '@/config/channels'
+import { REAL_SKU_SEED, buildRealSkuMaster } from './realSkuMaster'
 import type {
   AdsRecord,
   CanonicalSalesRecord,
@@ -55,101 +56,95 @@ const CHANNEL_VOLUME_WEIGHT: Record<ChannelId, number> = {
   purplle: 0.15,
 }
 
-const SKU_PROFILES: SkuGenProfile[] = [
+// Generation parameters only — product identity (name/category/brand/cogs/mrp)
+// is looked up from the real catalog (REAL_SKU_SEED) below, so demo sales
+// reference real SKUs rather than inventing parallel ones.
+type RawSkuGenProfile = Omit<SkuGenProfile, 'productName' | 'category' | 'brand' | 'cogs' | 'mrp' | 'asp'>
+
+function seed(sku: string) {
+  const s = REAL_SKU_SEED.find((r) => r.sku === sku)
+  if (!s) throw new Error(`Demo profile references a SKU not in the real catalog: ${sku}`)
+  return s
+}
+
+const RAW_PROFILES: RawSkuGenProfile[] = [
   {
-    sku: 'HC-ROSE-015', productName: 'Rosemary Hair Oil 15ml', category: 'Hair Care', brand: 'HLPL',
-    cogs: 85, mrp: 299, asp: 249, baseDailyUnits: 18, trend: 'growth', monthlyRatePct: 6,
+    sku: 'AO/EO/Rosemary/15', baseDailyUnits: 18, trend: 'growth', monthlyRatePct: 6,
     channels: ['amazon_in_seller', 'flipkart', 'meesho', 'nykaa', 'purplle'],
     leadTimeDays: 21, minimumStock: 500, safetyStock: 300,
   },
   {
-    sku: 'HC-ROSE-030', productName: 'Rosemary Hair Oil 30ml', category: 'Hair Care', brand: 'HLPL',
-    cogs: 140, mrp: 499, asp: 429, baseDailyUnits: 10, trend: 'stable', monthlyRatePct: 0,
+    sku: 'AO/EO/Rosemary/30', baseDailyUnits: 10, trend: 'stable', monthlyRatePct: 0,
     channels: ['amazon_in_seller', 'flipkart', 'nykaa'],
     leadTimeDays: 21, minimumStock: 300, safetyStock: 180,
   },
   {
-    sku: 'HC-ONION-100', productName: 'Onion Hair Oil 100ml', category: 'Hair Care', brand: 'HLPL',
-    cogs: 110, mrp: 399, asp: 339, baseDailyUnits: 15, trend: 'decline', monthlyRatePct: -6,
+    sku: 'AO/Shmp/Rosemary/200', baseDailyUnits: 15, trend: 'decline', monthlyRatePct: -6,
     channels: ['amazon_in_seller', 'flipkart', 'meesho', 'myntra'],
     leadTimeDays: 21, minimumStock: 300, safetyStock: 150,
   },
   {
-    sku: 'HC-ARGAN-030', productName: 'Argan Hair Serum 30ml', category: 'Hair Care', brand: 'HLPL',
-    cogs: 160, mrp: 599, asp: 499, baseDailyUnits: 8, trend: 'stable', monthlyRatePct: 0.5,
+    sku: 'AO/HS/HairGSerum/30', baseDailyUnits: 8, trend: 'stable', monthlyRatePct: 0.5,
     channels: ['amazon_in_seller', 'nykaa', 'purplle'],
     leadTimeDays: 25, minimumStock: 200, safetyStock: 120,
   },
   {
-    sku: 'HC-BIOT-200', productName: 'Biotin Hair Shampoo 200ml', category: 'Hair Care', brand: 'HLPL',
-    cogs: 95, mrp: 349, asp: 299, baseDailyUnits: 12, trend: 'stable', monthlyRatePct: 1,
+    // Stock-out risk role — see STOCK_OUT_RISK_SKU below.
+    sku: 'AO/Condinr/Rosemary/200', baseDailyUnits: 12, trend: 'stable', monthlyRatePct: 1,
     channels: ['amazon_in_seller', 'flipkart', 'meesho'],
     leadTimeDays: 30, minimumStock: 250, safetyStock: 150,
   },
   {
-    sku: 'HC-COND-200', productName: 'Anti-Hairfall Conditioner 200ml', category: 'Hair Care', brand: 'HLPL',
-    cogs: 105, mrp: 399, asp: 339, baseDailyUnits: 9, trend: 'stable', monthlyRatePct: 0,
+    sku: 'AO/BWash/Salicylic/300', baseDailyUnits: 9, trend: 'stable', monthlyRatePct: 0,
     channels: ['amazon_in_seller', 'flipkart', 'myntra'],
     leadTimeDays: 25, minimumStock: 200, safetyStock: 120,
   },
   {
-    sku: 'SC-VITC-030', productName: 'Vitamin C Face Serum 30ml', category: 'Skin Care', brand: 'HLPL',
-    cogs: 130, mrp: 599, asp: 499, baseDailyUnits: 15, trend: 'growth', monthlyRatePct: 8,
+    sku: 'AO/FS/VitaminC/30', baseDailyUnits: 15, trend: 'growth', monthlyRatePct: 8,
     channels: ['amazon_in_seller', 'nykaa', 'purplle', 'myntra', 'amazon_us'],
     leadTimeDays: 21, minimumStock: 400, safetyStock: 250,
   },
   {
-    sku: 'SC-NIAC-030', productName: 'Niacinamide Face Serum 30ml', category: 'Skin Care', brand: 'HLPL',
-    cogs: 120, mrp: 549, asp: 449, baseDailyUnits: 7, trend: 'stable', monthlyRatePct: 0,
+    // Excess-inventory role — see EXCESS_INVENTORY_SKU below.
+    sku: 'AO/BR/Moisturiser/100', baseDailyUnits: 7, trend: 'stable', monthlyRatePct: 0,
     channels: ['amazon_in_seller', 'nykaa'],
     leadTimeDays: 21, minimumStock: 200, safetyStock: 120,
   },
   {
-    sku: 'SC-ALOE-150', productName: 'Aloe Vera Gel 150ml', category: 'Skin Care', brand: 'HLPL',
-    cogs: 70, mrp: 249, asp: 199, baseDailyUnits: 11, trend: 'stable', monthlyRatePct: 1,
+    sku: 'AO/HBR/Cleanser/100', baseDailyUnits: 11, trend: 'stable', monthlyRatePct: 1,
     channels: ['amazon_in_seller', 'flipkart', 'purplle'],
     leadTimeDays: 18, minimumStock: 300, safetyStock: 150,
   },
   {
-    sku: 'WL-MVIT-060', productName: 'Multivitamin Gummies 60ct', category: 'Wellness', brand: 'HLPL',
-    cogs: 150, mrp: 699, asp: 599, baseDailyUnits: 10, trend: 'new', monthlyRatePct: 15,
+    sku: 'NX/Blend/HGS/25', baseDailyUnits: 10, trend: 'new', monthlyRatePct: 15,
     launchMonth: '2026-03',
     channels: ['amazon_in_seller', 'flipkart'],
     leadTimeDays: 35, minimumStock: 250, safetyStock: 150,
   },
   {
-    sku: 'WL-BIOT-060', productName: 'Biotin Tablets 60ct', category: 'Wellness', brand: 'HLPL',
-    cogs: 90, mrp: 399, asp: 349, baseDailyUnits: 9, trend: 'stable', monthlyRatePct: 0.5,
+    sku: 'AO/LBalm/Beet', baseDailyUnits: 9, trend: 'stable', monthlyRatePct: 0.5,
     channels: ['amazon_in_seller', 'flipkart', 'meesho'],
     leadTimeDays: 30, minimumStock: 200, safetyStock: 120,
   },
   {
-    sku: 'PC-HAND-250', productName: 'Herbal Hand Wash 250ml', category: 'Personal Care', brand: 'HLPL',
-    cogs: 55, mrp: 199, asp: 169, baseDailyUnits: 13, trend: 'decline', monthlyRatePct: -3,
+    sku: 'AO/RO/AB/Foot/50', baseDailyUnits: 13, trend: 'decline', monthlyRatePct: -3,
     channels: ['amazon_in_seller', 'flipkart', 'meesho'],
     leadTimeDays: 15, minimumStock: 300, safetyStock: 150,
   },
 ]
 
-// SKUs deliberately positioned for inventory-risk insights.
-const STOCK_OUT_RISK_SKU = 'HC-BIOT-200'
-const EXCESS_INVENTORY_SKU = 'SC-NIAC-030'
+const SKU_PROFILES: SkuGenProfile[] = RAW_PROFILES.map((p) => {
+  const s = seed(p.sku)
+  return { ...p, productName: s.productName, category: s.category, brand: s.brand, cogs: s.cogs, mrp: s.mrp, asp: Math.round(s.mrp * 0.85) }
+})
 
+// SKUs deliberately positioned for inventory-risk insights.
+const STOCK_OUT_RISK_SKU = 'AO/Condinr/Rosemary/200'
+const EXCESS_INVENTORY_SKU = 'AO/BR/Moisturiser/100'
+
+/** The app's Product Master: the full real catalog (all SKUs, not just the ones used for demo sales generation). */
 export function generateSkuMaster(): SkuMaster[] {
-  return SKU_PROFILES.map((p) => ({
-    sku: p.sku,
-    productName: p.productName,
-    category: p.category,
-    brand: p.brand,
-    cogs: p.cogs,
-    mrp: p.mrp,
-    standardSellingPrice: p.asp,
-    launchDate: p.launchMonth ? `${p.launchMonth}-01` : START_DATE_ISO,
-    status: 'active',
-    leadTimeDays: p.leadTimeDays,
-    minimumStock: p.minimumStock,
-    safetyStock: p.safetyStock,
-  }))
+  return buildRealSkuMaster()
 }
 
 function eachDate(startIso: string, endIso: string): string[] {
@@ -257,12 +252,12 @@ interface CampaignProfile {
 }
 
 const CAMPAIGNS: CampaignProfile[] = [
-  { name: 'Rosemary Oil - Exact Match', channel: 'amazon_in_seller', sku: 'HC-ROSE-015', baseDailySpend: 1400, targetRoas: 6.5 },
-  { name: 'Rosemary Oil - Broad', channel: 'amazon_in_seller', sku: 'HC-ROSE-015', baseDailySpend: 900, targetRoas: 3.2 },
-  { name: 'Onion Oil - Auto', channel: 'amazon_in_seller', sku: 'HC-ONION-100', baseDailySpend: 1100, targetRoas: 1.2 },
-  { name: 'Brand Defense', channel: 'amazon_in_seller', sku: 'HC-ROSE-030', baseDailySpend: 300, targetRoas: 11 },
-  { name: 'Vitamin C Serum - Category', channel: 'amazon_in_seller', sku: 'SC-VITC-030', baseDailySpend: 1600, targetRoas: 4.8, deteriorateFromDate: '2026-08-08' },
-  { name: 'Vitamin C Serum - US Launch', channel: 'amazon_us', sku: 'SC-VITC-030', baseDailySpend: 250, targetRoas: 2.5 },
+  { name: 'Rosemary Oil - Exact Match', channel: 'amazon_in_seller', sku: 'AO/EO/Rosemary/15', baseDailySpend: 1400, targetRoas: 6.5 },
+  { name: 'Rosemary Oil - Broad', channel: 'amazon_in_seller', sku: 'AO/EO/Rosemary/15', baseDailySpend: 900, targetRoas: 3.2 },
+  { name: 'Shampoo - Auto', channel: 'amazon_in_seller', sku: 'AO/Shmp/Rosemary/200', baseDailySpend: 1100, targetRoas: 1.2 },
+  { name: 'Brand Defense', channel: 'amazon_in_seller', sku: 'AO/EO/Rosemary/30', baseDailySpend: 300, targetRoas: 11 },
+  { name: 'Vitamin C Serum - Category', channel: 'amazon_in_seller', sku: 'AO/FS/VitaminC/30', baseDailySpend: 1600, targetRoas: 4.8, deteriorateFromDate: '2026-08-08' },
+  { name: 'Vitamin C Serum - US Launch', channel: 'amazon_us', sku: 'AO/FS/VitaminC/30', baseDailySpend: 250, targetRoas: 2.5 },
 ]
 
 export function generateAdsRecords(): AdsRecord[] {

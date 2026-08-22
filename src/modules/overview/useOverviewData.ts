@@ -3,7 +3,8 @@ import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
 import { CHANNELS, CHANNEL_MAP } from '@/config/channels'
 import { addMonths, ytdMonthKeys } from '@/lib/format'
-import { buildAllChannelPnls, buildMasterPnl } from '@/engine/pnl'
+import { buildAllChannelPnlViews } from '@/engine/channelPnlRouter'
+import { buildMasterPnl } from '@/engine/pnl'
 import { marketingFromAds } from '@/engine/marketing'
 import { filterByMonth, groupBySku, growthPct, sumFacts } from '@/engine/sales'
 import { forecastDemand } from '@/engine/forecast'
@@ -18,31 +19,33 @@ import {
 } from '@/engine/insight'
 
 export function useOverviewData() {
-  const { salesRecords, adsRecords, skuMaster, inventorySnapshots, fixedExpenses } = useDataStore()
+  const { salesRecords, adsRecords, skuMaster, inventorySnapshots, fixedExpenses, flipkartFacts, amazonUsaFacts, meeshoFacts } = useDataStore()
   const { month } = useFilterStore()
 
   return useMemo(() => {
     const previousMonth = addMonths(month, -1)
+    const channelIds = CHANNELS.map((c) => c.id)
+    const facts = { flipkartFacts, amazonUsaFacts, meeshoFacts }
 
     const currentMarketing = marketingFromAds(adsRecords, month)
     const previousMarketing = marketingFromAds(adsRecords, previousMonth)
 
-    const currentChannelPnls = buildAllChannelPnls(salesRecords, skuMaster, fixedExpenses, month, currentMarketing)
-    const previousChannelPnls = buildAllChannelPnls(salesRecords, skuMaster, fixedExpenses, previousMonth, previousMarketing)
+    const currentChannelPnls = buildAllChannelPnlViews(channelIds, month, { salesRecords, skuMaster, fixedExpenses, marketing: currentMarketing, facts }).map((v) => v.canonical)
+    const previousChannelPnls = buildAllChannelPnlViews(channelIds, previousMonth, { salesRecords, skuMaster, fixedExpenses, marketing: previousMarketing, facts }).map((v) => v.canonical)
     const masterCurrent = buildMasterPnl(currentChannelPnls, month)
     const masterPrevious = buildMasterPnl(previousChannelPnls, previousMonth)
 
     const ytdMonths = ytdMonthKeys(month)
     const ytdNetSales = ytdMonths.reduce((sum, m) => {
       const marketing = marketingFromAds(adsRecords, m)
-      const pnls = buildAllChannelPnls(salesRecords, skuMaster, fixedExpenses, m, marketing)
-      return sum + (buildMasterPnl(pnls, m).lines.netSales ?? 0)
+      const views = buildAllChannelPnlViews(channelIds, m, { salesRecords, skuMaster, fixedExpenses, marketing, facts })
+      return sum + (buildMasterPnl(views.map((v) => v.canonical), m).lines.netSales ?? 0)
     }, 0)
     const previousYearYtdMonths = ytdMonths.map((m) => addMonths(m, -12))
     const previousYtdNetSales = previousYearYtdMonths.reduce((sum, m) => {
       const marketing = marketingFromAds(adsRecords, m)
-      const pnls = buildAllChannelPnls(salesRecords, skuMaster, fixedExpenses, m, marketing)
-      return sum + (buildMasterPnl(pnls, m).lines.netSales ?? 0)
+      const views = buildAllChannelPnlViews(channelIds, m, { salesRecords, skuMaster, fixedExpenses, marketing, facts })
+      return sum + (buildMasterPnl(views.map((v) => v.canonical), m).lines.netSales ?? 0)
     }, 0)
 
     const currentFacts = sumFacts(filterByMonth(salesRecords, month))
@@ -81,11 +84,13 @@ export function useOverviewData() {
     const fastestGrowingSku = [...skuRows].filter((r) => r.growth !== null && r.prevUnits > 0).sort((a, b) => (b.growth ?? 0) - (a.growth ?? 0))[0]
     const decliningSku = [...skuRows].filter((r) => r.growth !== null && r.prevUnits > 0).sort((a, b) => (a.growth ?? 0) - (b.growth ?? 0))[0]
 
-    // Inventory
-    const inventoryRows = skuMaster.map((s) => {
+    // Inventory — only SKUs with a known stock position; no snapshot means
+    // unknown coverage, not "excess".
+    const inventoryRows = skuMaster.flatMap((s) => {
       const snapshot = inventorySnapshots.find((i) => i.sku === s.sku)
+      if (!snapshot) return []
       const trailingDaily = salesRecords
-        .filter((r) => r.sku === s.sku && r.orderDate <= (snapshot?.asOfDate ?? month))
+        .filter((r) => r.sku === s.sku && r.orderDate <= snapshot.asOfDate)
         .slice(-90)
       const series = Object.entries(
         trailingDaily.reduce<Record<string, number>>((acc, r) => {
@@ -94,8 +99,8 @@ export function useOverviewData() {
         }, {}),
       ).map(([date, units]) => ({ date, units }))
       const forecast = forecastDemand(series)
-      const coverageDays = forecast.avgDailyUnits > 0 ? (snapshot?.currentStock ?? 0) / forecast.avgDailyUnits : Infinity
-      return { sku: s.sku, productName: s.productName, coverageDays, currentStock: snapshot?.currentStock ?? 0, cogs: s.cogs }
+      const coverageDays = forecast.avgDailyUnits > 0 ? snapshot.currentStock / forecast.avgDailyUnits : Infinity
+      return [{ sku: s.sku, productName: s.productName, coverageDays, currentStock: snapshot.currentStock, cogs: s.cogs }]
     })
     const stockOutRiskSkus = inventoryRows.filter((r) => r.coverageDays <= INVENTORY_THRESHOLDS.buyNowCoverageDays)
     const excessInventorySkus = inventoryRows.filter((r) => r.coverageDays >= INVENTORY_THRESHOLDS.excessInventoryCoverageDays)
@@ -157,5 +162,5 @@ export function useOverviewData() {
       avgCoverageDays,
       insights,
     }
-  }, [salesRecords, adsRecords, skuMaster, inventorySnapshots, fixedExpenses, month])
+  }, [salesRecords, adsRecords, skuMaster, inventorySnapshots, fixedExpenses, flipkartFacts, amazonUsaFacts, meeshoFacts, month])
 }

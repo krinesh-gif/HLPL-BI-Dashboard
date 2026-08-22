@@ -24,9 +24,12 @@ export function useInventoryPlan(): InventoryPlanRow[] {
   const { skuMaster, salesRecords, inventorySnapshots } = useDataStore()
 
   return useMemo(() => {
-    return skuMaster.map((sku) => {
+    // Only plan for SKUs with a known stock position — a SKU with no
+    // inventory feed at all has genuinely unknown coverage, not "excess".
+    return skuMaster.flatMap((sku): InventoryPlanRow[] => {
       const snapshot = inventorySnapshots.find((i) => i.sku === sku.sku)
-      const asOfDate = snapshot?.asOfDate ?? new Date().toISOString().slice(0, 10)
+      if (!snapshot) return []
+      const asOfDate = snapshot.asOfDate
 
       const byDay = new Map<string, number>()
       for (const r of salesRecords) {
@@ -40,7 +43,7 @@ export function useInventoryPlan(): InventoryPlanRow[] {
       const forecast = forecastDemand(series)
       const recommendation = computeInventoryRecommendation(
         {
-          currentStock: snapshot?.currentStock ?? 0,
+          currentStock: snapshot.currentStock,
           avgDailyUnits: forecast.avgDailyUnits,
           forecastM1: forecast.forecastM1,
           leadTimeDays: sku.leadTimeDays,
@@ -49,10 +52,10 @@ export function useInventoryPlan(): InventoryPlanRow[] {
         asOfDate,
       )
 
-      return {
+      return [{
         sku: sku.sku,
         productName: sku.productName,
-        currentStock: snapshot?.currentStock ?? 0,
+        currentStock: snapshot.currentStock,
         avgMonthlySales: forecast.avgDailyUnits * 30,
         forecastM1: forecast.forecastM1,
         forecastM2: forecast.forecastM2,
@@ -65,7 +68,7 @@ export function useInventoryPlan(): InventoryPlanRow[] {
         riskStatus: recommendation.riskStatus,
         methodology: forecast.methodology,
         cogs: sku.cogs,
-      }
+      }]
     })
   }, [skuMaster, salesRecords, inventorySnapshots])
 }

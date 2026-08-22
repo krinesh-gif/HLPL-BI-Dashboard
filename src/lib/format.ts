@@ -24,7 +24,8 @@ export function formatCurrencyFull(value: number, currency: 'INR' | 'USD' = 'INR
   if (!Number.isFinite(value)) return '—'
   const locale = currency === 'INR' ? 'en-IN' : 'en-US'
   const symbol = currency === 'INR' ? '₹' : '$'
-  return `${symbol}${Math.round(value).toLocaleString(locale)}`
+  const rounded = Math.round(value) || 0 // normalize -0 to 0
+  return `${symbol}${rounded.toLocaleString(locale)}`
 }
 
 export function formatPercent(value: number, decimals = 1): string {

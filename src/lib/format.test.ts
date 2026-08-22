@@ -25,6 +25,11 @@ describe('formatCurrencyFull', () => {
   it('uses Indian digit grouping', () => {
     expect(formatCurrencyFull(1245000)).toBe('₹12,45,000')
   })
+
+  it('normalizes negative zero to a plain zero', () => {
+    expect(formatCurrencyFull(-0)).toBe('₹0')
+    expect(formatCurrencyFull(0 - 0.4)).toBe('₹0')
+  })
 })
 
 describe('formatPercent', () => {

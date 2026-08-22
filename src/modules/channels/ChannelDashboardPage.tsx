@@ -6,6 +6,7 @@ import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { ComparisonBarChart } from '@/components/charts/ComparisonBarChart'
 import { MixDonutChart } from '@/components/charts/MixDonutChart'
 import { PnlTable } from '@/components/pnl/PnlTable'
+import { NativePnlTable } from '@/components/pnl/NativePnlTable'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
 import { formatCurrencyCompact, formatNumber, formatPercent } from '@/lib/format'
@@ -65,8 +66,14 @@ export function ChannelDashboardPage() {
       </div>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Channel P&L</h2>
-        <PnlTable lines={d.pnl.lines} currency={channelDef.currency} />
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+          Channel P&L {d.native && '— native structure (real data)'}
+        </h2>
+        {d.native ? (
+          <NativePnlTable lineDefs={d.native.lineDefs} values={d.native.values} currency={d.native.currency} />
+        ) : (
+          <PnlTable lines={d.pnl.lines} currency={channelDef.currency} />
+        )}
       </section>
     </PageShell>
   )

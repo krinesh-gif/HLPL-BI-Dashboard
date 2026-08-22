@@ -3,14 +3,14 @@ import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
 import type { ChannelId } from '@/config/channels'
 import { addMonths, monthLabel } from '@/lib/format'
-import { buildChannelPnl } from '@/engine/pnl'
+import { buildChannelPnlView } from '@/engine/channelPnlRouter'
 import { marketingFromAds } from '@/engine/marketing'
 import { filterByChannel, filterByMonth, groupBySku, growthPct, sumFacts } from '@/engine/sales'
 
 const TREND_MONTHS = 6
 
 export function useChannelData(channel: ChannelId) {
-  const { salesRecords, adsRecords, skuMaster, fixedExpenses } = useDataStore()
+  const { salesRecords, adsRecords, skuMaster, fixedExpenses, flipkartFacts, amazonUsaFacts, meeshoFacts } = useDataStore()
   const { month } = useFilterStore()
 
   return useMemo(() => {
@@ -23,7 +23,10 @@ export function useChannelData(channel: ChannelId) {
     const previousFacts = sumFacts(previousRecords)
 
     const marketing = marketingFromAds(adsRecords, month)
-    const pnl = buildChannelPnl(salesRecords, skuMaster, fixedExpenses, channel, month, marketing)
+    const pnlView = buildChannelPnlView(channel, month, {
+      salesRecords, skuMaster, fixedExpenses, marketing,
+      facts: { flipkartFacts, amazonUsaFacts, meeshoFacts },
+    })
 
     const trend = Array.from({ length: TREND_MONTHS }).map((_, i) => {
       const m = addMonths(month, i - (TREND_MONTHS - 1))
@@ -53,11 +56,12 @@ export function useChannelData(channel: ChannelId) {
       asp: currentFacts.quantity > 0 ? currentFacts.grossSales / currentFacts.quantity : 0,
       rtoRate: currentFacts.quantity > 0 ? (currentFacts.rtoUnits / currentFacts.quantity) * 100 : 0,
       returnRate: currentFacts.quantity > 0 ? (currentFacts.returnUnits / currentFacts.quantity) * 100 : 0,
-      pnl,
+      pnl: pnlView.canonical,
+      native: pnlView.native,
       trend,
       categorySales,
       topSkus,
       bottomSkus,
     }
-  }, [salesRecords, adsRecords, skuMaster, fixedExpenses, channel, month])
+  }, [salesRecords, adsRecords, skuMaster, fixedExpenses, flipkartFacts, amazonUsaFacts, meeshoFacts, channel, month])
 }

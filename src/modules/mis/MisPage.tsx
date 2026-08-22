@@ -2,24 +2,29 @@ import { useMemo } from 'react'
 import { PageShell } from '@/components/layout/PageShell'
 import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
-import { buildAllChannelPnls, buildMasterPnl } from '@/engine/pnl'
+import { CHANNELS } from '@/config/channels'
+import { buildAllChannelPnlViews } from '@/engine/channelPnlRouter'
+import { buildMasterPnl } from '@/engine/pnl'
 import { marketingFromAds } from '@/engine/marketing'
 import { buildMisRows } from '@/engine/mis'
 import { formatCurrencyFull, formatPercent, monthLabel } from '@/lib/format'
 import clsx from 'clsx'
 
 export function MisPage() {
-  const { salesRecords, adsRecords, skuMaster, fixedExpenses } = useDataStore()
+  const { salesRecords, adsRecords, skuMaster, fixedExpenses, flipkartFacts, amazonUsaFacts, meeshoFacts } = useDataStore()
   const { month } = useFilterStore()
 
   const rows = useMemo(() => {
     const getLinesForMonth = (m: string) => {
       const marketing = marketingFromAds(adsRecords, m)
-      const pnls = buildAllChannelPnls(salesRecords, skuMaster, fixedExpenses, m, marketing)
-      return buildMasterPnl(pnls, m).lines
+      const views = buildAllChannelPnlViews(CHANNELS.map((c) => c.id), m, {
+        salesRecords, skuMaster, fixedExpenses, marketing,
+        facts: { flipkartFacts, amazonUsaFacts, meeshoFacts },
+      })
+      return buildMasterPnl(views.map((v) => v.canonical), m).lines
     }
     return buildMisRows(month, getLinesForMonth)
-  }, [salesRecords, adsRecords, skuMaster, fixedExpenses, month])
+  }, [salesRecords, adsRecords, skuMaster, fixedExpenses, flipkartFacts, amazonUsaFacts, meeshoFacts, month])
 
   return (
     <PageShell title="Investor MIS" subtitle={`Management-level reporting for ${monthLabel(month)}`}>
