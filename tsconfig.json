@@ -1,8 +1,27 @@
 {
+  // Solution-style config: `tsc -b` type-checks the three projects below.
+  //
+  // The compilerOptions here are not used by those projects (each has its own)
+  // — they exist because Vercel's function builder reads THIS file when it
+  // compiles api/*.ts. Left as `files: []` with no options, it has nothing
+  // sensible to compile the functions with.
   "files": [],
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" },
     { "path": "./tsconfig.api.json" }
-  ]
+  ],
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true
+  }
 }
