@@ -1,8 +1,14 @@
-import type { CanonicalSalesRecord } from '@/data/models'
+import type { AdsRecord, CanonicalSalesRecord } from '@/data/models'
 
 /** Channel + Order ID + SKU + Order Date uniquely identifies a sales line. */
 export function recordKey(r: Pick<CanonicalSalesRecord, 'channel' | 'orderId' | 'sku' | 'orderDate'>): string {
   return `${r.channel}|${r.orderId}|${r.sku}|${r.orderDate}`
+}
+
+/** Channel + Campaign + Date + SKU uniquely identifies one ads report row
+ * (a campaign report has one row per campaign/SKU per reporting day). */
+export function adsRecordKey(r: Pick<AdsRecord, 'channel' | 'campaign' | 'date' | 'sku'>): string {
+  return `${r.channel}|${r.campaign}|${r.date}|${r.sku ?? ''}`
 }
 
 export interface DuplicateCheckResult {
