@@ -23,7 +23,7 @@ export function usePnlInputs(): {
   const {
     salesRecords, adsRecords, skuMaster, fixedExpenses,
     flipkartFacts, amazonUsaFacts, meeshoFacts,
-    costVersions, mappings, comboComponents,
+    costVersions, mappings, comboComponents, manualAdSpend,
   } = useDataStore()
 
   return useMemo(() => {
@@ -43,11 +43,11 @@ export function usePnlInputs(): {
 
     return {
       inputs,
-      forMonth: (month: string) => ({ ...inputs, marketing: marketingFromAds(adsRecords, month) }),
+      forMonth: (month: string) => ({ ...inputs, marketing: marketingFromAds(adsRecords, month, manualAdSpend) }),
     }
   }, [
     salesRecords, adsRecords, skuMaster, fixedExpenses,
     flipkartFacts, amazonUsaFacts, meeshoFacts,
-    costVersions, mappings, comboComponents,
+    costVersions, mappings, comboComponents, manualAdSpend,
   ])
 }

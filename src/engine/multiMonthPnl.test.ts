@@ -38,30 +38,30 @@ describe('the Total column', () => {
     // months is (1,100,000 - 590,000) / 1,100,000 = 46.4%. Averaging would
     // overweight a month a tenth the size of the other.
     const margin = row(built, 'grossMarginPct')
-    expect(margin.values[0]).toBeCloseTo(50, 5)
-    expect(margin.values[1]).toBeCloseTo(10, 5)
-    expect(margin.total).toBeCloseTo(46.36, 2)
-    expect(margin.total).not.toBeCloseTo(30, 1)
+    expect(margin.values[0]!).toBeCloseTo(50, 5)
+    expect(margin.values[1]!).toBeCloseTo(10, 5)
+    expect(margin.total!).toBeCloseTo(46.36, 2)
+    expect(margin.total!).not.toBeCloseTo(30, 1)
   })
 
   it('does the same for contribution and EBITDA margins', () => {
     const totals = built.totals
-    expect(row(built, 'contributionMarginPct').total).toBeCloseTo(
+    expect(row(built, 'contributionMarginPct').total!).toBeCloseTo(
       ((totals.contributionProfit ?? 0) / (totals.netSales ?? 1)) * 100, 5)
-    expect(row(built, 'ebitdaMarginPct').total).toBeCloseTo(
+    expect(row(built, 'ebitdaMarginPct').total!).toBeCloseTo(
       ((totals.ebitda ?? 0) / (totals.netSales ?? 1)) * 100, 5)
   })
 
   it('keeps the profit identity intact across the period', () => {
-    expect(row(built, 'grossProfit').total).toBeCloseTo(
-      row(built, 'netSales').total - row(built, 'cogs').total, 5)
+    expect(row(built, 'grossProfit').total!).toBeCloseTo(
+      row(built, 'netSales').total! - row(built, 'cogs').total!, 5)
   })
 
   it('derives the Total by the same arithmetic as each month', () => {
     // A one-month table's Total must equal that month exactly, or the two are
     // being computed differently.
     const single = buildMultiMonthPnl(['2026-07'], linesFor, computeSubtotals)
-    for (const r of single.rows) expect(r.total).toBeCloseTo(r.values[0], 6)
+    for (const r of single.rows) expect(r.total).toBeCloseTo(r.values[0]!, 6)
   })
 })
 
@@ -140,7 +140,7 @@ describe('comparing two months', () => {
     // 50% to 10% is a fall of 40 percentage points. Calling it "-80% growth"
     // would be a different and much more confusing statement.
     const margin = find('grossMarginPct')
-    expect(margin.change).toBeCloseTo(-40, 5)
+    expect(margin.change!).toBeCloseTo(-40, 5)
     expect(margin.growthPct).toBeNull()
   })
 })

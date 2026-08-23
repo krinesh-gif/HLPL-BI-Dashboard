@@ -66,6 +66,22 @@ BEGIN
   CREATE INDEX IF NOT EXISTS cost_versions_sku_idx ON cost_versions (sku, effective_from DESC);
 
   -- ---------------------------------------------------------------------------
+  -- Advertising spend entered by hand, for platforms that bill by monthly
+  -- invoice rather than publishing a campaign report. Kept apart from
+  -- ads_records so a manual figure can never be mistaken for a measured one.
+  -- ---------------------------------------------------------------------------
+  CREATE TABLE IF NOT EXISTS manual_ad_spend (
+    channel     TEXT NOT NULL,
+    month       TEXT NOT NULL,
+    amount      DOUBLE PRECISION NOT NULL,
+    file_name   TEXT,
+    note        TEXT,
+    entered_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    entered_by  TEXT,
+    PRIMARY KEY (channel, month)
+  );
+
+  -- ---------------------------------------------------------------------------
   -- Import audit trail. uploaded_by is recorded from the first upload onwards so
   -- history stays attributable.
   -- ---------------------------------------------------------------------------

@@ -27,10 +27,10 @@ export function PnlPage() {
       `HLPL_PnL_${r.view}_${r.months[0]}_to_${r.months[r.months.length - 1]}`,
       r.table.rows.map((row) => {
         const out: Record<string, string | number> = { Particular: row.def.label }
-        r.months.forEach((m, i) => {
-          out[monthLabel(m)] = row.def.kind === 'percent' ? Number(row.values[i].toFixed(2)) : Math.round(row.values[i])
-        })
-        out.Total = row.def.kind === 'percent' ? Number(row.total.toFixed(2)) : Math.round(row.total)
+        const cell = (v: number | null) =>
+          v === null ? '' : row.def.kind === 'percent' ? Number(v.toFixed(2)) : Math.round(v)
+        r.months.forEach((m, i) => { out[monthLabel(m)] = cell(row.values[i]) })
+        out.Total = cell(row.total)
         return out
       }),
     )
@@ -131,7 +131,10 @@ export function PnlPage() {
             {r.table.rows.map((row) => {
               const isSubtotal = row.def.kind === 'subtotal'
               const isPercent = row.def.kind === 'percent'
-              const format = (v: number) => (isPercent ? formatPercent(v) : formatCurrencyFull(v))
+              // An undefined figure and a zero are different answers; a margin
+              // in a month with no revenue is unmeasurable, not 0%.
+              const format = (v: number | null) =>
+                v === null ? '—' : isPercent ? formatPercent(v) : formatCurrencyFull(v)
 
               return (
                 <tr
@@ -149,7 +152,7 @@ export function PnlPage() {
                     <td
                       key={r.months[i]}
                       className={`px-4 py-2 text-right tabular-nums ${
-                        isPercent && v < 0 ? 'text-rose-600' : isSubtotal && v < 0 ? 'text-rose-600' : ''
+                        v !== null && v < 0 ? 'text-rose-600' : ''
                       }`}
                     >
                       {v === 0 && !isPercent ? '—' : format(v)}
@@ -157,7 +160,7 @@ export function PnlPage() {
                   ))}
                   <td
                     className={`border-l-2 border-slate-300 bg-slate-50 px-4 py-2 text-right font-semibold tabular-nums ${
-                      row.total < 0 ? 'text-rose-600' : 'text-slate-900'
+                      row.total !== null && row.total < 0 ? 'text-rose-600' : 'text-slate-900'
                     }`}
                   >
                     {row.total === 0 && !isPercent ? '—' : format(row.total)}
@@ -234,15 +237,16 @@ export function PnlPage() {
                   .filter((row) => row.def.kind !== 'input' || row.def.key === 'grossSales')
                   .map((row) => {
                     const pct = row.def.kind === 'percent'
-                    const fmt = (v: number) => (pct ? formatPercent(v) : formatCurrencyFull(v))
+                    const fmt = (v: number | null) => (v === null ? '—' : pct ? formatPercent(v) : formatCurrencyFull(v))
                     return (
                       <tr key={row.def.key} className="border-b border-slate-100 last:border-0">
                         <td className="py-1.5 text-slate-700">{row.def.label}</td>
                         <td className="py-1.5 text-right tabular-nums text-slate-500">{fmt(row.earlier)}</td>
                         <td className="py-1.5 text-right tabular-nums font-medium text-slate-900">{fmt(row.later)}</td>
-                        <td className={`py-1.5 text-right tabular-nums ${row.change >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                          {row.change >= 0 ? '+' : ''}
-                          {pct ? `${row.change.toFixed(1)} pp` : formatCurrencyFull(row.change)}
+                        <td className={`py-1.5 text-right tabular-nums ${row.change === null ? 'text-slate-400' : row.change >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {row.change === null
+                            ? '—'
+                            : `${row.change >= 0 ? '+' : ''}${pct ? `${row.change.toFixed(1)} pp` : formatCurrencyFull(row.change)}`}
                         </td>
                         <td className={`py-1.5 text-right tabular-nums ${row.growthPct === null ? 'text-slate-400' : row.growthPct >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                           {row.growthPct === null ? '—' : `${row.growthPct >= 0 ? '+' : ''}${formatPercent(row.growthPct)}`}

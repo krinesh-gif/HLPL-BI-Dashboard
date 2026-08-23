@@ -23,7 +23,7 @@ export async function GET(request: Request): Promise<Response> {
   const auth = await requireSession(request)
   if (auth.response) return auth.response
 
-  const [skuRows, salesRows, adsRows, importRows, inventoryRows, expenseRows, flipkart, amazonUsa, meesho] =
+  const [skuRows, salesRows, adsRows, importRows, inventoryRows, expenseRows, flipkart, amazonUsa, meesho, manualAds] =
     await Promise.all([
       sql`SELECT * FROM sku_master ORDER BY sku`,
       sql`SELECT * FROM sales_records ORDER BY order_date`,
@@ -34,6 +34,7 @@ export async function GET(request: Request): Promise<Response> {
       sql`SELECT data FROM flipkart_facts ORDER BY month`,
       sql`SELECT data FROM amazon_usa_facts ORDER BY month`,
       sql`SELECT data FROM meesho_facts ORDER BY month`,
+      sql`SELECT channel, month, amount, file_name, note, entered_at FROM manual_ad_spend ORDER BY month`,
     ])
 
   const salesRecords = (salesRows as Row[]).map(toSalesRecord)
@@ -51,6 +52,14 @@ export async function GET(request: Request): Promise<Response> {
     flipkartFacts: (flipkart as Row[]).map((r) => r.data),
     amazonUsaFacts: (amazonUsa as Row[]).map((r) => r.data),
     meeshoFacts: (meesho as Row[]).map((r) => r.data),
+    manualAdSpend: (manualAds as Row[]).map((r) => ({
+      channel: String(r.channel),
+      month: String(r.month),
+      amount: Number(r.amount),
+      fileName: r.file_name ? String(r.file_name) : undefined,
+      note: r.note ? String(r.note) : undefined,
+      enteredAt: r.entered_at ? new Date(String(r.entered_at)).toISOString() : new Date().toISOString(),
+    })),
   })
 }
 

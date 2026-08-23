@@ -1,3 +1,4 @@
+import type { AdsChannelId } from '@/config/adsChannels'
 import type { BusinessChannelId, ChannelId } from '@/config/channels'
 import type { PnlLineKey } from '@/config/pnlStructure'
 
@@ -68,6 +69,26 @@ export interface AdsRecord {
   adSales: number
   adOrders: number
   importId: string
+}
+
+/**
+ * A month's advertising spend entered by hand rather than uploaded.
+ *
+ * Some platforms bill through a monthly invoice instead of publishing a
+ * campaign report — Nykaa's marketing-investment value is the case here. The
+ * figure is real money and belongs in the P&L, but it carries no impressions,
+ * clicks or attributed sales, so it is stored separately from report data and
+ * labelled wherever it is shown.
+ */
+export interface ManualAdSpend {
+  channel: AdsChannelId
+  month: string // yyyy-mm
+  amount: number
+  /** Name of the invoice the figure came from, when one was attached. */
+  fileName?: string
+  note?: string
+  enteredAt: string
+  enteredBy?: string
 }
 
 // ---------------------------------------------------------------------------

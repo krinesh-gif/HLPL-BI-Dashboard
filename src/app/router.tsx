@@ -8,7 +8,8 @@ import { NetSalesReconciliationPage } from '@/modules/pnl/NetSalesReconciliation
 import { CostSheetPage } from '@/modules/products/CostSheetPage'
 import { InsightPage } from '@/modules/insight/InsightPage'
 import { ChannelDashboardPage } from '@/modules/channels/ChannelDashboardPage'
-import { AmazonAdsPage } from '@/modules/marketing/AmazonAdsPage'
+import { AdsOverviewPage } from '@/modules/marketing/AdsOverviewPage'
+import { AdsChannelPage } from '@/modules/marketing/AdsChannelPage'
 import { SkuAnalyticsPage } from '@/modules/products/SkuAnalyticsPage'
 import { ProductMasterPage } from '@/modules/products/ProductMasterPage'
 import { SkuMappingPage } from '@/modules/products/SkuMappingPage'
@@ -37,7 +38,8 @@ export const router = createHashRouter([
       { path: 'pnl/reconciliation', element: <NetSalesReconciliationPage /> },
       { path: 'insight', element: <InsightPage /> },
       { path: 'channels/:channelId', element: <ChannelDashboardPage /> },
-      { path: 'marketing/amazon-ads', element: <AmazonAdsPage /> },
+      { path: 'marketing/ads', element: <AdsOverviewPage /> },
+      { path: 'marketing/ads/:adsChannelId', element: <AdsChannelPage /> },
       { path: 'products/sku-analytics', element: <SkuAnalyticsPage /> },
       { path: 'products/master', element: <ProductMasterPage /> },
       { path: 'products/sku-mapping', element: <SkuMappingPage /> },

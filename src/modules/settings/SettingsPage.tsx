@@ -1,6 +1,7 @@
 import { PageShell } from '@/components/layout/PageShell'
 import { INSIGHT_THRESHOLDS, ADS_ACTION_THRESHOLDS, FORECAST_ASSUMPTIONS, INVENTORY_THRESHOLDS, FISCAL_YEAR } from '@/config/thresholds'
-import { DEFAULT_ALLOCATION_WEIGHTS, CHANNEL_MAP } from '@/config/channels'
+import { channelLabel, DEFAULT_ALLOCATION_WEIGHTS, SOURCE_MAP, channelOfSource } from '@/config/channels'
+import type { BusinessChannelId, SalesSourceId } from '@/config/channels'
 import { DEFAULT_CHANNEL_FEE_RATES } from '@/config/marketplaceFees'
 
 function ConfigTable({ title, rows }: { title: string; rows: { key: string; value: string }[] }) {
@@ -50,7 +51,10 @@ export function SettingsPage() {
         <ConfigTable title="Fiscal Year" rows={[{ key: 'startMonth (0-indexed)', value: String(FISCAL_YEAR.startMonth) }]} />
         <ConfigTable
           title="Default Fixed-Expense Allocation Weights"
-          rows={Object.entries(DEFAULT_ALLOCATION_WEIGHTS).map(([k, v]) => ({ key: CHANNEL_MAP[k as keyof typeof CHANNEL_MAP].label, value: `${(v * 100).toFixed(0)}%` }))}
+          rows={Object.entries(DEFAULT_ALLOCATION_WEIGHTS).map(([k, v]) => ({
+            key: channelLabel(k as BusinessChannelId),
+            value: `${(v * 100).toFixed(0)}%`,
+          }))}
         />
       </div>
 
@@ -72,7 +76,14 @@ export function SettingsPage() {
             <tbody>
               {Object.entries(DEFAULT_CHANNEL_FEE_RATES).map(([channel, rates]) => (
                 <tr key={channel} className="border-t border-slate-100">
-                  <td className="py-1.5 pr-4 text-slate-700">{CHANNEL_MAP[channel as keyof typeof CHANNEL_MAP].label}</td>
+                  <td className="py-1.5 pr-4 text-slate-700">
+                    {(() => {
+                      const source = channel as SalesSourceId
+                      const owner = channelLabel(channelOfSource(source))
+                      const name = SOURCE_MAP[source]?.label ?? source
+                      return name === owner ? owner : `${owner} — ${name}`
+                    })()}
+                  </td>
                   <td className="py-1.5 pr-4 text-right tabular-nums">{rates.commissionPct}</td>
                   <td className="py-1.5 pr-4 text-right tabular-nums">{rates.fulfilmentPct}</td>
                   <td className="py-1.5 pr-4 text-right tabular-nums">{rates.shippingPct}</td>

@@ -13,6 +13,7 @@ import type {
   FlipkartPnlFacts,
   ImportRecord,
   InventorySnapshot,
+  ManualAdSpend,
   MeeshoPnlFacts,
   SkuMaster,
 } from '@/data/models'
@@ -30,6 +31,8 @@ interface SharedDataset {
   flipkartFacts: FlipkartPnlFacts[]
   amazonUsaFacts: AmazonUsaPnlFacts[]
   meeshoFacts: MeeshoPnlFacts[]
+  /** Advertising spend typed in by hand, for platforms that bill by invoice. */
+  manualAdSpend: ManualAdSpend[]
 }
 
 const EMPTY_DATASET: SharedDataset = {
@@ -43,6 +46,7 @@ const EMPTY_DATASET: SharedDataset = {
   flipkartFacts: [],
   amazonUsaFacts: [],
   meeshoFacts: [],
+  manualAdSpend: [],
 }
 
 const EMPTY_MAPPINGS: MappingTablesState = { mappings: [], comboComponents: [], costVersions: [] }
@@ -115,6 +119,9 @@ interface DataState extends SharedDataset, MappingTablesState {
    * months these versions name are affected. */
   saveCostVersions: (versions: CostVersion[]) => Promise<void>
   removeCostVersion: (sku: string, effectiveFrom: string) => Promise<void>
+  /** Records a month's ad spend for a channel that has no report to upload. */
+  saveManualAdSpend: (entry: Omit<ManualAdSpend, 'enteredAt'>) => Promise<void>
+  removeManualAdSpend: (channel: string, month: string) => Promise<void>
   /** Imports the company's SKU-map workbook: costs, channel-code mappings and
    * combo recipes in one go. */
   importSkuMapWorkbook: (fileName: string, parsed: SkuMapWorkbookResult) => Promise<ImportOutcome>
@@ -267,6 +274,13 @@ export const useDataStore = create<DataState>((set, get) => {
         }
       })
     },
+
+    saveManualAdSpend: (entry) => writeThen(() => api.post('/api/ads/import', { manualSpend: entry })),
+
+    removeManualAdSpend: (channel, month) =>
+      writeThen(() =>
+        api.delete(`/api/ads/import?channel=${encodeURIComponent(channel)}&month=${encodeURIComponent(month)}`),
+      ),
 
     removeCostVersion: (sku, effectiveFrom) =>
       writeThen(() =>

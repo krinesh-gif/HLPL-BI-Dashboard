@@ -19,13 +19,18 @@ export interface PnlRowDef {
   key: string
   label: string
   kind: PnlRowKind
-  /** Reads the row's value out of one month's computed P&L lines. */
-  value: (lines: PnlLineValues) => number
+  /**
+   * Reads the row's value out of one month's computed P&L lines. Null where
+   * the figure is undefined rather than zero — a margin in a month with no
+   * revenue is not 0%, it is unmeasurable, and printing 0.0% there reads as a
+   * month that made no money on everything it sold.
+   */
+  value: (lines: PnlLineValues) => number | null
   /**
    * How the Total column is produced. Money sums; a percentage is recomputed
    * from the totals of its numerator and denominator.
    */
-  total: (totals: PnlLineValues) => number
+  total: (totals: PnlLineValues) => number | null
   /** Shown indented under the subtotal it feeds. */
   indent?: boolean
 }
@@ -43,9 +48,9 @@ const FIXED_EXPENSE_KEYS: (keyof PnlLineValues)[] = [
 
 /** A margin over Net Sales, computed from whatever totals it is handed — so
  * the same function serves a single month and the Total column. */
-const marginOf = (profit: (l: PnlLineValues) => number) => (l: PnlLineValues) => {
+const marginOf = (profit: (l: PnlLineValues) => number) => (l: PnlLineValues): number | null => {
   const net = l.netSales ?? 0
-  return net !== 0 ? (profit(l) / net) * 100 : 0
+  return net !== 0 ? (profit(l) / net) * 100 : null
 }
 
 const grossProfit = (l: PnlLineValues) => l.grossProfit ?? 0
@@ -83,9 +88,9 @@ const ADDITIVE_KEYS: (keyof PnlLineValues)[] = [
 
 export interface MultiMonthPnlRow {
   def: PnlRowDef
-  /** Value per month, in the same order as `months`. */
-  values: number[]
-  total: number
+  /** Value per month, in the same order as `months`. Null means undefined. */
+  values: (number | null)[]
+  total: number | null
 }
 
 export interface MultiMonthPnl {
@@ -199,11 +204,12 @@ export function periodLabel(months: string[]): string {
 
 export interface PnlComparisonRow {
   def: PnlRowDef
-  earlier: number
-  later: number
+  earlier: number | null
+  later: number | null
   /** Rupee change for money rows; percentage-POINT change for percentage rows,
-   * which is a different quantity and must not be presented as growth. */
-  change: number
+   * which is a different quantity and must not be presented as growth. Null
+   * when either month's figure is undefined. */
+  change: number | null
   /** Growth %, for money rows only. Null for percentage rows, where growth in
    * a percentage is rarely the question being asked. */
   growthPct: number | null
@@ -220,13 +226,16 @@ export function comparePnlMonths(
   return PNL_ROWS.map((def) => {
     const earlier = def.value(earlierLines)
     const later = def.value(laterLines)
+    const comparable = earlier !== null && later !== null
     return {
       def,
       earlier,
       later,
-      change: later - earlier,
+      change: comparable ? later - earlier : null,
       growthPct:
-        def.kind === 'percent' || earlier === 0 ? null : ((later - earlier) / Math.abs(earlier)) * 100,
+        !comparable || def.kind === 'percent' || earlier === 0
+          ? null
+          : ((later - earlier) / Math.abs(earlier)) * 100,
     }
   })
 }

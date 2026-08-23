@@ -3,10 +3,38 @@ import { sql } from '../_lib/db.js'
 import { requireSession } from '../_lib/auth.js'
 import { isNonEmptyString, json, readJson } from '../_lib/http.js'
 import { adsRecordKey } from '../../src/data/normalize/dedupKeys.js'
-import type { AdsRecord } from '../../src/data/models.js'
+import type { AdsRecord, ManualAdSpend } from '../../src/data/models.js'
 
+/**
+ * Advertising writes.
+ *
+ * `records` imports an uploaded campaign report. `manualSpend` saves a month's
+ * figure typed in by hand, for a platform that bills by invoice instead of
+ * publishing a report.
+ *
+ * Both live on this one route because Vercel creates a function per file and
+ * the plan caps how many a deployment may have — see
+ * tests/api/functionBudget.test.ts. They are the same resource anyway: what a
+ * channel spent on advertising.
+ */
 interface Body {
   records?: unknown
+  manualSpend?: unknown
+}
+
+const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/
+
+function isManualSpend(v: unknown): v is ManualAdSpend {
+  if (!v || typeof v !== 'object') return false
+  const m = v as ManualAdSpend
+  return (
+    isNonEmptyString(m.channel) &&
+    isNonEmptyString(m.month) &&
+    MONTH_PATTERN.test(m.month) &&
+    typeof m.amount === 'number' &&
+    Number.isFinite(m.amount) &&
+    m.amount >= 0
+  )
 }
 
 const CHUNK_SIZE = 500
@@ -20,8 +48,33 @@ export async function POST(request: Request): Promise<Response> {
   if (auth.response) return auth.response
 
   const body = await readJson<Body>(request)
+
+  if (body && body.manualSpend !== undefined) {
+    if (!isManualSpend(body.manualSpend)) {
+      return json(
+        { error: 'Expected { manualSpend: { channel, month: "yyyy-mm", amount: number >= 0 } }.' },
+        400,
+      )
+    }
+    const m = body.manualSpend
+    // Re-entering a month corrects it rather than adding a second figure,
+    // which would double-count that month's spend.
+    await sql.query(
+      `INSERT INTO manual_ad_spend (channel, month, amount, file_name, note, entered_by, entered_at)
+       VALUES ($1, $2, $3, $4, $5, $6, now())
+       ON CONFLICT (channel, month) DO UPDATE SET
+         amount     = EXCLUDED.amount,
+         file_name  = EXCLUDED.file_name,
+         note       = EXCLUDED.note,
+         entered_by = EXCLUDED.entered_by,
+         entered_at = now()`,
+      [m.channel, m.month, m.amount, m.fileName ?? null, m.note ?? null, auth.user.id],
+    )
+    return json({ saved: 1 })
+  }
+
   if (!body || !isAdsRecordArray(body.records)) {
-    return json({ error: 'Expected { records: AdsRecord[] }.' }, 400)
+    return json({ error: 'Expected { records: AdsRecord[] } or { manualSpend: {...} }.' }, 400)
   }
 
   const { records } = body
@@ -64,4 +117,21 @@ export async function POST(request: Request): Promise<Response> {
   return json({ inserted, skippedAsDuplicate: records.length - inserted })
 }
 
-export default createHandler({ POST })
+/** Removes a manual monthly figure. The month then falls back to whatever
+ * report data exists for it, or to no data. */
+export async function DELETE(request: Request): Promise<Response> {
+  const auth = await requireSession(request)
+  if (auth.response) return auth.response
+
+  const url = new URL(request.url)
+  const channel = url.searchParams.get('channel')
+  const month = url.searchParams.get('month')
+  if (!isNonEmptyString(channel) || !isNonEmptyString(month)) {
+    return json({ error: 'Both channel and month are required.' }, 400)
+  }
+
+  await sql`DELETE FROM manual_ad_spend WHERE channel = ${channel} AND month = ${month}`
+  return json({ ok: true })
+}
+
+export default createHandler({ POST, DELETE })

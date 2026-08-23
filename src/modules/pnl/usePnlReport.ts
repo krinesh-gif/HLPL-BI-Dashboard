@@ -90,15 +90,16 @@ export function usePnlReport() {
           }
         : null
 
+    const at = (key: string, i: number): number => table.rows.find((r) => r.def.key === key)?.values[i] ?? 0
     const trend = months.map((m, i) => ({
       month: m,
-      netSales: table.rows.find((r) => r.def.key === 'netSales')?.values[i] ?? 0,
-      grossProfit: table.rows.find((r) => r.def.key === 'grossProfit')?.values[i] ?? 0,
-      contribution: table.rows.find((r) => r.def.key === 'contribution')?.values[i] ?? 0,
-      ebitda: table.rows.find((r) => r.def.key === 'ebitda')?.values[i] ?? 0,
-      grossMarginPct: table.rows.find((r) => r.def.key === 'grossMarginPct')?.values[i] ?? 0,
-      contributionMarginPct: table.rows.find((r) => r.def.key === 'contributionMarginPct')?.values[i] ?? 0,
-      ebitdaMarginPct: table.rows.find((r) => r.def.key === 'ebitdaMarginPct')?.values[i] ?? 0,
+      netSales: at('netSales', i),
+      grossProfit: at('grossProfit', i),
+      contribution: at('contribution', i),
+      ebitda: at('ebitda', i),
+      grossMarginPct: at('grossMarginPct', i),
+      contributionMarginPct: at('contributionMarginPct', i),
+      ebitdaMarginPct: at('ebitdaMarginPct', i),
     }))
 
     return {
