@@ -38,11 +38,9 @@ BEGIN
     brand                  TEXT NOT NULL,
     cogs                   DOUBLE PRECISION NOT NULL DEFAULT 0,
     mrp                    DOUBLE PRECISION NOT NULL DEFAULT 0,
-    standard_selling_price DOUBLE PRECISION NOT NULL DEFAULT 0,
     launch_date            TEXT NOT NULL,
     status                 TEXT NOT NULL,
     lead_time_days         INTEGER NOT NULL DEFAULT 21,
-    minimum_stock          INTEGER NOT NULL DEFAULT 0,
     safety_stock           INTEGER NOT NULL DEFAULT 0
   );
 

@@ -3,7 +3,7 @@ import { detectFlipkartSkuPnlReport, normalizeFlipkartSkuPnl } from './flipkartS
 import type { SkuMaster } from '@/data/models'
 
 const skuMaster: SkuMaster[] = [
-  { sku: 'AO/EO/Rosemary/30', productName: 'Rosemary Essential Oil 30ml', category: 'Essential Oils', brand: 'Aravi Organic', cogs: 81, mrp: 649, standardSellingPrice: 649, launchDate: '2025-01-01', status: 'active', leadTimeDays: 21, minimumStock: 300, safetyStock: 180 },
+  { sku: 'AO/EO/Rosemary/30', productName: 'Rosemary Essential Oil 30ml', category: 'Essential Oils', brand: 'Aravi Organic', cogs: 81, mrp: 649, launchDate: '2025-01-01', status: 'active', leadTimeDays: 21, safetyStock: 180 },
 ]
 
 describe('detectFlipkartSkuPnlReport', () => {

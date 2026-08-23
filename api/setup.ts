@@ -84,11 +84,11 @@ export async function POST(request: Request): Promise<Response> {
     await sql.query(
       `INSERT INTO sku_master (
          sku, product_name, category, sub_category, brand, cogs, mrp,
-         standard_selling_price, launch_date, status, lead_time_days, minimum_stock, safety_stock
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         launch_date, status, lead_time_days, safety_stock
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        ON CONFLICT (sku) DO NOTHING`,
       [s.sku, s.productName, s.category, s.subCategory ?? null, s.brand, s.cogs, s.mrp,
-        s.standardSellingPrice, s.launchDate, s.status, s.leadTimeDays, s.minimumStock, s.safetyStock],
+        s.launchDate, s.status, s.leadTimeDays, s.safetyStock],
     )
   }
 

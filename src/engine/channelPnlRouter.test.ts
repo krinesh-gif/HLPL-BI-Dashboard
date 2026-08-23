@@ -3,7 +3,7 @@ import { buildChannelPnlView } from './channelPnlRouter'
 import type { FlipkartPnlFacts, SkuMaster } from '@/data/models'
 
 const skuMaster: SkuMaster[] = [
-  { sku: 'S1', productName: 'Test', category: 'Test', brand: 'HLPL', cogs: 50, mrp: 200, standardSellingPrice: 180, launchDate: '2025-01-01', status: 'active', leadTimeDays: 20, minimumStock: 100, safetyStock: 50 },
+  { sku: 'S1', productName: 'Test', category: 'Test', brand: 'HLPL', cogs: 50, mrp: 200, launchDate: '2025-01-01', status: 'active', leadTimeDays: 20, safetyStock: 50 },
 ]
 
 const flipkartFacts: FlipkartPnlFacts = {

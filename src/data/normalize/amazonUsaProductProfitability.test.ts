@@ -3,7 +3,7 @@ import { detectAmazonUsaProductProfitabilityReport, normalizeAmazonUsaProductPro
 import type { SkuMaster } from '@/data/models'
 
 const skuMaster: SkuMaster[] = [
-  { sku: 'NX/Spray/Sunscreen/100', productName: 'NX Sunscreen Spray 100ml', category: 'Skin Care', brand: 'Aravi Organic', cogs: 96.4, mrp: 449, standardSellingPrice: 449, launchDate: '2025-01-01', status: 'active', leadTimeDays: 21, minimumStock: 200, safetyStock: 120 },
+  { sku: 'NX/Spray/Sunscreen/100', productName: 'NX Sunscreen Spray 100ml', category: 'Skin Care', brand: 'Aravi Organic', cogs: 96.4, mrp: 449, launchDate: '2025-01-01', status: 'active', leadTimeDays: 21, safetyStock: 120 },
 ]
 
 const headers = [

@@ -5,7 +5,7 @@ import type { SkuMaster } from '@/data/models'
 const ROWF = ['om', 'pm', 'odS', 'pdS', 'disp', 'sku', 'name', 'status', 'priceType', 'txn', 'sub', 'gst', 'qty', 'sale', 'ret', 'fwd', 'rship', 'rprem', 'rpremR', 'comm', 'ffee', 'wh', 'gold', 'mall', 'oss', 'gstOss', 'gcp', 'tcs', 'tds', 'comp', 'claims', 'rec', 'settle']
 
 const skuMaster: SkuMaster[] = [
-  { sku: 'AO/LBalm/Tinted(BT)', productName: 'Beetroot Tinted Lip Balm', category: 'Lip Care', brand: 'Aravi Organic', cogs: 21, mrp: 279, standardSellingPrice: 279, launchDate: '2025-01-01', status: 'active', leadTimeDays: 18, minimumStock: 200, safetyStock: 120 },
+  { sku: 'AO/LBalm/Tinted(BT)', productName: 'Beetroot Tinted Lip Balm', category: 'Lip Care', brand: 'Aravi Organic', cogs: 21, mrp: 279, launchDate: '2025-01-01', status: 'active', leadTimeDays: 18, safetyStock: 120 },
 ]
 
 function orderRow(overrides: Partial<Record<string, string | number>> = {}): (string | number)[] {

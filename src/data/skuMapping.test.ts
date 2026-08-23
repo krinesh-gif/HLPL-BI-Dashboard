@@ -9,11 +9,9 @@ const sku = (s: string, cogs: number): SkuMaster => ({
   brand: 'Aravi Organic',
   cogs,
   mrp: cogs * 5,
-  standardSellingPrice: cogs * 5,
   launchDate: '2025-04-01',
   status: 'active',
   leadTimeDays: 21,
-  minimumStock: 0,
   safetyStock: 0,
 })
 

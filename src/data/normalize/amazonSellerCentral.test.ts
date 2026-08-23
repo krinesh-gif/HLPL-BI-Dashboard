@@ -4,7 +4,7 @@ import { recordKey } from './duplicates'
 import type { SkuMaster } from '@/data/models'
 
 const skuMaster: SkuMaster[] = [
-  { sku: 'HC-ROSE-015', productName: 'Rosemary Hair Oil 15ml', category: 'Hair Care', brand: 'HLPL', cogs: 85, mrp: 299, standardSellingPrice: 249, launchDate: '2025-01-01', status: 'active', leadTimeDays: 21, minimumStock: 500, safetyStock: 300 },
+  { sku: 'HC-ROSE-015', productName: 'Rosemary Hair Oil 15ml', category: 'Hair Care', brand: 'HLPL', cogs: 85, mrp: 299, launchDate: '2025-01-01', status: 'active', leadTimeDays: 21, safetyStock: 300 },
 ]
 
 describe('detectAmazonSellerCentralReport', () => {

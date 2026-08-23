@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { PageShell } from '@/components/layout/PageShell'
 import { useDataStore } from '@/store/dataStore'
 import { useSkuMappingWork, type MappingRow } from './useSkuMappingWork'
 import { formatCurrencyFull, formatPercent } from '@/lib/format'
+import { CHANNEL_MAP } from '@/config/channels'
 import type { ComboComponent, SkuMapping } from '@/data/skuMapping'
+import type { SkuMaster } from '@/data/models'
 
 type Tab = 'unmapped' | 'review' | 'done'
 
@@ -16,13 +18,37 @@ export function SkuMappingPage() {
   const { skuMaster, saveMappings, removeMapping } = useDataStore()
   const work = useSkuMappingWork()
   const [tab, setTab] = useState<Tab>('unmapped')
+  const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState<DraftComponent[]>([])
+  const [selected, setSelected] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const rows = tab === 'unmapped' ? work.unmapped : tab === 'review' ? work.needsVerification : work.done
+  const allRows = tab === 'unmapped' ? work.unmapped : tab === 'review' ? work.needsVerification : work.done
+
+  // Search covers the code, the product name from the report, the marketplace,
+  // and what it currently maps to — so a SKU can be found by any of the things
+  // someone might remember about it.
+  const rows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return allRows
+    const terms = q.split(/\s+/)
+    return allRows.filter((r) => {
+      const haystack = [
+        r.channelSku,
+        r.productName,
+        r.mapping?.internalSku ?? '',
+        ...r.channels.map((c) => CHANNEL_MAP[c]?.label ?? c),
+      ]
+        .join(' ')
+        .toLowerCase()
+      return terms.every((t) => haystack.includes(t))
+    })
+  }, [allRows, search])
+
   const unmappedShare = work.totalNetSales > 0 ? (work.unmappedNetSales / work.totalNetSales) * 100 : 0
+  const selectedInView = rows.filter((r) => selected.has(r.channelSku))
 
   async function run(action: () => Promise<void>) {
     setBusy(true)
@@ -49,7 +75,7 @@ export function SkuMappingPage() {
   }
 
   function acceptAllSuggestions() {
-    const withSuggestions = work.unmapped.filter((r) => r.suggestion)
+    const withSuggestions = rows.filter((r) => r.suggestion)
     if (withSuggestions.length === 0) return
     void run(() =>
       saveMappings({
@@ -60,21 +86,26 @@ export function SkuMappingPage() {
     )
   }
 
+  /** Linking to a single product also clears any recipe left over from a
+   * previous combo mapping, so a corrected SKU cannot keep costing as a bundle. */
   function linkAsSingle(row: MappingRow, internalSku: string) {
     if (!internalSku) return
-    const mapping: SkuMapping = {
-      channelSku: row.channelSku,
-      internalSku,
-      kind: 'SINGLE',
-      source: 'manual',
-      verified: true,
-    }
-    void run(() => saveMappings({ mappings: [mapping] }))
+    const mapping: SkuMapping = { channelSku: row.channelSku, internalSku, kind: 'SINGLE', source: 'manual', verified: true }
+    void run(() =>
+      saveMappings({
+        mappings: [mapping],
+        replaceRecipesFor: [row.channelSku, row.mapping?.internalSku].filter((s): s is string => Boolean(s)),
+      }),
+    )
   }
 
-  function markVerified(row: MappingRow) {
-    if (!row.mapping) return
-    void run(() => saveMappings({ mappings: [{ ...row.mapping!, verified: true, source: 'manual' }] }))
+  function markVerified(rowsToMark: MappingRow[]) {
+    const mappings = rowsToMark.filter((r) => r.mapping).map((r) => ({ ...r.mapping!, verified: true, source: 'manual' as const }))
+    if (mappings.length === 0) return
+    void run(async () => {
+      await saveMappings({ mappings })
+      setSelected(new Set())
+    })
   }
 
   function startComboEdit(row: MappingRow) {
@@ -92,23 +123,33 @@ export function SkuMappingPage() {
       setError('A combo needs at least one component.')
       return
     }
-    const mapping: SkuMapping = {
-      channelSku: row.channelSku,
-      internalSku: row.channelSku,
-      kind: 'COMBO',
-      source: 'manual',
-      verified: true,
-    }
+    const mapping: SkuMapping = { channelSku: row.channelSku, internalSku: row.channelSku, kind: 'COMBO', source: 'manual', verified: true }
     const components: ComboComponent[] = usable.map((d) => ({
       comboSku: row.channelSku,
       componentSku: d.componentSku,
       quantity: d.quantity || 1,
       source: 'manual',
     }))
-    void run(() => saveMappings({ mappings: [mapping], comboComponents: components, replaceRecipesFor: [row.channelSku] }))
+    void run(() =>
+      saveMappings({
+        mappings: [mapping],
+        comboComponents: components,
+        replaceRecipesFor: [row.channelSku, row.mapping?.internalSku].filter((s): s is string => Boolean(s)),
+      }),
+    )
   }
 
-  const suggestionCount = work.unmapped.filter((r) => r.suggestion).length
+  function toggle(channelSku: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(channelSku)) next.delete(channelSku)
+      else next.add(channelSku)
+      return next
+    })
+  }
+
+  const suggestionCount = rows.filter((r) => r.suggestion).length
+  const allInViewSelected = rows.length > 0 && rows.every((r) => selected.has(r.channelSku))
 
   return (
     <PageShell
@@ -124,11 +165,42 @@ export function SkuMappingPage() {
         <Stat label="Confirmed" value={String(work.done.length)} note="real component costs" tone="emerald" />
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <TabButton active={tab === 'unmapped'} onClick={() => setTab('unmapped')}>Not mapped ({work.unmapped.length})</TabButton>
-        <TabButton active={tab === 'review'} onClick={() => setTab('review')}>To verify ({work.needsVerification.length})</TabButton>
-        <TabButton active={tab === 'done'} onClick={() => setTab('done')}>Confirmed ({work.done.length})</TabButton>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <TabButton active={tab === 'unmapped'} onClick={() => { setTab('unmapped'); setSelected(new Set()) }}>Not mapped ({work.unmapped.length})</TabButton>
+        <TabButton active={tab === 'review'} onClick={() => { setTab('review'); setSelected(new Set()) }}>To verify ({work.needsVerification.length})</TabButton>
+        <TabButton active={tab === 'done'} onClick={() => { setTab('done'); setSelected(new Set()) }}>Confirmed ({work.done.length})</TabButton>
 
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search SKU, product, or marketplace…"
+          className="ml-auto w-72 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+        />
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {rows.length > 0 && (
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            <input type="checkbox" checked={allInViewSelected} onChange={() => setSelected(allInViewSelected ? new Set() : new Set(rows.map((r) => r.channelSku)))} />
+            Select all {search ? 'shown' : ''} ({rows.length})
+          </label>
+        )}
+        {selectedInView.length > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={() => markVerified(selectedInView)}
+              disabled={busy}
+              className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
+            >
+              Mark {selectedInView.length} as verified
+            </button>
+            <button type="button" onClick={() => setSelected(new Set())} className="text-sm text-slate-500 hover:text-slate-700">
+              Clear selection
+            </button>
+          </>
+        )}
         {tab === 'unmapped' && suggestionCount > 0 && (
           <button
             type="button"
@@ -143,14 +215,20 @@ export function SkuMappingPage() {
 
       {rows.length === 0 ? (
         <p className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
-          {tab === 'unmapped' ? 'Every SKU in your sales data has a cost. Nothing to map.' : 'Nothing here yet.'}
+          {search
+            ? `Nothing matches “${search}” in this tab.`
+            : tab === 'unmapped'
+              ? 'Every SKU in your sales data has a cost. Nothing to map.'
+              : 'Nothing here yet.'}
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
           <table className="w-full text-sm">
             <thead className="bg-slate-50">
               <tr>
+                <th className="w-8 px-3 py-2" />
                 <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Marketplace SKU</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Marketplace</th>
                 <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Orders</th>
                 <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Net Sales</th>
                 <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Cost basis</th>
@@ -161,13 +239,26 @@ export function SkuMappingPage() {
               {rows.map((row) => (
                 <tr key={row.channelSku} className="border-t border-slate-100 align-top">
                   <td className="px-3 py-2">
+                    <input type="checkbox" checked={selected.has(row.channelSku)} onChange={() => toggle(row.channelSku)} />
+                  </td>
+                  <td className="px-3 py-2">
                     <div className="font-mono text-xs text-slate-700">{row.channelSku}</div>
+                    <div className="mt-0.5 text-xs text-slate-500">{row.productName}</div>
                     {row.mapping && (
-                      <div className="mt-0.5 text-xs text-slate-500">
+                      <div className="mt-0.5 text-xs text-indigo-700">
                         → {row.mapping.internalSku} <span className="text-slate-400">({row.mapping.kind.toLowerCase()})</span>
                       </div>
                     )}
                     {row.mapping?.note && <div className="mt-0.5 text-xs text-amber-700">{row.mapping.note}</div>}
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex flex-wrap gap-1">
+                      {row.channels.map((c) => (
+                        <span key={c} className="whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+                          {CHANNEL_MAP[c]?.label ?? c}
+                        </span>
+                      ))}
+                    </div>
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-slate-600">{row.orders.toLocaleString()}</td>
                   <td className="px-3 py-2 text-right tabular-nums font-medium text-slate-800">{formatCurrencyFull(row.netSales)}</td>
@@ -210,16 +301,16 @@ export function SkuMappingPage() {
                             className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
                             title={row.suggestion.mapping.note}
                           >
-                            Use suggestion: {row.suggestion.components.length > 0
+                            Use: {row.suggestion.components.length > 0
                               ? row.suggestion.components.map((c) => `${c.componentSku}${c.quantity > 1 ? `×${c.quantity}` : ''}`).join(' + ')
                               : row.suggestion.mapping.internalSku}
                           </button>
                         )}
 
-                        {!row.mapping?.verified && row.mapping && (
+                        {row.mapping && !row.mapping.verified && (
                           <button
                             type="button"
-                            onClick={() => markVerified(row)}
+                            onClick={() => markVerified([row])}
                             disabled={busy}
                             className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
                           >
@@ -227,17 +318,12 @@ export function SkuMappingPage() {
                           </button>
                         )}
 
-                        <select
-                          defaultValue=""
+                        <ProductPicker
+                          skuMaster={skuMaster}
                           disabled={busy}
-                          onChange={(e) => linkAsSingle(row, e.target.value)}
-                          className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:border-indigo-500 focus:outline-none"
-                        >
-                          <option value="">Link to a product…</option>
-                          {skuMaster.map((s) => (
-                            <option key={s.sku} value={s.sku}>{s.sku}</option>
-                          ))}
-                        </select>
+                          label={row.mapping ? 'Change to…' : 'Link to a product…'}
+                          onPick={(sku) => linkAsSingle(row, sku)}
+                        />
 
                         <button
                           type="button"
@@ -254,8 +340,9 @@ export function SkuMappingPage() {
                             onClick={() => void run(() => removeMapping(row.channelSku))}
                             disabled={busy}
                             className="text-xs font-medium text-rose-600 hover:text-rose-800 disabled:opacity-40"
+                            title="Remove this mapping and start again"
                           >
-                            Unlink
+                            Unmap
                           </button>
                         )}
                       </div>
@@ -268,6 +355,59 @@ export function SkuMappingPage() {
         </div>
       )}
     </PageShell>
+  )
+}
+
+/**
+ * A type-to-search product chooser. A plain dropdown of several hundred SKUs is
+ * unusable; a text input backed by a datalist filters as you type on any part
+ * of the code or product name.
+ */
+function ProductPicker({
+  skuMaster,
+  disabled,
+  label,
+  onPick,
+}: {
+  skuMaster: SkuMaster[]
+  disabled: boolean
+  label: string
+  onPick: (sku: string) => void
+}) {
+  const listId = useId()
+  const [value, setValue] = useState('')
+
+  function commit(next: string) {
+    // Accept either the raw code or the "code — name" form the list shows.
+    const code = next.split(' — ')[0].trim()
+    if (skuMaster.some((s) => s.sku === code)) {
+      onPick(code)
+      setValue('')
+    }
+  }
+
+  return (
+    <>
+      <input
+        list={listId}
+        value={value}
+        disabled={disabled}
+        placeholder={label}
+        onChange={(e) => {
+          setValue(e.target.value)
+          commit(e.target.value)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit(value)
+        }}
+        className="w-48 rounded-md border border-slate-300 px-2 py-1 text-xs focus:border-indigo-500 focus:outline-none disabled:opacity-40"
+      />
+      <datalist id={listId}>
+        {skuMaster.map((s) => (
+          <option key={s.sku} value={`${s.sku} — ${s.productName}`} />
+        ))}
+      </datalist>
+    </>
   )
 }
 
@@ -306,7 +446,7 @@ function ComboEditor({
   onSave,
   onCancel,
 }: {
-  skuMaster: { sku: string }[]
+  skuMaster: SkuMaster[]
   draft: DraftComponent[]
   setDraft: (d: DraftComponent[]) => void
   busy: boolean
@@ -314,20 +454,19 @@ function ComboEditor({
   onCancel: () => void
 }) {
   return (
-    <div className="min-w-72 space-y-2 rounded-md border border-indigo-200 bg-indigo-50 p-3">
+    <div className="min-w-80 space-y-2 rounded-md border border-indigo-200 bg-indigo-50 p-3">
       <p className="text-xs font-semibold text-indigo-900">What is in this pack?</p>
       {draft.map((component, i) => (
         <div key={i} className="flex items-center gap-2">
-          <select
-            value={component.componentSku}
-            onChange={(e) => setDraft(draft.map((d, j) => (j === i ? { ...d, componentSku: e.target.value } : d)))}
-            className="flex-1 rounded-md border border-slate-300 px-2 py-1 text-xs focus:border-indigo-500 focus:outline-none"
-          >
-            <option value="">Choose a product…</option>
-            {skuMaster.map((s) => (
-              <option key={s.sku} value={s.sku}>{s.sku}</option>
-            ))}
-          </select>
+          <div className="flex-1">
+            <ProductPicker
+              skuMaster={skuMaster}
+              disabled={busy}
+              label={component.componentSku || 'Search for a product…'}
+              onPick={(sku) => setDraft(draft.map((d, j) => (j === i ? { ...d, componentSku: sku } : d)))}
+            />
+            {component.componentSku && <div className="mt-0.5 font-mono text-xs text-indigo-800">{component.componentSku}</div>}
+          </div>
           <input
             type="number"
             min={1}

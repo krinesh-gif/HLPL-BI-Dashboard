@@ -1,12 +1,16 @@
 import { useMemo } from 'react'
 import { useDataStore } from '@/store/dataStore'
 import { deriveComboFromCode, matchInternalSku, resolveCogs, type ComboComponent, type SkuMapping } from '@/data/skuMapping'
+import type { ChannelId } from '@/config/channels'
 
 /** A channel SKU seen in real sales, with how much money depends on getting
  * its cost right. */
 export interface MappingRow {
   channelSku: string
   productName: string
+  /** Which marketplaces this code was sold on, so a code can be searched for
+   * and judged in the context of the channel it came from. */
+  channels: ChannelId[]
   orders: number
   netSales: number
   mapping: SkuMapping | null
@@ -40,7 +44,7 @@ export function useSkuMappingWork(): SkuMappingWork {
 
     // Roll real sales up per channel SKU so the list can be worked in order of
     // how much revenue actually depends on each one.
-    const bySku = new Map<string, { productName: string; orders: number; netSales: number }>()
+    const bySku = new Map<string, { productName: string; orders: number; netSales: number; channels: Set<ChannelId> }>()
     let totalNetSales = 0
     for (const r of salesRecords) {
       totalNetSales += r.netSales
@@ -48,8 +52,9 @@ export function useSkuMappingWork(): SkuMappingWork {
       if (existing) {
         existing.orders += 1
         existing.netSales += r.netSales
+        existing.channels.add(r.channel)
       } else {
-        bySku.set(r.sku, { productName: r.productName, orders: 1, netSales: r.netSales })
+        bySku.set(r.sku, { productName: r.productName, orders: 1, netSales: r.netSales, channels: new Set([r.channel]) })
       }
     }
 
@@ -83,6 +88,7 @@ export function useSkuMappingWork(): SkuMappingWork {
       rows.push({
         channelSku,
         productName: agg.productName,
+        channels: [...agg.channels],
         orders: agg.orders,
         netSales: agg.netSales,
         mapping,

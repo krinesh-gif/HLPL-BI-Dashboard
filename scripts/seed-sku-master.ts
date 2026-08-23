@@ -25,10 +25,10 @@ async function main() {
     await sql`
       INSERT INTO sku_master (
         sku, product_name, category, sub_category, brand, cogs, mrp,
-        standard_selling_price, launch_date, status, lead_time_days, minimum_stock, safety_stock
+        launch_date, status, lead_time_days, safety_stock
       ) VALUES (
         ${s.sku}, ${s.productName}, ${s.category}, ${s.subCategory ?? null}, ${s.brand}, ${s.cogs}, ${s.mrp},
-        ${s.standardSellingPrice}, ${s.launchDate}, ${s.status}, ${s.leadTimeDays}, ${s.minimumStock}, ${s.safetyStock}
+        ${s.launchDate}, ${s.status}, ${s.leadTimeDays}, ${s.safetyStock}
       )
       ON CONFLICT (sku) DO NOTHING
     `

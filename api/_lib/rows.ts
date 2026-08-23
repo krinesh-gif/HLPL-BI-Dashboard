@@ -28,11 +28,9 @@ export function toSkuMaster(r: Row): SkuMaster {
     brand: str(r.brand),
     cogs: num(r.cogs),
     mrp: num(r.mrp),
-    standardSellingPrice: num(r.standard_selling_price),
     launchDate: str(r.launch_date),
     status: str(r.status) as SkuMaster['status'],
     leadTimeDays: num(r.lead_time_days),
-    minimumStock: num(r.minimum_stock),
     safetyStock: num(r.safety_stock),
   }
 }

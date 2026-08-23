@@ -44,11 +44,9 @@ export interface SkuMaster {
   brand: string
   cogs: number
   mrp: number
-  standardSellingPrice: number
   launchDate: string
   status: 'active' | 'inactive' | 'discontinued'
   leadTimeDays: number
-  minimumStock: number
   safetyStock: number
 }
 

@@ -5,8 +5,8 @@ import type { CanonicalSalesRecord, FixedExpenseEntry, SkuMaster } from '@/data/
 const skuMaster: SkuMaster[] = [
   {
     sku: 'SKU-1', productName: 'Test Product', category: 'Test', brand: 'HLPL',
-    cogs: 100, mrp: 500, standardSellingPrice: 400, launchDate: '2025-01-01',
-    status: 'active', leadTimeDays: 20, minimumStock: 100, safetyStock: 50,
+    cogs: 100, mrp: 500, launchDate: '2025-01-01',
+    status: 'active', leadTimeDays: 20, safetyStock: 50,
   },
 ]
 

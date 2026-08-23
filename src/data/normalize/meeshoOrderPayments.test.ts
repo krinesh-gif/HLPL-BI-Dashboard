@@ -4,7 +4,7 @@ import type { RawSheet } from '@/lib/csvParse'
 import type { SkuMaster } from '@/data/models'
 
 const skuMaster: SkuMaster[] = [
-  { sku: 'AO/LBalm/Tinted(BT)', productName: 'Beetroot Tinted Lip Balm', category: 'Lip Care', brand: 'Aravi Organic', cogs: 21, mrp: 279, standardSellingPrice: 279, launchDate: '2025-01-01', status: 'active', leadTimeDays: 18, minimumStock: 200, safetyStock: 120 },
+  { sku: 'AO/LBalm/Tinted(BT)', productName: 'Beetroot Tinted Lip Balm', category: 'Lip Care', brand: 'Aravi Organic', cogs: 21, mrp: 279, launchDate: '2025-01-01', status: 'active', leadTimeDays: 18, safetyStock: 120 },
 ]
 
 // Column order matches the real "Order Payments" sheet exactly (43 columns).

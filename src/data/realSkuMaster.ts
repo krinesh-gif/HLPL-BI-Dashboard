@@ -86,11 +86,9 @@ export function buildRealSkuMaster(): SkuMaster[] {
     brand: s.brand,
     cogs: s.cogs,
     mrp: s.mrp,
-    standardSellingPrice: s.mrp,
     launchDate: '2025-04-01',
     status: 'active',
     leadTimeDays: DEFAULT_LEAD_TIME_DAYS[s.category] ?? 21,
-    minimumStock: 200,
     safetyStock: 120,
   }))
 }

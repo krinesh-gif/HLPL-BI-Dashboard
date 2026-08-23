@@ -1,16 +1,16 @@
+import { Link } from 'react-router-dom'
 import { PageShell } from '@/components/layout/PageShell'
 import { useDataStore } from '@/store/dataStore'
 import { useSkuCostValidation } from './useSkuCostValidation'
 import { formatCurrencyFull, formatPercent } from '@/lib/format'
 import type { SkuMaster } from '@/data/models'
 
+// COGS drives every P&L and MRP is the reference price; the stock-planning
+// fields were removed from this screen because they are set once and are not
+// what anyone comes here to edit.
 const EDITABLE_NUMERIC_FIELDS: { key: keyof SkuMaster; label: string }[] = [
   { key: 'cogs', label: 'COGS' },
   { key: 'mrp', label: 'MRP' },
-  { key: 'standardSellingPrice', label: 'Std. Selling Price' },
-  { key: 'leadTimeDays', label: 'Lead Time (days)' },
-  { key: 'minimumStock', label: 'Min Stock' },
-  { key: 'safetyStock', label: 'Safety Stock' },
 ]
 
 export function ProductMasterPage() {
@@ -28,8 +28,14 @@ export function ProductMasterPage() {
           </h3>
           <p className="mt-1 text-xs text-amber-800">
             These SKUs account for {formatCurrencyFull(unmappedNetSales)} ({formatPercent(unmappedSharePct)}) of total net sales. Their COGS was
-            estimated (not looked up) in every P&L that includes them. Add each SKU below to the Product Master to replace the estimate with its
-            real cost.
+            estimated (not looked up) in every P&L that includes them.
+          </p>
+          <p className="mt-2 text-xs text-amber-900">
+            Most marketplace codes are renamed singles or combos rather than new products — link them on{' '}
+            <Link to="/products/sku-mapping" className="font-semibold underline">
+              Products → SKU Mapping
+            </Link>
+            . Only add a row here when it is genuinely a product you sell.
           </p>
           <div className="mt-3 overflow-x-auto rounded border border-amber-200 bg-white">
             <table className="w-full text-sm">

@@ -32,11 +32,9 @@ const PATCHABLE: Record<string, string> = {
   brand: 'brand',
   cogs: 'cogs',
   mrp: 'mrp',
-  standardSellingPrice: 'standard_selling_price',
   launchDate: 'launch_date',
   status: 'status',
   leadTimeDays: 'lead_time_days',
-  minimumStock: 'minimum_stock',
   safetyStock: 'safety_stock',
 }
 
@@ -65,10 +63,10 @@ export async function POST(request: Request): Promise<Response> {
     await sql.query(
       `INSERT INTO sku_master (
          sku, product_name, category, sub_category, brand, cogs, mrp,
-         standard_selling_price, launch_date, status, lead_time_days, minimum_stock, safety_stock
+         launch_date, status, lead_time_days, safety_stock
        )
        SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::float8[], $7::float8[],
-                            $8::float8[], $9::text[], $10::text[], $11::int[], $12::int[], $13::int[])
+                            $8::text[], $9::text[], $10::int[], $11::int[])
        ON CONFLICT (sku) DO UPDATE SET
          product_name = EXCLUDED.product_name,
          cogs         = EXCLUDED.cogs,
@@ -81,11 +79,9 @@ export async function POST(request: Request): Promise<Response> {
         rows.map(() => 'Aravi Organic'),
         rows.map((r) => Number(r.cogs) || 0),
         rows.map((r) => Number(r.mrp) || 0),
-        rows.map((r) => Number(r.mrp) || 0),
         rows.map(() => '2025-04-01'),
         rows.map(() => 'active'),
         rows.map(() => 21),
-        rows.map(() => 0),
         rows.map(() => 0),
       ],
     )

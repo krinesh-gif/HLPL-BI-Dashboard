@@ -4,7 +4,7 @@ import type { RawSheet } from '@/lib/csvParse'
 import type { SkuMaster } from '@/data/models'
 
 const skuMaster: SkuMaster[] = [
-  { sku: 'AO/HBR/Cleanser/100', productName: 'Barrier Repair Cleanser', category: 'Skin Care', brand: 'Aravi Organic', cogs: 46, mrp: 249, standardSellingPrice: 249, launchDate: '2025-01-01', status: 'active', leadTimeDays: 21, minimumStock: 200, safetyStock: 120 },
+  { sku: 'AO/HBR/Cleanser/100', productName: 'Barrier Repair Cleanser', category: 'Skin Care', brand: 'Aravi Organic', cogs: 46, mrp: 249, launchDate: '2025-01-01', status: 'active', leadTimeDays: 21, safetyStock: 120 },
 ]
 
 // A trimmed-down but structurally faithful "Overall Summary" sheet.

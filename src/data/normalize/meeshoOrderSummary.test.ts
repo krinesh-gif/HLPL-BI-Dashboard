@@ -3,7 +3,7 @@ import { detectMeeshoOrderSummaryReport, normalizeMeeshoOrderSummary } from './m
 import type { SkuMaster } from '@/data/models'
 
 const skuMaster: SkuMaster[] = [
-  { sku: 'AO/LBalm/Tinted(BT)', productName: 'Beetroot Tinted Lip Balm', category: 'Lip Care', brand: 'Aravi Organic', cogs: 21, mrp: 279, standardSellingPrice: 279, launchDate: '2025-01-01', status: 'active', leadTimeDays: 18, minimumStock: 200, safetyStock: 120 },
+  { sku: 'AO/LBalm/Tinted(BT)', productName: 'Beetroot Tinted Lip Balm', category: 'Lip Care', brand: 'Aravi Organic', cogs: 21, mrp: 279, launchDate: '2025-01-01', status: 'active', leadTimeDays: 18, safetyStock: 120 },
 ]
 
 const headers = ['Sub orderId', 'Catalog ID', 'Quantity', 'Price', 'Order Date', 'Order Status', 'Payout Value', 'Payout Status', 'Claim Status', 'SKU ID']
