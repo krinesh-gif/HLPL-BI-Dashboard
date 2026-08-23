@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useDataStore } from '@/store/dataStore'
-import { distinctCategories, isUncategorized, UNCATEGORIZED } from '@/data/categories'
+import { distinctCategories, isUncategorized, normalizeCategory, UNCATEGORIZED } from '@/data/categories'
+import { resolveCategory } from '@/data/skuMapping'
 
 export interface UncategorizedSku {
   sku: string
@@ -9,6 +10,9 @@ export interface UncategorizedSku {
    * false when it appears only in sales data and has no Product Master row at
    * all — a different problem with a different fix. */
   inProductMaster: boolean
+  /** True when a mapping exists but the product it points at has no category
+   * either, so mapping again will not help. */
+  mapped: boolean
   units: number
   netSales: number
 }
@@ -34,16 +38,31 @@ export interface UncategorizedWork {
  * of it fell back to Uncategorized on import.
  */
 export function useUncategorized(): UncategorizedWork {
-  const { skuMaster, salesRecords } = useDataStore()
+  const { skuMaster, salesRecords, mappings, comboComponents } = useDataStore()
 
   return useMemo(() => {
+    const tables = { skuMaster, mappings, comboComponents }
+
+    // Resolution is per SKU, not per row: a few hundred distinct codes stand
+    // behind tens of thousands of order lines.
+    const categoryBySku = new Map<string, string>()
+    const categoryFor = (sku: string, fallback: string): string => {
+      const cached = categoryBySku.get(sku)
+      if (cached !== undefined) return cached
+      // Follow the SKU map first. A marketplace code is a listing, not a
+      // product, and its category belongs to whatever it resolves to.
+      const resolved = resolveCategory(sku, tables) ?? normalizeCategory(fallback)
+      categoryBySku.set(sku, resolved)
+      return resolved
+    }
+
     const bySku = new Map<string, { units: number; netSales: number; productName: string }>()
     let totalNetSales = 0
 
     for (const r of salesRecords) {
       if (r.status === 'cancelled') continue
       totalNetSales += r.netSales
-      if (!isUncategorized(r.category)) continue
+      if (!isUncategorized(categoryFor(r.sku, r.category))) continue
       const bucket = bySku.get(r.sku)
       if (bucket) {
         bucket.units += r.quantity
@@ -54,6 +73,7 @@ export function useUncategorized(): UncategorizedWork {
     }
 
     const masterBySku = new Map(skuMaster.map((s) => [s.sku, s]))
+    const mappedSkus = new Set(mappings.map((m) => m.channelSku))
 
     // Product Master rows with no category count even when they have no sales
     // this period — they will land in Uncategorized the moment they sell.
@@ -67,6 +87,7 @@ export function useUncategorized(): UncategorizedWork {
         sku,
         productName: masterBySku.get(sku)?.productName ?? agg.productName,
         inProductMaster: masterBySku.has(sku),
+        mapped: mappedSkus.has(sku),
         units: agg.units,
         netSales: agg.netSales,
       }))
@@ -83,5 +104,5 @@ export function useUncategorized(): UncategorizedWork {
         (c) => c !== UNCATEGORIZED,
       ),
     }
-  }, [skuMaster, salesRecords])
+  }, [skuMaster, salesRecords, mappings, comboComponents])
 }

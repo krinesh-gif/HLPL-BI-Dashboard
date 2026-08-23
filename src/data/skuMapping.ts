@@ -1,4 +1,5 @@
 import type { SkuMaster } from './models'
+import { normalizeCategory, UNCATEGORIZED } from './categories'
 
 /**
  * Marketplace SKU codes are not the internal cost-master codes. A Flipkart
@@ -268,4 +269,50 @@ export function resolveCogs(channelSku: string, tables: MappingTables): CostReso
   }
 
   return { cogs, via: 'combo-recipe', verified: mapping.verified, missingComponents }
+}
+
+/**
+ * The category a marketplace code belongs to, followed through the SKU map.
+ *
+ * A code like `C2/RO/AH/FOOT/50` is not a product; it is a listing that
+ * resolves to one or more real products. Its category is theirs. Reading the
+ * category off the sales row alone — which is what happened before — left
+ * every unmapped and every mapped-but-unresolved code sitting in
+ * Uncategorized, so mapping a SKU fixed its cost but not its classification.
+ *
+ * Returns null when the code cannot be resolved at all, which is the honest
+ * answer and the signal that it still needs mapping.
+ */
+export function resolveCategory(channelSku: string, tables: MappingTables): string | null {
+  // A blank category, or any of the many ways a report writes "none", is not a
+  // category. Returning the raw value would let an empty string pass as a real
+  // classification and quietly remove the SKU from the list of work to do.
+  const realCategory = (sku: string | undefined): string | null => {
+    if (!sku) return null
+    const raw = tables.skuMaster.find((s) => s.sku === sku)?.category
+    if (raw === undefined) return null
+    const normalized = normalizeCategory(raw)
+    return normalized === UNCATEGORIZED ? null : normalized
+  }
+
+  const direct = realCategory(channelSku)
+  if (direct) return direct
+
+  const mapping = tables.mappings.find((m) => m.channelSku === channelSku)
+  if (!mapping) return null
+
+  if (mapping.kind === 'SINGLE') return realCategory(mapping.internalSku)
+
+  // A combo takes the category of its largest component by quantity. Bundles
+  // are nearly always built within one category, and where they are not, the
+  // biggest part is the better answer than none at all.
+  const components = tables.comboComponents
+    .filter((c) => c.comboSku === mapping.internalSku || c.comboSku === channelSku)
+    .sort((a, b) => b.quantity - a.quantity)
+
+  for (const component of components) {
+    const category = realCategory(component.componentSku)
+    if (category) return category
+  }
+  return null
 }

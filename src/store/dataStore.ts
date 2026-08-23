@@ -107,6 +107,8 @@ interface DataState extends SharedDataset, MappingTablesState {
   loadState: () => Promise<void>
   importReport: (report: ReportImport) => Promise<ImportOutcome>
   updateSkuMaster: (sku: string, patch: Partial<SkuMaster>) => Promise<void>
+  /** Creates a Product Master row for a SKU that has none. */
+  addProduct: (product: { sku: string; productName?: string; category?: string; cogs?: number; mrp?: number }) => Promise<void>
   /** Saves mappings and, for combos listed in `replaceRecipesFor`, replaces
    * their recipe outright so an edit can remove a component. */
   saveMappings: (input: {
@@ -257,6 +259,8 @@ export const useDataStore = create<DataState>((set, get) => {
     },
 
     updateSkuMaster: (sku, patch) => writeThen(() => api.post('/api/sku-master', { sku, patch })),
+
+    addProduct: (product) => writeThen(() => api.post('/api/sku-master', { upserts: [product] })),
 
     saveMappings: ({ mappings, comboComponents = [], replaceRecipesFor = [] }) =>
       writeThen(() => api.post('/api/sku-map', { mappings, comboComponents, replaceRecipesFor })),

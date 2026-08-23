@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { PageShell } from '@/components/layout/PageShell'
 import { useDataStore } from '@/store/dataStore'
 import { useSkuMappingWork, type MappingRow } from './useSkuMappingWork'
@@ -18,7 +19,10 @@ export function SkuMappingPage() {
   const { skuMaster, saveMappings, removeMapping } = useDataStore()
   const work = useSkuMappingWork()
   const [tab, setTab] = useState<Tab>('unmapped')
-  const [search, setSearch] = useState('')
+  // Arriving from the Uncategorized warning lands on the exact code that
+  // needs mapping, rather than on a list of several hundred to find it in.
+  const [params] = useSearchParams()
+  const [search, setSearch] = useState(params.get('q') ?? '')
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState<DraftComponent[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())

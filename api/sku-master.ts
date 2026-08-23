@@ -17,6 +17,9 @@ interface CostUpsert {
   productName?: string
   cogs?: number
   mrp?: number
+  /** Optional. Omitted by a cost sheet, supplied when a row is being created
+   * from the Uncategorized list with its classification already known. */
+  category?: string
 }
 
 function isUpsertArray(v: unknown): v is CostUpsert[] {
@@ -70,11 +73,14 @@ export async function POST(request: Request): Promise<Response> {
        ON CONFLICT (sku) DO UPDATE SET
          product_name = EXCLUDED.product_name,
          cogs         = EXCLUDED.cogs,
-         mrp          = EXCLUDED.mrp`,
+         mrp          = EXCLUDED.mrp,
+         -- A cost sheet sends no category and must not blank an existing one.
+         category     = CASE WHEN EXCLUDED.category = 'Uncategorized'
+                             THEN sku_master.category ELSE EXCLUDED.category END`,
       [
         rows.map((r) => r.sku),
         rows.map((r) => r.productName ?? r.sku),
-        rows.map(() => 'Uncategorized'),
+        rows.map((r) => r.category?.trim() || 'Uncategorized'),
         rows.map(() => null),
         rows.map(() => 'Aravi Organic'),
         rows.map((r) => Number(r.cogs) || 0),
