@@ -64,10 +64,7 @@ interface PreviewState {
 }
 
 export function UploadReportsPage() {
-  const {
-    skuMaster, addImportedSales, addImportedAds,
-    setFlipkartFacts, setAmazonUsaFacts, setMeeshoFacts,
-  } = useDataStore()
+  const { skuMaster, importReport, importProgress } = useDataStore()
   const { month: filterMonth } = useFilterStore()
   const [stage, setStage] = useState<Stage>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -205,12 +202,14 @@ export function UploadReportsPage() {
 
     setStage('importing')
     try {
-      if (preview.validRecords.length > 0) await addImportedSales(preview.validRecords, importRecord)
-      else if (preview.adsRecords.length === 0) await addImportedSales([], importRecord) // still record the import even if nothing came through
-      if (preview.adsRecords.length > 0) await addImportedAds(preview.adsRecords)
-      if (preview.flipkartFacts) await setFlipkartFacts(preview.flipkartFacts)
-      if (preview.amazonUsaFacts) await setAmazonUsaFacts(preview.amazonUsaFacts)
-      if (preview.meeshoFactsByMonth) for (const f of preview.meeshoFactsByMonth) await setMeeshoFacts(f)
+      await importReport({
+        importRecord,
+        salesRecords: preview.validRecords,
+        adsRecords: preview.adsRecords,
+        flipkartFacts: preview.flipkartFacts,
+        amazonUsaFacts: preview.amazonUsaFacts,
+        meeshoFactsByMonth: preview.meeshoFactsByMonth,
+      })
       setPreview(null)
       setStage('idle')
     } catch (e) {
@@ -311,7 +310,11 @@ export function UploadReportsPage() {
               disabled={totalValid === 0 || stage === 'importing'}
               className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
             >
-              {stage === 'importing' ? 'Importing…' : `Import ${totalValid.toLocaleString()} Records`}
+              {stage === 'importing'
+                ? importProgress && importProgress.total > 0
+                  ? `Importing ${importProgress.sent.toLocaleString()} of ${importProgress.total.toLocaleString()}…`
+                  : 'Importing…'
+                : `Import ${totalValid.toLocaleString()} Records`}
             </button>
             <button type="button" onClick={cancel} disabled={stage === 'importing'} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40">
               Cancel
