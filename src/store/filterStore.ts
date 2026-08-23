@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import type { ChannelId } from '@/config/channels'
-import { TODAY_ISO } from '@/data/demoData'
 import { toMonthKey } from '@/lib/format'
 
 export interface GlobalFilters {
@@ -19,7 +18,7 @@ interface FilterState extends GlobalFilters {
 }
 
 const DEFAULTS: GlobalFilters = {
-  month: toMonthKey(TODAY_ISO),
+  month: toMonthKey(new Date().toISOString().slice(0, 10)),
   channel: 'all',
   category: 'all',
   sku: 'all',

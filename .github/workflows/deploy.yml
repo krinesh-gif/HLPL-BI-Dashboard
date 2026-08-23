@@ -1,10 +1,11 @@
-name: Deploy to GitHub Pages
+name: Deploy to GitHub Pages (disabled)
 
+# The dashboard now runs on Vercel, where it requires a login and reads from a
+# shared database. This Pages build has neither — it would publish an
+# unauthenticated copy of real P&L data to a public URL. Auto-deploy is
+# therefore off; the job is kept only so it can be run deliberately if the
+# Pages deployment is ever needed again.
 on:
-  push:
-    branches:
-      - main
-      - claude/bold-ramanujan-m7g3dp
   workflow_dispatch: {}
 
 permissions:

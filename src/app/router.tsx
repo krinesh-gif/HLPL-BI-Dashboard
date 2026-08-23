@@ -19,6 +19,7 @@ import { ProcurementPlanningPage } from '@/modules/supply-chain/ProcurementPlann
 import { UploadReportsPage } from '@/modules/data-management/UploadReportsPage'
 import { ImportHistoryPage } from '@/modules/data-management/ImportHistoryPage'
 import { SettingsPage } from '@/modules/settings/SettingsPage'
+import { TeamPage } from '@/modules/settings/TeamPage'
 
 export const router = createHashRouter([
   {
@@ -44,6 +45,7 @@ export const router = createHashRouter([
       { path: 'data/upload', element: <UploadReportsPage /> },
       { path: 'data/import-history', element: <ImportHistoryPage /> },
       { path: 'settings', element: <SettingsPage /> },
+      { path: 'settings/team', element: <TeamPage /> },
     ],
   },
 ])

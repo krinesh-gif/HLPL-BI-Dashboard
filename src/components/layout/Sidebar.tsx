@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import clsx from 'clsx'
 import { NAVIGATION, type NavSection } from '@/config/navigation'
+import { useAuthStore } from '@/store/authStore'
 
 function sectionContainsPath(section: NavSection, pathname: string): boolean {
   if (section.path === pathname) return true
@@ -61,6 +62,8 @@ function SectionItem({ section }: { section: NavSection }) {
 }
 
 export function Sidebar() {
+  const { user, logout } = useAuthStore()
+
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col overflow-y-auto border-r border-slate-800 bg-slate-900 py-4">
       <div className="mb-4 px-4">
@@ -72,6 +75,20 @@ export function Sidebar() {
           <SectionItem key={section.label} section={section} />
         ))}
       </nav>
+      {user && (
+        <div className="mt-4 border-t border-slate-800 px-4 pt-4">
+          <div className="truncate text-xs text-slate-400" title={user.email}>
+            {user.email}
+          </div>
+          <button
+            type="button"
+            onClick={() => void logout()}
+            className="mt-2 text-xs font-medium text-slate-400 hover:text-white"
+          >
+            Sign out
+          </button>
+        </div>
+      )}
     </aside>
   )
 }

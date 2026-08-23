@@ -1,3 +1,4 @@
+import { api } from '@/lib/apiClient'
 import type { AdsRecord, CanonicalSalesRecord } from '@/data/models'
 
 /** Channel + Order ID + SKU + Order Date uniquely identifies a sales line. */
@@ -17,16 +18,12 @@ export interface DuplicateCheckResult {
   isLikelyReupload: boolean
 }
 
-/** Compares incoming records against everything already imported to catch a re-uploaded file. */
-export function checkForDuplicates(
-  incoming: CanonicalSalesRecord[],
-  existing: CanonicalSalesRecord[],
-): DuplicateCheckResult {
-  const existingKeys = new Set(existing.map(recordKey))
-  const duplicateCount = incoming.filter((r) => existingKeys.has(recordKey(r))).length
-  return {
-    duplicateCount,
-    newRecordCount: incoming.length - duplicateCount,
-    isLikelyReupload: incoming.length > 0 && duplicateCount / incoming.length >= 0.9,
-  }
+/**
+ * Asks the server how many of these rows are already in the shared database,
+ * so the upload preview can warn about a re-uploaded file. Only the dedup keys
+ * are sent — there is no need to ship whole rows just to count overlaps.
+ */
+export async function checkForDuplicates(incoming: CanonicalSalesRecord[]): Promise<DuplicateCheckResult> {
+  if (incoming.length === 0) return { duplicateCount: 0, newRecordCount: 0, isLikelyReupload: false }
+  return api.post<DuplicateCheckResult>('/api/sales/check-duplicates', { keys: incoming.map(recordKey) })
 }

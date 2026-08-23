@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { adsRecordKey, checkForDuplicates, recordKey } from './duplicates'
+import { adsRecordKey, recordKey } from './duplicates'
 import type { AdsRecord, CanonicalSalesRecord } from '@/data/models'
 
 function makeRecord(overrides: Partial<CanonicalSalesRecord> = {}): CanonicalSalesRecord {
@@ -38,22 +38,18 @@ describe('recordKey', () => {
   })
 })
 
-describe('checkForDuplicates', () => {
-  it('flags a re-uploaded file where every row is already imported', () => {
-    const existing = [makeRecord(), makeRecord({ orderId: 'ORD-2' })]
-    const result = checkForDuplicates(existing, existing)
-    expect(result.duplicateCount).toBe(2)
-    expect(result.newRecordCount).toBe(0)
-    expect(result.isLikelyReupload).toBe(true)
-  })
-
-  it('reports only the genuinely new rows when a growing month file is re-uploaded', () => {
-    const existing = [makeRecord(), makeRecord({ orderId: 'ORD-2' })]
-    const incoming = [...existing, makeRecord({ orderId: 'ORD-3' }), makeRecord({ orderId: 'ORD-4' })]
-    const result = checkForDuplicates(incoming, existing)
-    expect(result.duplicateCount).toBe(2)
-    expect(result.newRecordCount).toBe(2)
-    expect(result.isLikelyReupload).toBe(false)
+describe('recordKey uniqueness across a batch', () => {
+  // The database enforces de-duplication via a unique constraint on these
+  // keys, so what matters on the client is that distinct order lines never
+  // collide (which would silently drop a real row on import).
+  it('produces one distinct key per distinct order line', () => {
+    const batch = [
+      makeRecord({ orderId: 'ORD-1' }),
+      makeRecord({ orderId: 'ORD-2' }),
+      makeRecord({ orderId: 'ORD-1', sku: 'AO/EO/Rosemary/15' }),
+      makeRecord({ orderId: 'ORD-1', orderDate: '2026-06-02' }),
+    ]
+    expect(new Set(batch.map(recordKey)).size).toBe(4)
   })
 })
 

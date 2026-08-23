@@ -68,5 +68,11 @@ export const NAVIGATION: NavSection[] = [
       { label: 'Import History', path: '/data/import-history' },
     ],
   },
-  { label: 'Settings', path: '/settings' },
+  {
+    label: 'Settings',
+    children: [
+      { label: 'General', path: '/settings' },
+      { label: 'Team', path: '/settings/team' },
+    ],
+  },
 ]

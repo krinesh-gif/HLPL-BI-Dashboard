@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { detectAmazonSellerCentralReport, normalizeAmazonSellerCentralRows } from './amazonSellerCentral'
-import { checkForDuplicates } from './duplicates'
+import { recordKey } from './duplicates'
 import type { SkuMaster } from '@/data/models'
 
 const skuMaster: SkuMaster[] = [
@@ -58,23 +58,21 @@ describe('normalizeAmazonSellerCentralRows', () => {
   })
 })
 
-describe('checkForDuplicates', () => {
-  it('flags re-uploading the same file as a likely duplicate', () => {
+describe('dedup keys for normalized Amazon rows', () => {
+  // De-duplication itself is enforced by the database's unique constraint on
+  // dedup_key; what still needs testing here is that normalization produces
+  // keys that actually distinguish one order line from another.
+  it('gives two different orders distinct keys, and the same order a stable one', () => {
     const rows = [
       { 'amazon-order-id': '111-1', 'purchase-date': '2026-06-15', sku: 'HC-ROSE-015', quantity: '1', 'item-price': '249' },
       { 'amazon-order-id': '111-2', 'purchase-date': '2026-06-15', sku: 'HC-ROSE-015', quantity: '1', 'item-price': '249' },
     ]
     const first = normalizeAmazonSellerCentralRows(rows, skuMaster, 'import-1').validRecords
-    const result = checkForDuplicates(first, first)
-    expect(result.isLikelyReupload).toBe(true)
-    expect(result.duplicateCount).toBe(2)
-  })
+    const again = normalizeAmazonSellerCentralRows(rows, skuMaster, 'import-2').validRecords
 
-  it('does not flag genuinely new records', () => {
-    const rows = [{ 'amazon-order-id': '111-3', 'purchase-date': '2026-06-16', sku: 'HC-ROSE-015', quantity: '1', 'item-price': '249' }]
-    const incoming = normalizeAmazonSellerCentralRows(rows, skuMaster, 'import-2').validRecords
-    const result = checkForDuplicates(incoming, [])
-    expect(result.isLikelyReupload).toBe(false)
-    expect(result.newRecordCount).toBe(1)
+    expect(new Set(first.map(recordKey)).size).toBe(2)
+    // Re-parsing the same file must reproduce the same keys, or a re-upload
+    // would slip past the database's conflict check and double-count.
+    expect(again.map(recordKey)).toEqual(first.map(recordKey))
   })
 })

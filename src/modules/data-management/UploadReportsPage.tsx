@@ -46,7 +46,7 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   amazon_ads_sponsored_products: 'amazon_in_seller', // overridden per-preview when ads records exist
 }
 
-type Stage = 'idle' | 'needs-month' | 'parsed' | 'error'
+type Stage = 'idle' | 'needs-month' | 'parsed' | 'importing' | 'error'
 
 interface PreviewState {
   fileName: string
@@ -65,7 +65,7 @@ interface PreviewState {
 
 export function UploadReportsPage() {
   const {
-    skuMaster, salesRecords, addImportedSales, addImportedAds,
+    skuMaster, addImportedSales, addImportedAds,
     setFlipkartFacts, setAmazonUsaFacts, setMeeshoFacts,
   } = useDataStore()
   const { month: filterMonth } = useFilterStore()
@@ -75,30 +75,32 @@ export function UploadReportsPage() {
   const [pendingFile, setPendingFile] = useState<{ fileName: string; parsed: ParsedFile } | null>(null)
   const [flipkartMonth, setFlipkartMonth] = useState(filterMonth)
 
-  function showPreview(partial: Omit<PreviewState, 'duplicateCount' | 'isLikelyReupload' | 'adsRecords'> & { adsRecords?: AdsRecord[] }) {
-    const dup = checkForDuplicates(partial.validRecords, salesRecords)
+  async function showPreview(partial: Omit<PreviewState, 'duplicateCount' | 'isLikelyReupload' | 'adsRecords'> & { adsRecords?: AdsRecord[] }) {
+    // The duplicate check runs against the shared database now, not a local
+    // copy of every row — so it also catches rows a teammate already imported.
+    const dup = await checkForDuplicates(partial.validRecords)
     setPreview({ ...partial, adsRecords: partial.adsRecords ?? [], duplicateCount: dup.duplicateCount, isLikelyReupload: dup.isLikelyReupload })
     setStage('parsed')
   }
 
-  function buildSimplePreview(kind: ReportKind, fileName: string, parsed: ParsedFile, month: string) {
+  async function buildSimplePreview(kind: ReportKind, fileName: string, parsed: ParsedFile, month: string) {
     const importId = `import-${Date.now()}`
 
     if (kind === 'amazon_seller_central') {
       const r = normalizeAmazonSellerCentralRows(parsed.rows, skuMaster, importId)
-      showPreview({ fileName, reportKind: kind, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
+      await showPreview({ fileName, reportKind: kind, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
     } else if (kind === 'flipkart_sku_pnl') {
       const r = normalizeFlipkartSkuPnl(parsed.rows, skuMaster, month, importId)
-      showPreview({ fileName, reportKind: kind, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings, flipkartFacts: r.facts })
+      await showPreview({ fileName, reportKind: kind, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings, flipkartFacts: r.facts })
     } else if (kind === 'amazon_usa_product_profitability') {
       const r = normalizeAmazonUsaProductProfitability(parsed.headers, parsed.rows, skuMaster, importId)
-      showPreview({ fileName, reportKind: kind, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings, amazonUsaFacts: r.facts })
+      await showPreview({ fileName, reportKind: kind, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings, amazonUsaFacts: r.facts })
     } else if (kind === 'meesho_order_summary') {
       const r = normalizeMeeshoOrderSummary(parsed.rows, skuMaster, importId)
-      showPreview({ fileName, reportKind: kind, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
+      await showPreview({ fileName, reportKind: kind, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
     } else if (kind === 'amazon_ads_sponsored_products') {
       const r = normalizeAmazonAdsSponsoredProductsReport(parsed.rows, importId)
-      showPreview({ fileName, reportKind: kind, totalRows: r.totalRows, validRecords: [], adsRecords: r.adsRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
+      await showPreview({ fileName, reportKind: kind, totalRows: r.totalRows, validRecords: [], adsRecords: r.adsRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
     }
   }
 
@@ -117,7 +119,7 @@ export function UploadReportsPage() {
         }
         const importId = `import-${Date.now()}`
         const r = normalizeMeeshoSettlementJson(data as MeeshoSettlementJson, skuMaster, importId)
-        showPreview({
+        await showPreview({
           fileName: file.name, reportKind: 'meesho_settlement_json', totalRows: r.totalRows,
           validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings,
           meeshoFactsByMonth: r.factsByMonth,
@@ -132,7 +134,7 @@ export function UploadReportsPage() {
 
         if (detectFlipkartWorkbook(sheetNames)) {
           const r = normalizeFlipkartWorkbook(sheets, skuMaster, importId)
-          showPreview({
+          await showPreview({
             fileName: file.name, reportKind: 'flipkart_workbook', totalRows: r.totalRows,
             validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings, flipkartFacts: r.facts,
           })
@@ -141,7 +143,7 @@ export function UploadReportsPage() {
 
         if (detectMeeshoOrderPaymentsSheet(sheets['Order Payments'])) {
           const r = normalizeMeeshoOrderPayments(sheets['Order Payments'], sheets['Ads Cost'], skuMaster, importId)
-          showPreview({
+          await showPreview({
             fileName: file.name, reportKind: 'meesho_order_payments', totalRows: r.totalRows,
             validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings, meeshoFactsByMonth: r.factsByMonth,
           })
@@ -173,20 +175,20 @@ export function UploadReportsPage() {
         return
       }
 
-      buildSimplePreview(kind, file.name, parsed, filterMonth)
+      await buildSimplePreview(kind, file.name, parsed, filterMonth)
     } catch (e) {
       setStage('error')
       setError(`Upload failed. Existing data has NOT been changed. Reason: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
-  function confirmFlipkartMonth() {
+  async function confirmFlipkartMonth() {
     if (!pendingFile) return
-    buildSimplePreview('flipkart_sku_pnl', pendingFile.fileName, pendingFile.parsed, flipkartMonth)
+    await buildSimplePreview('flipkart_sku_pnl', pendingFile.fileName, pendingFile.parsed, flipkartMonth)
     setPendingFile(null)
   }
 
-  function confirmImport() {
+  async function confirmImport() {
     if (!preview) return
     const channel = preview.adsRecords[0]?.channel ?? REPORT_CHANNEL[preview.reportKind]
     const importRecord: ImportRecord = {
@@ -200,14 +202,23 @@ export function UploadReportsPage() {
       status: preview.invalidCount > 0 ? 'partial' : 'success',
       warnings: preview.warnings,
     }
-    if (preview.validRecords.length > 0) addImportedSales(preview.validRecords, importRecord)
-    else if (preview.adsRecords.length === 0) addImportedSales([], importRecord) // still record the import even if nothing came through
-    if (preview.adsRecords.length > 0) addImportedAds(preview.adsRecords)
-    if (preview.flipkartFacts) setFlipkartFacts(preview.flipkartFacts)
-    if (preview.amazonUsaFacts) setAmazonUsaFacts(preview.amazonUsaFacts)
-    if (preview.meeshoFactsByMonth) for (const f of preview.meeshoFactsByMonth) setMeeshoFacts(f)
-    setPreview(null)
-    setStage('idle')
+
+    setStage('importing')
+    try {
+      if (preview.validRecords.length > 0) await addImportedSales(preview.validRecords, importRecord)
+      else if (preview.adsRecords.length === 0) await addImportedSales([], importRecord) // still record the import even if nothing came through
+      if (preview.adsRecords.length > 0) await addImportedAds(preview.adsRecords)
+      if (preview.flipkartFacts) await setFlipkartFacts(preview.flipkartFacts)
+      if (preview.amazonUsaFacts) await setAmazonUsaFacts(preview.amazonUsaFacts)
+      if (preview.meeshoFactsByMonth) for (const f of preview.meeshoFactsByMonth) await setMeeshoFacts(f)
+      setPreview(null)
+      setStage('idle')
+    } catch (e) {
+      // The upload writes to a shared database now, so a failure has to be
+      // visible — silently returning to idle would look like it succeeded.
+      setStage('error')
+      setError(`Import failed: ${e instanceof Error ? e.message : String(e)}`)
+    }
   }
 
   function cancel() {
@@ -297,12 +308,12 @@ export function UploadReportsPage() {
             <button
               type="button"
               onClick={confirmImport}
-              disabled={totalValid === 0}
+              disabled={totalValid === 0 || stage === 'importing'}
               className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
             >
-              Import {totalValid.toLocaleString()} Records
+              {stage === 'importing' ? 'Importing…' : `Import ${totalValid.toLocaleString()} Records`}
             </button>
-            <button type="button" onClick={cancel} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+            <button type="button" onClick={cancel} disabled={stage === 'importing'} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40">
               Cancel
             </button>
           </div>
