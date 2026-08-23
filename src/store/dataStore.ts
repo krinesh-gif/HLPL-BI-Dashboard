@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { api } from '@/lib/apiClient'
+import { toMonthKey } from '@/lib/format'
+import { useFilterStore } from './filterStore'
 import type {
   AdsRecord,
   AmazonUsaPnlFacts,
@@ -55,6 +57,20 @@ export interface ImportProgress {
   total: number
 }
 
+/** What actually landed in the shared database, reported back so the upload
+ * page can confirm the outcome rather than just going quiet. */
+export interface ImportOutcome {
+  fileName: string
+  added: number
+  skippedAsDuplicate: number
+  monthsUpdated: string[]
+}
+
+interface BatchResult {
+  inserted: number
+  skippedAsDuplicate: number
+}
+
 interface DataState extends SharedDataset {
   loading: boolean
   /** Set when the shared dataset could not be loaded, so the UI can say so
@@ -64,7 +80,7 @@ interface DataState extends SharedDataset {
    * a large file is instead of appearing frozen. */
   importProgress: ImportProgress | null
   loadState: () => Promise<void>
-  importReport: (report: ReportImport) => Promise<void>
+  importReport: (report: ReportImport) => Promise<ImportOutcome>
   updateSkuMaster: (sku: string, patch: Partial<SkuMaster>) => Promise<void>
   patchFlipkartFacts: (month: string, patch: Partial<FlipkartPnlFacts>) => Promise<void>
   patchAmazonUsaFacts: (month: string, patch: Partial<AmazonUsaPnlFacts>) => Promise<void>
@@ -80,6 +96,21 @@ function batched<T>(items: T[], size: number): T[][] {
   const batches: T[][] = []
   for (let i = 0; i < items.length; i += size) batches.push(items.slice(i, i + size))
   return batches
+}
+
+/** The newest month present anywhere in the dataset — order rows or any
+ * channel's P&L facts — so the dashboard can open on a month that has numbers
+ * in it rather than on today's date. */
+export function latestMonthWithData(dataset: SharedDataset): string | null {
+  const months = [
+    ...dataset.salesRecords.map((r) => toMonthKey(r.orderDate)),
+    ...dataset.adsRecords.map((r) => toMonthKey(r.date)),
+    ...dataset.flipkartFacts.map((f) => f.month),
+    ...dataset.amazonUsaFacts.map((f) => f.month),
+    ...dataset.meeshoFacts.map((f) => f.month),
+  ].filter(Boolean)
+
+  return months.length === 0 ? null : months.reduce((a, b) => (a > b ? a : b))
 }
 
 export const useDataStore = create<DataState>((set, get) => {
@@ -101,6 +132,12 @@ export const useDataStore = create<DataState>((set, get) => {
       try {
         const dataset = await api.get<SharedDataset>('/api/state')
         set({ ...dataset, loading: false, error: null })
+        // Point the dashboard at the newest month that has data. Left on the
+        // current calendar month, every page reads as empty whenever the
+        // latest upload covers an earlier period — which looks exactly like
+        // the import having failed.
+        const latest = latestMonthWithData(dataset)
+        if (latest) useFilterStore.getState().defaultMonthTo(latest)
       } catch (e) {
         set({ loading: false, error: e instanceof Error ? e.message : 'Could not load the shared dataset.' })
       }
@@ -118,6 +155,10 @@ export const useDataStore = create<DataState>((set, get) => {
       set({ importProgress: { sent: 0, total } })
       try {
         let sent = 0
+        let added = 0
+        let skippedAsDuplicate = 0
+        const monthsUpdated: string[] = []
+
         // An import with no rows still records that the file was processed.
         if (salesRecords.length === 0 && adsRecords.length === 0) {
           await api.post('/api/sales/import', { records: [], importRecord })
@@ -129,25 +170,39 @@ export const useDataStore = create<DataState>((set, get) => {
           // roughly 80% of the payload — a real Flipkart workbook goes from
           // 22 MB to 4.5 MB without it. The uploaded file remains the record
           // of what was originally submitted.
-          await api.post('/api/sales/import', {
+          const result = await api.post<BatchResult>('/api/sales/import', {
             records: batch.map(({ raw: _raw, ...rest }) => rest),
             importRecord,
           })
+          added += result.inserted
+          skippedAsDuplicate += result.skippedAsDuplicate
           sent += batch.length
           set({ importProgress: { sent, total } })
         }
 
         for (const batch of batched(adsRecords, UPLOAD_BATCH_SIZE)) {
-          await api.post('/api/ads/import', { records: batch })
+          const result = await api.post<BatchResult>('/api/ads/import', { records: batch })
+          added += result.inserted
+          skippedAsDuplicate += result.skippedAsDuplicate
           sent += batch.length
           set({ importProgress: { sent, total } })
         }
 
-        if (flipkartFacts) await api.post('/api/facts/flipkart', { facts: flipkartFacts })
-        if (amazonUsaFacts) await api.post('/api/facts/amazon-usa', { facts: amazonUsaFacts })
-        for (const facts of meeshoFactsByMonth ?? []) await api.post('/api/facts/meesho', { facts })
+        if (flipkartFacts) {
+          await api.post('/api/facts/flipkart', { facts: flipkartFacts })
+          monthsUpdated.push(flipkartFacts.month)
+        }
+        if (amazonUsaFacts) {
+          await api.post('/api/facts/amazon-usa', { facts: amazonUsaFacts })
+          monthsUpdated.push(amazonUsaFacts.month)
+        }
+        for (const facts of meeshoFactsByMonth ?? []) {
+          await api.post('/api/facts/meesho', { facts })
+          monthsUpdated.push(facts.month)
+        }
 
         await get().loadState()
+        return { fileName: importRecord.fileName, added, skippedAsDuplicate, monthsUpdated }
       } finally {
         set({ importProgress: null })
       }

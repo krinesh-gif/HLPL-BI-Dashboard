@@ -10,7 +10,8 @@ import { detectMeeshoOrderPaymentsSheet, normalizeMeeshoOrderPayments } from '@/
 import { isMeeshoSettlementJson, normalizeMeeshoSettlementJson, type MeeshoSettlementJson } from '@/data/normalize/meeshoSettlementJson'
 import { detectAmazonAdsSponsoredProductsReport, normalizeAmazonAdsSponsoredProductsReport } from '@/data/normalize/amazonAdsSponsoredProducts'
 import { checkForDuplicates } from '@/data/normalize/duplicates'
-import { useDataStore } from '@/store/dataStore'
+import { useDataStore, type ImportOutcome } from '@/store/dataStore'
+import { monthLabel } from '@/lib/format'
 import { useFilterStore } from '@/store/filterStore'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
 import type { AdsRecord, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, MeeshoPnlFacts } from '@/data/models'
@@ -65,6 +66,7 @@ interface PreviewState {
 
 export function UploadReportsPage() {
   const { skuMaster, importReport, importProgress } = useDataStore()
+  const [outcome, setOutcome] = useState<ImportOutcome | null>(null)
   const { month: filterMonth } = useFilterStore()
   const [stage, setStage] = useState<Stage>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -103,6 +105,7 @@ export function UploadReportsPage() {
 
   async function handleFile(file: File) {
     setError(null)
+    setOutcome(null)
     try {
       const lowerName = file.name.toLowerCase()
 
@@ -202,7 +205,7 @@ export function UploadReportsPage() {
 
     setStage('importing')
     try {
-      await importReport({
+      const result = await importReport({
         importRecord,
         salesRecords: preview.validRecords,
         adsRecords: preview.adsRecords,
@@ -210,6 +213,7 @@ export function UploadReportsPage() {
         amazonUsaFacts: preview.amazonUsaFacts,
         meeshoFactsByMonth: preview.meeshoFactsByMonth,
       })
+      setOutcome(result)
       setPreview(null)
       setStage('idle')
     } catch (e) {
@@ -250,6 +254,34 @@ export function UploadReportsPage() {
 
       {stage === 'error' && error && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div>
+      )}
+
+      {outcome && stage === 'idle' && (
+        <div className="mb-6 rounded-lg border border-emerald-300 bg-emerald-50 p-4">
+          <h3 className="text-sm font-semibold text-emerald-900">✓ Imported {outcome.fileName}</h3>
+          <ul className="mt-2 space-y-0.5 text-sm text-emerald-800">
+            <li>{outcome.added.toLocaleString()} new record(s) added to the shared data.</li>
+            {outcome.skippedAsDuplicate > 0 && (
+              <li>
+                {outcome.skippedAsDuplicate.toLocaleString()} row(s) were already imported and were skipped, so nothing
+                is double-counted.
+              </li>
+            )}
+            {outcome.monthsUpdated.length > 0 && (
+              <li>P&amp;L updated for {outcome.monthsUpdated.map(monthLabel).join(', ')}.</li>
+            )}
+            {outcome.added === 0 && outcome.skippedAsDuplicate > 0 && (
+              <li className="font-medium">This file had already been imported — nothing changed.</li>
+            )}
+          </ul>
+          <button
+            type="button"
+            onClick={() => setOutcome(null)}
+            className="mt-3 text-xs font-medium text-emerald-700 hover:text-emerald-900"
+          >
+            Dismiss
+          </button>
+        </div>
       )}
 
       {stage === 'needs-month' && pendingFile && (

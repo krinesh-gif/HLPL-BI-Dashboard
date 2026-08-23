@@ -10,10 +10,17 @@ export interface GlobalFilters {
 }
 
 interface FilterState extends GlobalFilters {
+  /** True once someone picks a month themselves, after which newly loaded data
+   * must not move it out from under them. */
+  monthChosenByUser: boolean
   setMonth: (month: string) => void
   setChannel: (channel: ChannelId | 'all') => void
   setCategory: (category: string) => void
   setSku: (sku: string) => void
+  /** Points the dashboard at the most recent month that actually has data.
+   * Without this the app opens on the current calendar month and every page
+   * looks empty whenever the latest upload covers an earlier period. */
+  defaultMonthTo: (month: string) => void
   reset: () => void
 }
 
@@ -26,9 +33,12 @@ const DEFAULTS: GlobalFilters = {
 
 export const useFilterStore = create<FilterState>((set) => ({
   ...DEFAULTS,
-  setMonth: (month) => set({ month }),
+  monthChosenByUser: false,
+  setMonth: (month) => set({ month, monthChosenByUser: true }),
   setChannel: (channel) => set({ channel }),
   setCategory: (category) => set({ category }),
   setSku: (sku) => set({ sku }),
-  reset: () => set({ ...DEFAULTS }),
+  defaultMonthTo: (month) =>
+    set((state) => (state.monthChosenByUser || !month ? {} : { month })),
+  reset: () => set({ ...DEFAULTS, monthChosenByUser: false }),
 }))
