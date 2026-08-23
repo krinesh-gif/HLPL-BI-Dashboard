@@ -31,6 +31,9 @@ export interface CogsResult {
    * folded in as zero, which would show them at 100% margin. */
   uncostedUnits: number
   uncostedSkus: string[]
+  /** Net sales of the rows that could not be costed, so a caller can apply a
+   * percentage-of-revenue fallback to them and to nothing else. */
+  uncostedNetSales: number
 }
 
 /**
@@ -80,6 +83,7 @@ export function cogsForRecords(
 
   let cogs = 0
   let uncostedUnits = 0
+  let uncostedNetSales = 0
   const uncostedSkus = new Set<string>()
 
   for (const r of records) {
@@ -87,13 +91,14 @@ export function cogsForRecords(
     const unit = resolve(r.sku)
     if (unit === null || unit <= 0) {
       uncostedUnits += r.quantity
+      uncostedNetSales += r.netSales
       uncostedSkus.add(r.sku)
       continue
     }
     cogs += unit * r.quantity
   }
 
-  return { cogs, uncostedUnits, uncostedSkus: [...uncostedSkus] }
+  return { cogs, uncostedUnits, uncostedSkus: [...uncostedSkus], uncostedNetSales }
 }
 
 /**

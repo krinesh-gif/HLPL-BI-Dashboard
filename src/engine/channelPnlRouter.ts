@@ -8,8 +8,10 @@ import type {
   MeeshoPnlFacts,
   SkuMaster,
 } from '@/data/models'
+import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
+import { toMonthKey } from '@/lib/format'
 import { allocateFixedExpensesForMonth } from './allocation'
-import { buildChannelPnl, computeSubtotals, type CogsInputs, type MarketingByChannel } from './pnl'
+import { buildChannelPnl, cogsForRecords, computeSubtotals, type CogsInputs, type MarketingByChannel } from './pnl'
 import { amazonUsaToCanonicalBuckets, AMAZON_USA_LINE_DEFS, computeAmazonUsaPnl } from './nativePnl/amazonUsa'
 import { applyFlipkartOtherCosts, computeFlipkartPnl, flipkartToCanonicalBuckets, FLIPKART_LINE_DEFS } from './nativePnl/flipkart'
 import { applyMeeshoOtherCosts, computeMeeshoPnl, meeshoToCanonicalBuckets, MEESHO_LINE_DEFS } from './nativePnl/meesho'
@@ -49,6 +51,41 @@ function computeAllocatedOtherCosts(
   return Object.values(allocation).reduce((sum, v) => sum + (v ?? 0), 0)
 }
 
+/** Share of revenue charged as COGS for a SKU with no cost on file. Matches the
+ * fallback the company's own model uses for its unpriced bucket. */
+const UNPRICED_COGS_FALLBACK_PCT = 0.25
+
+/**
+ * COGS for a channel-month, recomputed from order rows at the cost that applied
+ * in that month.
+ *
+ * Native facts carry a `cogs` figure, but a marketplace does not know what a
+ * product costs us — that number was computed by the importer from whatever was
+ * in the Product Master on the day the file was uploaded, and then frozen into
+ * the facts blob. Left alone it makes effective-dated costs a no-op on exactly
+ * the channels that have settlement files, and it prices a month at an
+ * arbitrary date rather than at that month's cost.
+ *
+ * Returns null when there are no order rows to recompute from, in which case
+ * the imported figure is the only number available and is kept.
+ */
+function recomputedCogs(
+  channel: ChannelId,
+  month: string,
+  inputs: ChannelPnlViewInputs,
+): { priced: number; unpriced: number; total: number } | null {
+  if (!inputs.cogs?.costIndex) return null
+
+  const records = inputs.salesRecords.filter(
+    (r) => r.channel === channel && toMonthKey(r.orderDate) === month,
+  )
+  if (records.length === 0) return null
+
+  const result = cogsForRecords(records, inputs.skuMaster, month, inputs.cogs)
+  const unpriced = result.uncostedNetSales * UNPRICED_COGS_FALLBACK_PCT
+  return { priced: result.cogs, unpriced, total: result.cogs + unpriced }
+}
+
 export interface ChannelPnlViewInputs {
   salesRecords: CanonicalSalesRecord[]
   skuMaster: SkuMaster[]
@@ -68,8 +105,12 @@ export interface ChannelPnlViewInputs {
  */
 export function buildChannelPnlView(channel: ChannelId, month: string, inputs: ChannelPnlViewInputs): ChannelPnlView {
   if (channel === 'flipkart') {
-    const facts = inputs.facts.flipkartFacts.find((f) => f.month === month)
-    if (facts) {
+    const imported = inputs.facts.flipkartFacts.find((f) => f.month === month)
+    if (imported) {
+      const recomputed = recomputedCogs(channel, month, inputs)
+      const facts = recomputed
+        ? { ...imported, cogsPriced: recomputed.priced, cogsUnpriced: recomputed.unpriced }
+        : imported
       const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
       const values = applyFlipkartOtherCosts(computeFlipkartPnl(facts), otherCosts)
       const canonicalLines = computeSubtotals(flipkartToCanonicalBuckets(facts))
@@ -82,8 +123,12 @@ export function buildChannelPnlView(channel: ChannelId, month: string, inputs: C
   }
 
   if (channel === 'amazon_us') {
-    const facts = inputs.facts.amazonUsaFacts.find((f) => f.month === month)
-    if (facts) {
+    const imported = inputs.facts.amazonUsaFacts.find((f) => f.month === month)
+    if (imported) {
+      const recomputed = recomputedCogs(channel, month, inputs)
+      const facts = recomputed
+        ? { ...imported, cogsUsd: recomputed.total / NATIVE_PNL_ASSUMPTIONS.usdToInrRate }
+        : imported
       const values = computeAmazonUsaPnl(facts)
       const canonicalLines = computeSubtotals(amazonUsaToCanonicalBuckets(facts))
       return {
@@ -95,8 +140,10 @@ export function buildChannelPnlView(channel: ChannelId, month: string, inputs: C
   }
 
   if (channel === 'meesho') {
-    const facts = inputs.facts.meeshoFacts.find((f) => f.month === month)
-    if (facts) {
+    const imported = inputs.facts.meeshoFacts.find((f) => f.month === month)
+    if (imported) {
+      const recomputed = recomputedCogs(channel, month, inputs)
+      const facts = recomputed ? { ...imported, cogs: recomputed.total } : imported
       const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
       const values = applyMeeshoOtherCosts(computeMeeshoPnl(facts), otherCosts)
       const canonicalLines = computeSubtotals(meeshoToCanonicalBuckets(facts))

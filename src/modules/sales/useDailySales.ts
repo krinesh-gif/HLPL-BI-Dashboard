@@ -1,47 +1,152 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useDataStore } from '@/store/dataStore'
+import { CHANNELS, type ChannelId } from '@/config/channels'
+import { normalizeCategory, distinctCategories } from '@/data/categories'
+import { asp, orderBasisNetSales, rtoPct, type NetSalesFigure } from '@/engine/netSales'
 import { movingAverage } from '@/engine/sales'
+import type { CanonicalSalesRecord } from '@/data/models'
 
-export interface DailySalesRow {
+export type DailyLevel = 'company' | 'channel' | 'sku'
+
+export interface DailyRow {
   date: string
-  units: number
+  figure: NetSalesFigure
   revenue: number
+  units: number
   orders: number
+  asp: number | null
+  rtoPct: number | null
+  rtoUnits: number
   dodGrowthPct: number | null
   movingAvg7: number | null
+  /** Revenue split by channel for that day, used by the channel-level view. */
+  byChannel: Map<ChannelId, number>
 }
 
-export function useDailySales(sku: string, days = 45) {
-  const { salesRecords } = useDataStore()
+export interface DailyFilters {
+  from: string
+  to: string
+  channel: ChannelId | 'all'
+  category: string | 'all'
+  sku: string | 'all'
+}
 
-  return useMemo(() => {
-    const skuRecords = salesRecords.filter((r) => r.sku === sku)
-    const byDay = new Map<string, { units: number; revenue: number; orders: number }>()
-    for (const r of skuRecords) {
-      const bucket = byDay.get(r.orderDate) ?? { units: 0, revenue: 0, orders: 0 }
-      bucket.units += r.quantity
-      bucket.revenue += r.netSales
-      bucket.orders += 1
-      byDay.set(r.orderDate, bucket)
+const DEFAULT_WINDOW_DAYS = 45
+
+function isoDaysAgo(from: string, days: number): string {
+  const d = new Date(from)
+  d.setDate(d.getDate() - days)
+  return d.toISOString().slice(0, 10)
+}
+
+/**
+ * Day-level sales, at company, channel or SKU level.
+ *
+ * Every figure comes from the order-basis side of the central Net Sales
+ * engine. Settlement reports are monthly totals and cannot be split by day, so
+ * a daily figure that used them would be inventing a distribution the data
+ * does not contain. That means daily revenue for a settled channel will not sum
+ * exactly to its monthly P&L figure — which is a real property of the data,
+ * and the reason Net Sales Reconciliation exists rather than something to paper
+ * over here.
+ */
+export function useDailySales() {
+  const { salesRecords, skuMaster } = useDataStore()
+
+  const latestDate = useMemo(() => {
+    let latest = ''
+    for (const r of salesRecords) if (r.orderDate > latest) latest = r.orderDate
+    return latest || new Date().toISOString().slice(0, 10)
+  }, [salesRecords])
+
+  const [filters, setFilters] = useState<DailyFilters>(() => ({
+    from: '',
+    to: '',
+    channel: 'all',
+    category: 'all',
+    sku: 'all',
+  }))
+
+  // An unset range means "the recent window", resolved against the data rather
+  // than against today's date — the latest upload is often weeks old.
+  const from = filters.from || isoDaysAgo(latestDate, DEFAULT_WINDOW_DAYS)
+  const to = filters.to || latestDate
+
+  const result = useMemo(() => {
+    const inScope = salesRecords.filter(
+      (r) =>
+        r.orderDate >= from &&
+        r.orderDate <= to &&
+        (filters.channel === 'all' || r.channel === filters.channel) &&
+        (filters.category === 'all' || normalizeCategory(r.category) === filters.category) &&
+        (filters.sku === 'all' || r.sku === filters.sku),
+    )
+
+    const byDay = new Map<string, CanonicalSalesRecord[]>()
+    for (const r of inScope) {
+      const list = byDay.get(r.orderDate)
+      if (list) list.push(r)
+      else byDay.set(r.orderDate, [r])
     }
 
-    const sortedDates = Array.from(byDay.keys()).sort().slice(-days)
-    const units = sortedDates.map((d) => byDay.get(d)!.units)
-    const movingAvgs = movingAverage(units, 7)
+    const dates = [...byDay.keys()].sort()
+    const revenues = dates.map((d) => orderBasisNetSales(byDay.get(d)!).netSales)
+    const movingAvgs = movingAverage(revenues, 7)
 
-    const rows: DailySalesRow[] = sortedDates.map((date, i) => {
-      const bucket = byDay.get(date)!
-      const prevUnits = i > 0 ? byDay.get(sortedDates[i - 1])!.units : null
-      const dodGrowthPct = prevUnits !== null && prevUnits !== 0 ? ((bucket.units - prevUnits) / prevUnits) * 100 : null
-      return { date, units: bucket.units, revenue: bucket.revenue, orders: bucket.orders, dodGrowthPct, movingAvg7: movingAvgs[i] }
+    const rows: DailyRow[] = dates.map((date, i) => {
+      const records = byDay.get(date)!
+      const figure = orderBasisNetSales(records)
+
+      const byChannel = new Map<ChannelId, number>()
+      for (const c of CHANNELS) {
+        const channelRecords = records.filter((r) => r.channel === c.id)
+        if (channelRecords.length > 0) byChannel.set(c.id, orderBasisNetSales(channelRecords).netSales)
+      }
+
+      const previous = i > 0 ? revenues[i - 1] : null
+      return {
+        date,
+        figure,
+        revenue: figure.netSales,
+        units: figure.units,
+        orders: figure.orders,
+        asp: asp(figure),
+        rtoPct: rtoPct(figure),
+        rtoUnits: figure.rtoUnits,
+        dodGrowthPct: previous !== null && previous !== 0 ? ((figure.netSales - previous) / Math.abs(previous)) * 100 : null,
+        movingAvg7: movingAvgs[i],
+        byChannel,
+      }
     })
 
-    const currentMonth = sortedDates.length > 0 ? sortedDates[sortedDates.length - 1].slice(0, 7) : ''
-    const monthToDateUnits = rows.filter((r) => r.date.startsWith(currentMonth)).reduce((s, r) => s + r.units, 0)
-    const daysElapsedInMonth = rows.filter((r) => r.date.startsWith(currentMonth)).length
-    const daysInMonth = new Date(Number(currentMonth.slice(0, 4)), Number(currentMonth.slice(5, 7)), 0).getDate()
-    const runRateUnits = daysElapsedInMonth > 0 ? (monthToDateUnits / daysElapsedInMonth) * daysInMonth : 0
+    const total = orderBasisNetSales(inScope)
 
-    return { rows, runRateUnits, currentMonth }
-  }, [salesRecords, sku, days])
+    // Channels that actually appear, so the chart does not draw six flat lines.
+    const activeChannels = CHANNELS.filter((c) => rows.some((r) => (r.byChannel.get(c.id) ?? 0) !== 0))
+
+    const daysWithSales = rows.length
+    return {
+      rows,
+      total,
+      activeChannels,
+      avgDailyRevenue: daysWithSales > 0 ? total.netSales / daysWithSales : 0,
+      avgDailyUnits: daysWithSales > 0 ? total.units / daysWithSales : 0,
+      bestDay: rows.length > 0 ? rows.reduce((a, b) => (b.revenue > a.revenue ? b : a)) : null,
+    }
+  }, [salesRecords, from, to, filters.channel, filters.category, filters.sku])
+
+  const options = useMemo(
+    () => ({
+      categories: distinctCategories(salesRecords.map((r) => r.category)),
+      // Only SKUs that actually sold — the full Product Master is hundreds of
+      // entries, most irrelevant to any given range.
+      skus: [...new Set(salesRecords.map((r) => r.sku))].sort().map((sku) => ({
+        sku,
+        label: skuMaster.find((s) => s.sku === sku)?.productName ?? sku,
+      })),
+    }),
+    [salesRecords, skuMaster],
+  )
+
+  return { ...result, filters: { ...filters, from, to }, setFilters, options, latestDate }
 }

@@ -3,7 +3,6 @@ import { useParams } from 'react-router-dom'
 import { PageShell } from '@/components/layout/PageShell'
 import { KPICard, KPIGrid } from '@/components/ui/KPICard'
 import { TrendLineChart } from '@/components/charts/TrendLineChart'
-import { ComparisonBarChart } from '@/components/charts/ComparisonBarChart'
 import { MixDonutChart } from '@/components/charts/MixDonutChart'
 import { PnlTable } from '@/components/pnl/PnlTable'
 import { NativePnlTable } from '@/components/pnl/NativePnlTable'
@@ -11,6 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
 import { formatCurrencyCompact, formatNumber, formatPercent } from '@/lib/format'
 import { useChannelData } from './useChannelData'
+import { TopProducts } from './TopProducts'
 
 export function ChannelDashboardPage() {
   const { channelId } = useParams<{ channelId: string }>()
@@ -60,10 +60,12 @@ export function ChannelDashboardPage() {
         <ChartCard title="Category Sales Mix">
           <MixDonutChart data={d.categorySales} valueFormatter={(v) => formatCurrencyCompact(v)} />
         </ChartCard>
-        <ChartCard title="Top SKUs">
-          <ComparisonBarChart data={d.topSkus.map((s) => ({ name: s.productName, value: s.netSales }))} xKey="name" yKey="value" horizontal valueFormatter={(v) => formatCurrencyCompact(v)} />
-        </ChartCard>
       </div>
+
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Top Products</h2>
+        <TopProducts channel={channel} />
+      </section>
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
