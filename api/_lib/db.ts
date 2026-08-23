@@ -19,3 +19,29 @@ export const isDatabaseConfigured = Boolean(connectionString)
 // placeholder the module loads, `isDatabaseConfigured` reports the truth, and
 // any query that does slip through fails loudly on its own.
 export const sql = neon(connectionString ?? 'postgres://unconfigured:unconfigured@unconfigured.invalid/unconfigured')
+
+let schemaApplied: Promise<void> | null = null
+
+/**
+ * Applies the schema if it has not been applied to this warm instance yet.
+ *
+ * The schema is only otherwise run during first-time setup, so a workspace set
+ * up before a table existed would never get it — and the owner is not someone
+ * who should have to run SQL by hand to pick up a new feature. Every statement
+ * is CREATE ... IF NOT EXISTS, so this is a no-op once things are in place, and
+ * the promise is cached so concurrent requests on one instance wait on a single
+ * run rather than racing.
+ */
+export function ensureSchema(): Promise<void> {
+  if (!isDatabaseConfigured) return Promise.resolve()
+  schemaApplied ??= (async () => {
+    const { SCHEMA_SQL } = await import('./schema.js')
+    await sql.query(SCHEMA_SQL)
+  })().catch((e) => {
+    // Don't cache a failure — a transient error should not leave every later
+    // request on this instance believing the schema is missing.
+    schemaApplied = null
+    throw e
+  })
+  return schemaApplied
+}

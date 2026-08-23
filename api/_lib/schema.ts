@@ -158,6 +158,34 @@ BEGIN
     note     TEXT,
     PRIMARY KEY (month, category)
   );
+
+  -- -------------------------------------------------------------------------
+  -- Marketplace SKU codes are not the internal cost-master codes: a listing may
+  -- be a renamed single, a multipack, or a bundle of different products.
+  -- Without these two tables such codes fall back to costing a flat percentage
+  -- of revenue, which on real Flipkart data covered about half of all sales.
+  -- -------------------------------------------------------------------------
+  CREATE TABLE IF NOT EXISTS sku_map (
+    channel_sku  TEXT PRIMARY KEY,
+    internal_sku TEXT NOT NULL,
+    kind         TEXT NOT NULL,              -- SINGLE | COMBO
+    source       TEXT NOT NULL,              -- imported | derived | manual
+    -- Derived mappings are guesses from the shape of the code and stay
+    -- unverified until a person confirms them.
+    verified     BOOLEAN NOT NULL DEFAULT false,
+    note         TEXT,
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+  CREATE TABLE IF NOT EXISTS combo_components (
+    combo_sku     TEXT NOT NULL,
+    component_sku TEXT NOT NULL,
+    quantity      DOUBLE PRECISION NOT NULL DEFAULT 1,
+    source        TEXT NOT NULL,
+    PRIMARY KEY (combo_sku, component_sku)
+  );
+
+  CREATE INDEX IF NOT EXISTS combo_components_combo_idx ON combo_components (combo_sku);
 END
 $schema$;
 `
