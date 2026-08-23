@@ -1,6 +1,7 @@
+import { createHandler } from '../_lib/handler'
 import { sql } from '../_lib/db'
 import { requireSession } from '../_lib/auth'
-import { isNonEmptyString, json, methodNotAllowed, readJson } from '../_lib/http'
+import { isNonEmptyString, json, readJson } from '../_lib/http'
 import { adsRecordKey } from '../../src/data/normalize/dedupKeys'
 import type { AdsRecord } from '../../src/data/models'
 
@@ -63,6 +64,4 @@ export async function POST(request: Request): Promise<Response> {
   return json({ inserted, skippedAsDuplicate: records.length - inserted })
 }
 
-export function GET(): Response {
-  return methodNotAllowed(['POST'])
-}
+export default createHandler({ POST })

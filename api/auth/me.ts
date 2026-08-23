@@ -1,3 +1,4 @@
+import { createHandler } from '../_lib/handler'
 import { getSessionUser } from '../_lib/auth'
 import { json } from '../_lib/http'
 
@@ -8,3 +9,5 @@ export async function GET(request: Request): Promise<Response> {
   const user = await getSessionUser(request)
   return json({ user })
 }
+
+export default createHandler({ GET })

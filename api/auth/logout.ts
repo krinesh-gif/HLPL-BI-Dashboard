@@ -1,5 +1,6 @@
+import { createHandler } from '../_lib/handler'
 import { clearedSessionCookie, destroySession, readSessionToken } from '../_lib/auth'
-import { json, methodNotAllowed } from '../_lib/http'
+import { json } from '../_lib/http'
 
 export async function POST(request: Request): Promise<Response> {
   const token = readSessionToken(request)
@@ -9,6 +10,4 @@ export async function POST(request: Request): Promise<Response> {
   return json({ ok: true }, 200, { 'set-cookie': clearedSessionCookie() })
 }
 
-export function GET(): Response {
-  return methodNotAllowed(['POST'])
-}
+export default createHandler({ POST })

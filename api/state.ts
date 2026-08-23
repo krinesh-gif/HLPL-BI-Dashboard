@@ -1,3 +1,4 @@
+import { createHandler } from './_lib/handler'
 import { sql } from './_lib/db'
 import { requireSession } from './_lib/auth'
 import { json } from './_lib/http'
@@ -52,3 +53,5 @@ export async function GET(request: Request): Promise<Response> {
     meeshoFacts: (meesho as Row[]).map((r) => r.data),
   })
 }
+
+export default createHandler({ GET })

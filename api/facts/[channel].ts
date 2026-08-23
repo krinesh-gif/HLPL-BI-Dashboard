@@ -1,3 +1,4 @@
+import { createHandler } from '../_lib/handler'
 import { sql } from '../_lib/db'
 import { requireSession } from '../_lib/auth'
 import { isNonEmptyString, json, readJson } from '../_lib/http'
@@ -67,3 +68,5 @@ export async function PATCH(request: Request): Promise<Response> {
   // facts is a no-op, not an error.
   return json({ ok: true, updated: updated.length > 0 })
 }
+
+export default createHandler({ POST, PATCH })

@@ -1,3 +1,4 @@
+import { createHandler } from './_lib/handler'
 import { sql } from './_lib/db'
 import { hashPassword, requireSession } from './_lib/auth'
 import { isNonEmptyString, json, readJson } from './_lib/http'
@@ -54,3 +55,5 @@ export async function DELETE(request: Request): Promise<Response> {
   await sql`DELETE FROM users WHERE id = ${id}`
   return json({ ok: true })
 }
+
+export default createHandler({ GET, POST, DELETE })

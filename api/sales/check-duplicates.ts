@@ -1,6 +1,7 @@
+import { createHandler } from '../_lib/handler'
 import { sql } from '../_lib/db'
 import { requireSession } from '../_lib/auth'
-import { json, methodNotAllowed, readJson } from '../_lib/http'
+import { json, readJson } from '../_lib/http'
 
 interface Body {
   keys?: unknown
@@ -39,6 +40,4 @@ export async function POST(request: Request): Promise<Response> {
   })
 }
 
-export function GET(): Response {
-  return methodNotAllowed(['POST'])
-}
+export default createHandler({ POST })

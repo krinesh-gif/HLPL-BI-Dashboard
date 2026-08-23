@@ -1,6 +1,7 @@
+import { createHandler } from '../_lib/handler'
 import { sql } from '../_lib/db'
 import { createSession, sessionCookie, verifyPassword } from '../_lib/auth'
-import { isNonEmptyString, json, methodNotAllowed, readJson } from '../_lib/http'
+import { isNonEmptyString, json, readJson } from '../_lib/http'
 
 interface LoginBody {
   email?: unknown
@@ -31,6 +32,4 @@ export async function POST(request: Request): Promise<Response> {
   return json({ user: { id: user.id, email: user.email } }, 200, { 'set-cookie': sessionCookie(token) })
 }
 
-export function GET(): Response {
-  return methodNotAllowed(['POST'])
-}
+export default createHandler({ POST })

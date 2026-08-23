@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { build } from 'esbuild'
-import { readdirSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { mkdirSync, readdirSync, rmSync, statSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 /**
  * Vercel bundles each serverless function reading the *root* tsconfig.json,
@@ -46,5 +47,34 @@ describe('serverless function bundling', () => {
         tsconfigRaw: '{}', // no `paths` — exactly what Vercel's bundler sees
       }),
     ).resolves.toBeDefined()
+  })
+})
+
+/**
+ * A route without a default export deploys fine and then fails every request:
+ * Vercel's Node runtime looks for `module.default` and finds nothing. Bundling
+ * each route and importing it catches that here instead.
+ */
+describe('every route exports a callable default handler', () => {
+  // Written inside the project so the bundle's remaining bare imports
+  // (@neondatabase/serverless, bcryptjs) resolve from node_modules.
+  const outDir = join('node_modules', '.tmp', 'route-handler-check')
+
+  beforeAll(() => mkdirSync(outDir, { recursive: true }))
+  afterAll(() => rmSync(outDir, { recursive: true, force: true }))
+
+  it.each(entryPoints)('%s', async (entryPoint) => {
+    const outfile = join(outDir, `${entryPoint.replace(/[^a-z0-9]/gi, '_')}.mjs`)
+    await build({
+      entryPoints: [entryPoint],
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      outfile,
+      external: ['@neondatabase/serverless', 'bcryptjs'],
+      tsconfigRaw: '{}',
+    })
+    const mod = (await import(pathToFileURL(resolve(outfile)).href)) as { default?: unknown }
+    expect(typeof mod.default).toBe('function')
   })
 })

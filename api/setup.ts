@@ -1,3 +1,4 @@
+import { createHandler } from './_lib/handler'
 import { isDatabaseConfigured, sql } from './_lib/db'
 import { SCHEMA_SQL } from './_lib/schema'
 import { createSession, hashPassword, sessionCookie } from './_lib/auth'
@@ -96,3 +97,5 @@ export async function POST(request: Request): Promise<Response> {
   const token = await createSession(id)
   return json({ user: { id, email } }, 201, { 'set-cookie': sessionCookie(token) })
 }
+
+export default createHandler({ GET, POST })
