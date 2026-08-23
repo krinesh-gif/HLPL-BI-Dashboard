@@ -9,11 +9,13 @@ const connectionString =
   process.env.POSTGRES_URL ??
   process.env.NEON_DATABASE_URL
 
-if (!connectionString) {
-  throw new Error(
-    'No database connection string found. Set DATABASE_URL (or POSTGRES_URL) — ' +
-      'connecting a Neon/Postgres database to the Vercel project injects this automatically.',
-  )
-}
+/** Whether a database is actually wired up. Routes that can explain the
+ * problem to the user (notably /api/setup) check this first. */
+export const isDatabaseConfigured = Boolean(connectionString)
 
-export const sql = neon(connectionString)
+// Deliberately not thrown at module load: a throw here fails the whole
+// serverless function before any handler runs, so the browser gets an opaque
+// 500 and can't tell "no database yet" apart from a real fault. With a
+// placeholder the module loads, `isDatabaseConfigured` reports the truth, and
+// any query that does slip through fails loudly on its own.
+export const sql = neon(connectionString ?? 'postgres://unconfigured:unconfigured@unconfigured.invalid/unconfigured')

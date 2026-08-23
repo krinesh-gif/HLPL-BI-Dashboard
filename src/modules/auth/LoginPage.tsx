@@ -1,22 +1,39 @@
 import { useEffect, useState } from 'react'
-import { api } from '@/lib/apiClient'
+import { ApiError, api } from '@/lib/apiClient'
 import { useAuthStore } from '@/store/authStore'
+
+type Mode = 'checking' | 'login' | 'setup' | 'no-database' | 'blocked'
 
 export function LoginPage() {
   const { login, setUp } = useAuthStore()
-  const [mode, setMode] = useState<'checking' | 'login' | 'setup'>('checking')
+  const [mode, setMode] = useState<Mode>('checking')
+  const [blockedReason, setBlockedReason] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   // Whether this is a brand-new workspace decides which form to show: a first
-  // administrator has to be created before anyone can sign in.
+  // administrator has to be created before anyone can sign in. When that can't
+  // be determined, say so — falling back to a sign-in form nobody has an
+  // account for would hide the actual problem behind a dead end.
   useEffect(() => {
     api
-      .get<{ needsSetup: boolean }>('/api/setup')
-      .then(({ needsSetup }) => setMode(needsSetup ? 'setup' : 'login'))
-      .catch(() => setMode('login'))
+      .get<{ needsSetup: boolean; databaseConfigured: boolean }>('/api/setup')
+      .then(({ needsSetup, databaseConfigured }) => {
+        if (!databaseConfigured) return setMode('no-database')
+        setMode(needsSetup ? 'setup' : 'login')
+      })
+      .catch((e: unknown) => {
+        // A 404 means this deployment predates the setup route, which is the
+        // likeliest reason someone lands here unable to sign in.
+        setBlockedReason(
+          e instanceof ApiError && e.status === 404
+            ? 'This deployment is running an older version of the app that has no setup screen. In Vercel, open Deployments and redeploy the latest commit.'
+            : `Could not reach the server (${e instanceof Error ? e.message : 'unknown error'}).`,
+        )
+        setMode('blocked')
+      })
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -34,6 +51,47 @@ export function LoginPage() {
 
   if (mode === 'checking') {
     return <div className="flex min-h-screen items-center justify-center bg-slate-100 text-sm text-slate-500">Loading…</div>
+  }
+
+  if (mode === 'no-database' || mode === 'blocked') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
+        <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
+          <h1 className="text-xl font-bold text-slate-900">HLPL</h1>
+          <p className="mt-1 text-sm text-slate-500">Business Intelligence</p>
+
+          <div className="mt-5 rounded-md bg-amber-50 px-4 py-3">
+            <p className="text-sm font-semibold text-amber-900">Setup isn&apos;t finished yet</p>
+            <p className="mt-1 text-sm text-amber-800">
+              {mode === 'no-database'
+                ? 'No database is connected to this project yet, so there is nothing to sign in to.'
+                : blockedReason}
+            </p>
+          </div>
+
+          {mode === 'no-database' && (
+            <ol className="mt-4 list-decimal space-y-1.5 pl-5 text-sm text-slate-600">
+              <li>In Vercel, open this project and click the <strong>Storage</strong> tab.</li>
+              <li>
+                <strong>Create Database</strong> → choose <strong>Neon</strong> → accept the free plan.
+              </li>
+              <li>
+                Open <strong>Deployments</strong>, then <strong>⋯ → Redeploy</strong> on the most recent one.
+              </li>
+              <li>Reload this page — it will offer to create your account.</li>
+            </ol>
+          )}
+
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mt-6 w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            Check again
+          </button>
+        </div>
+      </div>
+    )
   }
 
   const isSetup = mode === 'setup'

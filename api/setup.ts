@@ -1,4 +1,4 @@
-import { sql } from './_lib/db'
+import { isDatabaseConfigured, sql } from './_lib/db'
 import { SCHEMA_SQL } from './_lib/schema'
 import { createSession, hashPassword, sessionCookie } from './_lib/auth'
 import { isNonEmptyString, json, readJson } from './_lib/http'
@@ -25,7 +25,10 @@ async function needsSetup(): Promise<boolean> {
 }
 
 export async function GET(): Promise<Response> {
-  return json({ needsSetup: await needsSetup() })
+  // Reported separately from needsSetup so the sign-in page can say "no
+  // database connected yet" instead of showing a sign-in form nobody can use.
+  if (!isDatabaseConfigured) return json({ needsSetup: false, databaseConfigured: false })
+  return json({ needsSetup: await needsSetup(), databaseConfigured: true })
 }
 
 /**
@@ -40,6 +43,13 @@ export async function GET(): Promise<Response> {
  * the first login, when there is no data in the system to expose.
  */
 export async function POST(request: Request): Promise<Response> {
+  if (!isDatabaseConfigured) {
+    return json(
+      { error: 'No database is connected to this project yet. Add one in Vercel → Storage, then redeploy.' },
+      503,
+    )
+  }
+
   const body = await readJson<SetupBody>(request)
   if (!body || !isNonEmptyString(body.email) || !isNonEmptyString(body.password)) {
     return json({ error: 'Email and password are required.' }, 400)
