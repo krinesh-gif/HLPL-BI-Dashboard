@@ -6,9 +6,12 @@ export interface KPICardProps {
   value: string
   delta?: { pct: number | null; label?: string }
   tone?: 'neutral' | 'good' | 'bad'
+  /** Where the figure came from, e.g. which report. Shown small beneath it, so
+   * a number can never be read without knowing what produced it. */
+  note?: string
 }
 
-export function KPICard({ label, value, delta, tone = 'neutral' }: KPICardProps) {
+export function KPICard({ label, value, delta, tone = 'neutral', note }: KPICardProps) {
   const deltaTone = delta && delta.pct !== null ? (delta.pct >= 0 ? 'good' : 'bad') : 'neutral'
 
   return (
@@ -37,6 +40,7 @@ export function KPICard({ label, value, delta, tone = 'neutral' }: KPICardProps)
           {delta.label && <span className="ml-1 font-normal text-slate-400">{delta.label}</span>}
         </div>
       )}
+      {note && <div className="mt-1 text-[11px] leading-tight text-slate-400">{note}</div>}
     </div>
   )
 }

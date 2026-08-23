@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import clsx from 'clsx'
 import { NAVIGATION, type NavSection } from '@/config/navigation'
 import { useAuthStore } from '@/store/authStore'
+import { BUILD_COMMIT, buildLabel } from '@/lib/buildInfo'
 
 function sectionContainsPath(section: NavSection, pathname: string): boolean {
   if (section.path === pathname) return true
@@ -89,6 +90,12 @@ export function Sidebar() {
           </button>
         </div>
       )}
+      {/* Which build is running. A number that looks wrong on the live site and
+          right locally has two very different explanations, and this is the
+          fastest way to tell them apart. */}
+      <div className="mt-3 px-4 text-[10px] text-slate-600" title={`Built from commit ${BUILD_COMMIT}`}>
+        {buildLabel()}
+      </div>
     </aside>
   )
 }

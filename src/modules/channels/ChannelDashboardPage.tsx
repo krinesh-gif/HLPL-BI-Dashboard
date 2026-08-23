@@ -11,6 +11,7 @@ import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
 import { formatCurrencyCompact, formatNumber, formatPercent } from '@/lib/format'
 import { useChannelData } from './useChannelData'
 import { TopProducts } from './TopProducts'
+import { Link } from 'react-router-dom'
 
 export function ChannelDashboardPage() {
   const { channelId } = useParams<{ channelId: string }>()
@@ -39,8 +40,23 @@ export function ChannelDashboardPage() {
 
   return (
     <PageShell title={channelDef.label} subtitle="KPIs, trends, and standardized P&L for this channel">
+      {d.partialSettlementWarning && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+          <h3 className="text-sm font-semibold text-amber-900">⚠ This month's settlement report may be incomplete</h3>
+          <p className="mt-1 text-xs text-amber-800">{d.partialSettlementWarning}</p>
+          <Link to="/pnl/reconciliation" className="mt-2 inline-block text-xs font-semibold text-amber-900 underline">
+            See the full reconciliation
+          </Link>
+        </div>
+      )}
+
       <KPIGrid>
-        <KPICard label="Net Sales" value={formatCurrencyCompact(d.currentFacts.netSales)} delta={{ pct: d.growth, label: 'MoM' }} />
+        <KPICard
+          label="Net Sales"
+          value={formatCurrencyCompact(d.currentFacts.netSales)}
+          delta={{ pct: d.growth, label: 'MoM' }}
+          note={d.sourceLabel}
+        />
         <KPICard label="Units" value={formatNumber(d.currentFacts.units)} />
         <KPICard label="Orders" value={formatNumber(d.currentFacts.orders)} />
         <KPICard label="AOV" value={formatCurrencyCompact(d.aov)} />

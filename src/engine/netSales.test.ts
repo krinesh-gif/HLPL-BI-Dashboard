@@ -242,3 +242,39 @@ describe('reconciling the two bases', () => {
     expect(r.causes.find((c) => c.key === 'gross-gap')?.amount).toBe(200000)
   })
 })
+
+describe('a settlement report that covers only part of the month', () => {
+  // Net Sales is read from the settlement report, so a file downloaded before
+  // the month has finished settling makes every figure on the channel
+  // understate — the opposite of the problem this area was built to fix.
+  const partial: MeeshoPnlFacts[] = [
+    { month: '2026-07', grossSale: 231810, returns: 46253, forwardShipping: 0, reverseShipping: 0,
+      returnPremium: 0, returnPremiumRecovered: 0, commission: 0, fixedFee: 0, warehousing: 0,
+      goldFee: 0, mallFee: 0, otherSettlementCharge: 0, ads: 0, gst: 0, tcs: 0, tds: 0,
+      compensation: 0, claims: 0, recovery: 0, settlementAmount: 0, cogs: 0 },
+  ]
+  const facts: ChannelFacts = { ...noFacts, meeshoFacts: partial }
+
+  // The owner's real July: order rows imply roughly 3.95 L of gross against
+  // 2.32 L on the settlement file.
+  const orderRows = [record({ orderDate: '2026-07-05', grossSales: 394797, netSales: 328923, quantity: 2067 })]
+
+  it('warns when settlement gross falls far below the order rows', () => {
+    const r = reconcileChannelMonth(orderRows, 'meesho', '2026-07', facts)
+    expect(r.partialSettlementWarning).toContain('may cover only part of the month')
+    expect(r.partialSettlementWarning).toContain('41%')
+  })
+
+  it('stays quiet when the shortfall is within what settlement lag explains', () => {
+    const r = reconcileChannelMonth(
+      [record({ orderDate: '2026-07-05', grossSales: 250000, netSales: 200000, quantity: 1000 })],
+      'meesho', '2026-07', facts,
+    )
+    expect(r.partialSettlementWarning).toBeNull()
+  })
+
+  it('does not warn when there is no settlement report at all', () => {
+    const r = reconcileChannelMonth(orderRows, 'myntra', '2026-07', facts)
+    expect(r.partialSettlementWarning).toBeNull()
+  })
+})

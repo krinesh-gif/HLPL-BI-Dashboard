@@ -7,6 +7,7 @@ import { addMonths, monthLabel } from '@/lib/format'
 import { buildChannelPnlView } from '@/engine/channelPnlRouter'
 import { filterByChannel, filterByMonth, groupBySku, growthPct } from '@/engine/sales'
 import { asp, aov, netSalesForChannelMonth, orderBasisNetSales, returnPct, rtoPct } from '@/engine/netSales'
+import { reconcileChannelMonth } from '@/engine/reconciliation'
 
 const TREND_MONTHS = 6
 
@@ -62,6 +63,10 @@ export function useChannelData(channel: ChannelId) {
       returnRate: returnPct(currentFacts) ?? 0,
       basis: currentFacts.basis,
       sourceLabel: currentFacts.sourceLabel,
+      // Surfaced on the channel page rather than only on the reconciliation
+      // screen: a figure that is understating needs to say so where it is read.
+      partialSettlementWarning: reconcileChannelMonth(salesRecords, channel, month, channelFacts)
+        .partialSettlementWarning,
       pnl: pnlView.canonical,
       native: pnlView.native,
       trend,

@@ -151,6 +151,14 @@ function ReconciliationRow({ row, open, onToggle }: { row: ChannelReconciliation
         </td>
       </tr>
 
+      {row.partialSettlementWarning && (
+        <tr className="border-t border-amber-200 bg-amber-50">
+          <td colSpan={6} className="px-4 py-2 text-xs text-amber-900">
+            <strong>⚠ Settlement report may be incomplete.</strong> {row.partialSettlementWarning}
+          </td>
+        </tr>
+      )}
+
       {open && (
         <tr className="border-t border-slate-100 bg-slate-50/60">
           <td colSpan={6} className="px-4 py-3">

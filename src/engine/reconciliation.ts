@@ -59,7 +59,20 @@ export interface ChannelReconciliation {
    * places to look for it. */
   residual: number
   status: 'no-settlement-report' | 'no-order-report' | 'reconciled' | 'gap'
+  /**
+   * Set when the settlement report looks like it covers only part of the
+   * month. Because settlement is the authoritative source for Net Sales, a
+   * partial file makes every figure on the channel understate — the opposite
+   * of the problem this whole area was built to fix, and worth saying loudly
+   * rather than leaving to be inferred from a percentage.
+   */
+  partialSettlementWarning: string | null
 }
+
+/** How far below the order rows the settlement gross has to fall before the
+ * file is more likely incomplete than merely lagging. A week of settlement lag
+ * on a month is roughly a quarter; a third is past what timing explains. */
+const PARTIAL_SETTLEMENT_THRESHOLD = 1 / 3
 
 /** A gap smaller than this share of settlement net sales is rounding, not a
  * finding worth chasing. */
@@ -87,7 +100,7 @@ export function reconcileChannelMonth(
     return {
       channel, month, orderBasis, settlementBasis: null,
       difference: 0, differencePct: null, causes: [], residual: 0,
-      status: 'no-settlement-report',
+      status: 'no-settlement-report', partialSettlementWarning: null,
     }
   }
 
@@ -112,7 +125,7 @@ export function reconcileChannelMonth(
       difference,
       differencePct: settlementBasis.netSales !== 0 ? 100 : null,
       causes, residual: 0,
-      status: 'no-order-report',
+      status: 'no-order-report', partialSettlementWarning: null,
     }
   }
 
@@ -201,10 +214,24 @@ export function reconcileChannelMonth(
   const differencePct =
     settlementBasis.netSales !== 0 ? (difference / Math.abs(settlementBasis.netSales)) * 100 : null
 
+  // A settlement file downloaded before the month has fully settled contains
+  // only part of it. Since settlement is what Net Sales is read from, that
+  // silently understates the channel everywhere.
+  const shortfall =
+    orderBasis.grossSales > 0 ? (orderBasis.grossSales - settlementBasis.grossSales) / orderBasis.grossSales : 0
+  const partialSettlementWarning =
+    shortfall > PARTIAL_SETTLEMENT_THRESHOLD
+      ? `The settlement report shows ${Math.round(shortfall * 100)}% less gross sales than the order rows for this month. ` +
+        'That is more than settlement lag usually explains, so this file may cover only part of the month. ' +
+        'Net Sales is read from it, so every figure for this channel would be understated. ' +
+        'Re-download the settlement report once the month has fully settled and upload it again.'
+      : null
+
   return {
     channel, month, orderBasis, settlementBasis,
     difference, differencePct, causes, residual,
     status: differencePct !== null && Math.abs(differencePct) <= TOLERANCE_PCT ? 'reconciled' : 'gap',
+    partialSettlementWarning,
   }
 }
 
