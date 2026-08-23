@@ -6,6 +6,7 @@ import { MasterPnlPage } from '@/modules/pnl/MasterPnlPage'
 import { ChannelPnlPage } from '@/modules/pnl/ChannelPnlPage'
 import { FixedExpensesPage } from '@/modules/pnl/FixedExpensesPage'
 import { NetSalesReconciliationPage } from '@/modules/pnl/NetSalesReconciliationPage'
+import { CostSheetPage } from '@/modules/products/CostSheetPage'
 import { InsightPage } from '@/modules/insight/InsightPage'
 import { ChannelDashboardPage } from '@/modules/channels/ChannelDashboardPage'
 import { AmazonAdsPage } from '@/modules/marketing/AmazonAdsPage'
@@ -40,6 +41,7 @@ export const router = createHashRouter([
       { path: 'products/sku-analytics', element: <SkuAnalyticsPage /> },
       { path: 'products/master', element: <ProductMasterPage /> },
       { path: 'products/sku-mapping', element: <SkuMappingPage /> },
+      { path: 'products/cost-sheet', element: <CostSheetPage /> },
       { path: 'sales/daily', element: <DailySalesPage /> },
       { path: 'sales/monthly', element: <MonthlySalesPage /> },
       { path: 'sales/channel', element: <ChannelSalesPage /> },

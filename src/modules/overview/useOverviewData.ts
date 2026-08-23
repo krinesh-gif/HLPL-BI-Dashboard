@@ -1,11 +1,11 @@
 import { useMemo } from 'react'
 import { useDataStore } from '@/store/dataStore'
+import { usePnlInputs } from '@/engine/usePnlInputs'
 import { useFilterStore } from '@/store/filterStore'
 import { CHANNELS, CHANNEL_MAP } from '@/config/channels'
 import { addMonths, ytdMonthKeys } from '@/lib/format'
 import { buildAllChannelPnlViews } from '@/engine/channelPnlRouter'
 import { buildMasterPnl } from '@/engine/pnl'
-import { marketingFromAds } from '@/engine/marketing'
 import { filterByMonth, groupBySku, growthPct } from '@/engine/sales'
 import { asp as aspOf, aov as aovOf, netSalesForMonth, orderBasisNetSales, rtoPct } from '@/engine/netSales'
 import { forecastDemand } from '@/engine/forecast'
@@ -20,7 +20,8 @@ import {
 } from '@/engine/insight'
 
 export function useOverviewData() {
-  const { salesRecords, adsRecords, skuMaster, inventorySnapshots, fixedExpenses, flipkartFacts, amazonUsaFacts, meeshoFacts } = useDataStore()
+  const { salesRecords, adsRecords, skuMaster, inventorySnapshots, flipkartFacts, amazonUsaFacts, meeshoFacts } = useDataStore()
+  const { forMonth } = usePnlInputs()
   const { month } = useFilterStore()
 
   return useMemo(() => {
@@ -28,11 +29,8 @@ export function useOverviewData() {
     const channelIds = CHANNELS.map((c) => c.id)
     const facts = { flipkartFacts, amazonUsaFacts, meeshoFacts }
 
-    const currentMarketing = marketingFromAds(adsRecords, month)
-    const previousMarketing = marketingFromAds(adsRecords, previousMonth)
-
-    const currentChannelPnls = buildAllChannelPnlViews(channelIds, month, { salesRecords, skuMaster, fixedExpenses, marketing: currentMarketing, facts }).map((v) => v.canonical)
-    const previousChannelPnls = buildAllChannelPnlViews(channelIds, previousMonth, { salesRecords, skuMaster, fixedExpenses, marketing: previousMarketing, facts }).map((v) => v.canonical)
+    const currentChannelPnls = buildAllChannelPnlViews(channelIds, month, forMonth(month)).map((v) => v.canonical)
+    const previousChannelPnls = buildAllChannelPnlViews(channelIds, previousMonth, forMonth(previousMonth)).map((v) => v.canonical)
     const masterCurrent = buildMasterPnl(currentChannelPnls, month)
     const masterPrevious = buildMasterPnl(previousChannelPnls, previousMonth)
 
@@ -166,5 +164,5 @@ export function useOverviewData() {
       avgCoverageDays,
       insights,
     }
-  }, [salesRecords, adsRecords, skuMaster, inventorySnapshots, fixedExpenses, flipkartFacts, amazonUsaFacts, meeshoFacts, month])
+  }, [salesRecords, adsRecords, skuMaster, inventorySnapshots, flipkartFacts, amazonUsaFacts, meeshoFacts, forMonth, month])
 }

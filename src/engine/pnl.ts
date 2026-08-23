@@ -2,6 +2,8 @@ import type { ChannelId } from '@/config/channels'
 import { CHANNELS } from '@/config/channels'
 import { PNL_STRUCTURE, type PnlLineKey } from '@/config/pnlStructure'
 import type { CanonicalSalesRecord, ChannelPnl, FixedExpenseEntry, PnlLineValues, PnlResult, SkuMaster } from '@/data/models'
+import { cogsForMonth, type CostVersionsBySku } from '@/data/costVersions'
+import { resolveCogs, type ComboComponent, type SkuMapping } from '@/data/skuMapping'
 import { filterByChannel, filterByMonth } from './sales'
 import { orderBasisNetSales } from './netSales'
 import { allocateFixedExpensesForMonth } from './allocation'
@@ -9,9 +11,89 @@ import { allocateFixedExpensesForMonth } from './allocation'
 /** Marketing spend, keyed by channel, for a given month. Comes from Amazon Ads / other ad-platform imports. */
 export type MarketingByChannel = Partial<Record<ChannelId, { ads: number; performanceMarketing?: number; otherMarketing?: number }>>
 
-function cogsForRecords(records: CanonicalSalesRecord[], skuMaster: SkuMaster[]): number {
-  const cogsBySku = new Map(skuMaster.map((s) => [s.sku, s.cogs]))
-  return records.reduce((sum, r) => sum + (cogsBySku.get(r.sku) ?? 0) * r.quantity, 0)
+/**
+ * Optional inputs that make COGS accurate. Both are optional so a caller that
+ * has neither still gets a P&L — it is just costed from the Product Master's
+ * current figures, which is what the app did before either existed.
+ */
+export interface CogsInputs {
+  /** Effective-dated costs, so a closed month keeps the cost that applied then. */
+  costIndex?: CostVersionsBySku
+  /** Marketplace-code mappings and combo recipes, so a bundle is costed from
+   * its components rather than falling through as unknown. */
+  mappings?: SkuMapping[]
+  comboComponents?: ComboComponent[]
+}
+
+export interface CogsResult {
+  cogs: number
+  /** Units whose cost could not be established at all. Reported rather than
+   * folded in as zero, which would show them at 100% margin. */
+  uncostedUnits: number
+  uncostedSkus: string[]
+}
+
+/**
+ * The COGS of a set of order rows, priced at the cost that applied in `month`.
+ *
+ * This is what keeps history still. July's P&L asks for July's cost and gets
+ * it, no matter how many times the cost has changed since — so re-opening a
+ * closed month shows the same margin it showed when it was closed.
+ */
+export function cogsForRecords(
+  records: CanonicalSalesRecord[],
+  skuMaster: SkuMaster[],
+  month: string,
+  inputs: CogsInputs = {},
+): CogsResult {
+  const costFor = (sku: string): number | undefined => {
+    if (inputs.costIndex) {
+      const versioned = cogsForMonth(sku, month, inputs.costIndex)
+      if (versioned !== null) return versioned
+    }
+    return undefined
+  }
+
+  const masterCost = new Map(skuMaster.map((s) => [s.sku, s.cogs]))
+  const tables = {
+    skuMaster,
+    mappings: inputs.mappings ?? [],
+    comboComponents: inputs.comboComponents ?? [],
+    costFor,
+  }
+
+  // Resolution is per SKU, not per row: a channel with tens of thousands of
+  // order lines has only a few hundred distinct codes.
+  const unitCost = new Map<string, number | null>()
+  const resolve = (sku: string): number | null => {
+    const cached = unitCost.get(sku)
+    if (cached !== undefined) return cached
+
+    let value = costFor(sku) ?? null
+    if (value === null) {
+      const resolved = resolveCogs(sku, tables)
+      value = resolved ? resolved.cogs : (masterCost.get(sku) ?? null)
+    }
+    unitCost.set(sku, value)
+    return value
+  }
+
+  let cogs = 0
+  let uncostedUnits = 0
+  const uncostedSkus = new Set<string>()
+
+  for (const r of records) {
+    if (r.status === 'cancelled') continue
+    const unit = resolve(r.sku)
+    if (unit === null || unit <= 0) {
+      uncostedUnits += r.quantity
+      uncostedSkus.add(r.sku)
+      continue
+    }
+    cogs += unit * r.quantity
+  }
+
+  return { cogs, uncostedUnits, uncostedSkus: [...uncostedSkus] }
 }
 
 /**
@@ -32,13 +114,14 @@ export function buildChannelPnl(
   channel: ChannelId,
   month: string,
   marketing: MarketingByChannel,
+  cogsInputs: CogsInputs = {},
 ): ChannelPnl {
   const records = filterByChannel(filterByMonth(allRecords, month), channel)
   // One Net Sales calculation for the whole app: the P&L's revenue lines are
   // the central engine's figure, not a second summation with its own rules
   // about cancellations and currency.
   const facts = orderBasisNetSales(records)
-  const cogs = cogsForRecords(records, skuMaster)
+  const { cogs } = cogsForRecords(records, skuMaster, month, cogsInputs)
   const channelMarketing = marketing[channel] ?? { ads: 0 }
   const allocation = allocateFixedExpensesForMonth(allRecords, fixedExpenses, month)
   const myAllocation = allocation[channel] ?? {}
@@ -127,6 +210,7 @@ export function buildAllChannelPnls(
   fixedExpenses: FixedExpenseEntry[],
   month: string,
   marketing: MarketingByChannel,
+  cogsInputs: CogsInputs = {},
 ): ChannelPnl[] {
-  return CHANNELS.map((c) => buildChannelPnl(allRecords, skuMaster, fixedExpenses, c.id, month, marketing))
+  return CHANNELS.map((c) => buildChannelPnl(allRecords, skuMaster, fixedExpenses, c.id, month, marketing, cogsInputs))
 }

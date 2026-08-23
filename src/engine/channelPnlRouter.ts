@@ -9,7 +9,7 @@ import type {
   SkuMaster,
 } from '@/data/models'
 import { allocateFixedExpensesForMonth } from './allocation'
-import { buildChannelPnl, computeSubtotals, type MarketingByChannel } from './pnl'
+import { buildChannelPnl, computeSubtotals, type CogsInputs, type MarketingByChannel } from './pnl'
 import { amazonUsaToCanonicalBuckets, AMAZON_USA_LINE_DEFS, computeAmazonUsaPnl } from './nativePnl/amazonUsa'
 import { applyFlipkartOtherCosts, computeFlipkartPnl, flipkartToCanonicalBuckets, FLIPKART_LINE_DEFS } from './nativePnl/flipkart'
 import { applyMeeshoOtherCosts, computeMeeshoPnl, meeshoToCanonicalBuckets, MEESHO_LINE_DEFS } from './nativePnl/meesho'
@@ -55,6 +55,9 @@ export interface ChannelPnlViewInputs {
   fixedExpenses: FixedExpenseEntry[]
   marketing: MarketingByChannel
   facts: ChannelFactsStore
+  /** Effective-dated costs and combo recipes. Optional so a caller with
+   * neither still gets a P&L, costed from the Product Master as before. */
+  cogs?: CogsInputs
 }
 
 /**
@@ -107,7 +110,7 @@ export function buildChannelPnlView(channel: ChannelId, month: string, inputs: C
 
   // Every other channel (and these three before any real facts are uploaded)
   // falls back to the generic template built from order-level sales records.
-  const canonical = buildChannelPnl(inputs.salesRecords, inputs.skuMaster, inputs.fixedExpenses, channel, month, inputs.marketing)
+  const canonical = buildChannelPnl(inputs.salesRecords, inputs.skuMaster, inputs.fixedExpenses, channel, month, inputs.marketing, inputs.cogs)
   return { channel, month, canonical }
 }
 

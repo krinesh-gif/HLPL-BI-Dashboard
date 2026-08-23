@@ -6,27 +6,22 @@ import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
 import { CHANNELS, CHANNEL_MAP, type ChannelId } from '@/config/channels'
 import { buildChannelPnlView } from '@/engine/channelPnlRouter'
-import { marketingFromAds } from '@/engine/marketing'
+import { usePnlInputs } from '@/engine/usePnlInputs'
 import { monthLabel } from '@/lib/format'
 import { nextDownloadFileName, toMonthYearSuffix } from '@/lib/downloadNaming'
 import { downloadCsv, nativePnlToCsv, pnlToCsv } from '@/lib/exportCsv'
 
 export function ChannelPnlPage() {
-  const {
-    salesRecords, adsRecords, skuMaster, fixedExpenses, flipkartFacts, amazonUsaFacts, meeshoFacts,
-    patchFlipkartFacts, patchAmazonUsaFacts,
-  } = useDataStore()
+  const { patchFlipkartFacts, patchAmazonUsaFacts } = useDataStore()
   const { month } = useFilterStore()
+  const { forMonth } = usePnlInputs()
   const [channel, setChannel] = useState<ChannelId>('amazon_in_seller')
   const [view, setView] = useState<'native' | 'standardized'>('native')
 
-  const pnlView = useMemo(() => {
-    const marketing = marketingFromAds(adsRecords, month)
-    return buildChannelPnlView(channel, month, {
-      salesRecords, skuMaster, fixedExpenses, marketing,
-      facts: { flipkartFacts, amazonUsaFacts, meeshoFacts },
-    })
-  }, [salesRecords, adsRecords, skuMaster, fixedExpenses, flipkartFacts, amazonUsaFacts, meeshoFacts, channel, month])
+  const pnlView = useMemo(
+    () => buildChannelPnlView(channel, month, forMonth(month)),
+    [forMonth, channel, month],
+  )
 
   const showingNative = view === 'native' && !!pnlView.native
 

@@ -220,6 +220,14 @@ export interface MappingTables {
   skuMaster: SkuMaster[]
   mappings: SkuMapping[]
   comboComponents: ComboComponent[]
+  /**
+   * The cost of an internal SKU in the month being reported on. Supplied by
+   * callers that build a P&L, so a combo's components are priced at what they
+   * cost in that month rather than at today's cost. Omitted by callers that
+   * only need to know whether a code resolves at all, in which case the
+   * Product Master's current cost is used.
+   */
+  costFor?: (sku: string) => number | undefined
 }
 
 /**
@@ -229,7 +237,8 @@ export interface MappingTables {
  * so, rather than presenting a guess as a measurement.
  */
 export function resolveCogs(channelSku: string, tables: MappingTables): CostResolution | null {
-  const costOf = new Map(tables.skuMaster.map((s) => [s.sku, s.cogs]))
+  const masterCost = new Map(tables.skuMaster.map((s) => [s.sku, s.cogs]))
+  const costOf = { get: (sku: string) => tables.costFor?.(sku) ?? masterCost.get(sku) }
 
   const direct = costOf.get(channelSku)
   if (direct !== undefined && direct > 0) {

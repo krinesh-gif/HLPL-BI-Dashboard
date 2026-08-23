@@ -45,6 +45,7 @@ export const NAVIGATION: NavSection[] = [
       { label: 'SKU Analytics', path: '/products/sku-analytics' },
       { label: 'Product Master', path: '/products/master' },
       { label: 'SKU Mapping', path: '/products/sku-mapping' },
+      { label: 'Cost Sheet', path: '/products/cost-sheet' },
     ],
   },
   {

@@ -45,6 +45,27 @@ BEGIN
   );
 
   -- ---------------------------------------------------------------------------
+  -- Effective-dated COGS. A cost belongs to a SKU *in a month*, not to a SKU,
+  -- so closing a month freezes the cost that applied to it. Rows are never
+  -- updated in place except to correct a version with the same effective
+  -- month, which is what makes a mis-keyed cost sheet fixable without
+  -- disturbing any other month.
+  -- ---------------------------------------------------------------------------
+  CREATE TABLE IF NOT EXISTS cost_versions (
+    sku            TEXT NOT NULL,
+    effective_from TEXT NOT NULL,
+    cogs           DOUBLE PRECISION NOT NULL,
+    source         TEXT NOT NULL,
+    note           TEXT,
+    file_name      TEXT,
+    uploaded_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    uploaded_by    TEXT,
+    PRIMARY KEY (sku, effective_from)
+  );
+
+  CREATE INDEX IF NOT EXISTS cost_versions_sku_idx ON cost_versions (sku, effective_from DESC);
+
+  -- ---------------------------------------------------------------------------
   -- Import audit trail. uploaded_by is recorded from the first upload onwards so
   -- history stays attributable.
   -- ---------------------------------------------------------------------------

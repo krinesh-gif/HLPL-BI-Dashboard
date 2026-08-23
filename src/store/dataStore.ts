@@ -4,6 +4,7 @@ import { toMonthKey } from '@/lib/format'
 import { useFilterStore } from './filterStore'
 import type { ComboComponent, SkuMapping } from '@/data/skuMapping'
 import type { SkuMapWorkbookResult } from '@/data/normalize/skuMapWorkbook'
+import type { CostVersion } from '@/data/costVersions'
 import type {
   AdsRecord,
   AmazonUsaPnlFacts,
@@ -44,7 +45,7 @@ const EMPTY_DATASET: SharedDataset = {
   meeshoFacts: [],
 }
 
-const EMPTY_MAPPINGS: MappingTablesState = { mappings: [], comboComponents: [] }
+const EMPTY_MAPPINGS: MappingTablesState = { mappings: [], comboComponents: [], costVersions: [] }
 
 /** Everything one uploaded report contributes, imported as a single unit. */
 export interface ReportImport {
@@ -86,6 +87,9 @@ interface BatchResult {
 interface MappingTablesState {
   mappings: SkuMapping[]
   comboComponents: ComboComponent[]
+  /** Effective-dated COGS. Every P&L reads the version in force for its own
+   * month, so closed months keep the cost they were closed at. */
+  costVersions: CostVersion[]
 }
 
 interface DataState extends SharedDataset, MappingTablesState {
@@ -107,6 +111,10 @@ interface DataState extends SharedDataset, MappingTablesState {
     replaceRecipesFor?: string[]
   }) => Promise<void>
   removeMapping: (channelSku: string) => Promise<void>
+  /** Saves effective-dated costs. Existing months are left alone; only the
+   * months these versions name are affected. */
+  saveCostVersions: (versions: CostVersion[]) => Promise<void>
+  removeCostVersion: (sku: string, effectiveFrom: string) => Promise<void>
   /** Imports the company's SKU-map workbook: costs, channel-code mappings and
    * combo recipes in one go. */
   importSkuMapWorkbook: (fileName: string, parsed: SkuMapWorkbookResult) => Promise<ImportOutcome>
@@ -159,11 +167,12 @@ export const useDataStore = create<DataState>((set, get) => {
 
     loadState: async () => {
       try {
-        const [dataset, mapping] = await Promise.all([
+        const [dataset, mapping, costs] = await Promise.all([
           api.get<SharedDataset>('/api/state'),
-          api.get<MappingTablesState>('/api/sku-map'),
+          api.get<Omit<MappingTablesState, 'costVersions'>>('/api/sku-map'),
+          api.get<{ versions: CostVersion[] }>('/api/cost-versions'),
         ])
-        set({ ...dataset, ...mapping, loading: false, error: null })
+        set({ ...dataset, ...mapping, costVersions: costs.versions, loading: false, error: null })
         // Point the dashboard at the newest month that has data. Left on the
         // current calendar month, every page reads as empty whenever the
         // latest upload covers an earlier period — which looks exactly like
@@ -247,6 +256,24 @@ export const useDataStore = create<DataState>((set, get) => {
 
     removeMapping: (channelSku) =>
       writeThen(() => api.delete(`/api/sku-map?channelSku=${encodeURIComponent(channelSku)}`)),
+
+    saveCostVersions: (versions) => {
+      // Batched for the same reason every other bulk write is: a full cost
+      // sheet is thousands of rows and the serverless request body cap is
+      // 4.5 MB.
+      return writeThen(async () => {
+        for (const batch of batched(versions, UPLOAD_BATCH_SIZE)) {
+          await api.post('/api/cost-versions', { versions: batch })
+        }
+      })
+    },
+
+    removeCostVersion: (sku, effectiveFrom) =>
+      writeThen(() =>
+        api.delete(
+          `/api/cost-versions?sku=${encodeURIComponent(sku)}&effectiveFrom=${encodeURIComponent(effectiveFrom)}`,
+        ),
+      ),
 
     importSkuMapWorkbook: async (fileName, parsed) => {
       // Costs first: recipes are summed from them, so loading them in the other
