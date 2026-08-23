@@ -24,14 +24,14 @@ export const useAuthStore = create<AuthState>((set) => ({
   checking: true,
   checkSession: async () => {
     try {
-      const { user } = await api.get<{ user: AuthUser | null }>('/api/auth/me')
+      const { user } = await api.get<{ user: AuthUser | null }>('/api/auth')
       set({ user, checking: false })
     } catch {
       set({ user: null, checking: false })
     }
   },
   login: async (email, password) => {
-    const { user } = await api.post<{ user: AuthUser }>('/api/auth/login', { email, password })
+    const { user } = await api.post<{ user: AuthUser }>('/api/auth', { email, password })
     set({ user })
   },
   setUp: async (email, password) => {
@@ -39,7 +39,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user })
   },
   logout: async () => {
-    await api.post('/api/auth/logout')
+    await api.delete('/api/auth')
     set({ user: null })
   },
 }))
