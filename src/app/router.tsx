@@ -10,6 +10,7 @@ import { ChannelDashboardPage } from '@/modules/channels/ChannelDashboardPage'
 import { AmazonAdsPage } from '@/modules/marketing/AmazonAdsPage'
 import { SkuAnalyticsPage } from '@/modules/products/SkuAnalyticsPage'
 import { ProductMasterPage } from '@/modules/products/ProductMasterPage'
+import { SkuMappingPage } from '@/modules/products/SkuMappingPage'
 import { DailySalesPage } from '@/modules/sales/DailySalesPage'
 import { MonthlySalesPage } from '@/modules/sales/MonthlySalesPage'
 import { ChannelSalesPage } from '@/modules/sales/ChannelSalesPage'
@@ -36,6 +37,7 @@ export const router = createHashRouter([
       { path: 'marketing/amazon-ads', element: <AmazonAdsPage /> },
       { path: 'products/sku-analytics', element: <SkuAnalyticsPage /> },
       { path: 'products/master', element: <ProductMasterPage /> },
+      { path: 'products/sku-mapping', element: <SkuMappingPage /> },
       { path: 'sales/daily', element: <DailySalesPage /> },
       { path: 'sales/monthly', element: <MonthlySalesPage /> },
       { path: 'sales/channel', element: <ChannelSalesPage /> },

@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { api } from '@/lib/apiClient'
 import { toMonthKey } from '@/lib/format'
 import { useFilterStore } from './filterStore'
+import type { ComboComponent, SkuMapping } from '@/data/skuMapping'
+import type { SkuMapWorkbookResult } from '@/data/normalize/skuMapWorkbook'
 import type {
   AdsRecord,
   AmazonUsaPnlFacts,
@@ -42,6 +44,8 @@ const EMPTY_DATASET: SharedDataset = {
   meeshoFacts: [],
 }
 
+const EMPTY_MAPPINGS: MappingTablesState = { mappings: [], comboComponents: [] }
+
 /** Everything one uploaded report contributes, imported as a single unit. */
 export interface ReportImport {
   importRecord: ImportRecord
@@ -64,6 +68,14 @@ export interface ImportOutcome {
   added: number
   skippedAsDuplicate: number
   monthsUpdated: string[]
+  /** Set when the uploaded file was a SKU-map workbook rather than a sales
+   * report, so the confirmation can describe what it actually did. */
+  mapping?: {
+    mappingsSaved: number
+    recipesSaved: number
+    costChanges: { sku: string; from: number | null; to: number }[]
+    warnings: string[]
+  }
 }
 
 interface BatchResult {
@@ -71,7 +83,12 @@ interface BatchResult {
   skippedAsDuplicate: number
 }
 
-interface DataState extends SharedDataset {
+interface MappingTablesState {
+  mappings: SkuMapping[]
+  comboComponents: ComboComponent[]
+}
+
+interface DataState extends SharedDataset, MappingTablesState {
   loading: boolean
   /** Set when the shared dataset could not be loaded, so the UI can say so
    * instead of rendering an empty dashboard that looks like real zeroes. */
@@ -82,6 +99,17 @@ interface DataState extends SharedDataset {
   loadState: () => Promise<void>
   importReport: (report: ReportImport) => Promise<ImportOutcome>
   updateSkuMaster: (sku: string, patch: Partial<SkuMaster>) => Promise<void>
+  /** Saves mappings and, for combos listed in `replaceRecipesFor`, replaces
+   * their recipe outright so an edit can remove a component. */
+  saveMappings: (input: {
+    mappings: SkuMapping[]
+    comboComponents?: ComboComponent[]
+    replaceRecipesFor?: string[]
+  }) => Promise<void>
+  removeMapping: (channelSku: string) => Promise<void>
+  /** Imports the company's SKU-map workbook: costs, channel-code mappings and
+   * combo recipes in one go. */
+  importSkuMapWorkbook: (fileName: string, parsed: SkuMapWorkbookResult) => Promise<ImportOutcome>
   patchFlipkartFacts: (month: string, patch: Partial<FlipkartPnlFacts>) => Promise<void>
   patchAmazonUsaFacts: (month: string, patch: Partial<AmazonUsaPnlFacts>) => Promise<void>
 }
@@ -124,14 +152,18 @@ export const useDataStore = create<DataState>((set, get) => {
 
   return {
     ...EMPTY_DATASET,
+    ...EMPTY_MAPPINGS,
     loading: true,
     error: null,
     importProgress: null,
 
     loadState: async () => {
       try {
-        const dataset = await api.get<SharedDataset>('/api/state')
-        set({ ...dataset, loading: false, error: null })
+        const [dataset, mapping] = await Promise.all([
+          api.get<SharedDataset>('/api/state'),
+          api.get<MappingTablesState>('/api/sku-map'),
+        ])
+        set({ ...dataset, ...mapping, loading: false, error: null })
         // Point the dashboard at the newest month that has data. Left on the
         // current calendar month, every page reads as empty whenever the
         // latest upload covers an earlier period — which looks exactly like
@@ -209,6 +241,46 @@ export const useDataStore = create<DataState>((set, get) => {
     },
 
     updateSkuMaster: (sku, patch) => writeThen(() => api.post('/api/sku-master', { sku, patch })),
+
+    saveMappings: ({ mappings, comboComponents = [], replaceRecipesFor = [] }) =>
+      writeThen(() => api.post('/api/sku-map', { mappings, comboComponents, replaceRecipesFor })),
+
+    removeMapping: (channelSku) =>
+      writeThen(() => api.delete(`/api/sku-map?channelSku=${encodeURIComponent(channelSku)}`)),
+
+    importSkuMapWorkbook: async (fileName, parsed) => {
+      // Costs first: recipes are summed from them, so loading them in the other
+      // order would briefly value combos using stale component costs.
+      let costChanges: { sku: string; from: number | null; to: number }[] = []
+      if (parsed.costs.length > 0) {
+        const result = await api.post<{ changes: typeof costChanges }>('/api/sku-master', { upserts: parsed.costs })
+        costChanges = result.changes
+      }
+
+      for (const batch of batched(parsed.mappings, UPLOAD_BATCH_SIZE)) {
+        await api.post('/api/sku-map', {
+          mappings: batch,
+          comboComponents: parsed.comboComponents.filter((c) =>
+            batch.some((m) => m.internalSku === c.comboSku || m.channelSku === c.comboSku),
+          ),
+          replaceRecipesFor: batch.map((m) => m.internalSku),
+        })
+      }
+
+      await get().loadState()
+      return {
+        fileName,
+        added: 0,
+        skippedAsDuplicate: 0,
+        monthsUpdated: [],
+        mapping: {
+          mappingsSaved: parsed.mappings.length,
+          recipesSaved: new Set(parsed.comboComponents.map((c) => c.comboSku)).size,
+          costChanges,
+          warnings: parsed.warnings,
+        },
+      }
+    },
 
     patchFlipkartFacts: (month, patch) => writeThen(() => api.patch('/api/facts/flipkart', { month, patch })),
     patchAmazonUsaFacts: (month, patch) => writeThen(() => api.patch('/api/facts/amazon-usa', { month, patch })),

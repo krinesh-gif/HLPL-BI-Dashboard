@@ -7,6 +7,7 @@ import { detectFlipkartWorkbook, normalizeFlipkartWorkbook } from '@/data/normal
 import { detectAmazonUsaProductProfitabilityReport, normalizeAmazonUsaProductProfitability } from '@/data/normalize/amazonUsaProductProfitability'
 import { detectMeeshoOrderSummaryReport, normalizeMeeshoOrderSummary } from '@/data/normalize/meeshoOrderSummary'
 import { detectMeeshoOrderPaymentsSheet, normalizeMeeshoOrderPayments } from '@/data/normalize/meeshoOrderPayments'
+import { detectSkuMapWorkbook, normalizeSkuMapWorkbook } from '@/data/normalize/skuMapWorkbook'
 import { isMeeshoSettlementJson, normalizeMeeshoSettlementJson, type MeeshoSettlementJson } from '@/data/normalize/meeshoSettlementJson'
 import { detectAmazonAdsSponsoredProductsReport, normalizeAmazonAdsSponsoredProductsReport } from '@/data/normalize/amazonAdsSponsoredProducts'
 import { checkForDuplicates } from '@/data/normalize/duplicates'
@@ -65,7 +66,7 @@ interface PreviewState {
 }
 
 export function UploadReportsPage() {
-  const { skuMaster, importReport, importProgress } = useDataStore()
+  const { skuMaster, importReport, importProgress, importSkuMapWorkbook } = useDataStore()
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null)
   const { month: filterMonth } = useFilterStore()
   const [stage, setStage] = useState<Stage>('idle')
@@ -131,6 +132,14 @@ export function UploadReportsPage() {
         const sheets = await readWorkbookSheetsRaw(file)
         const sheetNames = Object.keys(sheets)
         const importId = `import-${Date.now()}`
+
+        if (detectSkuMapWorkbook(sheetNames)) {
+          const r = normalizeSkuMapWorkbook(sheets)
+          const result = await importSkuMapWorkbook(file.name, r)
+          setOutcome(result)
+          setStage('idle')
+          return
+        }
 
         if (detectFlipkartWorkbook(sheetNames)) {
           const r = normalizeFlipkartWorkbook(sheets, skuMaster, importId)
@@ -260,17 +269,46 @@ export function UploadReportsPage() {
         <div className="mb-6 rounded-lg border border-emerald-300 bg-emerald-50 p-4">
           <h3 className="text-sm font-semibold text-emerald-900">✓ Imported {outcome.fileName}</h3>
           <ul className="mt-2 space-y-0.5 text-sm text-emerald-800">
-            <li>{outcome.added.toLocaleString()} new record(s) added to the shared data.</li>
-            {outcome.skippedAsDuplicate > 0 && (
+            {outcome.mapping ? (
+              <>
+                <li>{outcome.mapping.mappingsSaved.toLocaleString()} SKU mapping(s) saved.</li>
+                <li>{outcome.mapping.recipesSaved.toLocaleString()} combo recipe(s) saved.</li>
+                {outcome.mapping.costChanges.length > 0 && (
+                  <li>
+                    <span>{outcome.mapping.costChanges.length} product cost(s) changed:</span>
+                    <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
+                      {outcome.mapping.costChanges.slice(0, 8).map((c) => (
+                        <span key={c.sku} className="whitespace-nowrap">
+                          <span className="font-mono">{c.sku}</span>{' '}
+                          {c.from === null ? 'added at' : `${c.from} →`} {c.to}
+                        </span>
+                      ))}
+                      {outcome.mapping.costChanges.length > 8 && (
+                        <span>+{outcome.mapping.costChanges.length - 8} more</span>
+                      )}
+                    </span>
+                  </li>
+                )}
+                {outcome.mapping.warnings.slice(0, 4).map((w) => (
+                  <li key={w} className="text-amber-800">⚠ {w}</li>
+                ))}
+                <li className="pt-1 font-medium">
+                  Check the results under Products → SKU Mapping.
+                </li>
+              </>
+            ) : (
+              <li>{outcome.added.toLocaleString()} new record(s) added to the shared data.</li>
+            )}
+            {!outcome.mapping && outcome.skippedAsDuplicate > 0 && (
               <li>
                 {outcome.skippedAsDuplicate.toLocaleString()} row(s) were already imported and were skipped, so nothing
                 is double-counted.
               </li>
             )}
-            {outcome.monthsUpdated.length > 0 && (
+            {!outcome.mapping && outcome.monthsUpdated.length > 0 && (
               <li>P&amp;L updated for {outcome.monthsUpdated.map(monthLabel).join(', ')}.</li>
             )}
-            {outcome.added === 0 && outcome.skippedAsDuplicate > 0 && (
+            {!outcome.mapping && outcome.added === 0 && outcome.skippedAsDuplicate > 0 && (
               <li className="font-medium">This file had already been imported — nothing changed.</li>
             )}
           </ul>

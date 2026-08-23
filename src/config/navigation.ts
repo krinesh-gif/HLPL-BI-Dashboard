@@ -43,6 +43,7 @@ export const NAVIGATION: NavSection[] = [
     children: [
       { label: 'SKU Analytics', path: '/products/sku-analytics' },
       { label: 'Product Master', path: '/products/master' },
+      { label: 'SKU Mapping', path: '/products/sku-mapping' },
     ],
   },
   {
