@@ -13,6 +13,9 @@ interface AuthState {
   checking: boolean
   checkSession: () => Promise<void>
   login: (email: string, password: string) => Promise<void>
+  /** First-run only: creates the tables, the first account, and the product
+   * catalogue, then signs that account in. */
+  setUp: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -29,6 +32,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
   login: async (email, password) => {
     const { user } = await api.post<{ user: AuthUser }>('/api/auth/login', { email, password })
+    set({ user })
+  },
+  setUp: async (email, password) => {
+    const { user } = await api.post<{ user: AuthUser }>('/api/setup', { email, password })
     set({ user })
   },
   logout: async () => {

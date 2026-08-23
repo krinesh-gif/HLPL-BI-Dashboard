@@ -1,95 +1,124 @@
-# Setting up the shared dashboard on Vercel
+# Setting up the shared dashboard
 
-One-time setup. After this, the dashboard is live at a Vercel URL, requires a login,
-and every teammate sees the same data.
+Everything below is done in your web browser. No coding, nothing to install, no
+command line. About 10 minutes.
 
-Steps 1–5 are things only you can do (they need your Vercel account).
+At the end you'll have a private web address your team logs into, where everyone
+sees the same live data.
 
 ---
 
-## 1. Import the repo into Vercel
+## Step 1 — Put the app online
 
-1. Go to <https://vercel.com/new> and sign in with GitHub.
-2. Find **HLPL-BI-Dashboard** and click **Import**.
-3. Leave every build setting as-is — `vercel.json` already specifies them.
-4. Under **Git Branch**, set the production branch to `claude/bold-ramanujan-m7g3dp`
-   (or merge that branch into `main` first and leave it as `main`).
-5. Click **Deploy**. The first deploy will succeed but the app won't work yet —
-   there's no database.
+Vercel is the service that hosts the dashboard. It's free for this.
 
-## 2. Create the database
+1. Go to **<https://vercel.com/new>**
+2. Click **Continue with GitHub** and sign in.
+3. You'll see a list of your repositories. Find **HLPL-BI-Dashboard** and click
+   **Import**.
+4. Leave all the build settings alone — they're already configured.
+5. Find the **Production Branch** (or "Git Branch") box and set it to:
+   ```
+   claude/bold-ramanujan-m7g3dp
+   ```
+6. Click **Deploy** and wait about a minute.
 
-1. In the project, open the **Storage** tab.
-2. **Create Database** → choose **Neon** (Serverless Postgres) → **Continue**.
-3. Accept the free plan and connect it to this project.
+You'll get a success screen with a web address. The app won't work yet — it has
+nowhere to store data. That's next.
 
-Vercel injects `DATABASE_URL` automatically. You don't paste any secret by hand.
+---
 
-## 3. Create the tables, seed products, and create your login
+## Step 2 — Add the database
 
-Run these on your own computer, from a clone of this repo:
+1. In your new Vercel project, click the **Storage** tab at the top.
+2. Click **Create Database**.
+3. Choose **Neon** (labelled *Serverless Postgres*), then **Continue**.
+4. Accept the free plan and confirm, making sure it's connected to this project.
+
+Vercel handles the connection details itself — there's nothing to copy or paste.
+
+---
+
+## Step 3 — Wake the app up
+
+The app needs one restart to notice the database you just added.
+
+1. Go to the **Deployments** tab.
+2. On the top (most recent) deployment, click the **⋯** menu → **Redeploy**.
+3. Confirm, and wait for it to finish.
+
+---
+
+## Step 4 — Create your login
+
+1. Click **Visit** (or open your project's web address).
+2. You'll see a **"Welcome — let's set up your dashboard"** screen.
+3. Enter the email and password you want to sign in with (at least 8
+   characters), and click **Create my account**.
+
+That one click creates the database tables, loads your product list with its
+costs, creates your account, and signs you in. You should land on the dashboard.
+
+This screen only ever appears once. After your account exists it's replaced by a
+normal sign-in screen, and nobody can use it to create an account.
+
+---
+
+## Step 5 — Add your team
+
+Inside the dashboard, go to **Settings → Team → Add teammate**.
+
+Enter their email and a temporary password, then send those to them directly.
+The password is stored scrambled and can't be looked up later — so if someone
+forgets theirs, remove them and add them again.
+
+Everyone you add can sign in, upload reports, and edit product costs. To remove
+someone, click **Remove** on that page; it takes effect immediately.
+
+---
+
+## Check that sharing actually works
+
+Worth doing once, since shared data is the whole point:
+
+1. Sign in and upload a report (**Data → Upload Reports**).
+2. Open the same web address in a **different browser**, or a private/incognito
+   window, and sign in.
+3. The data from step 1 should already be there.
+
+Also try signing out and then pasting a dashboard link — you should land on the
+sign-in screen, not the data.
+
+---
+
+## Good to know
+
+- **Re-uploading a file is safe.** Upload the same report twice and nothing
+  doubles up. Upload an updated version (say June grew from 24 rows to 30) and
+  only the 6 new rows are added. This holds even if two people upload at the
+  same moment.
+- **The old GitHub Pages address is no longer updated.** That version had no
+  login, so it would have left real P&L figures on a public web address. It's
+  switched off. You can delete it entirely in the repository's GitHub settings.
+- **Everyone has the same access.** There's no view-only role yet — anyone you
+  add can upload and change costs. Ask if you'd like that added.
+
+---
+
+## For developers
+
+The setup screen covers everything above, but the same steps can be run from a
+terminal against `DATABASE_URL`:
 
 ```bash
 npm install
-
-# Copy this from Vercel: Project → Settings → Environment Variables → DATABASE_URL
-export DATABASE_URL='postgres://...'
-
-npm run init-db                      # creates the tables
-npm run seed-sku-master              # loads the 45 real SKUs and their costs
-npm run create-user -- you@yourcompany.com   # prompts for a password (min 8 chars)
+export DATABASE_URL='...'      # Vercel → Settings → Environment Variables
+npm run init-db                # create the tables
+npm run seed-sku-master        # load the product catalogue
+npm run create-user -- you@yourcompany.com
 ```
 
-All three are safe to re-run — `init-db` and `seed-sku-master` skip anything
-that already exists, so a re-run never overwrites cost edits made in the app.
-
-> **Why not just paste `db/schema.sql` into the Neon query box?** That editor
-> sends the whole thing as one prepared statement and rejects it with
-> *"cannot insert multiple commands into a prepared statement"*. `npm run init-db`
-> reads the same file and sends each statement separately.
-
-## 4. Redeploy and sign in
-
-1. Back in Vercel, open **Deployments** → **⋯** on the latest → **Redeploy**
-   (so the app picks up the database connection).
-2. Open your Vercel URL. You should see a login page.
-3. Sign in with the account you created in step 3.
-
----
-
-## Adding your team
-
-Once signed in: **Settings → Team → Add teammate**. Enter their email and a
-temporary password, then pass those to them directly — the password is stored
-hashed and cannot be looked up later. Anyone you add can sign in, upload
-reports, and edit product costs.
-
-To revoke someone's access, use **Remove** on that same page. It takes effect
-immediately.
-
-## Confirming it actually works
-
-The point of this setup is shared data, so verify that specifically:
-
-1. Sign in and upload a report (**Data → Upload Reports**).
-2. Open the same URL in a **different browser** (or a private window) and sign
-   in as a different teammate.
-3. The data from step 1 should already be there. That's the proof it's shared
-   rather than saved per-browser.
-
-Also worth checking once: sign out, then paste a dashboard URL directly — you
-should land on the login page, not the dashboard.
-
-## Notes
-
-- **Uploads are de-duplicated in the database.** Re-uploading the same file
-  changes nothing; re-uploading a file that has grown adds only the new rows.
-  This holds even if two people upload at the same moment.
-- **The old GitHub Pages site is no longer updated.** Its build has no login,
-  so leaving it live would keep an unauthenticated copy of real P&L figures on
-  a public URL. Auto-deploy is disabled in
-  `.github/workflows/deploy.yml`; delete the Pages deployment in the repo's
-  GitHub settings if you want it gone entirely.
-- **Everyone has full access.** There is no view-only role — any teammate you
-  add can upload and edit costs. Add a role column and a permission check on
-  the API routes if that changes.
+The schema itself lives in [`api/_lib/schema.ts`](api/_lib/schema.ts) as a
+single `DO` block — one statement, so it can be pasted into a database console
+without tripping the "cannot insert multiple commands into a prepared statement"
+error.

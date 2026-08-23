@@ -1,32 +1,16 @@
 /**
- * Creates the database tables by running db/schema.sql.
+ * Creates the database tables.
  *
  *   DATABASE_URL='postgres://...' npm run init-db
  *
- * Neon's query editor (and any driver using prepared statements) rejects a
- * multi-statement string with "cannot insert multiple commands into a prepared
- * statement", so the file is split and each statement sent on its own.
+ * Normally unnecessary — opening the dashboard for the first time offers a
+ * setup screen that does this (plus creating your login and loading the
+ * product list). This exists for setting up a database from a terminal.
  *
  * Safe to re-run: every statement in the schema is CREATE ... IF NOT EXISTS.
  */
-import { readFile } from 'node:fs/promises'
-import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
 import { neon } from '@neondatabase/serverless'
-
-const here = dirname(fileURLToPath(import.meta.url))
-
-/** Splits on semicolons after stripping `-- ...` comments. The schema contains
- * no functions or dollar-quoted bodies, so no semicolon is ever nested. */
-function splitStatements(sql: string): string[] {
-  return sql
-    .split('\n')
-    .map((line) => line.replace(/--.*$/, ''))
-    .join('\n')
-    .split(';')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
-}
+import { SCHEMA_SQL } from '../api/_lib/schema'
 
 async function main() {
   const connectionString = process.env.DATABASE_URL ?? process.env.POSTGRES_URL
@@ -35,22 +19,8 @@ async function main() {
     process.exit(1)
   }
 
-  const schema = await readFile(join(here, '..', 'db', 'schema.sql'), 'utf8')
-  const statements = splitStatements(schema)
-  const sql = neon(connectionString)
-
-  for (const [i, statement] of statements.entries()) {
-    const label = statement.split('\n')[0].slice(0, 60)
-    try {
-      await sql.query(statement)
-      console.log(`  [${i + 1}/${statements.length}] ${label}`)
-    } catch (e) {
-      console.error(`\nFailed on statement ${i + 1}:\n${statement}\n`)
-      throw e
-    }
-  }
-
-  console.log(`\nDone — ${statements.length} statements applied.`)
+  await neon(connectionString).query(SCHEMA_SQL)
+  console.log('Database ready — tables created (existing ones left untouched).')
 }
 
 main().catch((e) => {
