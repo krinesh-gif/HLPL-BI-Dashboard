@@ -40,11 +40,11 @@ export function ChannelDashboardPage() {
   return (
     <PageShell title={channelDef.label} subtitle="KPIs, trends, and standardized P&L for this channel">
       <KPIGrid>
-        <KPICard label="Net Sales" value={formatCurrencyCompact(d.currentFacts.netSales, channelDef.currency)} delta={{ pct: d.growth, label: 'MoM' }} />
-        <KPICard label="Units" value={formatNumber(d.currentFacts.quantity)} />
+        <KPICard label="Net Sales" value={formatCurrencyCompact(d.currentFacts.netSales)} delta={{ pct: d.growth, label: 'MoM' }} />
+        <KPICard label="Units" value={formatNumber(d.currentFacts.units)} />
         <KPICard label="Orders" value={formatNumber(d.currentFacts.orders)} />
-        <KPICard label="AOV" value={formatCurrencyCompact(d.aov, channelDef.currency)} />
-        <KPICard label="ASP" value={formatCurrencyCompact(d.asp, channelDef.currency)} />
+        <KPICard label="AOV" value={formatCurrencyCompact(d.aov)} />
+        <KPICard label="ASP" value={formatCurrencyCompact(d.asp)} />
         <KPICard label="RTO Rate" value={formatPercent(d.rtoRate)} tone={d.rtoRate > 5 ? 'bad' : 'neutral'} />
         <KPICard label="Return Rate" value={formatPercent(d.returnRate)} />
         <KPICard label="Contribution Margin %" value={formatPercent(d.pnl.lines.contributionMarginPct ?? 0)} />
@@ -52,16 +52,16 @@ export function ChannelDashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ChartCard title="Sales Trend (6 Months)">
-          <TrendLineChart data={d.trend} xKey="month" series={[{ key: 'netSales', label: 'Net Sales' }]} valueFormatter={(v) => formatCurrencyCompact(v, channelDef.currency)} />
+          <TrendLineChart data={d.trend} xKey="month" series={[{ key: 'netSales', label: 'Net Sales' }]} valueFormatter={(v) => formatCurrencyCompact(v)} />
         </ChartCard>
         <ChartCard title="Units Trend (6 Months)">
           <TrendLineChart data={d.trend} xKey="month" series={[{ key: 'units', label: 'Units' }]} />
         </ChartCard>
         <ChartCard title="Category Sales Mix">
-          <MixDonutChart data={d.categorySales} valueFormatter={(v) => formatCurrencyCompact(v, channelDef.currency)} />
+          <MixDonutChart data={d.categorySales} valueFormatter={(v) => formatCurrencyCompact(v)} />
         </ChartCard>
         <ChartCard title="Top SKUs">
-          <ComparisonBarChart data={d.topSkus.map((s) => ({ name: s.productName, value: s.netSales }))} xKey="name" yKey="value" horizontal valueFormatter={(v) => formatCurrencyCompact(v, channelDef.currency)} />
+          <ComparisonBarChart data={d.topSkus.map((s) => ({ name: s.productName, value: s.netSales }))} xKey="name" yKey="value" horizontal valueFormatter={(v) => formatCurrencyCompact(v)} />
         </ChartCard>
       </div>
 

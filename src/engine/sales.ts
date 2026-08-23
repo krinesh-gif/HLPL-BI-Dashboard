@@ -2,53 +2,11 @@ import type { ChannelId } from '@/config/channels'
 import { toMonthKey } from '@/lib/format'
 import type { CanonicalSalesRecord } from '@/data/models'
 
-export interface SalesFacts {
-  grossSales: number
-  discount: number
-  returnValueEstimate: number
-  netSales: number
-  quantity: number
-  orders: number
-  returnUnits: number
-  rtoUnits: number
-  marketplaceFee: number
-  shippingCost: number
-  tax: number
-}
-
-const EMPTY_FACTS: SalesFacts = {
-  grossSales: 0,
-  discount: 0,
-  returnValueEstimate: 0,
-  netSales: 0,
-  quantity: 0,
-  orders: 0,
-  returnUnits: 0,
-  rtoUnits: 0,
-  marketplaceFee: 0,
-  shippingCost: 0,
-  tax: 0,
-}
-
-export function sumFacts(records: CanonicalSalesRecord[]): SalesFacts {
-  return records.reduce<SalesFacts>(
-    (acc, r) => ({
-      grossSales: acc.grossSales + r.grossSales,
-      discount: acc.discount + r.discount,
-      returnValueEstimate: acc.returnValueEstimate + (r.grossSales - r.netSales - r.discount),
-      netSales: acc.netSales + r.netSales,
-      quantity: acc.quantity + r.quantity,
-      orders: acc.orders + 1,
-      returnUnits: acc.returnUnits + r.returnUnits,
-      rtoUnits: acc.rtoUnits + r.rtoUnits,
-      marketplaceFee: acc.marketplaceFee + r.marketplaceFee,
-      shippingCost: acc.shippingCost + r.shippingCost,
-      tax: acc.tax + r.tax,
-    }),
-    { ...EMPTY_FACTS },
-  )
-}
-
+/**
+ * Grouping and trend helpers. Aggregation of money and units deliberately does
+ * NOT live here: every such figure comes from engine/netSales.ts, so the app
+ * has exactly one Net Sales calculation rather than one per screen.
+ */
 export function filterByMonth(records: CanonicalSalesRecord[], month: string): CanonicalSalesRecord[] {
   return records.filter((r) => toMonthKey(r.orderDate) === month)
 }

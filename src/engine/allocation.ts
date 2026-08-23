@@ -1,7 +1,8 @@
 import type { ChannelId } from '@/config/channels'
 import { CHANNELS, DEFAULT_ALLOCATION_WEIGHTS } from '@/config/channels'
 import type { CanonicalSalesRecord, FixedExpenseEntry, PnlLineValues } from '@/data/models'
-import { filterByMonth, groupByChannel, sumFacts } from './sales'
+import { filterByMonth, groupByChannel } from './sales'
+import { orderBasisNetSales } from './netSales'
 
 const FIXED_EXPENSE_CATEGORIES = [
   'salaries',
@@ -30,7 +31,7 @@ export function computeSalesContributionWeights(
   let total = 0
 
   for (const channel of CHANNELS.map((c) => c.id)) {
-    const net = sumFacts(byChannel.get(channel) ?? []).netSales
+    const net = orderBasisNetSales(byChannel.get(channel) ?? []).netSales
     netSalesByChannel.set(channel, net)
     total += net
   }

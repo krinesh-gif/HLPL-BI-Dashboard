@@ -5,6 +5,7 @@ import { MisPage } from '@/modules/mis/MisPage'
 import { MasterPnlPage } from '@/modules/pnl/MasterPnlPage'
 import { ChannelPnlPage } from '@/modules/pnl/ChannelPnlPage'
 import { FixedExpensesPage } from '@/modules/pnl/FixedExpensesPage'
+import { NetSalesReconciliationPage } from '@/modules/pnl/NetSalesReconciliationPage'
 import { InsightPage } from '@/modules/insight/InsightPage'
 import { ChannelDashboardPage } from '@/modules/channels/ChannelDashboardPage'
 import { AmazonAdsPage } from '@/modules/marketing/AmazonAdsPage'
@@ -32,6 +33,7 @@ export const router = createHashRouter([
       { path: 'pnl/master', element: <MasterPnlPage /> },
       { path: 'pnl/channel', element: <ChannelPnlPage /> },
       { path: 'pnl/fixed-expenses', element: <FixedExpensesPage /> },
+      { path: 'pnl/reconciliation', element: <NetSalesReconciliationPage /> },
       { path: 'insight', element: <InsightPage /> },
       { path: 'channels/:channelId', element: <ChannelDashboardPage /> },
       { path: 'marketing/amazon-ads', element: <AmazonAdsPage /> },

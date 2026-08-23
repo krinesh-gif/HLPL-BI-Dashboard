@@ -18,6 +18,7 @@ export const NAVIGATION: NavSection[] = [
       { label: 'Master P&L', path: '/pnl/master' },
       { label: 'Channel P&L', path: '/pnl/channel' },
       { label: 'Fixed Expenses', path: '/pnl/fixed-expenses' },
+      { label: 'Net Sales Reconciliation', path: '/pnl/reconciliation' },
     ],
   },
   { label: 'Business Insight', path: '/insight' },

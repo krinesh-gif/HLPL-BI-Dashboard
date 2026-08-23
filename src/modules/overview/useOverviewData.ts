@@ -6,7 +6,8 @@ import { addMonths, ytdMonthKeys } from '@/lib/format'
 import { buildAllChannelPnlViews } from '@/engine/channelPnlRouter'
 import { buildMasterPnl } from '@/engine/pnl'
 import { marketingFromAds } from '@/engine/marketing'
-import { filterByMonth, groupBySku, growthPct, sumFacts } from '@/engine/sales'
+import { filterByMonth, groupBySku, growthPct } from '@/engine/sales'
+import { asp as aspOf, aov as aovOf, netSalesForMonth, orderBasisNetSales, rtoPct } from '@/engine/netSales'
 import { forecastDemand } from '@/engine/forecast'
 import { INVENTORY_THRESHOLDS } from '@/config/thresholds'
 import {
@@ -36,26 +37,24 @@ export function useOverviewData() {
     const masterPrevious = buildMasterPnl(previousChannelPnls, previousMonth)
 
     const ytdMonths = ytdMonthKeys(month)
-    const ytdNetSales = ytdMonths.reduce((sum, m) => {
-      const marketing = marketingFromAds(adsRecords, m)
-      const views = buildAllChannelPnlViews(channelIds, m, { salesRecords, skuMaster, fixedExpenses, marketing, facts })
-      return sum + (buildMasterPnl(views.map((v) => v.canonical), m).lines.netSales ?? 0)
-    }, 0)
-    const previousYearYtdMonths = ytdMonths.map((m) => addMonths(m, -12))
-    const previousYtdNetSales = previousYearYtdMonths.reduce((sum, m) => {
-      const marketing = marketingFromAds(adsRecords, m)
-      const views = buildAllChannelPnlViews(channelIds, m, { salesRecords, skuMaster, fixedExpenses, marketing, facts })
-      return sum + (buildMasterPnl(views.map((v) => v.canonical), m).lines.netSales ?? 0)
-    }, 0)
+    const ytdNetSales = ytdMonths.reduce(
+      (sum, m) => sum + netSalesForMonth(salesRecords, m, facts, channelIds).netSales, 0)
+    const previousYtdNetSales = ytdMonths
+      .map((m) => addMonths(m, -12))
+      .reduce((sum, m) => sum + netSalesForMonth(salesRecords, m, facts, channelIds).netSales, 0)
 
-    const currentFacts = sumFacts(filterByMonth(salesRecords, month))
-    const previousFacts = sumFacts(filterByMonth(salesRecords, previousMonth))
+    // One figure, from the one engine. Previously this summed order rows while
+    // masterCurrent read the P&L (settlement for Meesho/Flipkart/Amazon USA),
+    // then divided one by the other to get ASP — mixing two datasets inside a
+    // single ratio.
+    const currentFacts = netSalesForMonth(salesRecords, month, facts, channelIds)
+    const previousFacts = netSalesForMonth(salesRecords, previousMonth, facts, channelIds)
 
     const currentAdsMonth = adsRecords.filter((r) => r.date.slice(0, 7) === month)
     const totalAdSpend = currentAdsMonth.reduce((s, r) => s + r.spend, 0)
     const totalAdSales = currentAdsMonth.reduce((s, r) => s + r.adSales, 0)
     const acos = totalAdSales > 0 ? (totalAdSpend / totalAdSales) * 100 : 0
-    const tacos = (masterCurrent.lines.netSales ?? 0) > 0 ? (totalAdSpend / (masterCurrent.lines.netSales ?? 1)) * 100 : 0
+    const tacos = currentFacts.netSales > 0 ? (totalAdSpend / currentFacts.netSales) * 100 : 0
     const roas = totalAdSpend > 0 ? totalAdSales / totalAdSpend : 0
 
     // Channel performance
@@ -75,9 +74,9 @@ export function useOverviewData() {
     const currentBySku = groupBySku(filterByMonth(salesRecords, month))
     const previousBySku = groupBySku(filterByMonth(salesRecords, previousMonth))
     const skuRows = skuMaster.map((s) => {
-      const curUnits = sumFacts(currentBySku.get(s.sku) ?? []).quantity
-      const prevUnits = sumFacts(previousBySku.get(s.sku) ?? []).quantity
-      const curNet = sumFacts(currentBySku.get(s.sku) ?? []).netSales
+      const curUnits = orderBasisNetSales(currentBySku.get(s.sku) ?? []).units
+      const prevUnits = orderBasisNetSales(previousBySku.get(s.sku) ?? []).units
+      const curNet = orderBasisNetSales(currentBySku.get(s.sku) ?? []).netSales
       return { sku: s.sku, productName: s.productName, curUnits, prevUnits, curNet, growth: growthPct(curUnits, prevUnits) }
     })
     const topSku = [...skuRows].sort((a, b) => b.curNet - a.curNet)[0]
@@ -110,7 +109,7 @@ export function useOverviewData() {
 
     // Insights (Action Required)
     const insights: Insight[] = []
-    const revIns = revenueInsight(masterCurrent.lines.netSales ?? 0, masterPrevious.lines.netSales ?? 0)
+    const revIns = revenueInsight(currentFacts.netSales, previousFacts.netSales)
     if (revIns) insights.push(revIns)
     const marginIns = marginDeclineInsight(masterCurrent.lines, masterPrevious.lines)
     if (marginIns) insights.push(marginIns)
@@ -120,8 +119,8 @@ export function useOverviewData() {
       if (ins) insights.push(ins)
     }
     for (const c of CHANNELS) {
-      const facts = sumFacts(filterByMonth(salesRecords, month).filter((r) => r.channel === c.id))
-      const ins = rtoInsight(c.id, facts.rtoUnits, facts.quantity)
+      const channelFigure = orderBasisNetSales(filterByMonth(salesRecords, month).filter((r) => r.channel === c.id))
+      const ins = rtoInsight(c.id, channelFigure.rtoUnits, channelFigure.shippedUnits)
       if (ins) insights.push(ins)
     }
     if (channelSummaries.length > 0) {
@@ -141,10 +140,15 @@ export function useOverviewData() {
       ytdNetSales,
       previousYtdNetSales,
       ytdGrowth: growthPct(ytdNetSales, previousYtdNetSales),
-      revenueGrowthMoM: growthPct(masterCurrent.lines.netSales ?? 0, masterPrevious.lines.netSales ?? 0),
+      revenueGrowthMoM: growthPct(currentFacts.netSales, previousFacts.netSales),
       ordersGrowthMoM: growthPct(currentFacts.orders, previousFacts.orders),
-      aov: currentFacts.orders > 0 ? (masterCurrent.lines.netSales ?? 0) / currentFacts.orders : 0,
-      asp: currentFacts.quantity > 0 ? (masterCurrent.lines.grossSales ?? 0) / currentFacts.quantity : 0,
+      aov: aovOf(currentFacts) ?? 0,
+      // ASP = Net Sales / Units, both from the same figure. It used to divide
+      // P&L gross sales by order-row units — two datasets in one ratio.
+      asp: aspOf(currentFacts) ?? 0,
+      previousAsp: aspOf(previousFacts),
+      rtoPct: rtoPct(currentFacts),
+      netSalesBasis: currentFacts.basis,
       totalAdSpend,
       roas,
       acos,

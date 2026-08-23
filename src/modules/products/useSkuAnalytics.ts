@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
 import { addMonths } from '@/lib/format'
-import { filterByMonth, groupBySku, growthPct, sumFacts } from '@/engine/sales'
+import { filterByMonth, groupBySku, growthPct } from '@/engine/sales'
+import { orderBasisNetSales } from '@/engine/netSales'
 
 export type SkuGrowthBucket = 'fast-growing' | 'stable' | 'declining' | 'high-volume-declining' | 'low-volume-high-growth' | 'zero-sales'
 
@@ -38,21 +39,21 @@ export function useSkuAnalytics(): SkuAnalyticsRow[] {
     return skuMaster
       .filter((s) => category === 'all' || s.category === category)
       .map((s) => {
-        const currentFacts = sumFacts(currentBySku.get(s.sku) ?? [])
-        const previousFacts = sumFacts(previousBySku.get(s.sku) ?? [])
-        const unitGrowthPct = growthPct(currentFacts.quantity, previousFacts.quantity)
+        const currentFacts = orderBasisNetSales(currentBySku.get(s.sku) ?? [])
+        const previousFacts = orderBasisNetSales(previousBySku.get(s.sku) ?? [])
+        const unitGrowthPct = growthPct(currentFacts.units, previousFacts.units)
         const revenueGrowthPct = growthPct(currentFacts.netSales, previousFacts.netSales)
 
         return {
           sku: s.sku,
           productName: s.productName,
           category: s.category,
-          currentUnits: currentFacts.quantity,
-          previousUnits: previousFacts.quantity,
+          currentUnits: currentFacts.units,
+          previousUnits: previousFacts.units,
           currentNetSales: currentFacts.netSales,
           unitGrowthPct,
           revenueGrowthPct,
-          bucket: classify(currentFacts.quantity, unitGrowthPct),
+          bucket: classify(currentFacts.units, unitGrowthPct),
         }
       })
   }, [salesRecords, skuMaster, month, category])

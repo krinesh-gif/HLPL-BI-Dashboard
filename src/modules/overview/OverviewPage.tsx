@@ -27,7 +27,7 @@ export function OverviewPage() {
           <KPICard label="Contribution Margin %" value={formatPercent(d.masterCurrent.lines.contributionMarginPct ?? 0)} />
           <KPICard label="EBITDA" value={formatCurrencyCompact(d.masterCurrent.lines.ebitda ?? 0)} />
           <KPICard label="EBITDA Margin %" value={formatPercent(d.masterCurrent.lines.ebitdaMarginPct ?? 0)} />
-          <KPICard label="Units Sold" value={formatNumber(d.currentFacts.quantity)} />
+          <KPICard label="Units Sold" value={formatNumber(d.currentFacts.units)} />
           <KPICard label="AOV / ASP" value={`${formatCurrencyCompact(d.aov)} / ${formatCurrencyCompact(d.asp)}`} />
         </KPIGrid>
       </Section>

@@ -27,3 +27,21 @@ export function downloadCsv(fileName: string, csv: string) {
   a.click()
   URL.revokeObjectURL(url)
 }
+
+/** Escapes one CSV field: quotes wrap it, and an embedded quote is doubled. */
+function csvField(value: string | number): string {
+  const text = typeof value === 'number' ? String(value) : value
+  return `"${text.replace(/"/g, '""')}"`
+}
+
+/**
+ * Downloads an array of uniform objects as CSV, using the first row's keys as
+ * the header. Used by the analysis screens, whose shapes are chosen at runtime
+ * (metric, month window, ranking) and so cannot have a fixed column list.
+ */
+export function exportRowsToCsv(fileName: string, rows: Record<string, string | number>[]) {
+  if (rows.length === 0) return
+  const headers = Object.keys(rows[0])
+  const body = rows.map((row) => headers.map((h) => csvField(row[h] ?? '')).join(','))
+  downloadCsv(fileName, [headers.map(csvField).join(','), ...body].join('\n'))
+}

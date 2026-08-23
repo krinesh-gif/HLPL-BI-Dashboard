@@ -2,7 +2,8 @@ import type { ChannelId } from '@/config/channels'
 import { CHANNELS } from '@/config/channels'
 import { PNL_STRUCTURE, type PnlLineKey } from '@/config/pnlStructure'
 import type { CanonicalSalesRecord, ChannelPnl, FixedExpenseEntry, PnlLineValues, PnlResult, SkuMaster } from '@/data/models'
-import { filterByChannel, filterByMonth, sumFacts } from './sales'
+import { filterByChannel, filterByMonth } from './sales'
+import { orderBasisNetSales } from './netSales'
 import { allocateFixedExpensesForMonth } from './allocation'
 
 /** Marketing spend, keyed by channel, for a given month. Comes from Amazon Ads / other ad-platform imports. */
@@ -33,7 +34,10 @@ export function buildChannelPnl(
   marketing: MarketingByChannel,
 ): ChannelPnl {
   const records = filterByChannel(filterByMonth(allRecords, month), channel)
-  const facts = sumFacts(records)
+  // One Net Sales calculation for the whole app: the P&L's revenue lines are
+  // the central engine's figure, not a second summation with its own rules
+  // about cancellations and currency.
+  const facts = orderBasisNetSales(records)
   const cogs = cogsForRecords(records, skuMaster)
   const channelMarketing = marketing[channel] ?? { ads: 0 }
   const allocation = allocateFixedExpensesForMonth(allRecords, fixedExpenses, month)
@@ -41,8 +45,8 @@ export function buildChannelPnl(
 
   const lines: PnlLineValues = {
     grossSales: facts.grossSales,
-    discounts: facts.discount,
-    returns: facts.returnValueEstimate,
+    discounts: facts.discounts,
+    returns: facts.returnsValue,
     otherRevenueAdj: 0,
     cogs,
     marketplaceCommission: facts.marketplaceFee,
