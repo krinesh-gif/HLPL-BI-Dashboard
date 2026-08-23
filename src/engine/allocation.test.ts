@@ -13,16 +13,18 @@ function record(channel: CanonicalSalesRecord['channel'], netSales: number): Can
 
 describe('computeSalesContributionWeights', () => {
   it('weights channels by their share of net sales for the month', () => {
-    const records = [record('amazon_in_seller', 800), record('flipkart', 200)]
+    // Rows are keyed by the report they came from; weights are per business
+    // channel, so both Amazon India reports land on one weight.
+    const records = [record('amazon_in_seller', 600), record('amazon_in_vendor', 200), record('flipkart', 200)]
     const weights = computeSalesContributionWeights(records, '2026-06')
-    expect(weights.amazon_in_seller).toBeCloseTo(0.8)
+    expect(weights.amazon_in).toBeCloseTo(0.8)
     expect(weights.flipkart).toBeCloseTo(0.2)
     expect(weights.meesho).toBe(0)
   })
 
   it('falls back to default weights when there is no sales data for the month', () => {
     const weights = computeSalesContributionWeights([], '2026-06')
-    expect(weights.amazon_in_seller).toBeGreaterThan(0)
+    expect(weights.amazon_in).toBeGreaterThan(0)
     const total = Object.values(weights).reduce((a, b) => a + b, 0)
     expect(total).toBeCloseTo(1)
   })
@@ -30,13 +32,13 @@ describe('computeSalesContributionWeights', () => {
 
 describe('allocateFixedExpensesForMonth', () => {
   it('splits each expense category proportionally to sales share', () => {
-    const records = [record('amazon_in_seller', 600), record('flipkart', 400)]
+    const records = [record('amazon_in_seller', 400), record('amazon_in_vendor', 200), record('flipkart', 400)]
     const fixedExpenses: FixedExpenseEntry[] = [
       { month: '2026-06', category: 'rent', amount: 100000 },
       { month: '2026-05', category: 'rent', amount: 999999 }, // different month, must be ignored
     ]
     const allocation = allocateFixedExpensesForMonth(records, fixedExpenses, '2026-06')
-    expect(allocation.amazon_in_seller?.rent).toBeCloseTo(60000)
+    expect(allocation.amazon_in?.rent).toBeCloseTo(60000)
     expect(allocation.flipkart?.rent).toBeCloseTo(40000)
   })
 })

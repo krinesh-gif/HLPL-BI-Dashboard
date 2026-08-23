@@ -1,15 +1,15 @@
-import type { ChannelId } from '@/config/channels'
-import { CHANNELS } from '@/config/channels'
+import type { BusinessChannelId } from '@/config/channels'
+import { BUSINESS_CHANNEL_IDS, channelOfSource } from '@/config/channels'
 import { PNL_STRUCTURE, type PnlLineKey } from '@/config/pnlStructure'
 import type { CanonicalSalesRecord, ChannelPnl, FixedExpenseEntry, PnlLineValues, PnlResult, SkuMaster } from '@/data/models'
 import { cogsForMonth, type CostVersionsBySku } from '@/data/costVersions'
 import { resolveCogs, type ComboComponent, type SkuMapping } from '@/data/skuMapping'
-import { filterByChannel, filterByMonth } from './sales'
+import { filterByMonth } from './sales'
 import { orderBasisNetSales } from './netSales'
 import { allocateFixedExpensesForMonth } from './allocation'
 
 /** Marketing spend, keyed by channel, for a given month. Comes from Amazon Ads / other ad-platform imports. */
-export type MarketingByChannel = Partial<Record<ChannelId, { ads: number; performanceMarketing?: number; otherMarketing?: number }>>
+export type MarketingByChannel = Partial<Record<BusinessChannelId, { ads: number; performanceMarketing?: number; otherMarketing?: number }>>
 
 /**
  * Optional inputs that make COGS accurate. Both are optional so a caller that
@@ -116,12 +116,15 @@ export function buildChannelPnl(
   allRecords: CanonicalSalesRecord[],
   skuMaster: SkuMaster[],
   fixedExpenses: FixedExpenseEntry[],
-  channel: ChannelId,
+  channel: BusinessChannelId,
   month: string,
   marketing: MarketingByChannel,
   cogsInputs: CogsInputs = {},
 ): ChannelPnl {
-  const records = filterByChannel(filterByMonth(allRecords, month), channel)
+  // Every report belonging to this business channel. For Amazon India that is
+  // Seller Central and Vendor Central together, which is what makes one P&L
+  // out of two uploads without anyone combining them by hand.
+  const records = filterByMonth(allRecords, month).filter((r) => channelOfSource(r.channel) === channel)
   // One Net Sales calculation for the whole app: the P&L's revenue lines are
   // the central engine's figure, not a second summation with its own rules
   // about cancellations and currency.
@@ -217,5 +220,5 @@ export function buildAllChannelPnls(
   marketing: MarketingByChannel,
   cogsInputs: CogsInputs = {},
 ): ChannelPnl[] {
-  return CHANNELS.map((c) => buildChannelPnl(allRecords, skuMaster, fixedExpenses, c.id, month, marketing, cogsInputs))
+  return BUSINESS_CHANNEL_IDS.map((c) => buildChannelPnl(allRecords, skuMaster, fixedExpenses, c, month, marketing, cogsInputs))
 }

@@ -9,24 +9,25 @@ export interface NavSection {
   children?: NavLeaf[]
 }
 
+/**
+ * The navigation reflects how the business is run, not how the data arrives.
+ *
+ * Channels are the seven business channels. Amazon India appears once, with
+ * Seller Central and Vendor Central available as a drill-down inside it rather
+ * than as two entries here.
+ *
+ * P&L is a single top-level section. It is deliberately NOT repeated inside
+ * each channel: one report, one format, one place it can be produced from.
+ */
 export const NAVIGATION: NavSection[] = [
   { label: 'Overview', path: '/' },
-  { label: 'Investor MIS', path: '/mis' },
-  {
-    label: 'P&L',
-    children: [
-      { label: 'Master P&L', path: '/pnl/master' },
-      { label: 'Channel P&L', path: '/pnl/channel' },
-      { label: 'Fixed Expenses', path: '/pnl/fixed-expenses' },
-      { label: 'Net Sales Reconciliation', path: '/pnl/reconciliation' },
-    ],
-  },
   { label: 'Business Insight', path: '/insight' },
+  { label: 'Investor MIS', path: '/mis' },
+  { label: 'P&L', path: '/pnl' },
   {
     label: 'Channels',
     children: [
-      { label: 'Amazon India — Seller', path: '/channels/amazon_in_seller' },
-      { label: 'Amazon India — Vendor', path: '/channels/amazon_in_vendor' },
+      { label: 'Amazon India', path: '/channels/amazon_in' },
       { label: 'Amazon USA', path: '/channels/amazon_us' },
       { label: 'Flipkart', path: '/channels/flipkart' },
       { label: 'Meesho', path: '/channels/meesho' },
@@ -36,40 +37,44 @@ export const NAVIGATION: NavSection[] = [
     ],
   },
   {
-    label: 'Marketing',
-    children: [{ label: 'Amazon Ads', path: '/marketing/amazon-ads' }],
-  },
-  {
-    label: 'Products',
-    children: [
-      { label: 'SKU Analytics', path: '/products/sku-analytics' },
-      { label: 'Product Master', path: '/products/master' },
-      { label: 'SKU Mapping', path: '/products/sku-mapping' },
-      { label: 'Cost Sheet', path: '/products/cost-sheet' },
-    ],
-  },
-  {
     label: 'Sales',
     children: [
       { label: 'Daily Sales', path: '/sales/daily' },
       { label: 'Monthly Sales', path: '/sales/monthly' },
       { label: 'Channel Sales', path: '/sales/channel' },
+      { label: 'SKU Sales', path: '/products/sku-analytics' },
       { label: 'ASP Analysis', path: '/sales/asp' },
       { label: 'RTO Analysis', path: '/sales/rto' },
     ],
   },
   {
-    label: 'Supply Chain',
+    label: 'Marketing',
     children: [
-      { label: 'Inventory Dashboard', path: '/supply-chain/inventory' },
-      { label: 'Demand Forecast', path: '/supply-chain/forecast' },
-      { label: 'Procurement Planning', path: '/supply-chain/procurement' },
+      { label: 'Ads Overview', path: '/marketing/ads' },
+      { label: 'Amazon India', path: '/marketing/ads/amazon_in' },
+      { label: 'Amazon USA', path: '/marketing/ads/amazon_us' },
+      { label: 'Flipkart', path: '/marketing/ads/flipkart' },
+      { label: 'Myntra', path: '/marketing/ads/myntra' },
+      { label: 'Nykaa', path: '/marketing/ads/nykaa' },
     ],
   },
   {
+    label: 'Supply Chain',
+    children: [
+      { label: 'Inventory', path: '/supply-chain/inventory' },
+      { label: 'Forecast', path: '/supply-chain/forecast' },
+      { label: 'Procurement', path: '/supply-chain/procurement' },
+    ],
+  },
+  { label: 'Product Master', path: '/products/master' },
+  { label: 'Cost Master', path: '/products/cost-sheet' },
+  { label: 'SKU Mapping', path: '/products/sku-mapping' },
+  { label: 'Fixed Expenses', path: '/pnl/fixed-expenses' },
+  { label: 'Net Sales Reconciliation', path: '/pnl/reconciliation' },
+  {
     label: 'Data',
     children: [
-      { label: 'Upload Reports', path: '/data/upload' },
+      { label: 'Data Upload', path: '/data/upload' },
       { label: 'Import History', path: '/data/import-history' },
     ],
   },

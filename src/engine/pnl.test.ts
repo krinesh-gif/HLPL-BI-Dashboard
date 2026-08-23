@@ -47,16 +47,16 @@ describe('computeSubtotals', () => {
 describe('buildChannelPnl', () => {
   it('pulls COGS from the SKU master, not from order data', () => {
     const records = [record({}), record({ orderId: 'o2', quantity: 5, grossSales: 2000, netSales: 1800 })]
-    const pnl = buildChannelPnl(records, skuMaster, [], 'amazon_in_seller', '2026-06', {})
+    const pnl = buildChannelPnl(records, skuMaster, [], 'amazon_in', '2026-06', {})
     // 15 total units * 100 COGS
     expect(pnl.lines.cogs).toBe(1500)
   })
 
   it('is unaffected by re-importing the same order data twice for COGS/marketing lines', () => {
     const records = [record({})]
-    const marketing = { amazon_in_seller: { ads: 500 } }
-    const pnl1 = buildChannelPnl(records, skuMaster, [], 'amazon_in_seller', '2026-06', marketing)
-    const pnl2 = buildChannelPnl([...records, ...records], skuMaster, [], 'amazon_in_seller', '2026-06', marketing)
+    const marketing = { amazon_in: { ads: 500 } }
+    const pnl1 = buildChannelPnl(records, skuMaster, [], 'amazon_in', '2026-06', marketing)
+    const pnl2 = buildChannelPnl([...records, ...records], skuMaster, [], 'amazon_in', '2026-06', marketing)
     // Marketing is sourced independently of order volume.
     expect(pnl1.lines.ads).toBe(500)
     expect(pnl2.lines.ads).toBe(500)
@@ -68,7 +68,7 @@ describe('buildChannelPnl', () => {
       record({ orderId: 'o2', channel: 'flipkart' }),
       record({ orderId: 'o3', orderDate: '2026-05-01' }),
     ]
-    const pnl = buildChannelPnl(records, skuMaster, [], 'amazon_in_seller', '2026-06', {})
+    const pnl = buildChannelPnl(records, skuMaster, [], 'amazon_in', '2026-06', {})
     expect(pnl.lines.grossSales).toBe(4000)
   })
 })
@@ -77,8 +77,8 @@ describe('buildMasterPnl', () => {
   it('sums input lines across all channel P&Ls and recomputes subtotals', () => {
     const fixedExpenses: FixedExpenseEntry[] = []
     const records = [record({}), record({ orderId: 'o2', channel: 'flipkart' })]
-    const channelPnls = ['amazon_in_seller', 'flipkart'].map((ch) =>
-      buildChannelPnl(records, skuMaster, fixedExpenses, ch as 'amazon_in_seller' | 'flipkart', '2026-06', {}),
+    const channelPnls = ['amazon_in', 'flipkart'].map((ch) =>
+      buildChannelPnl(records, skuMaster, fixedExpenses, ch as 'amazon_in' | 'flipkart', '2026-06', {}),
     )
     const master = buildMasterPnl(channelPnls, '2026-06')
     expect(master.lines.grossSales).toBe(8000)

@@ -3,7 +3,7 @@ import { PageShell } from '@/components/layout/PageShell'
 import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
-import { CHANNELS, type ChannelId } from '@/config/channels'
+import { BUSINESS_CHANNELS, type BusinessChannelId } from '@/config/channels'
 import { addMonths, formatCurrencyCompact, formatCurrencyFull, formatPercent, monthLabel } from '@/lib/format'
 import { growthPct } from '@/engine/sales'
 import { netSalesForChannelMonth } from '@/engine/netSales'
@@ -38,10 +38,10 @@ export function ChannelSalesPage() {
     const facts = { flipkartFacts, amazonUsaFacts, meeshoFacts }
     const months = Array.from({ length: monthsShown }, (_, i) => addMonths(month, i - (monthsShown - 1)))
 
-    const matrix = new Map<string, Map<ChannelId, { netSales: number; units: number; orders: number }>>()
+    const matrix = new Map<string, Map<BusinessChannelId, { netSales: number; units: number; orders: number }>>()
     for (const m of months) {
-      const row = new Map<ChannelId, { netSales: number; units: number; orders: number }>()
-      for (const c of CHANNELS) {
+      const row = new Map<BusinessChannelId, { netSales: number; units: number; orders: number }>()
+      for (const c of BUSINESS_CHANNELS) {
         const figure = netSalesForChannelMonth({ records: salesRecords, channel: c.id, month: m, facts })
         row.set(c.id, { netSales: figure.netSales, units: figure.units, orders: figure.orders })
       }
@@ -50,7 +50,7 @@ export function ChannelSalesPage() {
 
     // A channel with nothing in the whole window is a column of zeros; hiding
     // it keeps the table readable without hiding any month.
-    const activeChannels = CHANNELS.filter((c) =>
+    const activeChannels = BUSINESS_CHANNELS.filter((c) =>
       months.some((m) => {
         const cell = matrix.get(m)?.get(c.id)
         return cell !== undefined && (cell.netSales !== 0 || cell.units !== 0 || cell.orders !== 0)

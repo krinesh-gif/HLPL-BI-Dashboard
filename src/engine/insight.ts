@@ -1,5 +1,5 @@
-import type { ChannelId } from '@/config/channels'
-import { CHANNEL_MAP } from '@/config/channels'
+import type { BusinessChannelId } from '@/config/channels'
+import { channelLabel } from '@/config/channels'
 import { INSIGHT_THRESHOLDS } from '@/config/thresholds'
 import type { PnlLineValues } from '@/data/models'
 import { growthPct } from './sales'
@@ -109,14 +109,14 @@ export function skuGrowthInsights(rows: SkuGrowthInput[]): Insight[] {
   return insights
 }
 
-export function rtoInsight(channel: ChannelId, rtoUnits: number, quantity: number): Insight | null {
+export function rtoInsight(channel: BusinessChannelId, rtoUnits: number, quantity: number): Insight | null {
   if (quantity === 0) return null
   const rate = (rtoUnits / quantity) * 100
   if (rate >= INSIGHT_THRESHOLDS.rtoRateHighPct) {
     return {
       severity: 'orange',
       category: 'channel',
-      message: `${CHANNEL_MAP[channel].label} RTO rate is ${rate.toFixed(1)}% of units, above the ${INSIGHT_THRESHOLDS.rtoRateHighPct}% threshold.`,
+      message: `${channelLabel(channel)} RTO rate is ${rate.toFixed(1)}% of units, above the ${INSIGHT_THRESHOLDS.rtoRateHighPct}% threshold.`,
     }
   }
   return null

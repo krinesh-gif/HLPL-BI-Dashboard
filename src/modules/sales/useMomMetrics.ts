@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
-import { CHANNELS } from '@/config/channels'
+import { BUSINESS_CHANNEL_IDS } from '@/config/channels'
 import { addMonths } from '@/lib/format'
 import {
   categoryMomRows,
@@ -42,7 +42,7 @@ export function useMomMetrics(trendMonths = DEFAULT_TREND_MONTHS): {
   const [compareMonth, setCompareMonth] = useState<string>(addMonths(month, -1))
 
   return useMemo(() => {
-    const channels = CHANNELS.map((c) => c.id)
+    const channels = BUSINESS_CHANNEL_IDS
     const facts = { flipkartFacts, amazonUsaFacts, meeshoFacts }
     const inputs: MomInputs = { records: salesRecords, month, previousMonth: compareMonth, facts, channels }
 

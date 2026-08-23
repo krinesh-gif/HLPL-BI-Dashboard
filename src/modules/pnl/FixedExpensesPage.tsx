@@ -3,7 +3,7 @@ import { PageShell } from '@/components/layout/PageShell'
 import { DataTable } from '@/components/ui/DataTable'
 import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
-import { CHANNELS } from '@/config/channels'
+import { BUSINESS_CHANNELS } from '@/config/channels'
 import { computeSalesContributionWeights } from '@/engine/allocation'
 import { formatCurrencyFull, formatPercent, monthLabel } from '@/lib/format'
 
@@ -16,7 +16,7 @@ export function FixedExpensesPage() {
 
   const weights = useMemo(() => computeSalesContributionWeights(salesRecords, month), [salesRecords, month])
 
-  const allocationRows = CHANNELS.map((c) => ({
+  const allocationRows = BUSINESS_CHANNELS.map((c) => ({
     channel: c.label,
     weight: weights[c.id] ?? 0,
     allocated: totalExpense * (weights[c.id] ?? 0),

@@ -1,4 +1,4 @@
-import type { ChannelId } from '@/config/channels'
+import type { BusinessChannelId, ChannelId } from '@/config/channels'
 import type { PnlLineKey } from '@/config/pnlStructure'
 
 // ---------------------------------------------------------------------------
@@ -115,7 +115,8 @@ export interface PnlResult {
 }
 
 export interface ChannelPnl extends PnlResult {
-  channel: ChannelId
+  /** The management-level channel this P&L belongs to. */
+  channel: BusinessChannelId
 }
 
 // ---------------------------------------------------------------------------

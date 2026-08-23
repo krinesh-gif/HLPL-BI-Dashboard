@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { PageShell } from '@/components/layout/PageShell'
 import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
-import { CHANNELS } from '@/config/channels'
+import { BUSINESS_CHANNELS } from '@/config/channels'
 import { formatCurrencyFull, formatPercent, monthLabel } from '@/lib/format'
 import { reconcileAllChannels, type ChannelReconciliation, type ReconciliationCause } from '@/engine/reconciliation'
 
@@ -23,7 +23,7 @@ export function NetSalesReconciliationPage() {
     () =>
       reconcileAllChannels(
         salesRecords,
-        CHANNELS.map((c) => c.id),
+        BUSINESS_CHANNELS.map((c) => c.id),
         month,
         { flipkartFacts, amazonUsaFacts, meeshoFacts },
       ),
@@ -98,7 +98,7 @@ export function NetSalesReconciliationPage() {
           <ul className="mt-2 space-y-1 text-sm text-slate-700">
             {orderOnly.map((r) => (
               <li key={r.channel} className="flex justify-between border-b border-slate-100 py-1 last:border-0">
-                <span>{CHANNELS.find((c) => c.id === r.channel)?.label ?? r.channel}</span>
+                <span>{BUSINESS_CHANNELS.find((c) => c.id === r.channel)?.label ?? r.channel}</span>
                 <span className="tabular-nums">{formatCurrencyFull(r.orderBasis.netSales)}</span>
               </li>
             ))}
@@ -117,7 +117,7 @@ const STATUS_STYLE: Record<ChannelReconciliation['status'], { label: string; cla
 }
 
 function ReconciliationRow({ row, open, onToggle }: { row: ChannelReconciliation; open: boolean; onToggle: () => void }) {
-  const label = CHANNELS.find((c) => c.id === row.channel)?.label ?? row.channel
+  const label = BUSINESS_CHANNELS.find((c) => c.id === row.channel)?.label ?? row.channel
   const status = STATUS_STYLE[row.status]
   const definitive = row.causes.filter((c) => c.definitive)
   const candidates = row.causes.filter((c) => !c.definitive && c.measurable)

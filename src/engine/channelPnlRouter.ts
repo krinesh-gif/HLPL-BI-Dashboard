@@ -1,4 +1,4 @@
-import type { ChannelId } from '@/config/channels'
+import type { BusinessChannelId } from '@/config/channels'
 import type {
   AmazonUsaPnlFacts,
   CanonicalSalesRecord,
@@ -8,6 +8,7 @@ import type {
   MeeshoPnlFacts,
   SkuMaster,
 } from '@/data/models'
+import { channelOfSource } from '@/config/channels'
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { toMonthKey } from '@/lib/format'
 import { allocateFixedExpensesForMonth } from './allocation'
@@ -24,7 +25,7 @@ export interface NativePnlView {
 }
 
 export interface ChannelPnlView {
-  channel: ChannelId
+  channel: BusinessChannelId
   month: string
   /** Always populated — the generic canonical bucket structure, used by Master P&L/MIS. */
   canonical: ChannelPnl
@@ -44,7 +45,7 @@ export interface ChannelFactsStore {
 function computeAllocatedOtherCosts(
   allRecords: CanonicalSalesRecord[],
   fixedExpenses: FixedExpenseEntry[],
-  channel: ChannelId,
+  channel: BusinessChannelId,
   month: string,
 ): number {
   const allocation = allocateFixedExpensesForMonth(allRecords, fixedExpenses, month)[channel] ?? {}
@@ -70,14 +71,14 @@ const UNPRICED_COGS_FALLBACK_PCT = 0.25
  * the imported figure is the only number available and is kept.
  */
 function recomputedCogs(
-  channel: ChannelId,
+  channel: BusinessChannelId,
   month: string,
   inputs: ChannelPnlViewInputs,
 ): { priced: number; unpriced: number; total: number } | null {
   if (!inputs.cogs?.costIndex) return null
 
   const records = inputs.salesRecords.filter(
-    (r) => r.channel === channel && toMonthKey(r.orderDate) === month,
+    (r) => channelOfSource(r.channel) === channel && toMonthKey(r.orderDate) === month,
   )
   if (records.length === 0) return null
 
@@ -103,7 +104,7 @@ export interface ChannelPnlViewInputs {
  * every channel (native or not) also gets the generic canonical bucket
  * structure so the Master P&L and Investor MIS can roll up consistently.
  */
-export function buildChannelPnlView(channel: ChannelId, month: string, inputs: ChannelPnlViewInputs): ChannelPnlView {
+export function buildChannelPnlView(channel: BusinessChannelId, month: string, inputs: ChannelPnlViewInputs): ChannelPnlView {
   if (channel === 'flipkart') {
     const imported = inputs.facts.flipkartFacts.find((f) => f.month === month)
     if (imported) {
@@ -161,6 +162,6 @@ export function buildChannelPnlView(channel: ChannelId, month: string, inputs: C
   return { channel, month, canonical }
 }
 
-export function buildAllChannelPnlViews(channels: ChannelId[], month: string, inputs: ChannelPnlViewInputs): ChannelPnlView[] {
+export function buildAllChannelPnlViews(channels: BusinessChannelId[], month: string, inputs: ChannelPnlViewInputs): ChannelPnlView[] {
   return channels.map((c) => buildChannelPnlView(c, month, inputs))
 }

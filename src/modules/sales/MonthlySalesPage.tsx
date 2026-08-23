@@ -4,7 +4,7 @@ import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { DataTable } from '@/components/ui/DataTable'
 import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
-import { CHANNELS } from '@/config/channels'
+import { BUSINESS_CHANNEL_IDS } from '@/config/channels'
 import { addMonths, formatCurrencyFull, formatNumber, formatPercent, monthLabel } from '@/lib/format'
 import { growthPct } from '@/engine/sales'
 import { asp, netSalesForMonth, rtoPct } from '@/engine/netSales'
@@ -17,7 +17,7 @@ export function MonthlySalesPage() {
 
   const rows = useMemo(() => {
     const facts = { flipkartFacts, amazonUsaFacts, meeshoFacts }
-    const channelIds = CHANNELS.map((c) => c.id)
+    const channelIds = BUSINESS_CHANNEL_IDS
     const months = Array.from({ length: MONTHS_SHOWN }, (_, i) => addMonths(month, i - (MONTHS_SHOWN - 1)))
 
     const figures = months.map((m) => netSalesForMonth(salesRecords, m, facts, channelIds))

@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useDataStore } from '@/store/dataStore'
 import { usePnlInputs } from '@/engine/usePnlInputs'
 import { useFilterStore } from '@/store/filterStore'
-import { CHANNELS, CHANNEL_MAP } from '@/config/channels'
+import { BUSINESS_CHANNELS, BUSINESS_CHANNEL_IDS, channelLabel } from '@/config/channels'
 import { addMonths, ytdMonthKeys } from '@/lib/format'
 import { buildAllChannelPnlViews } from '@/engine/channelPnlRouter'
 import { buildMasterPnl } from '@/engine/pnl'
@@ -26,7 +26,7 @@ export function useOverviewData() {
 
   return useMemo(() => {
     const previousMonth = addMonths(month, -1)
-    const channelIds = CHANNELS.map((c) => c.id)
+    const channelIds = BUSINESS_CHANNEL_IDS
     const facts = { flipkartFacts, amazonUsaFacts, meeshoFacts }
 
     const currentChannelPnls = buildAllChannelPnlViews(channelIds, month, forMonth(month)).map((v) => v.canonical)
@@ -56,7 +56,7 @@ export function useOverviewData() {
     const roas = totalAdSpend > 0 ? totalAdSales / totalAdSpend : 0
 
     // Channel performance
-    const channelSummaries = CHANNELS.map((c) => {
+    const channelSummaries = BUSINESS_CHANNELS.map((c) => {
       const cur = currentChannelPnls.find((p) => p.channel === c.id)!
       const prev = previousChannelPnls.find((p) => p.channel === c.id)!
       const g = growthPct(cur.lines.netSales ?? 0, prev.lines.netSales ?? 0)
@@ -116,7 +116,7 @@ export function useOverviewData() {
       const ins = inventoryInsight(row.sku, row.productName, row.coverageDays)
       if (ins) insights.push(ins)
     }
-    for (const c of CHANNELS) {
+    for (const c of BUSINESS_CHANNELS) {
       const channelFigure = orderBasisNetSales(filterByMonth(salesRecords, month).filter((r) => r.channel === c.id))
       const ins = rtoInsight(c.id, channelFigure.rtoUnits, channelFigure.shippedUnits)
       if (ins) insights.push(ins)
@@ -124,7 +124,7 @@ export function useOverviewData() {
     if (channelSummaries.length > 0) {
       for (const c of channelSummaries) {
         if (c.growth !== null && c.growth >= 20) {
-          insights.push({ severity: 'green', category: 'channel', message: `${CHANNEL_MAP[c.channel].label} revenue increased ${c.growth.toFixed(0)}% MoM.` })
+          insights.push({ severity: 'green', category: 'channel', message: `${channelLabel(c.channel)} revenue increased ${c.growth.toFixed(0)}% MoM.` })
         }
       }
     }

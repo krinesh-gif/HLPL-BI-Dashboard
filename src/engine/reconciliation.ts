@@ -1,4 +1,5 @@
-import type { ChannelId } from '@/config/channels'
+import type { BusinessChannelId } from '@/config/channels'
+import { channelOfSource } from '@/config/channels'
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { toMonthKey } from '@/lib/format'
 import type { CanonicalSalesRecord } from '@/data/models'
@@ -47,7 +48,7 @@ export interface ReconciliationCause {
 }
 
 export interface ChannelReconciliation {
-  channel: ChannelId
+  channel: BusinessChannelId
   month: string
   orderBasis: NetSalesFigure
   settlementBasis: NetSalesFigure | null
@@ -87,12 +88,12 @@ function inr(r: CanonicalSalesRecord, fxRate: number): number {
 
 export function reconcileChannelMonth(
   records: CanonicalSalesRecord[],
-  channel: ChannelId,
+  channel: BusinessChannelId,
   month: string,
   facts: ChannelFacts,
   fxRate: number = NATIVE_PNL_ASSUMPTIONS.usdToInrRate,
 ): ChannelReconciliation {
-  const monthRecords = records.filter((r) => r.channel === channel && toMonthKey(r.orderDate) === month)
+  const monthRecords = records.filter((r) => channelOfSource(r.channel) === channel && toMonthKey(r.orderDate) === month)
   const orderBasis = orderBasisNetSales(monthRecords, fxRate)
   const settlementBasis = settlementBasisNetSales(channel, month, facts, fxRate)
 
@@ -245,7 +246,7 @@ function lastNDaysOfMonth(month: string, n: number): string {
 
 export function reconcileAllChannels(
   records: CanonicalSalesRecord[],
-  channels: ChannelId[],
+  channels: BusinessChannelId[],
   month: string,
   facts: ChannelFacts,
   fxRate: number = NATIVE_PNL_ASSUMPTIONS.usdToInrRate,

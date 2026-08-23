@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { ComparisonBarChart } from '@/components/charts/ComparisonBarChart'
 import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
-import type { ChannelId } from '@/config/channels'
+import { channelOfSource, type BusinessChannelId, type SalesSourceId } from '@/config/channels'
 import { addMonths, formatCurrencyCompact, formatCurrencyFull, formatNumber, formatPercent } from '@/lib/format'
 import { filterByMonth, growthPct } from '@/engine/sales'
 import { orderBasisNetSales } from '@/engine/netSales'
@@ -43,14 +43,16 @@ interface ProductRow {
  * reorders one list rather than showing two lists that disagree about what a
  * product sold.
  */
-export function TopProducts({ channel }: { channel: ChannelId }) {
+export function TopProducts({ channel, source }: { channel: BusinessChannelId; source?: SalesSourceId }) {
   const { salesRecords, skuMaster, costVersions, mappings, comboComponents } = useDataStore()
   const { month } = useFilterStore()
   const [topN, setTopN] = useState(10)
   const [rankBy, setRankBy] = useState<RankBy>('netSales')
 
   const rows = useMemo(() => {
-    const channelRecords = salesRecords.filter((r) => r.channel === channel)
+    const channelRecords = salesRecords.filter((r) =>
+      source ? r.channel === source : channelOfSource(r.channel) === channel,
+    )
     const current = filterByMonth(channelRecords, month)
     const previous = filterByMonth(channelRecords, addMonths(month, -1))
 
@@ -116,11 +118,11 @@ export function TopProducts({ channel }: { channel: ChannelId }) {
     })
 
     return { all: sorted, top: sorted.slice(0, topN), total: orderBasisNetSales(current).netSales }
-  }, [salesRecords, skuMaster, costVersions, mappings, comboComponents, channel, month, rankBy, topN])
+  }, [salesRecords, skuMaster, costVersions, mappings, comboComponents, channel, source, month, rankBy, topN])
 
   function exportRows() {
     exportRowsToCsv(
-      `HLPL_Top${topN}_${channel}_${month}`,
+      `HLPL_Top${topN}_${source ?? channel}_${month}`,
       rows.top.map((r, i) => ({
         Rank: i + 1,
         SKU: r.sku,

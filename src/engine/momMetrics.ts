@@ -1,5 +1,5 @@
-import type { ChannelId } from '@/config/channels'
-import { CHANNEL_MAP } from '@/config/channels'
+import type { BusinessChannelId } from '@/config/channels'
+import { BUSINESS_CHANNEL_IDS, channelLabel } from '@/config/channels'
 import { normalizeCategory } from '@/data/categories'
 import type { CanonicalSalesRecord } from '@/data/models'
 import { toMonthKey } from '@/lib/format'
@@ -96,13 +96,14 @@ export interface MomInputs {
   month: string
   previousMonth: string
   facts: ChannelFacts
-  channels: ChannelId[]
+  /** Management-level channels. Defaults to all of them. */
+  channels?: BusinessChannelId[]
 }
 
 /** Company-wide, one row. */
 export function masterMomRow(inputs: MomInputs): MomRow {
   const sum = (month: string) =>
-    inputs.channels
+    (inputs.channels ?? BUSINESS_CHANNEL_IDS)
       .map((channel) => netSalesForChannelMonth({ records: inputs.records, channel, month, facts: inputs.facts }))
       .reduce(addFigures, { ...EMPTY_FIGURE, sourceLabel: 'All channels' })
 
@@ -111,11 +112,11 @@ export function masterMomRow(inputs: MomInputs): MomRow {
 
 /** One row per channel that had activity in either month. */
 export function channelMomRows(inputs: MomInputs): MomRow[] {
-  return inputs.channels
+  return (inputs.channels ?? BUSINESS_CHANNEL_IDS)
     .map((channel) =>
       buildRow(
         channel,
-        CHANNEL_MAP[channel]?.label ?? channel,
+        channelLabel(channel),
         netSalesForChannelMonth({ records: inputs.records, channel, month: inputs.month, facts: inputs.facts }),
         netSalesForChannelMonth({ records: inputs.records, channel, month: inputs.previousMonth, facts: inputs.facts }),
       ),
@@ -184,7 +185,7 @@ export function metricTrend(
   records: CanonicalSalesRecord[],
   months: string[],
   facts: ChannelFacts,
-  channels: ChannelId[],
+  channels: BusinessChannelId[] = BUSINESS_CHANNEL_IDS,
 ): TrendPoint[] {
   return months.map((month) => {
     const figure = channels

@@ -1,5 +1,5 @@
-import type { ChannelId } from '@/config/channels'
-import { CHANNEL_MAP } from '@/config/channels'
+import type { BusinessChannelId, SalesSourceId } from '@/config/channels'
+import { BUSINESS_CHANNEL_IDS, channelOfSource, channelLabel, sourcesOfChannel } from '@/config/channels'
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { toMonthKey } from '@/lib/format'
 import type {
@@ -161,7 +161,7 @@ export interface ChannelFacts {
  * kind of silent cross-contamination this module exists to stop.
  */
 export function settlementBasisNetSales(
-  channel: ChannelId,
+  channel: BusinessChannelId,
   month: string,
   facts: ChannelFacts,
   fxRate: number = NATIVE_PNL_ASSUMPTIONS.usdToInrRate,
@@ -214,10 +214,19 @@ export function settlementBasisNetSales(
 
 export interface NetSalesScope {
   records: CanonicalSalesRecord[]
-  channel: ChannelId
+  /** The management-level channel. Amazon India covers both of its reports. */
+  channel: BusinessChannelId
   month: string
   facts: ChannelFacts
   fxRate?: number
+  /**
+   * Narrows to one uploaded report within the channel — Seller Central alone,
+   * say. Used only by the drill-down: management figures never pass it.
+   *
+   * Narrowing forces the order basis, because a settlement report covers the
+   * whole channel and cannot be attributed to one of its sources.
+   */
+  source?: SalesSourceId
 }
 
 /**
@@ -235,10 +244,18 @@ export interface NetSalesScope {
 export function netSalesForChannelMonth(scope: NetSalesScope): NetSalesFigure {
   const fxRate = scope.fxRate ?? NATIVE_PNL_ASSUMPTIONS.usdToInrRate
   const monthRecords = scope.records.filter(
-    (r) => r.channel === scope.channel && toMonthKey(r.orderDate) === scope.month,
+    (r) =>
+      toMonthKey(r.orderDate) === scope.month &&
+      (scope.source ? r.channel === scope.source : channelOfSource(r.channel) === scope.channel),
   )
   const order = orderBasisNetSales(monthRecords, fxRate)
-  const settlement = settlementBasisNetSales(scope.channel, scope.month, scope.facts, fxRate)
+
+  // Settlement figures belong to the whole channel, so a drill-down into one
+  // report has to stay on the order basis rather than claim the channel's
+  // settled total for one of its sources.
+  const settlement = scope.source
+    ? null
+    : settlementBasisNetSales(scope.channel, scope.month, scope.facts, fxRate)
 
   if (!settlement) return order
 
@@ -286,7 +303,7 @@ export function netSalesForMonth(
   records: CanonicalSalesRecord[],
   month: string,
   facts: ChannelFacts,
-  channels: ChannelId[],
+  channels: BusinessChannelId[] = BUSINESS_CHANNEL_IDS,
   fxRate: number = NATIVE_PNL_ASSUMPTIONS.usdToInrRate,
 ): NetSalesFigure {
   return channels
@@ -319,6 +336,24 @@ export function returnPct(figure: NetSalesFigure): number | null {
   return figure.shippedUnits > 0 ? (figure.returnUnits / figure.shippedUnits) * 100 : null
 }
 
-export function channelLabel(channel: ChannelId): string {
-  return CHANNEL_MAP[channel]?.label ?? channel
+export { channelLabel }
+
+/**
+ * One figure per report feeding a channel, for the drill-down that shows
+ * ₹1 Cr of Amazon India as ₹80 L Seller Central plus ₹20 L Vendor Central.
+ */
+export function netSalesBySource(
+  records: CanonicalSalesRecord[],
+  channel: BusinessChannelId,
+  month: string,
+  fxRate: number = NATIVE_PNL_ASSUMPTIONS.usdToInrRate,
+): { source: SalesSourceId; label: string; figure: NetSalesFigure }[] {
+  return sourcesOfChannel(channel).map((source) => ({
+    source: source.id,
+    label: source.label,
+    figure: orderBasisNetSales(
+      records.filter((r) => r.channel === source.id && toMonthKey(r.orderDate) === month),
+      fxRate,
+    ),
+  }))
 }

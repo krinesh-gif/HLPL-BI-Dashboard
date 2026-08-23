@@ -2,8 +2,7 @@ import { createHashRouter } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { OverviewPage } from '@/modules/overview/OverviewPage'
 import { MisPage } from '@/modules/mis/MisPage'
-import { MasterPnlPage } from '@/modules/pnl/MasterPnlPage'
-import { ChannelPnlPage } from '@/modules/pnl/ChannelPnlPage'
+import { PnlPage } from '@/modules/pnl/PnlPage'
 import { FixedExpensesPage } from '@/modules/pnl/FixedExpensesPage'
 import { NetSalesReconciliationPage } from '@/modules/pnl/NetSalesReconciliationPage'
 import { CostSheetPage } from '@/modules/products/CostSheetPage'
@@ -33,8 +32,7 @@ export const router = createHashRouter([
     children: [
       { index: true, element: <OverviewPage /> },
       { path: 'mis', element: <MisPage /> },
-      { path: 'pnl/master', element: <MasterPnlPage /> },
-      { path: 'pnl/channel', element: <ChannelPnlPage /> },
+      { path: 'pnl', element: <PnlPage /> },
       { path: 'pnl/fixed-expenses', element: <FixedExpensesPage /> },
       { path: 'pnl/reconciliation', element: <NetSalesReconciliationPage /> },
       { path: 'insight', element: <InsightPage /> },

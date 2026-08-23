@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { PageShell } from '@/components/layout/PageShell'
 import { useFilterStore } from '@/store/filterStore'
-import { CHANNELS } from '@/config/channels'
+import { BUSINESS_CHANNEL_IDS } from '@/config/channels'
 import { buildAllChannelPnlViews } from '@/engine/channelPnlRouter'
 import { buildMasterPnl } from '@/engine/pnl'
 import { usePnlInputs } from '@/engine/usePnlInputs'
@@ -15,7 +15,7 @@ export function MisPage() {
 
   const rows = useMemo(() => {
     const getLinesForMonth = (m: string) => {
-      const views = buildAllChannelPnlViews(CHANNELS.map((c) => c.id), m, forMonth(m))
+      const views = buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, m, forMonth(m))
       return buildMasterPnl(views.map((v) => v.canonical), m).lines
     }
     return buildMisRows(month, getLinesForMonth)
