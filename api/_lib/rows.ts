@@ -10,8 +10,8 @@ import type {
   ImportRecord,
   InventorySnapshot,
   SkuMaster,
-} from '@/data/models'
-import type { ChannelId } from '@/config/channels'
+} from '../../src/data/models'
+import type { ChannelId } from '../../src/config/channels'
 
 type Row = Record<string, unknown>
 

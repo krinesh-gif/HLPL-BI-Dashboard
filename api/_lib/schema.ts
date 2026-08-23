@@ -65,7 +65,7 @@ BEGIN
 
   -- ---------------------------------------------------------------------------
   -- Sales + ads rows. dedup_key holds the same key the client already computes
-  -- (recordKey / adsRecordKey in src/data/normalize/duplicates.ts); the UNIQUE
+  -- (recordKey / adsRecordKey in src/data/normalize/dedupKeys.ts); the UNIQUE
   -- constraint plus ON CONFLICT DO NOTHING makes de-duplication atomic even when
   -- two people import at the same moment.
   -- ---------------------------------------------------------------------------

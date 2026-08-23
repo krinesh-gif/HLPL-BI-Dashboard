@@ -2,7 +2,7 @@ import { isDatabaseConfigured, sql } from './_lib/db'
 import { SCHEMA_SQL } from './_lib/schema'
 import { createSession, hashPassword, sessionCookie } from './_lib/auth'
 import { isNonEmptyString, json, readJson } from './_lib/http'
-import { buildRealSkuMaster } from '@/data/realSkuMaster'
+import { buildRealSkuMaster } from '../src/data/realSkuMaster'
 
 const MIN_PASSWORD_LENGTH = 8
 

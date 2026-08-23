@@ -1,7 +1,7 @@
 import { sql } from './_lib/db'
 import { requireSession } from './_lib/auth'
 import { isNonEmptyString, json, methodNotAllowed, readJson } from './_lib/http'
-import type { SkuMaster } from '@/data/models'
+import type { SkuMaster } from '../src/data/models'
 
 interface Body {
   sku?: unknown

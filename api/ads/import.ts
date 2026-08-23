@@ -1,8 +1,8 @@
 import { sql } from '../_lib/db'
 import { requireSession } from '../_lib/auth'
 import { isNonEmptyString, json, methodNotAllowed, readJson } from '../_lib/http'
-import { adsRecordKey } from '@/data/normalize/duplicates'
-import type { AdsRecord } from '@/data/models'
+import { adsRecordKey } from '../../src/data/normalize/dedupKeys'
+import type { AdsRecord } from '../../src/data/models'
 
 interface Body {
   records?: unknown
