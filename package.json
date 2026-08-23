@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
+    "init-db": "tsx scripts/init-db.ts",
     "create-user": "tsx scripts/create-user.ts",
     "seed-sku-master": "tsx scripts/seed-sku-master.ts"
   },

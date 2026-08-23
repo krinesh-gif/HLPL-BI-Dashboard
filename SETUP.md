@@ -25,13 +25,7 @@ Steps 1–5 are things only you can do (they need your Vercel account).
 
 Vercel injects `DATABASE_URL` automatically. You don't paste any secret by hand.
 
-## 3. Create the tables
-
-1. Open the database you just created → **Query** (or open it in the Neon console).
-2. Copy the entire contents of [`db/schema.sql`](db/schema.sql) and run it.
-3. It should report success. Re-running it later is harmless.
-
-## 4. Seed products and create your login
+## 3. Create the tables, seed products, and create your login
 
 Run these on your own computer, from a clone of this repo:
 
@@ -41,16 +35,25 @@ npm install
 # Copy this from Vercel: Project → Settings → Environment Variables → DATABASE_URL
 export DATABASE_URL='postgres://...'
 
+npm run init-db                      # creates the tables
 npm run seed-sku-master              # loads the 45 real SKUs and their costs
 npm run create-user -- you@yourcompany.com   # prompts for a password (min 8 chars)
 ```
 
-## 5. Redeploy and sign in
+All three are safe to re-run — `init-db` and `seed-sku-master` skip anything
+that already exists, so a re-run never overwrites cost edits made in the app.
+
+> **Why not just paste `db/schema.sql` into the Neon query box?** That editor
+> sends the whole thing as one prepared statement and rejects it with
+> *"cannot insert multiple commands into a prepared statement"*. `npm run init-db`
+> reads the same file and sends each statement separately.
+
+## 4. Redeploy and sign in
 
 1. Back in Vercel, open **Deployments** → **⋯** on the latest → **Redeploy**
    (so the app picks up the database connection).
 2. Open your Vercel URL. You should see a login page.
-3. Sign in with the account you created in step 4.
+3. Sign in with the account you created in step 3.
 
 ---
 
