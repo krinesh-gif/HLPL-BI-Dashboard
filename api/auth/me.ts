@@ -1,6 +1,6 @@
-import { createHandler } from '../_lib/handler'
-import { getSessionUser } from '../_lib/auth'
-import { json } from '../_lib/http'
+import { createHandler } from '../_lib/handler.js'
+import { getSessionUser } from '../_lib/auth.js'
+import { json } from '../_lib/http.js'
 
 /** The client calls this on load to decide between the login page and the
  * dashboard. Returns `user: null` (not 401) so "logged out" is a normal

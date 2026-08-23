@@ -1,7 +1,7 @@
-import { createHandler } from '../_lib/handler'
-import { sql } from '../_lib/db'
-import { requireSession } from '../_lib/auth'
-import { json, readJson } from '../_lib/http'
+import { createHandler } from '../_lib/handler.js'
+import { sql } from '../_lib/db.js'
+import { requireSession } from '../_lib/auth.js'
+import { json, readJson } from '../_lib/http.js'
 
 interface Body {
   keys?: unknown

@@ -1,9 +1,9 @@
-import { createHandler } from './_lib/handler'
-import { isDatabaseConfigured, sql } from './_lib/db'
-import { SCHEMA_SQL } from './_lib/schema'
-import { createSession, hashPassword, sessionCookie } from './_lib/auth'
-import { isNonEmptyString, json, readJson } from './_lib/http'
-import { buildRealSkuMaster } from '../src/data/realSkuMaster'
+import { createHandler } from './_lib/handler.js'
+import { isDatabaseConfigured, sql } from './_lib/db.js'
+import { SCHEMA_SQL } from './_lib/schema.js'
+import { createSession, hashPassword, sessionCookie } from './_lib/auth.js'
+import { isNonEmptyString, json, readJson } from './_lib/http.js'
+import { buildRealSkuMaster } from '../src/data/realSkuMaster.js'
 
 const MIN_PASSWORD_LENGTH = 8
 

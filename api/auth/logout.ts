@@ -1,6 +1,6 @@
-import { createHandler } from '../_lib/handler'
-import { clearedSessionCookie, destroySession, readSessionToken } from '../_lib/auth'
-import { json } from '../_lib/http'
+import { createHandler } from '../_lib/handler.js'
+import { clearedSessionCookie, destroySession, readSessionToken } from '../_lib/auth.js'
+import { json } from '../_lib/http.js'
 
 export async function POST(request: Request): Promise<Response> {
   const token = readSessionToken(request)

@@ -10,7 +10,7 @@
  * Safe to re-run: every statement in the schema is CREATE ... IF NOT EXISTS.
  */
 import { neon } from '@neondatabase/serverless'
-import { SCHEMA_SQL } from '../api/_lib/schema'
+import { SCHEMA_SQL } from '../api/_lib/schema.js'
 
 async function main() {
   const connectionString = process.env.DATABASE_URL ?? process.env.POSTGRES_URL

@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs'
-import { sql } from './db'
-import { json } from './http'
+import { sql } from './db.js'
+import { json } from './http.js'
 
 const COOKIE_NAME = 'hlpl_session'
 const SESSION_TTL_DAYS = 30

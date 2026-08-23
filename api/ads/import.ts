@@ -1,9 +1,9 @@
-import { createHandler } from '../_lib/handler'
-import { sql } from '../_lib/db'
-import { requireSession } from '../_lib/auth'
-import { isNonEmptyString, json, readJson } from '../_lib/http'
-import { adsRecordKey } from '../../src/data/normalize/dedupKeys'
-import type { AdsRecord } from '../../src/data/models'
+import { createHandler } from '../_lib/handler.js'
+import { sql } from '../_lib/db.js'
+import { requireSession } from '../_lib/auth.js'
+import { isNonEmptyString, json, readJson } from '../_lib/http.js'
+import { adsRecordKey } from '../../src/data/normalize/dedupKeys.js'
+import type { AdsRecord } from '../../src/data/models.js'
 
 interface Body {
   records?: unknown

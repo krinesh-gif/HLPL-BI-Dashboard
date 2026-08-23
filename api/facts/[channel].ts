@@ -1,7 +1,7 @@
-import { createHandler } from '../_lib/handler'
-import { sql } from '../_lib/db'
-import { requireSession } from '../_lib/auth'
-import { isNonEmptyString, json, readJson } from '../_lib/http'
+import { createHandler } from '../_lib/handler.js'
+import { sql } from '../_lib/db.js'
+import { requireSession } from '../_lib/auth.js'
+import { isNonEmptyString, json, readJson } from '../_lib/http.js'
 
 /** The channel segment selects a table, so it is resolved through this map
  * rather than interpolated — an arbitrary URL segment must never become a

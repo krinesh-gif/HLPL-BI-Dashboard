@@ -1,7 +1,7 @@
-import { createHandler } from '../_lib/handler'
-import { sql } from '../_lib/db'
-import { createSession, sessionCookie, verifyPassword } from '../_lib/auth'
-import { isNonEmptyString, json, readJson } from '../_lib/http'
+import { createHandler } from '../_lib/handler.js'
+import { sql } from '../_lib/db.js'
+import { createSession, sessionCookie, verifyPassword } from '../_lib/auth.js'
+import { isNonEmptyString, json, readJson } from '../_lib/http.js'
 
 interface LoginBody {
   email?: unknown

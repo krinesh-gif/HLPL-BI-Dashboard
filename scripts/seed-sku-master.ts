@@ -9,7 +9,7 @@
  * app are never overwritten by a later re-seed.
  */
 import { neon } from '@neondatabase/serverless'
-import { buildRealSkuMaster } from '../src/data/realSkuMaster'
+import { buildRealSkuMaster } from '../src/data/realSkuMaster.js'
 
 async function main() {
   const connectionString = process.env.DATABASE_URL ?? process.env.POSTGRES_URL

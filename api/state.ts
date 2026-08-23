@@ -1,7 +1,7 @@
-import { createHandler } from './_lib/handler'
-import { sql } from './_lib/db'
-import { requireSession } from './_lib/auth'
-import { json } from './_lib/http'
+import { createHandler } from './_lib/handler.js'
+import { sql } from './_lib/db.js'
+import { requireSession } from './_lib/auth.js'
+import { json } from './_lib/http.js'
 import {
   toAdsRecord,
   toFixedExpense,
@@ -9,7 +9,7 @@ import {
   toInventorySnapshot,
   toSalesRecord,
   toSkuMaster,
-} from './_lib/rows'
+} from './_lib/rows.js'
 
 type Row = Record<string, unknown>
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { createHandler } from '../../api/_lib/handler'
-import { json } from '../../api/_lib/http'
+import { createHandler } from '../../api/_lib/handler.js'
+import { json } from '../../api/_lib/http.js'
 
 /**
  * Vercel's Node runtime invokes a function's *default* export with
