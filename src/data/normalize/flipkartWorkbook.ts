@@ -1,6 +1,7 @@
 import { mergeHeaderRows, rowsToRecords, type RawSheet } from '@/lib/csvParse'
 import type { CanonicalSalesRecord, FlipkartPnlFacts, SkuMaster } from '@/data/models'
 import { getField, type NormalizeResult } from './types'
+import { normalizeCategory } from '@/data/categories'
 
 /**
  * Normalizes the REAL Flipkart P&L workbook (Seller Hub ▸ Reports ▸ Profit &
@@ -151,7 +152,7 @@ export function normalizeFlipkartWorkbook(
       sellerType: 'marketplace',
       sku,
       productName: skuRecord?.productName ?? sku,
-      category: skuRecord?.category ?? 'Uncategorized',
+      category: normalizeCategory(skuRecord?.category),
       quantity: grossUnits,
       grossSales: orderItemValue,
       discount: 0,

@@ -16,6 +16,8 @@ import { SkuMappingPage } from '@/modules/products/SkuMappingPage'
 import { DailySalesPage } from '@/modules/sales/DailySalesPage'
 import { MonthlySalesPage } from '@/modules/sales/MonthlySalesPage'
 import { ChannelSalesPage } from '@/modules/sales/ChannelSalesPage'
+import { AspAnalysisPage } from '@/modules/sales/AspAnalysisPage'
+import { RtoAnalysisPage } from '@/modules/sales/RtoAnalysisPage'
 import { InventoryDashboardPage } from '@/modules/supply-chain/InventoryDashboardPage'
 import { DemandForecastPage } from '@/modules/supply-chain/DemandForecastPage'
 import { ProcurementPlanningPage } from '@/modules/supply-chain/ProcurementPlanningPage'
@@ -45,6 +47,8 @@ export const router = createHashRouter([
       { path: 'sales/daily', element: <DailySalesPage /> },
       { path: 'sales/monthly', element: <MonthlySalesPage /> },
       { path: 'sales/channel', element: <ChannelSalesPage /> },
+      { path: 'sales/asp', element: <AspAnalysisPage /> },
+      { path: 'sales/rto', element: <RtoAnalysisPage /> },
       { path: 'supply-chain/inventory', element: <InventoryDashboardPage /> },
       { path: 'supply-chain/forecast', element: <DemandForecastPage /> },
       { path: 'supply-chain/procurement', element: <ProcurementPlanningPage /> },

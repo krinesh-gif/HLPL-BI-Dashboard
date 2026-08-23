@@ -2,6 +2,7 @@ import type { RawSheet } from '@/lib/csvParse'
 import type { CanonicalSalesRecord, MeeshoPnlFacts, SkuMaster } from '@/data/models'
 import type { NormalizeResult } from './types'
 import { toMonthKey } from '@/lib/format'
+import { normalizeCategory } from '@/data/categories'
 
 /**
  * Normalizes Meesho's real "Order Payments" sheet from the aggregated
@@ -153,7 +154,7 @@ export function normalizeMeeshoOrderPayments(
       sellerType: 'marketplace',
       sku,
       productName: skuRecord?.productName ?? String(row[COL.productName] ?? sku),
-      category: skuRecord?.category ?? 'Uncategorized',
+      category: normalizeCategory(skuRecord?.category),
       quantity,
       grossSales: grossSale,
       discount: 0,

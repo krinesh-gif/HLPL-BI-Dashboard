@@ -1,5 +1,6 @@
 import type { CanonicalSalesRecord, MeeshoPnlFacts, SkuMaster } from '@/data/models'
 import type { NormalizeResult } from './types'
+import { normalizeCategory } from '@/data/categories'
 
 /**
  * Ingests the compact Meesho settlement JSON schema (order-level rows keyed
@@ -145,7 +146,7 @@ export function normalizeMeeshoSettlementJson(data: MeeshoSettlementJson, skuMas
       sellerType: 'marketplace',
       sku,
       productName: skuMasterEntry?.productName ?? name ?? sku,
-      category: skuMasterEntry?.category ?? 'Uncategorized',
+      category: normalizeCategory(skuMasterEntry?.category),
       quantity: qty,
       grossSales: sale,
       discount: 0,

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { PageShell } from '@/components/layout/PageShell'
 import { useDataStore } from '@/store/dataStore'
 import { useSkuCostValidation } from './useSkuCostValidation'
+import { UncategorizedPanel } from './UncategorizedPanel'
 import { formatCurrencyFull, formatPercent } from '@/lib/format'
 import type { SkuMaster } from '@/data/models'
 
@@ -21,6 +22,8 @@ export function ProductMasterPage() {
 
   return (
     <PageShell title="Product Master" subtitle="Centralized SKU data — COGS here is the single source of truth for every channel's P&L" showFilters={false}>
+      <UncategorizedPanel />
+
       {unmappedSkus.length > 0 && (
         <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4">
           <h3 className="text-sm font-semibold text-amber-900">

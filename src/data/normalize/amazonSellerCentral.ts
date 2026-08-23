@@ -1,5 +1,6 @@
 import type { CanonicalSalesRecord, SkuMaster } from '@/data/models'
 import { getField, headersPresent, type NormalizeResult } from './types'
+import { normalizeCategory } from '@/data/categories'
 
 // Column names as they appear in Amazon Seller Central's "All Orders" / order
 // report export. Multiple aliases are accepted per field since Amazon's report
@@ -83,7 +84,7 @@ export function normalizeAmazonSellerCentralRows(
       sellerType: 'seller_central',
       sku,
       productName: getField(row, COLUMNS.productName) ?? skuRecord?.productName ?? sku,
-      category: skuRecord?.category ?? 'Uncategorized',
+      category: normalizeCategory(skuRecord?.category),
       quantity,
       grossSales,
       discount,

@@ -54,6 +54,8 @@ export const NAVIGATION: NavSection[] = [
       { label: 'Daily Sales', path: '/sales/daily' },
       { label: 'Monthly Sales', path: '/sales/monthly' },
       { label: 'Channel Sales', path: '/sales/channel' },
+      { label: 'ASP Analysis', path: '/sales/asp' },
+      { label: 'RTO Analysis', path: '/sales/rto' },
     ],
   },
   {

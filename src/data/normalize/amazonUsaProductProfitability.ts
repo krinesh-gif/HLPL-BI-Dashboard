@@ -1,6 +1,7 @@
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import type { AmazonUsaPnlFacts, CanonicalSalesRecord, SkuMaster } from '@/data/models'
 import { getField, headersPresent, type NormalizeResult } from './types'
+import { normalizeCategory } from '@/data/categories'
 
 // Column names as they appear in Seller Central ▸ Reports ▸ Business Reports ▸
 // Product Profitability (the real export inspected in
@@ -136,7 +137,7 @@ export function normalizeAmazonUsaProductProfitability(
       sellerType: 'seller_central',
       sku: msku,
       productName: skuRecord?.productName ?? msku,
-      category: skuRecord?.category ?? 'Uncategorized',
+      category: normalizeCategory(skuRecord?.category),
       quantity: netUnitsSold,
       grossSales: sales,
       discount: 0,

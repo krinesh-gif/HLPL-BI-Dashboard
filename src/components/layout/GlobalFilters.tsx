@@ -3,6 +3,7 @@ import { CHANNELS } from '@/config/channels'
 import { useFilterStore } from '@/store/filterStore'
 import { useDataStore } from '@/store/dataStore'
 import { monthLabel } from '@/lib/format'
+import { distinctCategories } from '@/data/categories'
 
 export function GlobalFilters() {
   const { month, channel, category, setMonth, setChannel, setCategory, reset } = useFilterStore()
@@ -13,10 +14,13 @@ export function GlobalFilters() {
     return Array.from(set).sort()
   }, [salesRecords])
 
-  const categories = useMemo(() => {
-    const set = new Set(salesRecords.map((r) => r.category))
-    return Array.from(set).sort()
-  }, [salesRecords])
+  // distinctCategories folds every spelling of "no category" into one entry
+  // and puts it last, so the filter offers one Uncategorized rather than a
+  // blank, an "N/A" and an "unknown" that all mean the same thing.
+  const categories = useMemo(
+    () => distinctCategories(salesRecords.map((r) => r.category)),
+    [salesRecords],
+  )
 
   const isDefault = channel === 'all' && category === 'all'
 

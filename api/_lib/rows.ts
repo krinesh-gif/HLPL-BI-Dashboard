@@ -12,6 +12,7 @@ import type {
   SkuMaster,
 } from '../../src/data/models.js'
 import type { ChannelId } from '../../src/config/channels.js'
+import { normalizeCategory } from '../../src/data/categories.js'
 
 type Row = Record<string, unknown>
 
@@ -23,7 +24,7 @@ export function toSkuMaster(r: Row): SkuMaster {
   return {
     sku: str(r.sku),
     productName: str(r.product_name),
-    category: str(r.category),
+    category: normalizeCategory(r.category),
     subCategory: optStr(r.sub_category),
     brand: str(r.brand),
     cogs: num(r.cogs),
@@ -44,7 +45,7 @@ export function toSalesRecord(r: Row): CanonicalSalesRecord {
     sellerType: str(r.seller_type) as CanonicalSalesRecord['sellerType'],
     sku: str(r.sku),
     productName: str(r.product_name),
-    category: str(r.category),
+    category: normalizeCategory(r.category),
     subCategory: optStr(r.sub_category),
     quantity: num(r.quantity),
     grossSales: num(r.gross_sales),

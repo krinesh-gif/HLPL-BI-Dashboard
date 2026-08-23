@@ -1,5 +1,6 @@
 import type { CanonicalSalesRecord, SkuMaster } from '@/data/models'
 import { getField, headersPresent, type NormalizeResult } from './types'
+import { normalizeCategory } from '@/data/categories'
 
 // Column names as they appear in Meesho's raw "Order Summary" export
 // (Sub orderId, Catalog ID, Quantity, Price, Order Date, Order Status,
@@ -69,7 +70,7 @@ export function normalizeMeeshoOrderSummary(
       sellerType: 'marketplace',
       sku,
       productName: skuRecord?.productName ?? sku,
-      category: skuRecord?.category ?? 'Uncategorized',
+      category: normalizeCategory(skuRecord?.category),
       quantity,
       grossSales: price * quantity,
       discount: 0,

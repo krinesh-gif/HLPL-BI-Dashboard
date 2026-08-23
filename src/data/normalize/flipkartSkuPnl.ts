@@ -1,5 +1,6 @@
 import type { CanonicalSalesRecord, FlipkartPnlFacts, SkuMaster } from '@/data/models'
 import { getField, type NormalizeResult } from './types'
+import { normalizeCategory } from '@/data/categories'
 
 // Column names as they appear in Flipkart's "SKU-level P&L" export (Seller Hub
 // ▸ Reports ▸ Profit & Loss). One row per SKU per month (Flipkart aggregates
@@ -99,7 +100,7 @@ export function normalizeFlipkartSkuPnl(
       sellerType: 'marketplace',
       sku,
       productName: skuRecord?.productName ?? sku,
-      category: skuRecord?.category ?? 'Uncategorized',
+      category: normalizeCategory(skuRecord?.category),
       quantity: netUnits,
       grossSales: orderItemValue,
       discount: 0,
