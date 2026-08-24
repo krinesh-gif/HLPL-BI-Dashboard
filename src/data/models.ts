@@ -202,29 +202,81 @@ export interface AmazonUsaPnlFacts {
   fxConversionCostPct: number
 }
 
+/**
+ * Which calendar the month is cut on.
+ *
+ * The same order row carries both an order date and a payment date, so one
+ * upload produces two complete P&Ls. They are not a discrepancy to reconcile
+ * away — they answer different questions, and for Meesho they differ by
+ * roughly 2x in a given month because a July payment run settles a great deal
+ * of June's trading.
+ */
+export type PnlBasis = 'order' | 'settlement'
+
+/**
+ * Meesho's monthly P&L inputs, in the structure the business actually uses.
+ *
+ * Every figure is a positive magnitude; the sign convention lives in the
+ * compute function. Amounts are as Meesho bills them — inclusive of GST —
+ * except advertising, which Meesho reports ex-GST.
+ *
+ * `schemaVersion` guards against silently mis-reading facts stored under the
+ * older, thinner shape. A month without it is treated as absent and prompts a
+ * re-upload rather than being rendered as if it were complete.
+ */
 export interface MeeshoPnlFacts {
-  month: string
-  grossSale: number
-  returns: number
+  schemaVersion: 2
+  month: string // yyyy-mm
+  basis: PnlBasis
+
+  // --- Revenue -------------------------------------------------------------
+  grossSalesInclGst: number
+  salesReturnsInclGst: number
+  /** Output GST inside net sales, summed per row at that product's own rate —
+   * the catalogue mixes 5% and 18% lines, so a single blended rate would be
+   * wrong. */
+  outputGstOnSales: number
+
+  // --- Cost of goods -------------------------------------------------------
+  cogsUnitsSold: number
+  /** RTO stock that came back unsaleable. Shrinkage, not cost of sale. */
+  cogsRtoWriteOff: number
+  /** Customer returns that came back unsaleable — a worse rate than RTO,
+   * because the box has been opened. */
+  cogsReturnWriteOff: number
+
+  // --- Marketplace charges, as billed --------------------------------------
   forwardShipping: number
-  reverseShipping: number
-  returnPremium: number
-  returnPremiumRecovered: number
-  commission: number
-  fixedFee: number
-  warehousing: number
-  goldFee: number
-  mallFee: number
-  otherSettlementCharge: number
-  ads: number
-  gst: number
-  tcs: number
-  tds: number
+  returnShipping: number
+  /** Commission, fixed fee, warehousing, gold and mall fees, return premium,
+   * and support-service charges. */
+  otherMarketplaceFees: number
+
+  // --- Advertising ---------------------------------------------------------
+  adsSpendExGst: number
+  adCredits: number
+
+  // --- Platform adjustments ------------------------------------------------
   compensation: number
   claims: number
   recovery: number
-  settlementAmount: number
-  cogs: number
+  /** Subscription and programme fees Meesho recovers outside order rows. */
+  platformRecoverySubscriptions: number
+
+  // --- Volume, which drives own fulfilment cost ----------------------------
+  subOrdersDispatched: number
+  unitsDispatched: number
+  unitsDelivered: number
+  unitsRto: number
+  unitsReturned: number
+
+  // --- Memo: statutory and settlement bridge -------------------------------
+  tcs: number
+  tds: number
+  gstOnMarketplaceFees: number
+  gstOnAds: number
+  /** Meesho's own net settlement total for the month, for the bank bridge. */
+  netSettlementPerFile: number
 }
 
 // ---------------------------------------------------------------------------

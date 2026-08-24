@@ -10,6 +10,7 @@ import {
 import type { CanonicalSalesRecord } from '@/data/models'
 import { netSalesBySource, netSalesForChannelMonth, netSalesForMonth } from '@/engine/netSales'
 import { buildChannelPnl, buildMasterPnl } from '@/engine/pnl'
+import { meeshoFacts as makeMeeshoFacts } from '@/data/testFixtures'
 
 /**
  * Amazon India is one business channel fed by two reports.
@@ -124,12 +125,7 @@ describe('the drill-down', () => {
     // of the channel's sources would be inventing a split.
     const facts = {
       ...noFacts,
-      meeshoFacts: [{
-        month: '2026-08', grossSale: 999, returns: 0, forwardShipping: 0, reverseShipping: 0,
-        returnPremium: 0, returnPremiumRecovered: 0, commission: 0, fixedFee: 0, warehousing: 0,
-        goldFee: 0, mallFee: 0, otherSettlementCharge: 0, ads: 0, gst: 0, tcs: 0, tds: 0,
-        compensation: 0, claims: 0, recovery: 0, settlementAmount: 0, cogs: 0,
-      }],
+      meeshoFacts: [makeMeeshoFacts({ month: '2026-08', grossSalesInclGst: 999, salesReturnsInclGst: 0, cogsUnitsSold: 0 })],
     }
     const narrowed = netSalesForChannelMonth({
       records: [record('meesho', 500)], channel: 'meesho', month: '2026-08', facts, source: 'meesho',

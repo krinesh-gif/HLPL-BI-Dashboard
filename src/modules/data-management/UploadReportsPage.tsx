@@ -8,7 +8,6 @@ import { detectAmazonUsaProductProfitabilityReport, normalizeAmazonUsaProductPro
 import { detectMeeshoOrderSummaryReport, normalizeMeeshoOrderSummary } from '@/data/normalize/meeshoOrderSummary'
 import { detectMeeshoOrderPaymentsSheet, normalizeMeeshoOrderPayments } from '@/data/normalize/meeshoOrderPayments'
 import { detectSkuMapWorkbook, normalizeSkuMapWorkbook } from '@/data/normalize/skuMapWorkbook'
-import { isMeeshoSettlementJson, normalizeMeeshoSettlementJson, type MeeshoSettlementJson } from '@/data/normalize/meeshoSettlementJson'
 import { detectAmazonAdsSponsoredProductsReport, normalizeAmazonAdsSponsoredProductsReport } from '@/data/normalize/amazonAdsSponsoredProducts'
 import { checkForDuplicates } from '@/data/normalize/duplicates'
 import { useDataStore, type ImportOutcome } from '@/store/dataStore'
@@ -111,20 +110,12 @@ export function UploadReportsPage() {
       const lowerName = file.name.toLowerCase()
 
       if (lowerName.endsWith('.json')) {
-        const text = await file.text()
-        const data = JSON.parse(text) as unknown
-        if (!isMeeshoSettlementJson(data)) {
-          setStage('error')
-          setError('Upload failed. Existing data has NOT been changed. Reason: this JSON file does not match the expected Meesho settlement data schema (missing ROWF/orders).')
-          return
-        }
-        const importId = `import-${Date.now()}`
-        const r = normalizeMeeshoSettlementJson(data as MeeshoSettlementJson, skuMaster, importId)
-        await showPreview({
-          fileName: file.name, reportKind: 'meesho_settlement_json', totalRows: r.totalRows,
-          validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings,
-          meeshoFactsByMonth: r.factsByMonth,
-        })
+        setStage('error')
+        setError(
+          'Upload failed. Existing data has NOT been changed. Meesho is now read from the aggregated payment workbook ' +
+          '(Payments ▸ Download aggregated payment file), which produces both the order-basis and settlement-basis P&L ' +
+          'from one upload. Upload that .xlsx instead of the settlement JSON.',
+        )
         return
       }
 

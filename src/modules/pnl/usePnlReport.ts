@@ -13,7 +13,7 @@ import {
   monthsForQuickPeriod,
   type QuickPeriod,
 } from '@/engine/multiMonthPnl'
-import type { PnlLineValues } from '@/data/models'
+import type { PnlBasis, PnlLineValues } from '@/data/models'
 
 /** Master Company, or one business channel. */
 export type PnlView = 'master' | BusinessChannelId
@@ -39,6 +39,9 @@ export function usePnlReport() {
   const { forMonth } = usePnlInputs()
 
   const [view, setView] = useState<PnlView>('master')
+  // Meesho carries both an order-date and a payment-date statement. Order
+  // basis is the default: it is what a month's trading is judged on.
+  const [meeshoBasis, setMeeshoBasis] = useState<PnlBasis>('order')
   const [period, setPeriod] = useState<PnlPeriod>({ mode: 'quick', quick: '6m', from: month, to: month })
 
   const monthsWithData = useMemo(() => {
@@ -58,7 +61,7 @@ export function usePnlReport() {
 
     /** One month's P&L lines for the selected view. */
     const linesFor = (m: string): PnlLineValues => {
-      const inputs = forMonth(m)
+      const inputs = { ...forMonth(m), meeshoBasis }
       if (view === 'master') {
         const views = buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, m, inputs)
         return buildMasterPnl(views.map((v) => v.canonical), m).lines
@@ -73,7 +76,7 @@ export function usePnlReport() {
     const latestMonth = months[months.length - 1] ?? month
     const channelBreakdown =
       view === 'master'
-        ? buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, latestMonth, forMonth(latestMonth))
+        ? buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, latestMonth, { ...forMonth(latestMonth), meeshoBasis })
             .map((v) => ({ channel: v.channel, netSales: v.canonical.lines.netSales ?? 0 }))
             .filter((c) => c.netSales !== 0)
             .sort((a, b) => b.netSales - a.netSales)
@@ -102,8 +105,24 @@ export function usePnlReport() {
       ebitdaMarginPct: at('ebitdaMarginPct', i),
     }))
 
+    // The channel's own waterfall, for the most recent month in the period
+    // that actually has one. Anchoring it to the last month of the period
+    // showed nothing whenever that month had no statement yet — which is the
+    // normal state of the current month.
+    let native: ReturnType<typeof buildChannelPnlView>['native']
+    let nativeNotes: string[] = []
+    let nativeMonth = latestMonth
+    if (view !== 'master') {
+      for (let i = months.length - 1; i >= 0; i--) {
+        const built = buildChannelPnlView(view, months[i], { ...forMonth(months[i]), meeshoBasis })
+        if (built.native) { native = built.native; nativeNotes = built.notes; nativeMonth = months[i]; break }
+      }
+    }
+
     return {
       view, setView,
+      meeshoBasis, setMeeshoBasis,
+      native, nativeMonth, nativeNotes,
       period, setPeriod,
       months,
       monthsWithData,
@@ -113,5 +132,5 @@ export function usePnlReport() {
       trend,
       latestMonth,
     }
-  }, [view, period, month, monthsWithData, forMonth])
+  }, [view, meeshoBasis, period, month, monthsWithData, forMonth])
 }

@@ -11,6 +11,7 @@ import {
   type ChannelFacts,
 } from './netSales'
 import { reconcileChannelMonth } from './reconciliation'
+import { meeshoFacts as makeMeeshoFacts } from '@/data/testFixtures'
 
 const FX = 100 // a round rate keeps the USD assertions readable
 
@@ -90,10 +91,7 @@ describe('the Net Sales definition', () => {
 
 describe('which basis wins', () => {
   const meeshoFacts: MeeshoPnlFacts[] = [
-    { month: '2026-08', grossSale: 500000, returns: 100000, forwardShipping: 0, reverseShipping: 0,
-      returnPremium: 0, returnPremiumRecovered: 0, commission: 0, fixedFee: 0, warehousing: 0,
-      goldFee: 0, mallFee: 0, otherSettlementCharge: 0, ads: 0, gst: 0, tcs: 0, tds: 0,
-      compensation: 0, claims: 0, recovery: 0, settlementAmount: 0, cogs: 0 },
+    makeMeeshoFacts({ month: '2026-08', grossSalesInclGst: 500000, salesReturnsInclGst: 100000, cogsUnitsSold: 0 }),
   ]
   const facts: ChannelFacts = { ...noFacts, meeshoFacts }
 
@@ -109,9 +107,12 @@ describe('which basis wins', () => {
     const records = [record({ netSales: 380000, grossSales: 380000 })]
     const figure = netSalesForChannelMonth({ records, channel: 'meesho', month: '2026-08', facts })
 
-    expect(figure.netSales).toBe(400000) // settlement, not the 380000 from orders
+    expect(figure.netSales).toBe(400000) // the statement, not the 380000 from raw order rows
     expect(figure.basis).toBe('settlement')
-    expect(figure.sourceLabel).toBe('Meesho settlement report')
+    // The label names the basis. It used to say "settlement report" for what
+    // was in fact an order-basis figure — the mislabelling that made the
+    // dashboard and the P&L look like they disagreed.
+    expect(figure.sourceLabel).toBe('Meesho order report (order basis)')
   })
 
   it('still takes unit counts from order rows, since settlement reports carry none', () => {
@@ -170,10 +171,7 @@ describe('derived metrics', () => {
 
 describe('reconciling the two bases', () => {
   const meeshoFacts: MeeshoPnlFacts[] = [
-    { month: '2026-08', grossSale: 500000, returns: 100000, forwardShipping: 0, reverseShipping: 0,
-      returnPremium: 0, returnPremiumRecovered: 0, commission: 0, fixedFee: 0, warehousing: 0,
-      goldFee: 0, mallFee: 0, otherSettlementCharge: 0, ads: 0, gst: 0, tcs: 0, tds: 0,
-      compensation: 0, claims: 0, recovery: 0, settlementAmount: 0, cogs: 0 },
+    makeMeeshoFacts({ month: '2026-08', grossSalesInclGst: 500000, salesReturnsInclGst: 100000, cogsUnitsSold: 0 }),
   ]
   const facts: ChannelFacts = { ...noFacts, meeshoFacts }
 
@@ -248,10 +246,7 @@ describe('a settlement report that covers only part of the month', () => {
   // the month has finished settling makes every figure on the channel
   // understate — the opposite of the problem this area was built to fix.
   const partial: MeeshoPnlFacts[] = [
-    { month: '2026-07', grossSale: 231810, returns: 46253, forwardShipping: 0, reverseShipping: 0,
-      returnPremium: 0, returnPremiumRecovered: 0, commission: 0, fixedFee: 0, warehousing: 0,
-      goldFee: 0, mallFee: 0, otherSettlementCharge: 0, ads: 0, gst: 0, tcs: 0, tds: 0,
-      compensation: 0, claims: 0, recovery: 0, settlementAmount: 0, cogs: 0 },
+    makeMeeshoFacts({ month: '2026-07', grossSalesInclGst: 231810, salesReturnsInclGst: 46253, cogsUnitsSold: 0 }),
   ]
   const facts: ChannelFacts = { ...noFacts, meeshoFacts: partial }
 

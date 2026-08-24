@@ -7,6 +7,7 @@ import type {
   CanonicalSalesRecord,
   FlipkartPnlFacts,
   MeeshoPnlFacts,
+  PnlBasis,
 } from '@/data/models'
 
 /**
@@ -165,17 +166,33 @@ export function settlementBasisNetSales(
   month: string,
   facts: ChannelFacts,
   fxRate: number = NATIVE_PNL_ASSUMPTIONS.usdToInrRate,
+  meeshoBasis: PnlBasis = 'order',
 ): NetSalesFigure | null {
   if (channel === 'meesho') {
-    const f = facts.meeshoFacts.find((x) => x.month === month)
+    // Meesho now carries both bases. Which one is authoritative is the
+    // caller's choice; order basis is the default because it is what a
+    // month's trading is judged on.
+    const f = facts.meeshoFacts.find((x) => x.month === month && x.basis === meeshoBasis && x.schemaVersion === 2)
     if (!f) return null
+    const netSales = f.grossSalesInclGst - f.salesReturnsInclGst - f.outputGstOnSales
     return {
       ...EMPTY_FIGURE,
-      grossSales: f.grossSale,
-      returnsValue: f.returns,
-      netSales: f.grossSale - f.returns,
+      grossSales: f.grossSalesInclGst,
+      // Output GST was never revenue. Grouping it with returns here keeps the
+      // identity net = gross - discounts - returns intact while removing it.
+      returnsValue: f.salesReturnsInclGst + f.outputGstOnSales,
+      netSales,
+      units: f.unitsDispatched,
+      orders: f.subOrdersDispatched,
+      rtoUnits: f.unitsRto,
+      returnUnits: f.unitsReturned,
+      shippedUnits: f.unitsDispatched,
+      marketplaceFee: f.otherMarketplaceFees,
+      shippingCost: f.forwardShipping + f.returnShipping,
       basis: 'settlement',
-      sourceLabel: 'Meesho settlement report',
+      sourceLabel: meeshoBasis === 'order'
+        ? 'Meesho order report (order basis)'
+        : 'Meesho order report (settlement basis)',
     }
   }
 
@@ -219,6 +236,8 @@ export interface NetSalesScope {
   month: string
   facts: ChannelFacts
   fxRate?: number
+  /** Which calendar Meesho's months are cut on. Ignored by other channels. */
+  meeshoBasis?: PnlBasis
   /**
    * Narrows to one uploaded report within the channel — Seller Central alone,
    * say. Used only by the drill-down: management figures never pass it.
@@ -255,7 +274,7 @@ export function netSalesForChannelMonth(scope: NetSalesScope): NetSalesFigure {
   // settled total for one of its sources.
   const settlement = scope.source
     ? null
-    : settlementBasisNetSales(scope.channel, scope.month, scope.facts, fxRate)
+    : settlementBasisNetSales(scope.channel, scope.month, scope.facts, fxRate, scope.meeshoBasis ?? 'order')
 
   if (!settlement) return order
 

@@ -6,6 +6,7 @@ import { BUSINESS_CHANNELS, channelLabel } from '@/config/channels'
 import { formatCurrencyCompact, formatCurrencyFull, formatPercent, monthLabel } from '@/lib/format'
 import { exportRowsToCsv } from '@/lib/exportCsv'
 import { QUICK_PERIODS, type QuickPeriod } from '@/engine/multiMonthPnl'
+import { NativePnlTable } from '@/components/pnl/NativePnlTable'
 import { usePnlReport, type PnlView } from './usePnlReport'
 
 /**
@@ -53,6 +54,29 @@ export function PnlPage() {
             ))}
           </select>
         </label>
+
+        {r.view === 'meesho' && (
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-slate-500">Basis</span>
+            <div className="flex rounded-md border border-slate-300 bg-white p-0.5">
+              {([
+                { key: 'order', label: 'Order date' },
+                { key: 'settlement', label: 'Payment date' },
+              ] as const).map((b) => (
+                <button
+                  key={b.key}
+                  type="button"
+                  onClick={() => r.setMeeshoBasis(b.key)}
+                  className={`rounded px-3 py-1 text-sm font-medium transition ${
+                    r.meeshoBasis === b.key ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col gap-1">
           <span className="text-xs font-medium text-slate-500">Quick select</span>
@@ -176,6 +200,38 @@ export function PnlPage() {
         Percentages in the Total column are recomputed from the period's totals, not averaged across months — the average of monthly
         margins is not the margin of the period.
       </p>
+
+      {r.view === 'meesho' && (
+        <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          {r.meeshoBasis === 'order' ? (
+            <>
+              <strong>Order-date basis.</strong> Every order counted in the month the customer placed it — what a month's trading
+              earned. Use this for trading, marketing and SKU decisions.
+            </>
+          ) : (
+            <>
+              <strong>Payment-date basis.</strong> Every order counted in the month Meesho paid for it — what the bank saw. Use this
+              for cash and reconciliation.
+            </>
+          )}{' '}
+          The same orders sit behind both; they differ because a payment run settles a great deal of the previous month's trading.
+          Neither is more correct than the other.
+        </p>
+      )}
+
+      {r.native && (
+        <section>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            {channelLabel(r.view as Exclude<PnlView, 'master'>)} — full statement, {monthLabel(r.nativeMonth)}
+          </h2>
+          {r.nativeNotes.map((note) => (
+            <p key={note} className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              {note}
+            </p>
+          ))}
+          <NativePnlTable lineDefs={r.native.lineDefs} values={r.native.values} currency={r.native.currency} />
+        </section>
+      )}
 
       {/* ---- Channel drill-down ------------------------------------------ */}
       {r.channelBreakdown.length > 0 && (
