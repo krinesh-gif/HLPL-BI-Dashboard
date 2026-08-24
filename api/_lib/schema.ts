@@ -170,10 +170,31 @@ BEGIN
     data  JSONB NOT NULL
   );
 
+  -- Meesho alone carries two statements per month: the same orders bucketed by
+  -- order date and by payment date. Keying on month alone made the second one
+  -- written overwrite the first, so only one basis ever survived and the
+  -- page's basis toggle had nothing to switch between.
   CREATE TABLE IF NOT EXISTS meesho_facts (
-    month TEXT PRIMARY KEY,
-    data  JSONB NOT NULL
+    month TEXT NOT NULL,
+    basis TEXT NOT NULL DEFAULT 'order',   -- order | settlement
+    data  JSONB NOT NULL,
+    PRIMARY KEY (month, basis)
   );
+
+  -- Migrate a database created before Meesho carried two bases. The column is
+  -- backfilled from the stored object so a row already tagged with a basis
+  -- keeps it, and the single-column primary key is swapped for the pair.
+  ALTER TABLE meesho_facts ADD COLUMN IF NOT EXISTS basis TEXT NOT NULL DEFAULT 'order';
+  UPDATE meesho_facts SET basis = COALESCE(data->>'basis', 'order')
+   WHERE basis IS DISTINCT FROM COALESCE(data->>'basis', 'order');
+  IF EXISTS (
+    SELECT 1 FROM pg_index i
+      JOIN pg_class c ON c.oid = i.indrelid
+     WHERE c.relname = 'meesho_facts' AND i.indisprimary AND i.indnatts = 1
+  ) THEN
+    ALTER TABLE meesho_facts DROP CONSTRAINT meesho_facts_pkey;
+    ALTER TABLE meesho_facts ADD PRIMARY KEY (month, basis);
+  END IF;
 
   -- ---------------------------------------------------------------------------
   -- Operational data entered outside marketplace reports.

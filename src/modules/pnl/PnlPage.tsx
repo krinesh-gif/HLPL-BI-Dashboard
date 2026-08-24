@@ -219,6 +219,14 @@ export function PnlPage() {
         </p>
       )}
 
+      {r.view === 'meesho' && !r.native && (
+        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <strong>No Meesho statement stored for this period yet</strong>, so the figures above come from order rows alone and the
+          Order date / Payment date toggle has nothing to switch between. Upload the aggregated payment workbook (Payments ▸ Order
+          Payments) on Upload Reports — one upload produces both statements.
+        </p>
+      )}
+
       {r.native && (
         <section>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">

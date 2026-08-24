@@ -1,5 +1,5 @@
 import { createHandler } from './_lib/handler.js'
-import { sql } from './_lib/db.js'
+import { ensureSchema, sql } from './_lib/db.js'
 import { requireSession } from './_lib/auth.js'
 import { json } from './_lib/http.js'
 import {
@@ -23,6 +23,12 @@ export async function GET(request: Request): Promise<Response> {
   const auth = await requireSession(request)
   if (auth.response) return auth.response
 
+  // The one endpoint every session hits, so it is where a workspace created
+  // before a column existed picks up the migration — without it, opening the
+  // dashboard is what would fail. Memoized per warm instance, so this costs a
+  // round trip once rather than on every load.
+  await ensureSchema()
+
   const [skuRows, salesRows, adsRows, importRows, inventoryRows, expenseRows, flipkart, amazonUsa, meesho, manualAds] =
     await Promise.all([
       sql`SELECT * FROM sku_master ORDER BY sku`,
@@ -33,7 +39,7 @@ export async function GET(request: Request): Promise<Response> {
       sql`SELECT * FROM fixed_expenses`,
       sql`SELECT data FROM flipkart_facts ORDER BY month`,
       sql`SELECT data FROM amazon_usa_facts ORDER BY month`,
-      sql`SELECT data FROM meesho_facts ORDER BY month`,
+      sql`SELECT data FROM meesho_facts ORDER BY month, basis`,
       sql`SELECT channel, month, amount, file_name, note, entered_at FROM manual_ad_spend ORDER BY month`,
     ])
 
