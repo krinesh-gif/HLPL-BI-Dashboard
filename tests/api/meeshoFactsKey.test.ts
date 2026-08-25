@@ -46,7 +46,7 @@ describe.skipIf(!PGTEST_URL)('meesho_facts is keyed by month and basis', () => {
   it('creates the composite key on a new database', () => {
     const db = freshDb('hlpl_fresh_test')
     applySchema(db)
-    expect(pkOf(db)).toBe('basis,month')
+    expect(pkOf(db)).toBe('basis,month,source_file')
   })
 
   it('holds both bases for one month instead of overwriting', () => {
@@ -55,9 +55,9 @@ describe.skipIf(!PGTEST_URL)('meesho_facts is keyed by month and basis', () => {
     for (const [basis, gross] of [['order', 233469], ['settlement', 459577]] as const) {
       psql(
         db,
-        `INSERT INTO meesho_facts (month, basis, data)
-         VALUES ('2026-07', '${basis}', '{"month":"2026-07","basis":"${basis}","grossSalesInclGst":${gross}}')
-         ON CONFLICT (month, basis) DO UPDATE SET data = EXCLUDED.data`,
+        `INSERT INTO meesho_facts (month, basis, source_file, data)
+         VALUES ('2026-07', '${basis}', 'july.xlsx', '{"month":"2026-07","basis":"${basis}","grossSalesInclGst":${gross}}')
+         ON CONFLICT (month, basis, source_file) DO UPDATE SET data = EXCLUDED.data`,
       )
     }
     // July's two statements are genuinely different amounts of money. Before
@@ -77,7 +77,7 @@ describe.skipIf(!PGTEST_URL)('meesho_facts is keyed by month and basis', () => {
     )
     applySchema(db)
 
-    expect(pkOf(db)).toBe('basis,month')
+    expect(pkOf(db)).toBe('basis,month,source_file')
     // A row that already knew its basis keeps it; an untagged one predates the
     // split and is order basis, which is what the app produced back then.
     expect(psql(db, `SELECT month || '=' || basis FROM meesho_facts ORDER BY month`))
@@ -89,7 +89,7 @@ describe.skipIf(!PGTEST_URL)('meesho_facts is keyed by month and basis', () => {
     applySchema(db)
     applySchema(db)
     applySchema(db)
-    expect(pkOf(db)).toBe('basis,month')
+    expect(pkOf(db)).toBe('basis,month,source_file')
   })
 })
 
@@ -134,5 +134,70 @@ describe.skipIf(!PGTEST_URL)('meesho_transactions gains columns added after it s
                 VALUES ('aug.xlsx', ${row}, 'SUB9', '${type}', 'certain', '{}')`)
     }
     expect(psql(db, `SELECT count(*)::text FROM meesho_transactions WHERE sub_order_id = 'SUB9'`)).toBe('2')
+  })
+})
+
+/**
+ * A month arrives across several payment files.
+ *
+ * Meesho cuts a file on payment date, so the file the owner calls "April"
+ * carries March and April orders and the one they call "May" carries April and
+ * May. Keying a month's facts on the month alone meant the May upload replaced
+ * the complete April already stored with the slice of April it happened to
+ * settle — the month read correctly right after its own file was uploaded and
+ * wrongly after the next one.
+ */
+describe.skipIf(!PGTEST_URL)('meesho_facts keeps each payment file separate', () => {
+  const upload = (db: string, file: string, months: [string, number][]): void => {
+    psql(db, `DELETE FROM meesho_facts WHERE source_file = '${file}'`)
+    for (const [month, gross] of months) {
+      psql(
+        db,
+        `INSERT INTO meesho_facts (month, basis, source_file, data)
+         VALUES ('${month}', 'order', '${file}', '{"grossSalesInclGst":${gross}}')
+         ON CONFLICT (month, basis, source_file) DO UPDATE SET data = EXCLUDED.data`,
+      )
+    }
+  }
+  const shown = (db: string, month: string): string =>
+    psql(db, `SELECT coalesce(sum((data->>'grossSalesInclGst')::numeric), 0)::text
+                FROM meesho_facts WHERE month = '${month}'`)
+
+  it('adds a later file’s slice of a month instead of replacing it', () => {
+    const db = freshDb('hlpl_facts_overlap_test')
+    applySchema(db)
+    upload(db, 'April.xlsx', [['2026-03', 291698], ['2026-04', 342664.26]])
+    upload(db, 'May.xlsx', [['2026-04', 12000], ['2026-05', 310000]])
+
+    // Before the source file was part of the key this read 12000.
+    expect(shown(db, '2026-04')).toBe('354664.26')
+    expect(shown(db, '2026-03')).toBe('291698')
+  })
+
+  it('does not double-count when the same file is uploaded twice', () => {
+    const db = freshDb('hlpl_facts_reupload_test')
+    applySchema(db)
+    upload(db, 'May.xlsx', [['2026-04', 12000], ['2026-05', 310000]])
+    upload(db, 'May.xlsx', [['2026-04', 12000], ['2026-05', 310000]])
+    expect(shown(db, '2026-05')).toBe('310000')
+  })
+
+  it('releases a month a corrected file no longer covers', () => {
+    const db = freshDb('hlpl_facts_shrink_test')
+    applySchema(db)
+    upload(db, 'April.xlsx', [['2026-04', 342664.26]])
+    upload(db, 'May.xlsx', [['2026-04', 12000], ['2026-05', 310000]])
+    upload(db, 'May.xlsx', [['2026-05', 322000]])
+    expect(shown(db, '2026-04')).toBe('342664.26')
+  })
+
+  it('migrates a database keyed on month and basis alone, keeping its rows', () => {
+    const db = freshDb('hlpl_facts_key3_test')
+    psql(db, `CREATE TABLE meesho_facts (month TEXT NOT NULL, basis TEXT NOT NULL DEFAULT 'order',
+              data JSONB NOT NULL, PRIMARY KEY (month, basis))`)
+    psql(db, `INSERT INTO meesho_facts VALUES ('2026-04', 'order', '{"grossSalesInclGst":342664.26}')`)
+    applySchema(db)
+    expect(pkOf(db)).toBe('basis,month,source_file')
+    expect(shown(db, '2026-04')).toBe('342664.26')
   })
 })

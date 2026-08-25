@@ -6,6 +6,7 @@ import type { ComboComponent, SkuMapping } from '@/data/skuMapping'
 import type { SkuMapWorkbookResult } from '@/data/normalize/skuMapWorkbook'
 import type { CostVersion } from '@/data/costVersions'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
+import { mergeMeeshoFacts } from '@/data/meesho/mergeFacts'
 import type {
   AdsRecord,
   AmazonUsaPnlFacts,
@@ -185,12 +186,17 @@ export const useDataStore = create<DataState>((set, get) => {
           api.get<Omit<MappingTablesState, 'costVersions'>>('/api/sku-map'),
           api.get<{ versions: CostVersion[] }>('/api/cost-versions'),
         ])
-        set({ ...dataset, ...mapping, costVersions: costs.versions, loading: false, error: null })
+        // Meesho's facts are stored per payment file, because a file spans two
+        // order months and holds only the slice of each it settled. They are
+        // added back into one figure per month here, so everything downstream
+        // sees a whole month exactly as it did before.
+        const merged: SharedDataset = { ...dataset, meeshoFacts: mergeMeeshoFacts(dataset.meeshoFacts) }
+        set({ ...merged, ...mapping, costVersions: costs.versions, loading: false, error: null })
         // Point the dashboard at the newest month that has data. Left on the
         // current calendar month, every page reads as empty whenever the
         // latest upload covers an earlier period — which looks exactly like
         // the import having failed.
-        const latest = latestMonthWithData(dataset)
+        const latest = latestMonthWithData(merged)
         if (latest) useFilterStore.getState().defaultMonthTo(latest)
       } catch (e) {
         set({ loading: false, error: e instanceof Error ? e.message : 'Could not load the shared dataset.' })
@@ -250,13 +256,18 @@ export const useDataStore = create<DataState>((set, get) => {
           await api.post('/api/facts/amazon-usa', { facts: amazonUsaFacts })
           monthsUpdated.push(amazonUsaFacts.month)
         }
-        for (const facts of meeshoFactsByMonth ?? []) {
-          // The source rows ride along with the first month only: they are the
-          // whole file's events, not one month's, and both bases index the
-          // same rows by a different date.
-          const withRows = facts === meeshoFactsByMonth?.[0] ? meeshoTransactions : undefined
-          await api.post('/api/facts/meesho', { facts, transactions: withRows })
-          monthsUpdated.push(facts.month)
+        if (meeshoFactsByMonth && meeshoFactsByMonth.length > 0) {
+          // Sent as one request per file, not one per month. A payment file
+          // spans two order months and holds only the slice of each it
+          // settled, so its months are stored against the file and added up
+          // when read — otherwise the next file's partial month would replace
+          // the complete one already there.
+          await api.post('/api/facts/meesho', {
+            factsList: meeshoFactsByMonth,
+            sourceFile: importRecord.fileName,
+            transactions: meeshoTransactions,
+          })
+          for (const facts of meeshoFactsByMonth) monthsUpdated.push(facts.month)
         }
 
         await get().loadState()

@@ -27,8 +27,14 @@ interface FactsBody {
   month?: unknown
   basis?: unknown
   patch?: unknown
+  /** Every month one payment file produced, sent together so a re-upload can
+   * clear that file's previous contribution first. */
+  factsList?: unknown
+  sourceFile?: unknown
   transactions?: unknown
 }
+
+const s = (v: unknown): string => (typeof v === 'string' ? v : '')
 
 /**
  * One Meesho event row as the client sends it. Only the fields queried in SQL
@@ -76,6 +82,22 @@ export async function POST(request: Request): Promise<Response> {
   await ensureSchema()
 
   const body = await readJson<FactsBody>(request)
+
+  if (target.byBasis && Array.isArray(body?.factsList)) {
+    const sourceFile = s(body.sourceFile)
+    if (!sourceFile) return json({ error: 'Expected a sourceFile alongside factsList.' }, 400)
+    const stored = await storeFileFacts(target.table, sourceFile, body.factsList)
+
+    let storedTransactions = 0
+    if (Array.isArray(body.transactions)) {
+      if (body.transactions.length > MAX_TRANSACTIONS_PER_REQUEST) {
+        return json({ error: `At most ${MAX_TRANSACTIONS_PER_REQUEST} transactions per request.` }, 413)
+      }
+      storedTransactions = await storeTransactions(body.transactions as TransactionBody[])
+    }
+    return json({ ok: true, storedMonths: stored, storedTransactions })
+  }
+
   const facts = body?.facts as { month?: string; basis?: string } | undefined
   if (!facts || typeof facts !== 'object' || !isNonEmptyString(facts.month)) {
     return json({ error: 'Expected { facts: { month, ... } }.' }, 400)
@@ -89,9 +111,9 @@ export async function POST(request: Request): Promise<Response> {
       return json({ error: `Expected facts.basis to be one of ${BASES.join(', ')}.` }, 400)
     }
     await sql.query(
-      `INSERT INTO ${target.table} (month, basis, data) VALUES ($1, $2, $3)
-       ON CONFLICT (month, basis) DO UPDATE SET data = EXCLUDED.data`,
-      [facts.month, facts.basis, JSON.stringify(facts)],
+      `INSERT INTO ${target.table} (month, basis, source_file, data) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (month, basis, source_file) DO UPDATE SET data = EXCLUDED.data`,
+      [facts.month, facts.basis, s(body?.sourceFile), JSON.stringify(facts)],
     )
 
     let storedTransactions = 0
@@ -110,6 +132,36 @@ export async function POST(request: Request): Promise<Response> {
     [facts.month, JSON.stringify(facts)],
   )
   return json({ ok: true })
+}
+
+/**
+ * Replaces everything one payment file contributed.
+ *
+ * A file spans two order months and holds only the slice of each it settled,
+ * so its rows are stored against the file and added up at read time. Sending
+ * them together lets a re-upload clear the file's previous contribution first
+ * — otherwise a month the file no longer covers would linger.
+ */
+async function storeFileFacts(table: string, sourceFile: string, factsList: unknown[]): Promise<number> {
+  const usable = factsList.filter((f): f is { month: string; basis: string } => {
+    const c = f as { month?: unknown; basis?: unknown }
+    return typeof c?.month === 'string' && c.month !== '' && typeof c.basis === 'string' && BASES.includes(c.basis)
+  })
+  if (usable.length === 0) return 0
+
+  await sql.query(`DELETE FROM ${table} WHERE source_file = $1`, [sourceFile])
+  await sql.query(
+    `INSERT INTO ${table} (month, basis, source_file, data)
+     SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::jsonb[])
+     ON CONFLICT (month, basis, source_file) DO UPDATE SET data = EXCLUDED.data`,
+    [
+      usable.map((f) => f.month),
+      usable.map((f) => f.basis),
+      usable.map(() => sourceFile),
+      usable.map((f) => JSON.stringify(f)),
+    ],
+  )
+  return usable.length
 }
 
 /** Edits individual manual-entry fields on an already-stored month. Merging
@@ -217,7 +269,6 @@ async function storeTransactions(rows: TransactionBody[]): Promise<number> {
   await sql.query(`DELETE FROM meesho_transactions WHERE source_file = ANY($1::text[])`, [files])
 
   const n = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
-  const s = (v: unknown): string => (typeof v === 'string' ? v : '')
 
   await sql.query(
     `INSERT INTO meesho_transactions (

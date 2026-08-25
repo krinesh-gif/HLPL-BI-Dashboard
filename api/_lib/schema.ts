@@ -174,11 +174,17 @@ BEGIN
   -- order date and by payment date. Keying on month alone made the second one
   -- written overwrite the first, so only one basis ever survived and the
   -- page's basis toggle had nothing to switch between.
+  -- A payment file is cut on payment date, so it spans two order months and
+  -- holds only the part of each it happened to settle. Keying on month alone
+  -- meant the next file's partial month replaced the complete one already
+  -- stored; each file therefore keeps its own contribution and the app adds
+  -- them up.
   CREATE TABLE IF NOT EXISTS meesho_facts (
-    month TEXT NOT NULL,
-    basis TEXT NOT NULL DEFAULT 'order',   -- order | settlement
-    data  JSONB NOT NULL,
-    PRIMARY KEY (month, basis)
+    month       TEXT NOT NULL,
+    basis       TEXT NOT NULL DEFAULT 'order',   -- order | settlement
+    source_file TEXT NOT NULL DEFAULT '',
+    data        JSONB NOT NULL,
+    PRIMARY KEY (month, basis, source_file)
   );
 
   -- Migrate a database created before Meesho carried two bases. The column is
@@ -187,13 +193,14 @@ BEGIN
   ALTER TABLE meesho_facts ADD COLUMN IF NOT EXISTS basis TEXT NOT NULL DEFAULT 'order';
   UPDATE meesho_facts SET basis = COALESCE(data->>'basis', 'order')
    WHERE basis IS DISTINCT FROM COALESCE(data->>'basis', 'order');
+  ALTER TABLE meesho_facts ADD COLUMN IF NOT EXISTS source_file TEXT NOT NULL DEFAULT '';
   IF EXISTS (
     SELECT 1 FROM pg_index i
       JOIN pg_class c ON c.oid = i.indrelid
-     WHERE c.relname = 'meesho_facts' AND i.indisprimary AND i.indnatts = 1
+     WHERE c.relname = 'meesho_facts' AND i.indisprimary AND i.indnatts < 3
   ) THEN
     ALTER TABLE meesho_facts DROP CONSTRAINT meesho_facts_pkey;
-    ALTER TABLE meesho_facts ADD PRIMARY KEY (month, basis);
+    ALTER TABLE meesho_facts ADD PRIMARY KEY (month, basis, source_file);
   END IF;
 
   -- ---------------------------------------------------------------------------
