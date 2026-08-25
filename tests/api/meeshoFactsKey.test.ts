@@ -92,3 +92,47 @@ describe.skipIf(!PGTEST_URL)('meesho_facts is keyed by month and basis', () => {
     expect(pkOf(db)).toBe('basis,month')
   })
 })
+
+/**
+ * `CREATE TABLE IF NOT EXISTS` skips a table that already exists, so a column
+ * added after the table first shipped never reaches a database that has it.
+ * That is not hypothetical: the `flagged` column was written into the CREATE
+ * statement alone and a real PostgreSQL rejected the very next insert.
+ */
+describe.skipIf(!PGTEST_URL)('meesho_transactions gains columns added after it shipped', () => {
+  it('adds flagged to a database created before that column existed', () => {
+    const db = freshDb('hlpl_txn_migrate_test')
+    // The table as the first version of the schema created it.
+    psql(db, `CREATE TABLE meesho_transactions (
+      source_file TEXT NOT NULL, source_row INTEGER NOT NULL, sub_order_id TEXT NOT NULL,
+      sku TEXT NOT NULL DEFAULT '', order_date TEXT NOT NULL DEFAULT '',
+      dispatch_date TEXT NOT NULL DEFAULT '', payment_date TEXT NOT NULL DEFAULT '',
+      order_status TEXT NOT NULL DEFAULT '', event_type TEXT NOT NULL, confidence TEXT NOT NULL,
+      classification_reason TEXT NOT NULL DEFAULT '', quantity DOUBLE PRECISION NOT NULL DEFAULT 0,
+      sale_amount DOUBLE PRECISION NOT NULL DEFAULT 0, return_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+      settlement_amount DOUBLE PRECISION NOT NULL DEFAULT 0, recovery DOUBLE PRECISION NOT NULL DEFAULT 0,
+      recovery_reason TEXT NOT NULL DEFAULT '', import_id TEXT NOT NULL DEFAULT '',
+      data JSONB NOT NULL, PRIMARY KEY (source_file, source_row))`)
+    psql(db, `INSERT INTO meesho_transactions (source_file, source_row, sub_order_id, event_type, confidence, data)
+              VALUES ('july.xlsx', 4, 'S1', 'sale', 'certain', '{}')`)
+
+    applySchema(db)
+
+    expect(psql(db, `SELECT count(*)::text FROM information_schema.columns
+                      WHERE table_name = 'meesho_transactions' AND column_name = 'flagged'`)).toBe('1')
+    // The existing row survives and defaults to not needing review.
+    expect(psql(db, `SELECT source_file || ':' || flagged FROM meesho_transactions`)).toBe('july.xlsx:false')
+  })
+
+  it('keys on the source row, so one sub-order can carry several events', () => {
+    const db = freshDb('hlpl_txn_key_test')
+    applySchema(db)
+    // The sale and its return share a sub-order. Keying on the sub-order would
+    // delete one of two real financial events.
+    for (const [row, type] of [[4, 'sale'], [5, 'return']] as const) {
+      psql(db, `INSERT INTO meesho_transactions (source_file, source_row, sub_order_id, event_type, confidence, data)
+                VALUES ('aug.xlsx', ${row}, 'SUB9', '${type}', 'certain', '{}')`)
+    }
+    expect(psql(db, `SELECT count(*)::text FROM meesho_transactions WHERE sub_order_id = 'SUB9'`)).toBe('2')
+  })
+})

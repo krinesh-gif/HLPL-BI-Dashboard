@@ -15,6 +15,7 @@ import { monthLabel } from '@/lib/format'
 import { useFilterStore } from '@/store/filterStore'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
 import type { AdsRecord, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, MeeshoPnlFacts } from '@/data/models'
+import type { MeeshoTransaction } from '@/data/meesho/transaction'
 
 type ReportKind =
   | 'amazon_seller_central'
@@ -62,6 +63,7 @@ interface PreviewState {
   flipkartFacts?: FlipkartPnlFacts
   amazonUsaFacts?: AmazonUsaPnlFacts
   meeshoFactsByMonth?: MeeshoPnlFacts[]
+  meeshoTransactions?: MeeshoTransaction[]
 }
 
 export function UploadReportsPage() {
@@ -150,6 +152,7 @@ export function UploadReportsPage() {
             fileName: file.name, reportKind: 'meesho_order_payments', totalRows: r.totalRows,
             validRecords: r.validRecords, invalidCount: r.invalidRows.length,
             warnings: [...failed, ...r.warnings], meeshoFactsByMonth: r.factsByMonth,
+            meeshoTransactions: r.transactions,
           })
           return
         }

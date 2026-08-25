@@ -5,6 +5,7 @@ import { useFilterStore } from './filterStore'
 import type { ComboComponent, SkuMapping } from '@/data/skuMapping'
 import type { SkuMapWorkbookResult } from '@/data/normalize/skuMapWorkbook'
 import type { CostVersion } from '@/data/costVersions'
+import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type {
   AdsRecord,
   AmazonUsaPnlFacts,
@@ -59,6 +60,9 @@ export interface ReportImport {
   flipkartFacts?: FlipkartPnlFacts
   amazonUsaFacts?: AmazonUsaPnlFacts
   meeshoFactsByMonth?: MeeshoPnlFacts[]
+  /** The individual events behind those facts, stored for the review queue and
+   * the drill-down from a P&L line back to its source rows. */
+  meeshoTransactions?: MeeshoTransaction[]
 }
 
 export interface ImportProgress {
@@ -200,7 +204,7 @@ export const useDataStore = create<DataState>((set, get) => {
      * file (rows, then one facts call per month) downloaded everything three
      * or more times over, and a large file could not get through at all.
      */
-    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, meeshoFactsByMonth }) => {
+    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, meeshoFactsByMonth, meeshoTransactions }) => {
       const total = salesRecords.length + adsRecords.length
       set({ importProgress: { sent: 0, total } })
       try {
@@ -247,7 +251,11 @@ export const useDataStore = create<DataState>((set, get) => {
           monthsUpdated.push(amazonUsaFacts.month)
         }
         for (const facts of meeshoFactsByMonth ?? []) {
-          await api.post('/api/facts/meesho', { facts })
+          // The source rows ride along with the first month only: they are the
+          // whole file's events, not one month's, and both bases index the
+          // same rows by a different date.
+          const withRows = facts === meeshoFactsByMonth?.[0] ? meeshoTransactions : undefined
+          await api.post('/api/facts/meesho', { facts, transactions: withRows })
           monthsUpdated.push(facts.month)
         }
 

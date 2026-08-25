@@ -5,6 +5,7 @@ import { MisPage } from '@/modules/mis/MisPage'
 import { PnlPage } from '@/modules/pnl/PnlPage'
 import { FixedExpensesPage } from '@/modules/pnl/FixedExpensesPage'
 import { NetSalesReconciliationPage } from '@/modules/pnl/NetSalesReconciliationPage'
+import { TransactionReviewPage } from '@/modules/meesho/TransactionReviewPage'
 import { CostSheetPage } from '@/modules/products/CostSheetPage'
 import { InsightPage } from '@/modules/insight/InsightPage'
 import { ChannelDashboardPage } from '@/modules/channels/ChannelDashboardPage'
@@ -36,6 +37,7 @@ export const router = createHashRouter([
       { path: 'pnl', element: <PnlPage /> },
       { path: 'pnl/fixed-expenses', element: <FixedExpensesPage /> },
       { path: 'pnl/reconciliation', element: <NetSalesReconciliationPage /> },
+      { path: 'meesho/review', element: <TransactionReviewPage /> },
       { path: 'insight', element: <InsightPage /> },
       { path: 'channels/:channelId', element: <ChannelDashboardPage /> },
       { path: 'marketing/ads', element: <AdsOverviewPage /> },

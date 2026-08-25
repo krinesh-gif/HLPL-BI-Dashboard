@@ -249,6 +249,7 @@ export function normalizeMeeshoOrderPayments(
       eventType: classification.eventType,
       confidence: classification.confidence,
       classificationReason: classification.reason,
+      flagged: classification.confidence !== 'certain' || policy.alwaysReview,
       quantity,
       productGstPct: num(row, at(H.productGstPct)),
       listingPriceInclTax: num(row, at(H.listingPrice)),
@@ -279,7 +280,7 @@ export function normalizeMeeshoOrderPayments(
     }
     transactions.push(transaction)
 
-    if (classification.confidence !== 'certain' || policy.alwaysReview) {
+    if (transaction.flagged) {
       exceptions.push({
         transactionId, subOrderId, sourceRowNumber, orderDate, paymentDate: paymentDate ?? '',
         orderStatus, eventType: classification.eventType, confidence: classification.confidence,

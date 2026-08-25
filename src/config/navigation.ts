@@ -71,6 +71,7 @@ export const NAVIGATION: NavSection[] = [
   { label: 'SKU Mapping', path: '/products/sku-mapping' },
   { label: 'Fixed Expenses', path: '/pnl/fixed-expenses' },
   { label: 'Net Sales Reconciliation', path: '/pnl/reconciliation' },
+  { label: 'Meesho Transaction Review', path: '/meesho/review' },
   {
     label: 'Data',
     children: [

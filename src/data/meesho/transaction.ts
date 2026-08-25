@@ -33,6 +33,11 @@ export interface MeeshoTransaction {
   eventType: MeeshoEventType
   confidence: EventConfidence
   classificationReason: string
+  /** Whether this row is in the review queue. Stored rather than re-derived,
+   * so the importer's judgement and the review screen's filter cannot drift
+   * apart — a cancelled row is certain about what it is and still needs a
+   * person to confirm how it should be treated. */
+  flagged: boolean
 
   quantity: number
   productGstPct: number

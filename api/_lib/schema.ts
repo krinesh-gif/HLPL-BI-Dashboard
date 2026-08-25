@@ -197,6 +197,53 @@ BEGIN
   END IF;
 
   -- ---------------------------------------------------------------------------
+  -- The individual Meesho events behind the monthly facts above.
+  --
+  -- Kept out of the main state payload deliberately: one month is roughly two
+  -- thousand rows and the dashboard loads its whole dataset in one request, so
+  -- these are queried on demand instead. Keyed on the source file and row, so
+  -- re-uploading a file replaces exactly the rows it produced and a second file
+  -- covering overlapping orders does not silently double them.
+  -- ---------------------------------------------------------------------------
+  CREATE TABLE IF NOT EXISTS meesho_transactions (
+    source_file   TEXT NOT NULL,
+    source_row    INTEGER NOT NULL,
+    sub_order_id  TEXT NOT NULL,
+    sku           TEXT NOT NULL DEFAULT '',
+    order_date    TEXT NOT NULL DEFAULT '',
+    dispatch_date TEXT NOT NULL DEFAULT '',
+    payment_date  TEXT NOT NULL DEFAULT '',
+    order_status  TEXT NOT NULL DEFAULT '',
+    event_type    TEXT NOT NULL,
+    confidence    TEXT NOT NULL,
+    -- Set by the importer, not re-derived here: a cancelled row is certain
+    -- about what it is and still needs a person to confirm its treatment.
+    flagged       BOOLEAN NOT NULL DEFAULT false,
+    classification_reason TEXT NOT NULL DEFAULT '',
+    quantity      DOUBLE PRECISION NOT NULL DEFAULT 0,
+    sale_amount   DOUBLE PRECISION NOT NULL DEFAULT 0,
+    return_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+    settlement_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+    recovery      DOUBLE PRECISION NOT NULL DEFAULT 0,
+    recovery_reason TEXT NOT NULL DEFAULT '',
+    import_id     TEXT NOT NULL DEFAULT '',
+    -- The whole normalized transaction plus its untouched original row, so a
+    -- figure can always be traced to the cell it came from.
+    data          JSONB NOT NULL,
+    PRIMARY KEY (source_file, source_row)
+  );
+
+  -- Columns added after this table first shipped. CREATE TABLE IF NOT EXISTS
+  -- silently skips an existing table, so a new column has to be added
+  -- explicitly or it never reaches a database that already has the table.
+  ALTER TABLE meesho_transactions ADD COLUMN IF NOT EXISTS flagged BOOLEAN NOT NULL DEFAULT false;
+
+  CREATE INDEX IF NOT EXISTS meesho_transactions_order_month_idx ON meesho_transactions (left(order_date, 7));
+  CREATE INDEX IF NOT EXISTS meesho_transactions_payment_month_idx ON meesho_transactions (left(payment_date, 7));
+  CREATE INDEX IF NOT EXISTS meesho_transactions_confidence_idx ON meesho_transactions (confidence);
+  CREATE INDEX IF NOT EXISTS meesho_transactions_flagged_idx ON meesho_transactions (flagged) WHERE flagged;
+
+  -- ---------------------------------------------------------------------------
   -- Operational data entered outside marketplace reports.
   -- ---------------------------------------------------------------------------
   CREATE TABLE IF NOT EXISTS inventory_snapshots (
