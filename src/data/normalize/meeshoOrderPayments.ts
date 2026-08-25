@@ -145,6 +145,10 @@ export function normalizeMeeshoOrderPayments(
   skuMaster: SkuMaster[],
   importId: string,
   fileName = '',
+  /** The workbook's "Compensation and Recovery" sheet. Meesho charges
+   * subscription and programme fees here rather than against any order, so
+   * ignoring it silently understated the month's cost. */
+  recoverySheet?: RawSheet,
 ): MeeshoOrderPaymentsResult {
   const index = locateHeader(sheet, REQUIRED.map(normaliseHeader))
   if (!index) {
@@ -289,7 +293,9 @@ export function normalizeMeeshoOrderPayments(
     }
 
     // --- Aggregation ------------------------------------------------------
-    const netInclGst = saleAmount - Math.abs(returnAmount)
+    // Returns arrive negative, so the positive magnitude is the negated value.
+    const returnValue = -returnAmount
+    const netInclGst = saleAmount - returnValue
     const gstPct = num(row, at(H.productGstPct))
     const outputGst = gstPct > 0 ? netInclGst * (gstPct / (100 + gstPct)) : 0
 
@@ -305,27 +311,34 @@ export function normalizeMeeshoOrderPayments(
       ? unitCost * quantity * (1 - MEESHO_ASSUMPTIONS.customerReturnSaleablePct)
       : 0
 
-    const forwardShipping = Math.abs(transaction.shippingCharge)
-    const returnShipping = Math.abs(transaction.returnShippingCharge)
-    const otherFees =
-      Math.abs(transaction.fixedFee) + Math.abs(transaction.warehousingFee) +
-      Math.abs(transaction.returnPremium) + Math.abs(transaction.commission) +
-      Math.abs(transaction.goldPlatformFee) + Math.abs(transaction.mallPlatformFee) +
-      Math.abs(num(row, at(H.netOtherSupportCharges))) + Math.abs(transaction.gstOnOtherSupport) +
-      Math.abs(transaction.gstCompensation)
+    // Meesho writes a charge as a negative and a credit against that charge as
+    // a positive, so the cost is the negated signed total — not the total of
+    // the magnitudes. Taking magnitudes turned April's ₹147.66 of shipping
+    // credits into ₹147.66 of extra shipping cost, and the month read ₹295
+    // above the file on a line the owner reconciles directly.
+    const cost = (value: number): number => -value
 
-    const affiliate = classification.eventType === 'affiliate_fee' ? Math.abs(recovery) : 0
+    const forwardShipping = cost(transaction.shippingCharge)
+    const returnShipping = cost(transaction.returnShippingCharge)
+    const otherFees =
+      cost(transaction.fixedFee) + cost(transaction.warehousingFee) +
+      cost(transaction.returnPremium) + cost(transaction.commission) +
+      cost(transaction.goldPlatformFee) + cost(transaction.mallPlatformFee) +
+      cost(num(row, at(H.netOtherSupportCharges))) + cost(transaction.gstOnOtherSupport) +
+      cost(transaction.gstCompensation)
+
+    const affiliate = classification.eventType === 'affiliate_fee' ? cost(recovery) : 0
     const otherRecovery =
       classification.eventType === 'recovery' ||
       (classification.eventType === 'sale' && Math.abs(recovery) > 0 && !resolveRecoveryReason(recoveryReason).mapped)
-        ? Math.abs(recovery)
+        ? cost(recovery)
         : 0
     // An affiliate charge riding on a sale row still belongs to advertising.
     const affiliateOnSaleRow =
       classification.eventType !== 'affiliate_fee' &&
       Math.abs(recovery) > 0 &&
       resolveRecoveryReason(recoveryReason).mapped
-        ? Math.abs(recovery)
+        ? cost(recovery)
         : 0
 
     for (const [basis, month] of [
@@ -337,7 +350,7 @@ export function normalizeMeeshoOrderPayments(
 
       if (policy.entersRevenue) {
         f.grossSalesInclGst += saleAmount
-        f.salesReturnsInclGst += Math.abs(returnAmount)
+        f.salesReturnsInclGst += returnValue
         f.outputGstOnSales += outputGst
       }
       if (policy.entersCogs) {
@@ -355,11 +368,11 @@ export function normalizeMeeshoOrderPayments(
 
       f.affiliateFee += affiliate + affiliateOnSaleRow
       f.recovery += otherRecovery
-      f.compensation += Math.abs(compensation)
-      f.claims += Math.abs(claims)
+      f.compensation += compensation
+      f.claims += claims
 
-      f.tcs += Math.abs(transaction.tcs)
-      f.tds += Math.abs(transaction.tds)
+      f.tcs += cost(transaction.tcs)
+      f.tds += cost(transaction.tds)
       f.netSettlementPerFile += settlementAmount
 
       if (classification.eventType === 'unclassified' || classification.eventType === 'settlement_adjustment') {
@@ -405,6 +418,7 @@ export function normalizeMeeshoOrderPayments(
   })
 
   applyAdsSheet(adsSheet, factsFor)
+  const platformRecoveryRows = applyPlatformRecoverySheet(recoverySheet, factsFor)
 
   const warnings: string[] = []
   if (unknownSkuCount > 0) {
@@ -415,6 +429,9 @@ export function normalizeMeeshoOrderPayments(
   }
   if (exceptions.length > 0) {
     warnings.push(`${exceptions.length} row(s) need a look before these figures are relied on. Open Meesho ▸ Transaction Review.`)
+  }
+  if (platformRecoveryRows > 0) {
+    warnings.push(`${platformRecoveryRows} platform recovery / compensation entry(ies) read from the Compensation and Recovery sheet. These are charged outside any order.`)
   }
   if (unmappedColumns.length > 0) {
     warnings.push(`This file carries ${unmappedColumns.length} column(s) the app does not map: ${unmappedColumns.join(', ')}. They are stored against each transaction but are in no P&L line yet.`)
@@ -483,6 +500,44 @@ function applyAdsSheet(
       f.gstOnAds += gst
     }
   }
+}
+
+/**
+ * Meesho's platform recovery and compensation sheet.
+ *
+ * Subscription and programme charges land here, against a date rather than an
+ * order — April's file carries one SELLER_INSIGHTS recovery of ₹942.82. It is
+ * real money leaving the account and belongs in the month's cost, but because
+ * it hangs off no order it was being dropped entirely.
+ *
+ * The sheet reads "No data is available for these dates." when there is
+ * nothing, and that line must never be read as a transaction.
+ */
+function applyPlatformRecoverySheet(
+  sheet: RawSheet | undefined,
+  factsFor: (basis: MeeshoPnlFacts['basis'], month: string) => MeeshoPnlFacts,
+): number {
+  if (!sheet) return 0
+  const index = locateHeader(sheet, [normaliseHeader('Date'), normaliseHeader('Program Name')])
+  if (!index) return 0
+
+  const dateAt = columnAt(index, 'Date')
+  const amountAt = columnAt(index, 'Amount (inc GST) INR')
+  if (amountAt < 0) return 0
+
+  let applied = 0
+  for (const row of sheet.slice(index.dataStartRow)) {
+    const date = isoDate(text(row, dateAt))
+    if (!date) continue // the "No data is available" line, and any blank row
+    const amount = -num(row, amountAt) // charged negative, held as a positive cost
+    if (amount === 0) continue
+    const month = toMonthKey(date)
+    for (const basis of ['order', 'settlement'] as const) {
+      factsFor(basis, month).platformRecoverySubscriptions += amount
+    }
+    applied++
+  }
+  return applied
 }
 
 /** The spec's post-import assertions, reported whether or not they passed. */

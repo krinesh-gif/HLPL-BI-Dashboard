@@ -144,7 +144,10 @@ export function UploadReportsPage() {
         }
 
         if (detectMeeshoOrderPaymentsSheet(sheets['Order Payments'])) {
-          const r = normalizeMeeshoOrderPayments(sheets['Order Payments'], sheets['Ads Cost'], skuMaster, importId, file.name)
+          const r = normalizeMeeshoOrderPayments(
+            sheets['Order Payments'], sheets['Ads Cost'], skuMaster, importId, file.name,
+            sheets['Compensation and Recovery'],
+          )
           // Failed post-import assertions go in front of the owner before the
           // figures are relied on, not into a log nobody reads.
           const failed = r.checks.filter((c) => !c.passed).map((c) => `${c.name}: ${c.detail}`)

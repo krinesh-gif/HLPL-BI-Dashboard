@@ -49,8 +49,9 @@ export const MEESHO_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm1', label: 'CONTRIBUTION MARGIN 1 (after marketplace charges)', section: 'MEESHO MARKETPLACE CHARGES', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'MEESHO MARKETPLACE CHARGES', kind: 'percent' },
 
-  { key: 'adsSpend', label: 'Meesho Ads — gross spend (ex-GST)', section: 'ADVERTISING', kind: 'input' },
+  { key: 'adsSpend', label: 'Meesho Ads — spend (ex-GST)', section: 'ADVERTISING', kind: 'input' },
   { key: 'adCredits', label: 'Ad credits / waivers / discounts', section: 'ADVERTISING', kind: 'input' },
+  { key: 'adsGst', label: 'GST on Meesho Ads', section: 'ADVERTISING', kind: 'input' },
   { key: 'affiliateFee', label: 'Affiliate / referral commission', section: 'ADVERTISING', kind: 'input' },
   { key: 'totalAdvertising', label: 'Total Advertising', section: 'ADVERTISING', kind: 'subtotal' },
   { key: 'cm2', label: 'CONTRIBUTION MARGIN 2 (after advertising)', section: 'ADVERTISING', kind: 'subtotal' },
@@ -114,7 +115,11 @@ export function computeMeeshoPnl(facts: MeeshoPnlFacts, overheads = 0): NativeLi
   // Affiliate commission sits here rather than among marketplace fees: it is
   // paid to acquire a customer, so hiding it in fees understates what demand
   // costs and overstates CM1.
-  const totalAdvertising = facts.adsSpendExGst - facts.adCredits + facts.affiliateFee
+  //
+  // Advertising is carried including GST, which is the Total Ads Cost column
+  // the business reconciles the month against. Spend and tax are shown on
+  // their own lines above so the split stays visible.
+  const totalAdvertising = facts.adsSpendExGst - facts.adCredits + facts.gstOnAds + facts.affiliateFee
   const cm2 = cm1 - totalAdvertising
 
   // Charged per shipment, not per unit: one parcel takes one mailer and one
@@ -130,7 +135,8 @@ export function computeMeeshoPnl(facts: MeeshoPnlFacts, overheads = 0): NativeLi
 
   const ebitda = cm4 - overheads
 
-  const adsInclGst = facts.adsSpendExGst * (1 + MEESHO_ASSUMPTIONS.gstOnAdvertisingPct)
+  // The tax is read from the file rather than re-derived at an assumed rate.
+  const adsInclGst = facts.adsSpendExGst - facts.adCredits + facts.gstOnAds
   const expectedBankCredit =
     facts.netSettlementPerFile - adsInclGst - facts.platformRecoverySubscriptions
 
@@ -157,6 +163,7 @@ export function computeMeeshoPnl(facts: MeeshoPnlFacts, overheads = 0): NativeLi
 
     adsSpend: -facts.adsSpendExGst,
     adCredits: facts.adCredits,
+    adsGst: -facts.gstOnAds,
     affiliateFee: -facts.affiliateFee,
     totalAdvertising: -totalAdvertising,
     cm2,
@@ -248,7 +255,7 @@ export function meeshoToCanonicalBuckets(facts: MeeshoPnlFacts): PnlLineValues {
     returnCharges: 0,
     otherMarketplaceCharges:
       facts.recovery + facts.platformRecoverySubscriptions - facts.compensation - facts.claims,
-    ads: facts.adsSpendExGst - facts.adCredits + facts.affiliateFee,
+    ads: facts.adsSpendExGst - facts.adCredits + facts.gstOnAds + facts.affiliateFee,
     performanceMarketing: 0,
     otherMarketing: 0,
   }

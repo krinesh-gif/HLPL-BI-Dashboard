@@ -276,24 +276,30 @@ describe('rows that are not orders', () => {
     expect(f.unitsReturned).toBe(2)
   })
 
-  it('ships an exchange without booking it as a second sale', () => {
-    // A replacement parcel costs stock and freight and earns nothing new;
-    // recognising its sale amount would count one payment twice.
+  it('carries an exchange in Gross Sales but still flags it', () => {
+    // Gross Sales is the file's Total Sale Amount column, which is what the
+    // business reconciles against, so the row belongs in it. Whether a
+    // replacement against an already-counted order should earn revenue is a
+    // judgement — so it stays visible in the review queue rather than being
+    // decided silently in either direction.
     const exchange = dataRow({ 0: 'SUB7', 7: 'Exchange', 15: 190.6, 27: -175 })
-    const f = factsOf(normalizeMeeshoOrderPayments([['g'], realHeaderRow(), [''], exchange], undefined, skuMaster, 'i'), 'order', '2026-07')
-    expect(f.grossSalesInclGst).toBe(0)
+    const r = normalizeMeeshoOrderPayments([['g'], realHeaderRow(), [''], exchange], undefined, skuMaster, 'i')
+    const f = factsOf(r, 'order', '2026-07')
+    expect(f.grossSalesInclGst).toBe(190.6)
     expect(f.subOrdersDispatched).toBe(1)
     expect(f.returnShipping).toBe(175)
+    expect(r.exceptions.map((e) => e.eventType)).toContain('exchange')
   })
 
-  it('gives a cancelled order no revenue and no shipment', () => {
+  it('carries a cancelled order in Gross Sales but ships and costs nothing', () => {
     const cancelled = dataRow({ 0: 'SUB8', 7: 'Cancelled', 15: 323, 13: 279.36 })
-    const f = factsOf(normalizeMeeshoOrderPayments([['g'], realHeaderRow(), [''], cancelled], undefined, skuMaster, 'i'), 'order', '2026-07')
-    expect(f.grossSalesInclGst).toBe(0)
-    expect(f.subOrdersDispatched).toBe(0)
-    // The settlement is still real money and is still carried, so the
-    // reconciliation can show it rather than it vanishing.
+    const r = normalizeMeeshoOrderPayments([['g'], realHeaderRow(), [''], cancelled], undefined, skuMaster, 'i')
+    const f = factsOf(r, 'order', '2026-07')
+    expect(f.grossSalesInclGst).toBe(323)
+    expect(f.subOrdersDispatched).toBe(0)   // no parcel moved
+    expect(f.cogsUnitsSold).toBe(0)         // and no stock left the shelf
     expect(f.netSettlementPerFile).toBe(279.36)
+    expect(r.exceptions.map((e) => e.eventType)).toContain('cancellation')
   })
 
   it('sends the judgement calls to review rather than deciding silently', () => {
@@ -306,9 +312,73 @@ describe('rows that are not orders', () => {
     const r = normalizeMeeshoOrderPayments([['g'], realHeaderRow(), [''], ...rows], undefined, skuMaster, 'i')
     expect(r.exceptions).toHaveLength(3)
     expect(r.exceptions.map((e) => e.eventType).sort()).toEqual(['cancellation', 'exchange', 'unclassified'])
-    // An unrecognised status must never become revenue on its own.
+    // A status this app does not recognise still ships nothing and costs
+    // nothing until someone says what it is.
     const f = r.factsByMonth.find((x) => x.basis === 'order')!
-    expect(f.grossSalesInclGst).toBe(279)
+    expect(f.subOrdersDispatched).toBe(2) // the ordinary sale and the exchange
+  })
+})
+
+/**
+ * The three columns the business reconciles the dashboard against by hand:
+ * Total Sale Amount summed by order-date month, and the shipping charge.
+ * If either drifts, the whole statement is untrusted regardless of what the
+ * lines below it do.
+ */
+describe('tying to the file the owner checks against', () => {
+  const factsOf = (r: ReturnType<typeof normalizeMeeshoOrderPayments>, basis: 'order' | 'settlement', month: string) =>
+    r.factsByMonth.find((f) => f.basis === basis && f.month === month)!
+
+  it('Gross Sales is the sale-amount column, whatever the row’s status', () => {
+    const rows = [
+      dataRow({ 0: 'A', 7: 'Delivered', 15: 279 }),
+      dataRow({ 0: 'B', 7: 'RTO', 15: 199, 16: -199 }),
+      dataRow({ 0: 'C', 7: 'Cancelled', 15: 323 }),
+      dataRow({ 0: 'D', 7: 'Exchange', 15: 190.6 }),
+      dataRow({ 0: 'E', 7: '', 15: 0, 39: -28.25, 42: 'Affiliate Fee' }),
+    ]
+    const f = factsOf(normalizeMeeshoOrderPayments([['g'], realHeaderRow(), [''], ...rows], undefined, skuMaster, 'i'), 'order', '2026-07')
+    expect(f.grossSalesInclGst).toBeCloseTo(279 + 199 + 323 + 190.6, 6)
+  })
+
+  it('a shipping credit reduces shipping cost instead of adding to it', () => {
+    // Meesho writes a charge negative and a credit against it positive. Summing
+    // magnitudes turned April's ₹147.66 of credits into ₹147.66 of extra cost,
+    // and the month read ₹295 above the file across the two months in it.
+    const charged = dataRow({ 0: 'A', 29: -100 })
+    const credited = dataRow({ 0: 'B', 29: 40 })
+    const f = factsOf(normalizeMeeshoOrderPayments([['g'], realHeaderRow(), [''], charged, credited], undefined, skuMaster, 'i'), 'order', '2026-07')
+    expect(f.forwardShipping).toBe(60)
+  })
+})
+
+describe('the Compensation and Recovery sheet', () => {
+  const recoverySheet = (rows: (string | number)[][]) => [
+    ['Platform Recovery & Compensation'],
+    ['Date', 'Program Name', 'Reason', 'Amount (inc GST) INR'],
+    [''],
+    ...rows,
+  ]
+
+  it('charges a subscription recovery that hangs off no order', () => {
+    // April's file carries one SELLER_INSIGHTS recovery of ₹942.82. It never
+    // appears against an order, so it was being dropped entirely.
+    const r = normalizeMeeshoOrderPayments(
+      [['g'], realHeaderRow(), [''], dataRow()], undefined, skuMaster, 'i', 'f.xlsx',
+      recoverySheet([['2026-07-28', 'SELLER_INSIGHTS', 'Recovery for subscribed sellers', -942.82]]),
+    )
+    const f = r.factsByMonth.find((x) => x.basis === 'order' && x.month === '2026-07')!
+    expect(f.platformRecoverySubscriptions).toBe(942.82)
+    expect(r.warnings.some((w) => w.includes('platform recovery'))).toBe(true)
+  })
+
+  it('does not read the sheet’s “no data” line as a transaction', () => {
+    const r = normalizeMeeshoOrderPayments(
+      [['g'], realHeaderRow(), [''], dataRow()], undefined, skuMaster, 'i', 'f.xlsx',
+      recoverySheet([['No data is available for these dates.']]),
+    )
+    const f = r.factsByMonth.find((x) => x.basis === 'order' && x.month === '2026-07')!
+    expect(f.platformRecoverySubscriptions).toBe(0)
   })
 })
 
