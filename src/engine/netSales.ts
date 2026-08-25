@@ -172,7 +172,7 @@ export function settlementBasisNetSales(
     // Meesho now carries both bases. Which one is authoritative is the
     // caller's choice; order basis is the default because it is what a
     // month's trading is judged on.
-    const f = facts.meeshoFacts.find((x) => x.month === month && x.basis === meeshoBasis && x.schemaVersion === 2)
+    const f = facts.meeshoFacts.find((x) => x.month === month && x.basis === meeshoBasis && x.schemaVersion === 3)
     if (!f) return null
     const netSales = f.grossSalesInclGst - f.salesReturnsInclGst - f.outputGstOnSales
     return {

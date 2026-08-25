@@ -225,7 +225,7 @@ export type PnlBasis = 'order' | 'settlement'
  * re-upload rather than being rendered as if it were complete.
  */
 export interface MeeshoPnlFacts {
-  schemaVersion: 2
+  schemaVersion: 3
   month: string // yyyy-mm
   basis: PnlBasis
 
@@ -256,9 +256,16 @@ export interface MeeshoPnlFacts {
   adsSpendExGst: number
   adCredits: number
 
+  // --- Advertising, continued ----------------------------------------------
+  /** Affiliate and referral commission Meesho recovers against orders. Held
+   * apart from `recovery` because it buys demand: it belongs with advertising,
+   * not with marketplace fees, and never inside COGS. */
+  affiliateFee: number
+
   // --- Platform adjustments ------------------------------------------------
   compensation: number
   claims: number
+  /** Recoveries other than affiliate/referral. */
   recovery: number
   /** Subscription and programme fees Meesho recovers outside order rows. */
   platformRecoverySubscriptions: number
@@ -277,6 +284,14 @@ export interface MeeshoPnlFacts {
   gstOnAds: number
   /** Meesho's own net settlement total for the month, for the bank bridge. */
   netSettlementPerFile: number
+
+  // --- Held out of the figures above ---------------------------------------
+  /** Settlement value on rows the importer could not confidently classify.
+   * Never folded into revenue or cost; carried so the reconciliation can show
+   * exactly how much money is sitting unexplained. */
+  unclassifiedSettlement: number
+  /** Rows behind `unclassifiedSettlement`, for the review queue's count. */
+  unclassifiedRows: number
 }
 
 // ---------------------------------------------------------------------------

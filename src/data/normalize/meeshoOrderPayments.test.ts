@@ -20,7 +20,8 @@ function realHeaderRow(): (string | number)[] {
   h[24] = 'Meesho mall platform fee (Incl. GST)'; h[25] = 'Fixed Fee (Incl. GST)'; h[26] = 'Warehousing fee (Incl. GST)'
   h[27] = 'Return Shipping Charge (Incl. GST)'; h[28] = 'GST Compensation (PRP Shipping)'; h[29] = 'Shipping Charge (Incl. GST)'
   h[32] = 'Net Other Support Service Charges (Excl. GST)'; h[33] = 'GST on Net Other Support Service Charges'
-  h[34] = 'TCS'; h[36] = 'TDS'; h[37] = 'Compensation'; h[38] = 'Claims'; h[39] = 'Recovery'
+  h[34] = 'TCS'; h[35] = 'TDS Rate %'; h[36] = 'TDS'; h[37] = 'Compensation'; h[38] = 'Claims'; h[39] = 'Recovery'
+  h[40] = 'Compensation Reason'; h[41] = 'Claims Reason'; h[42] = 'Recovery Reason'
   return h
 }
 
@@ -99,7 +100,7 @@ describe('one upload, two bases', () => {
   })
 
   it('stamps a schema version so an older stored shape cannot be misread', () => {
-    for (const f of result.factsByMonth) expect(f.schemaVersion).toBe(2)
+    for (const f of result.factsByMonth) expect(f.schemaVersion).toBe(3)
   })
 
   it('leaves a row with no payment date out of the settlement basis only', () => {
@@ -188,12 +189,171 @@ describe('returned stock', () => {
 })
 
 describe('advertising', () => {
+  /** The Ads Cost sheet as the real workbook lays it out: a title row, the
+   * header, a formula-key row, then data. */
+  const adsSheet = (rows: (string | number)[][]): RawSheet => [
+    ['Ads Cost'],
+    ['Deduction Duration', 'Deduction Date', 'Campaign ID', 'Ad Cost', 'Credits / Waivers / Discounts',
+     'Ad Cost incl. Credits/Waivers/Discounts', 'GST', 'Total Ads Cost'],
+    ['', '', '', 'A', 'B', '(A + B)', '', ''],
+    ...rows,
+  ]
+
   it('lands in both bases on the month Meesho deducted it', () => {
     // Meesho reports ad spend only by deduction date, so spreading it across
     // order months would invent a distribution the report does not carry.
-    const ads: RawSheet = [['Ads'], ['Date'], [''], ['2026-07-31', '', '', '', '', '', '', 5000]]
+    const ads = adsSheet([['2026-07-29', '2026-07-31', '169618', 5000, 0, -5000, -900, -5900]])
     const r = normalizeMeeshoOrderPayments(sheet, ads, skuMaster, 'i')
     expect(factsFor(r, 'order', '2026-07').adsSpendExGst).toBe(5000)
     expect(factsFor(r, 'settlement', '2026-07').adsSpendExGst).toBe(5000)
+  })
+
+  it('takes spend ex-GST and the tax separately, never the two added together', () => {
+    // The Total Ads Cost column is spend plus GST. Reading it as spend
+    // overstated August advertising by ₹5,099 on ₹28,329 and then added
+    // another 18% of tax on top of a figure that already contained it.
+    const ads = adsSheet([['2026-07-29', '2026-07-31', '169618', 5000, 0, -5000, -900, -5900]])
+    const f = factsFor(normalizeMeeshoOrderPayments(sheet, ads, skuMaster, 'i'), 'order', '2026-07')
+    expect(f.adsSpendExGst).toBe(5000)
+    expect(f.gstOnAds).toBe(900)
+  })
+
+  it('uses the deduction date, not the campaign duration, to pick the month', () => {
+    // A campaign running on 31 July is deducted on 2 August; the money left
+    // the account in August.
+    const ads = adsSheet([['2026-07-31', '2026-08-02', '169618', 1000, 0, -1000, -180, -1180]])
+    const r = normalizeMeeshoOrderPayments(sheet, ads, skuMaster, 'i')
+    expect(factsFor(r, 'order', '2026-08').adsSpendExGst).toBe(1000)
+    expect(r.factsByMonth.find((x) => x.month === '2026-07' && x.basis === 'order')?.adsSpendExGst ?? 0).toBe(0)
+  })
+})
+
+/**
+ * The report is a ledger of financial events, not a list of orders.
+ *
+ * Every case below was found in the company's real August payment file. Before
+ * these fixes that file produced 60 phantom shipments and 61 phantom units in
+ * August, each carrying invented cost of goods and packaging cost, because
+ * every row was read as an order.
+ */
+describe('rows that are not orders', () => {
+  const factsOf = (r: ReturnType<typeof normalizeMeeshoOrderPayments>, basis: 'order' | 'settlement', month: string) =>
+    r.factsByMonth.find((f) => f.basis === basis && f.month === month)!
+
+  it('does not turn a blank-status affiliate fee into a shipment', () => {
+    // 145 rows of the real file: blank status, zero sale, a negative recovery
+    // with the reason "Affiliate Fee". Each was being counted as delivered.
+    const affiliate = dataRow({ 0: 'SUB2', 7: '', 10: 1, 13: -28.25, 15: 0, 39: -28.25, 42: 'Affiliate Fee' })
+    const r = normalizeMeeshoOrderPayments([['g'], realHeaderRow(), [''], dataRow(), affiliate], undefined, skuMaster, 'i')
+    const f = factsOf(r, 'order', '2026-07')
+
+    expect(f.subOrdersDispatched).toBe(1)   // the real order only
+    expect(f.unitsDispatched).toBe(2)
+    expect(f.grossSalesInclGst).toBe(279)   // the fee row adds no revenue
+    expect(f.affiliateFee).toBe(28.25)      // and is advertising, not a fee
+    expect(f.recovery).toBe(0)
+  })
+
+  it('charges no cost of goods against a fee row', () => {
+    // The clearest symptom: a zero-sale fee row was costed as if a product
+    // had shipped, at whatever the Product Master said that SKU cost.
+    const affiliate = dataRow({ 0: 'SUB2', 7: '', 10: 1, 13: -28.25, 15: 0, 39: -28.25, 42: 'Affiliate Fee' })
+    const withFee = normalizeMeeshoOrderPayments([['g'], realHeaderRow(), [''], dataRow(), affiliate], undefined, skuMaster, 'i')
+    const without = normalizeMeeshoOrderPayments([['g'], realHeaderRow(), [''], dataRow()], undefined, skuMaster, 'i')
+    expect(factsOf(withFee, 'order', '2026-07').cogsUnitsSold).toBe(factsOf(without, 'order', '2026-07').cogsUnitsSold)
+  })
+
+  it('counts one dispatch when a sub-order appears as both a sale and a return', () => {
+    // 145 sub-orders in the real file appear twice. The return is a reversal
+    // of a shipment already counted, not a second parcel.
+    const sale = dataRow({ 0: 'SUB9', 7: 'Shipped', 15: 160, 16: 0 })
+    const ret = dataRow({ 0: 'SUB9', 7: 'Return', 15: 0, 16: -160, 13: -251.18, 12: '2026-08-06' })
+    const f = factsOf(normalizeMeeshoOrderPayments([['g'], realHeaderRow(), [''], sale, ret], undefined, skuMaster, 'i'), 'order', '2026-07')
+
+    expect(f.subOrdersDispatched).toBe(1)
+    expect(f.grossSalesInclGst).toBe(160)
+    expect(f.salesReturnsInclGst).toBe(160)   // fully reversed
+    expect(f.unitsReturned).toBe(2)
+  })
+
+  it('ships an exchange without booking it as a second sale', () => {
+    // A replacement parcel costs stock and freight and earns nothing new;
+    // recognising its sale amount would count one payment twice.
+    const exchange = dataRow({ 0: 'SUB7', 7: 'Exchange', 15: 190.6, 27: -175 })
+    const f = factsOf(normalizeMeeshoOrderPayments([['g'], realHeaderRow(), [''], exchange], undefined, skuMaster, 'i'), 'order', '2026-07')
+    expect(f.grossSalesInclGst).toBe(0)
+    expect(f.subOrdersDispatched).toBe(1)
+    expect(f.returnShipping).toBe(175)
+  })
+
+  it('gives a cancelled order no revenue and no shipment', () => {
+    const cancelled = dataRow({ 0: 'SUB8', 7: 'Cancelled', 15: 323, 13: 279.36 })
+    const f = factsOf(normalizeMeeshoOrderPayments([['g'], realHeaderRow(), [''], cancelled], undefined, skuMaster, 'i'), 'order', '2026-07')
+    expect(f.grossSalesInclGst).toBe(0)
+    expect(f.subOrdersDispatched).toBe(0)
+    // The settlement is still real money and is still carried, so the
+    // reconciliation can show it rather than it vanishing.
+    expect(f.netSettlementPerFile).toBe(279.36)
+  })
+
+  it('sends the judgement calls to review rather than deciding silently', () => {
+    const rows = [
+      dataRow(),
+      dataRow({ 0: 'SUB7', 7: 'Exchange', 15: 190.6 }),
+      dataRow({ 0: 'SUB8', 7: 'Cancelled', 15: 323 }),
+      dataRow({ 0: 'SUB9', 7: 'Teleported', 15: 500 }),
+    ]
+    const r = normalizeMeeshoOrderPayments([['g'], realHeaderRow(), [''], ...rows], undefined, skuMaster, 'i')
+    expect(r.exceptions).toHaveLength(3)
+    expect(r.exceptions.map((e) => e.eventType).sort()).toEqual(['cancellation', 'exchange', 'unclassified'])
+    // An unrecognised status must never become revenue on its own.
+    const f = r.factsByMonth.find((x) => x.basis === 'order')!
+    expect(f.grossSalesInclGst).toBe(279)
+  })
+})
+
+describe('reading the sheet', () => {
+  it('finds columns by name, so an inserted column cannot shift the P&L', () => {
+    const header = realHeaderRow()
+    const row = dataRow()
+    header.splice(2, 0, 'Some New Meesho Column')
+    row.splice(2, 0, 'x')
+    const r = normalizeMeeshoOrderPayments([['g'], header, [''], row], undefined, skuMaster, 'i')
+    const f = r.factsByMonth.find((x) => x.basis === 'order')!
+    expect(f.grossSalesInclGst).toBe(279)
+    expect(r.unmappedColumns).toContain('Some New Meesho Column')
+  })
+
+  it('reports a column it does not recognise instead of dropping it', () => {
+    const header = realHeaderRow()
+    header[43] = 'Brand New Fee (Incl. GST)'
+    const r = normalizeMeeshoOrderPayments([['g'], header, [''], dataRow()], undefined, skuMaster, 'i')
+    expect(r.unmappedColumns).toContain('Brand New Fee (Incl. GST)')
+    expect(r.warnings.some((w) => w.includes('does not map'))).toBe(true)
+  })
+
+  it('keeps the sub-order as text, so a long numeric id is not rounded', () => {
+    const r = normalizeMeeshoOrderPayments(
+      [['g'], realHeaderRow(), [''], dataRow({ 0: '307978112155113600_1' })], undefined, skuMaster, 'i',
+    )
+    expect(r.transactions[0].subOrderId).toBe('307978112155113600_1')
+  })
+
+  it('keeps the original row against each transaction for audit', () => {
+    const r = normalizeMeeshoOrderPayments([['g'], realHeaderRow(), [''], dataRow()], undefined, skuMaster, 'i', 'August 2026.xlsx')
+    const t = r.transactions[0]
+    expect(t.sourceFile).toBe('August 2026.xlsx')
+    expect(t.sourceSheet).toBe('Order Payments')
+    expect(t.sourceRowNumber).toBe(4)
+    expect(t.raw['Total Sale Amount (Incl. Shipping & GST)']).toBe('279')
+  })
+
+  it('does not shift a late-evening order into the previous month', () => {
+    // A 31 July 23:40 order parsed through a timezone would land in June or
+    // August depending on the server, moving revenue between closed months.
+    const r = normalizeMeeshoOrderPayments(
+      [['g'], realHeaderRow(), [''], dataRow({ 1: '2026-07-31 23:40:00' })], undefined, skuMaster, 'i',
+    )
+    expect(r.factsByMonth.some((f) => f.basis === 'order' && f.month === '2026-07')).toBe(true)
   })
 })

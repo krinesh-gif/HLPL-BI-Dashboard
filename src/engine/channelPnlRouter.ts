@@ -216,7 +216,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
     // rather than rendered as if it were complete — a half-read P&L is worse
     // than an obviously missing one.
     const imported = inputs.facts.meeshoFacts.find(
-      (f) => f.month === month && f.basis === basis && f.schemaVersion === 2,
+      (f) => f.month === month && f.basis === basis && f.schemaVersion === 3,
     )
     if (imported) {
       // COGS is recomputed from order rows at the month's effective cost

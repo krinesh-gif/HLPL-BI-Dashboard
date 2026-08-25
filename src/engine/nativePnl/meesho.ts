@@ -51,6 +51,7 @@ export const MEESHO_LINE_DEFS: NativeLineDef[] = [
 
   { key: 'adsSpend', label: 'Meesho Ads — gross spend (ex-GST)', section: 'ADVERTISING', kind: 'input' },
   { key: 'adCredits', label: 'Ad credits / waivers / discounts', section: 'ADVERTISING', kind: 'input' },
+  { key: 'affiliateFee', label: 'Affiliate / referral commission', section: 'ADVERTISING', kind: 'input' },
   { key: 'totalAdvertising', label: 'Total Advertising', section: 'ADVERTISING', kind: 'subtotal' },
   { key: 'cm2', label: 'CONTRIBUTION MARGIN 2 (after advertising)', section: 'ADVERTISING', kind: 'subtotal' },
   { key: 'cm2Pct', label: 'CM2 %', section: 'ADVERTISING', kind: 'percent' },
@@ -110,7 +111,10 @@ export function computeMeeshoPnl(facts: MeeshoPnlFacts, overheads = 0): NativeLi
   const totalMarketplaceCharges = facts.forwardShipping + facts.returnShipping + facts.otherMarketplaceFees
   const cm1 = grossProfit - totalMarketplaceCharges
 
-  const totalAdvertising = facts.adsSpendExGst - facts.adCredits
+  // Affiliate commission sits here rather than among marketplace fees: it is
+  // paid to acquire a customer, so hiding it in fees understates what demand
+  // costs and overstates CM1.
+  const totalAdvertising = facts.adsSpendExGst - facts.adCredits + facts.affiliateFee
   const cm2 = cm1 - totalAdvertising
 
   // Charged per shipment, not per unit: one parcel takes one mailer and one
@@ -153,6 +157,7 @@ export function computeMeeshoPnl(facts: MeeshoPnlFacts, overheads = 0): NativeLi
 
     adsSpend: -facts.adsSpendExGst,
     adCredits: facts.adCredits,
+    affiliateFee: -facts.affiliateFee,
     totalAdvertising: -totalAdvertising,
     cm2,
     cm2Pct: pct(cm2, netRevenue),
@@ -243,7 +248,7 @@ export function meeshoToCanonicalBuckets(facts: MeeshoPnlFacts): PnlLineValues {
     returnCharges: 0,
     otherMarketplaceCharges:
       facts.recovery + facts.platformRecoverySubscriptions - facts.compensation - facts.claims,
-    ads: facts.adsSpendExGst - facts.adCredits,
+    ads: facts.adsSpendExGst - facts.adCredits + facts.affiliateFee,
     performanceMarketing: 0,
     otherMarketing: 0,
   }

@@ -142,10 +142,14 @@ export function UploadReportsPage() {
         }
 
         if (detectMeeshoOrderPaymentsSheet(sheets['Order Payments'])) {
-          const r = normalizeMeeshoOrderPayments(sheets['Order Payments'], sheets['Ads Cost'], skuMaster, importId)
+          const r = normalizeMeeshoOrderPayments(sheets['Order Payments'], sheets['Ads Cost'], skuMaster, importId, file.name)
+          // Failed post-import assertions go in front of the owner before the
+          // figures are relied on, not into a log nobody reads.
+          const failed = r.checks.filter((c) => !c.passed).map((c) => `${c.name}: ${c.detail}`)
           await showPreview({
             fileName: file.name, reportKind: 'meesho_order_payments', totalRows: r.totalRows,
-            validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings, meeshoFactsByMonth: r.factsByMonth,
+            validRecords: r.validRecords, invalidCount: r.invalidRows.length,
+            warnings: [...failed, ...r.warnings], meeshoFactsByMonth: r.factsByMonth,
           })
           return
         }
