@@ -390,6 +390,9 @@ export function normalizeMeeshoOrderPayments(
     if (policy.entersRevenue || policy.entersVolume) {
       validRecords.push({
         orderId: subOrderId,
+        // The payment batch that settled this event: what makes a sale row and
+        // its return row two rows rather than one.
+        lineId: transaction.transactionRef,
         orderDate,
         channel: 'meesho',
         marketplace: 'meesho',

@@ -9,9 +9,18 @@
  */
 import type { AdsRecord, CanonicalSalesRecord } from '../models'
 
-/** Channel + Order ID + SKU + Order Date uniquely identifies a sales line. */
-export function recordKey(r: Pick<CanonicalSalesRecord, 'channel' | 'orderId' | 'sku' | 'orderDate'>): string {
-  return `${r.channel}|${r.orderId}|${r.sku}|${r.orderDate}`
+/**
+ * Channel + Order ID + SKU + Order Date identifies a sales line, plus the
+ * line's own id where the marketplace reports several lines against one order.
+ *
+ * Meesho files a sale and its later return under the same sub-order, the same
+ * SKU and the same order date. Without the line id those two rows produced the
+ * same key, and the insert's ON CONFLICT DO NOTHING kept whichever arrived
+ * first and dropped the other — so a month's order rows were a lossy, arbitrary
+ * subset of the file, and which half survived depended on upload order.
+ */
+export function recordKey(r: Pick<CanonicalSalesRecord, 'channel' | 'orderId' | 'sku' | 'orderDate' | 'lineId'>): string {
+  return `${r.channel}|${r.orderId}|${r.sku}|${r.orderDate}|${r.lineId ?? ''}`
 }
 
 /** Channel + Campaign + Date + SKU uniquely identifies one ads report row

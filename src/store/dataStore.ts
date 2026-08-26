@@ -129,7 +129,7 @@ interface DataState extends SharedDataset, MappingTablesState {
    * files alone. Uploads add to what is there, which is right when a month
    * arrives across several files — but it leaves no way back when what is
    * stored is wrong. */
-  clearMeeshoData: () => Promise<number>
+  clearMeeshoData: () => Promise<{ clearedEvents: number; clearedOrderRows: number }>
   /** Saves effective-dated costs. Existing months are left alone; only the
    * months these versions name are affected. */
   saveCostVersions: (versions: CostVersion[]) => Promise<void>
@@ -287,9 +287,9 @@ export const useDataStore = create<DataState>((set, get) => {
       writeThen(() => api.post('/api/sku-map', { mappings, comboComponents, replaceRecipesFor })),
 
     clearMeeshoData: async () => {
-      const result = await api.delete<{ cleared: number }>('/api/facts/meesho')
+      const result = await api.delete<{ clearedEvents: number; clearedOrderRows: number }>('/api/facts/meesho')
       await get().loadState()
-      return result.cleared
+      return result
     },
 
     removeMapping: (channelSku) =>

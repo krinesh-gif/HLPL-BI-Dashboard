@@ -9,6 +9,11 @@ import type { PnlLineKey } from '@/config/pnlStructure'
 // ---------------------------------------------------------------------------
 export interface CanonicalSalesRecord {
   orderId: string
+  /** Distinguishes several lines of one order where the marketplace reports
+   * them separately — Meesho files a sale and its return under the same
+   * sub-order, same SKU and same order date, so without this the two collide
+   * on the de-dup key and one is silently discarded. */
+  lineId?: string
   orderDate: string // ISO yyyy-mm-dd
   channel: ChannelId
   marketplace: string

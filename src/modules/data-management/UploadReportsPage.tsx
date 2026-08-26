@@ -91,8 +91,11 @@ export function UploadReportsPage() {
     setResetting(true)
     setResetResult(null)
     try {
-      const cleared = await clearMeeshoData()
-      setResetResult(`Removed ${cleared.toLocaleString('en-IN')} Meesho event(s). Upload the payment files again to rebuild.`)
+      const { clearedEvents, clearedOrderRows } = await clearMeeshoData()
+      setResetResult(
+        `Removed ${clearedEvents.toLocaleString('en-IN')} Meesho event(s) and ` +
+        `${clearedOrderRows.toLocaleString('en-IN')} order row(s). Upload the payment files again to rebuild.`,
+      )
     } catch (e) {
       setResetResult(e instanceof Error ? e.message : String(e))
     } finally {
