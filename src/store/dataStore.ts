@@ -125,6 +125,11 @@ interface DataState extends SharedDataset, MappingTablesState {
     replaceRecipesFor?: string[]
   }) => Promise<void>
   removeMapping: (channelSku: string) => Promise<void>
+  /** Removes every stored Meesho event, so the channel can be rebuilt from the
+   * files alone. Uploads add to what is there, which is right when a month
+   * arrives across several files — but it leaves no way back when what is
+   * stored is wrong. */
+  clearMeeshoData: () => Promise<number>
   /** Saves effective-dated costs. Existing months are left alone; only the
    * months these versions name are affected. */
   saveCostVersions: (versions: CostVersion[]) => Promise<void>
@@ -280,6 +285,12 @@ export const useDataStore = create<DataState>((set, get) => {
 
     saveMappings: ({ mappings, comboComponents = [], replaceRecipesFor = [] }) =>
       writeThen(() => api.post('/api/sku-map', { mappings, comboComponents, replaceRecipesFor })),
+
+    clearMeeshoData: async () => {
+      const result = await api.delete<{ cleared: number }>('/api/facts/meesho')
+      await get().loadState()
+      return result.cleared
+    },
 
     removeMapping: (channelSku) =>
       writeThen(() => api.delete(`/api/sku-map?channelSku=${encodeURIComponent(channelSku)}`)),

@@ -70,7 +70,7 @@ interface PreviewState {
 }
 
 export function UploadReportsPage() {
-  const { skuMaster, importReport, importProgress, importSkuMapWorkbook } = useDataStore()
+  const { skuMaster, importReport, importProgress, importSkuMapWorkbook, clearMeeshoData, meeshoFacts } = useDataStore()
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null)
   const { month: filterMonth } = useFilterStore()
   const [stage, setStage] = useState<Stage>('idle')
@@ -78,6 +78,27 @@ export function UploadReportsPage() {
   const [preview, setPreview] = useState<PreviewState | null>(null)
   const [pendingFile, setPendingFile] = useState<{ fileName: string; parsed: ParsedFile } | null>(null)
   const [flipkartMonth, setFlipkartMonth] = useState(filterMonth)
+  const [resetting, setResetting] = useState(false)
+  const [resetResult, setResetResult] = useState<string | null>(null)
+
+  const meeshoMonths = meeshoFacts.filter((f) => f.basis === 'order').length
+
+  async function resetMeesho() {
+    if (!window.confirm(
+      'Remove every stored Meesho event?\n\nThe P&L for every Meesho month will be empty until you upload the ' +
+      'payment files again. Nothing else is touched.',
+    )) return
+    setResetting(true)
+    setResetResult(null)
+    try {
+      const cleared = await clearMeeshoData()
+      setResetResult(`Removed ${cleared.toLocaleString('en-IN')} Meesho event(s). Upload the payment files again to rebuild.`)
+    } catch (e) {
+      setResetResult(e instanceof Error ? e.message : String(e))
+    } finally {
+      setResetting(false)
+    }
+  }
 
   async function showPreview(partial: Omit<PreviewState, 'duplicateCount' | 'isLikelyReupload' | 'adsRecords'> & { adsRecords?: AdsRecord[] }) {
     // The duplicate check runs against the shared database now, not a local
@@ -270,6 +291,27 @@ export function UploadReportsPage() {
       {stage === 'error' && error && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div>
       )}
+
+      <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-slate-700">Start Meesho over</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Uploading a Meesho payment file adds to what is stored, because a month arrives across several files. That
+          leaves no way back if what is stored is wrong — figures from an earlier upload stay whatever you upload next.
+          This removes every Meesho event so the channel is rebuilt from the files alone. Nothing else is touched.
+        </p>
+        <p className="mt-2 text-xs text-slate-500">
+          Currently holding {meeshoMonths} Meesho month(s) on the order-date basis.
+        </p>
+        <button
+          type="button"
+          onClick={resetMeesho}
+          disabled={resetting}
+          className="mt-3 rounded-md border border-rose-300 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+        >
+          {resetting ? 'Removing…' : 'Remove all Meesho data'}
+        </button>
+        {resetResult && <p className="mt-2 text-xs text-slate-700">{resetResult}</p>}
+      </section>
 
       {outcome && stage === 'idle' && (
         <div className="mb-6 rounded-lg border border-emerald-300 bg-emerald-50 p-4">

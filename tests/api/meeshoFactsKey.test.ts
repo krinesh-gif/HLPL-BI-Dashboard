@@ -161,6 +161,44 @@ describe.skipIf(!PGTEST_URL)('migrating a database that keyed rows by file', () 
  * field added on one side and forgotten on the other would silently read zero
  * in every month.
  */
+/**
+ * Uploading adds to what is stored, which is right — a month arrives across
+ * several payment files. But it left no way back when the stored rows were
+ * wrong. Running the owner's five real files through the importer produced
+ * their spreadsheet totals to the paisa while their dashboard read about 1.18
+ * lakh higher; the whole difference was rows left over from earlier uploads
+ * that nothing could remove.
+ */
+describe.skipIf(!PGTEST_URL)('clearing Meesho data', () => {
+  it('removes every event, so the channel rebuilds from the files alone', () => {
+    const db = freshDb('hlpl_reset_test')
+    applySchema(db)
+    storeEvent(db, { subOrder: 'REAL', txn: 'T1', orderDate: '2026-03-11', paymentDate: '2026-04-02', gross: 291698, file: 'April.xlsx' })
+    storeEvent(db, { subOrder: 'STALE', txn: 'OLD', orderDate: '2026-03-15', paymentDate: '2026-04-01', gross: 10411, file: 'gone.xlsx' })
+    // The owner's screen: 291,698 of real March plus 10,411 of residue.
+    expect(grossOf(db, '2026-03')).toBe('302109')
+
+    psql(db, 'DELETE FROM meesho_transactions')
+    psql(db, 'DELETE FROM meesho_ads')
+    psql(db, 'DELETE FROM meesho_platform_recovery')
+    expect(psql(db, 'SELECT count(*)::text FROM meesho_transactions')).toBe('0')
+
+    storeEvent(db, { subOrder: 'REAL', txn: 'T1', orderDate: '2026-03-11', paymentDate: '2026-04-02', gross: 291698, file: 'April.xlsx' })
+    expect(grossOf(db, '2026-03')).toBe('291698')
+  })
+
+  it('clears the dated sheets too, not only the order rows', () => {
+    const db = freshDb('hlpl_reset_dated_test')
+    applySchema(db)
+    psql(db, `INSERT INTO meesho_ads VALUES ('2026-03-31','2026-04-02','16206903',747.42,0,134.54)`)
+    psql(db, `INSERT INTO meesho_platform_recovery VALUES ('2026-04-28','SELLER_INSIGHTS',942.82,'x')`)
+    psql(db, 'DELETE FROM meesho_ads')
+    psql(db, 'DELETE FROM meesho_platform_recovery')
+    expect(psql(db, 'SELECT count(*)::text FROM meesho_ads')).toBe('0')
+    expect(psql(db, 'SELECT count(*)::text FROM meesho_platform_recovery')).toBe('0')
+  })
+})
+
 describe('the contribution field list', () => {
   it('is identical on both sides of the network boundary', async () => {
     const client = await import('../../src/data/meesho/contribution')
