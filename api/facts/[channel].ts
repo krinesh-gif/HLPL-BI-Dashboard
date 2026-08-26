@@ -20,21 +20,18 @@ const FACT_TABLES: Record<string, FactTable> = {
   meesho: { table: 'meesho_facts', byBasis: true },
 }
 
-const BASES = ['order', 'settlement']
-
 interface FactsBody {
   facts?: unknown
   month?: unknown
   basis?: unknown
   patch?: unknown
-  /** Every month one payment file produced, sent together so a re-upload can
-   * clear that file's previous contribution first. */
-  factsList?: unknown
-  sourceFile?: unknown
   transactions?: unknown
+  adsRows?: unknown
+  recoveryRows?: unknown
 }
 
 const s = (v: unknown): string => (typeof v === 'string' ? v : '')
+const n = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
 
 /**
  * One Meesho event row as the client sends it. Only the fields queried in SQL
@@ -42,6 +39,8 @@ const s = (v: unknown): string => (typeof v === 'string' ? v : '')
  * source row, goes into `data`.
  */
 interface TransactionBody {
+  transactionRef?: string
+  contribution?: unknown
   sourceFile?: string
   sourceRowNumber?: number
   subOrderId?: string
@@ -83,47 +82,24 @@ export async function POST(request: Request): Promise<Response> {
 
   const body = await readJson<FactsBody>(request)
 
-  if (target.byBasis && Array.isArray(body?.factsList)) {
-    const sourceFile = s(body.sourceFile)
-    if (!sourceFile) return json({ error: 'Expected a sourceFile alongside factsList.' }, 400)
-    const stored = await storeFileFacts(target.table, sourceFile, body.factsList)
-
-    let storedTransactions = 0
-    if (Array.isArray(body.transactions)) {
-      if (body.transactions.length > MAX_TRANSACTIONS_PER_REQUEST) {
-        return json({ error: `At most ${MAX_TRANSACTIONS_PER_REQUEST} transactions per request.` }, 413)
-      }
-      storedTransactions = await storeTransactions(body.transactions as TransactionBody[])
+  if (target.byBasis) {
+    // Meesho stores events, never months: a month is summed from its rows at
+    // read time, so an event repeated across uploads cannot be counted twice.
+    const transactions = Array.isArray(body?.transactions) ? body.transactions : []
+    if (transactions.length > MAX_TRANSACTIONS_PER_REQUEST) {
+      return json({ error: `At most ${MAX_TRANSACTIONS_PER_REQUEST} transactions per request.` }, 413)
     }
-    return json({ ok: true, storedMonths: stored, storedTransactions })
+    const storedTransactions = await storeTransactions(transactions as TransactionBody[])
+    const dated = await storeAdsAndRecovery(
+      Array.isArray(body?.adsRows) ? (body.adsRows as Parameters<typeof storeAdsAndRecovery>[0]) : [],
+      Array.isArray(body?.recoveryRows) ? (body.recoveryRows as Parameters<typeof storeAdsAndRecovery>[1]) : [],
+    )
+    return json({ ok: true, storedTransactions, storedAds: dated.ads, storedRecovery: dated.recovery })
   }
 
   const facts = body?.facts as { month?: string; basis?: string } | undefined
   if (!facts || typeof facts !== 'object' || !isNonEmptyString(facts.month)) {
     return json({ error: 'Expected { facts: { month, ... } }.' }, 400)
-  }
-
-  if (target.byBasis) {
-    // Refused rather than defaulted: a statement stored under the wrong basis
-    // silently overwrites the right one, which is the failure this key exists
-    // to prevent.
-    if (!isNonEmptyString(facts.basis) || !BASES.includes(facts.basis)) {
-      return json({ error: `Expected facts.basis to be one of ${BASES.join(', ')}.` }, 400)
-    }
-    await sql.query(
-      `INSERT INTO ${target.table} (month, basis, source_file, data) VALUES ($1, $2, $3, $4)
-       ON CONFLICT (month, basis, source_file) DO UPDATE SET data = EXCLUDED.data`,
-      [facts.month, facts.basis, s(body?.sourceFile), JSON.stringify(facts)],
-    )
-
-    let storedTransactions = 0
-    if (Array.isArray(body?.transactions)) {
-      if (body.transactions.length > MAX_TRANSACTIONS_PER_REQUEST) {
-        return json({ error: `At most ${MAX_TRANSACTIONS_PER_REQUEST} transactions per request.` }, 413)
-      }
-      storedTransactions = await storeTransactions(body.transactions as TransactionBody[])
-    }
-    return json({ ok: true, storedTransactions })
   }
 
   await sql.query(
@@ -135,33 +111,50 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 /**
- * Replaces everything one payment file contributed.
+ * Advertising and platform-recovery rows, keyed on their own identity.
  *
- * A file spans two order months and holds only the slice of each it settled,
- * so its rows are stored against the file and added up at read time. Sending
- * them together lets a re-upload clear the file's previous contribution first
- * — otherwise a month the file no longer covers would linger.
+ * Both repeat across Meesho's overlapping downloads exactly as order rows do,
+ * so both are keyed on what the row is rather than which file carried it.
  */
-async function storeFileFacts(table: string, sourceFile: string, factsList: unknown[]): Promise<number> {
-  const usable = factsList.filter((f): f is { month: string; basis: string } => {
-    const c = f as { month?: unknown; basis?: unknown }
-    return typeof c?.month === 'string' && c.month !== '' && typeof c.basis === 'string' && BASES.includes(c.basis)
-  })
-  if (usable.length === 0) return 0
+async function storeAdsAndRecovery(
+  ads: { deductionDuration?: string; deductionDate?: string; campaignId?: string; spendExGst?: number; credits?: number; gst?: number }[],
+  recovery: { entryDate?: string; programName?: string; amount?: number; reason?: string }[],
+): Promise<{ ads: number; recovery: number }> {
+  const usableAds = ads.filter((a) => isNonEmptyString(a.deductionDate) && isNonEmptyString(a.campaignId))
+  if (usableAds.length > 0) {
+    await sql.query(
+      `INSERT INTO meesho_ads (deduction_duration, deduction_date, campaign_id, spend_ex_gst, credits, gst)
+       SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::float8[], $5::float8[], $6::float8[])
+       ON CONFLICT (deduction_duration, deduction_date, campaign_id) DO UPDATE SET
+         spend_ex_gst = EXCLUDED.spend_ex_gst, credits = EXCLUDED.credits, gst = EXCLUDED.gst`,
+      [
+        usableAds.map((a) => s(a.deductionDuration)),
+        usableAds.map((a) => s(a.deductionDate)),
+        usableAds.map((a) => s(a.campaignId)),
+        usableAds.map((a) => n(a.spendExGst)),
+        usableAds.map((a) => n(a.credits)),
+        usableAds.map((a) => n(a.gst)),
+      ],
+    )
+  }
 
-  await sql.query(`DELETE FROM ${table} WHERE source_file = $1`, [sourceFile])
-  await sql.query(
-    `INSERT INTO ${table} (month, basis, source_file, data)
-     SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::jsonb[])
-     ON CONFLICT (month, basis, source_file) DO UPDATE SET data = EXCLUDED.data`,
-    [
-      usable.map((f) => f.month),
-      usable.map((f) => f.basis),
-      usable.map(() => sourceFile),
-      usable.map((f) => JSON.stringify(f)),
-    ],
-  )
-  return usable.length
+  const usableRecovery = recovery.filter((r) => isNonEmptyString(r.entryDate) && isNonEmptyString(r.programName))
+  if (usableRecovery.length > 0) {
+    await sql.query(
+      `INSERT INTO meesho_platform_recovery (entry_date, program_name, amount, reason)
+       SELECT * FROM UNNEST($1::text[], $2::text[], $3::float8[], $4::text[])
+       ON CONFLICT (entry_date, program_name) DO UPDATE SET
+         amount = EXCLUDED.amount, reason = EXCLUDED.reason`,
+      [
+        usableRecovery.map((r) => s(r.entryDate)),
+        usableRecovery.map((r) => s(r.programName)),
+        usableRecovery.map((r) => n(r.amount)),
+        usableRecovery.map((r) => s(r.reason)),
+      ],
+    )
+  }
+
+  return { ads: usableAds.length, recovery: usableRecovery.length }
 }
 
 /** Edits individual manual-entry fields on an already-stored month. Merging
@@ -260,30 +253,34 @@ export async function GET(request: Request): Promise<Response> {
  * another — and collapsing them would delete real financial events.
  */
 async function storeTransactions(rows: TransactionBody[]): Promise<number> {
-  const usable = rows.filter(
-    (t) => typeof t.sourceFile === 'string' && t.sourceFile !== '' && Number.isInteger(t.sourceRowNumber),
-  )
+  // Keyed on the row's own identity, so an event that arrives in several of
+  // Meesho's overlapping downloads is stored once however often it is
+  // uploaded. A sub-order alone is not unique — it carries a sale row and a
+  // return row — so the payment batch it settled in completes the key.
+  const usable = rows.filter((t) => isNonEmptyString(t.subOrderId) && isNonEmptyString(t.transactionRef))
   if (usable.length === 0) return 0
 
-  const files = [...new Set(usable.map((t) => t.sourceFile as string))]
-  await sql.query(`DELETE FROM meesho_transactions WHERE source_file = ANY($1::text[])`, [files])
-
-  const n = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
 
   await sql.query(
     `INSERT INTO meesho_transactions (
-       source_file, source_row, sub_order_id, sku, order_date, dispatch_date, payment_date,
+       sub_order_id, transaction_ref, sku, order_date, dispatch_date, payment_date,
        order_status, event_type, confidence, flagged, classification_reason, quantity,
-       sale_amount, return_amount, settlement_amount, recovery, recovery_reason, import_id, data)
+       sale_amount, return_amount, settlement_amount, recovery, recovery_reason,
+       source_file, source_row, contribution, data)
      SELECT * FROM UNNEST(
-       $1::text[], $2::int[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[],
-       $8::text[], $9::text[], $10::text[], $11::bool[], $12::text[], $13::float8[],
-       $14::float8[], $15::float8[], $16::float8[], $17::float8[], $18::text[], $19::text[], $20::jsonb[])
-     ON CONFLICT (source_file, source_row) DO UPDATE SET data = EXCLUDED.data, flagged = EXCLUDED.flagged`,
+       $1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[],
+       $7::text[], $8::text[], $9::text[], $10::bool[], $11::text[], $12::float8[],
+       $13::float8[], $14::float8[], $15::float8[], $16::float8[], $17::text[],
+       $18::text[], $19::int[], $20::jsonb[], $21::jsonb[])
+     ON CONFLICT (sub_order_id, transaction_ref) DO UPDATE SET
+       order_date = EXCLUDED.order_date, payment_date = EXCLUDED.payment_date,
+       event_type = EXCLUDED.event_type, confidence = EXCLUDED.confidence,
+       flagged = EXCLUDED.flagged, contribution = EXCLUDED.contribution,
+       source_file = EXCLUDED.source_file, source_row = EXCLUDED.source_row,
+       data = EXCLUDED.data`,
     [
-      usable.map((t) => s(t.sourceFile)),
-      usable.map((t) => t.sourceRowNumber as number),
       usable.map((t) => s(t.subOrderId)),
+      usable.map((t) => s(t.transactionRef)),
       usable.map((t) => s(t.sku)),
       usable.map((t) => s(t.orderDate)),
       usable.map((t) => s(t.dispatchDate)),
@@ -299,7 +296,9 @@ async function storeTransactions(rows: TransactionBody[]): Promise<number> {
       usable.map((t) => n(t.settlementAmount)),
       usable.map((t) => n(t.recovery)),
       usable.map((t) => s(t.recoveryReason)),
-      usable.map(() => ''),
+      usable.map((t) => s(t.sourceFile)),
+      usable.map((t) => (Number.isInteger(t.sourceRowNumber) ? (t.sourceRowNumber as number) : 0)),
+      usable.map((t) => JSON.stringify(t.contribution ?? {})),
       usable.map((t) => JSON.stringify(t)),
     ],
   )

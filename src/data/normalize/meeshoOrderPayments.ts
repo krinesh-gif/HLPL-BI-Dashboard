@@ -1,7 +1,6 @@
 import type { RawSheet } from '@/lib/csvParse'
 import type { CanonicalSalesRecord, MeeshoPnlFacts, SkuMaster } from '@/data/models'
 import type { NormalizeResult } from './types'
-import { toMonthKey } from '@/lib/format'
 import { normalizeCategory } from '@/data/categories'
 import { MEESHO_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { columnAt, locateHeader, missingColumns, normaliseHeader, type ColumnIndex } from '@/data/meesho/columns'
@@ -9,6 +8,7 @@ import { classifyRow } from '@/data/meesho/events'
 import { MEESHO_REVENUE_POLICY } from '@/data/meesho/policy'
 import { resolveRecoveryReason } from '@/data/meesho/feeCategories'
 import type { MeeshoException, MeeshoTransaction } from '@/data/meesho/transaction'
+import { factsFromContributions, type DatedContribution, type MeeshoContribution } from '@/data/meesho/contribution'
 
 /**
  * Normalises Meesho's "Order Payments" sheet from the aggregated payment file.
@@ -108,9 +108,30 @@ function isoDate(raw: string): string | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10)
 }
 
+/** One advertising deduction, with the identity that makes it unique across
+ * Meesho's overlapping downloads. */
+export interface MeeshoAdsRow {
+  deductionDuration: string
+  deductionDate: string
+  campaignId: string
+  spendExGst: number
+  credits: number
+  gst: number
+}
+
+/** One platform recovery or compensation entry, likewise. */
+export interface MeeshoRecoveryRow {
+  entryDate: string
+  programName: string
+  amount: number
+  reason: string
+}
+
 export interface MeeshoOrderPaymentsResult extends NormalizeResult {
   factsByMonth: MeeshoPnlFacts[]
   transactions: MeeshoTransaction[]
+  adsRows: MeeshoAdsRow[]
+  recoveryRows: MeeshoRecoveryRow[]
   exceptions: MeeshoException[]
   /** Header names the workbook carried that this app does not map. Surfaced so
    * a new Meesho fee column is a question rather than a silent omission. */
@@ -125,19 +146,6 @@ export interface ReconciliationCheck {
   detail: string
 }
 
-function emptyFacts(month: string, basis: MeeshoPnlFacts['basis']): MeeshoPnlFacts {
-  return {
-    schemaVersion: 3, month, basis,
-    grossSalesInclGst: 0, salesReturnsInclGst: 0, outputGstOnSales: 0,
-    cogsUnitsSold: 0, cogsRtoWriteOff: 0, cogsReturnWriteOff: 0,
-    forwardShipping: 0, returnShipping: 0, otherMarketplaceFees: 0,
-    adsSpendExGst: 0, adCredits: 0, affiliateFee: 0,
-    compensation: 0, claims: 0, recovery: 0, platformRecoverySubscriptions: 0,
-    subOrdersDispatched: 0, unitsDispatched: 0, unitsDelivered: 0, unitsRto: 0, unitsReturned: 0,
-    tcs: 0, tds: 0, gstOnMarketplaceFees: 0, gstOnAds: 0, netSettlementPerFile: 0,
-    unclassifiedSettlement: 0, unclassifiedRows: 0,
-  }
-}
 
 export function normalizeMeeshoOrderPayments(
   sheet: RawSheet,
@@ -155,7 +163,7 @@ export function normalizeMeeshoOrderPayments(
     return {
       validRecords: [], totalRows: 0,
       invalidRows: [{ rowIndex: 0, reason: 'Could not find the Order Payments header row.' }],
-      warnings: [], factsByMonth: [], transactions: [], exceptions: [], unmappedColumns: [],
+      warnings: [], factsByMonth: [], transactions: [], adsRows: [], recoveryRows: [], exceptions: [], unmappedColumns: [],
       checks: [{ name: 'Header located', passed: false, detail: 'No row carried the expected Meesho column names.' }],
     }
   }
@@ -171,13 +179,9 @@ export function normalizeMeeshoOrderPayments(
   const exceptions: MeeshoException[] = []
   const skuByCode = new Map(skuMaster.map((s) => [s.sku, s]))
 
-  const facts = new Map<string, MeeshoPnlFacts>()
-  const factsFor = (basis: MeeshoPnlFacts['basis'], month: string): MeeshoPnlFacts => {
-    const key = `${basis}|${month}`
-    let f = facts.get(key)
-    if (!f) { f = emptyFacts(month, basis); facts.set(key, f) }
-    return f
-  }
+  // One entry per source row. Months are derived from these at the end, so a
+  // row can never be counted twice by being present in two uploaded files.
+  const contributions: DatedContribution[] = []
 
   let unknownSkuCount = 0
   let rowsWithoutPaymentDate = 0
@@ -280,6 +284,7 @@ export function normalizeMeeshoOrderPayments(
       claimsReason: text(row, at(H.claimsReason)),
       recoveryReason,
       settlementAmount,
+      contribution: {},
       sourceFile: fileName, sourceSheet: 'Order Payments', sourceRowNumber, raw,
     }
     transactions.push(transaction)
@@ -333,6 +338,8 @@ export function normalizeMeeshoOrderPayments(
       (classification.eventType === 'sale' && Math.abs(recovery) > 0 && !resolveRecoveryReason(recoveryReason).mapped)
         ? cost(recovery)
         : 0
+    const heldOut =
+      classification.eventType === 'unclassified' || classification.eventType === 'settlement_adjustment'
     // An affiliate charge riding on a sale row still belongs to advertising.
     const affiliateOnSaleRow =
       classification.eventType !== 'affiliate_fee' &&
@@ -341,55 +348,44 @@ export function normalizeMeeshoOrderPayments(
         ? cost(recovery)
         : 0
 
-    for (const [basis, month] of [
-      ['order', toMonthKey(orderDate)],
-      ['settlement', paymentDate ? toMonthKey(paymentDate) : null],
-    ] as const) {
-      if (!month) continue
-      const f = factsFor(basis, month)
+    const rowContribution: Partial<MeeshoContribution> = {
+      grossSalesInclGst: policy.entersRevenue ? saleAmount : 0,
+      salesReturnsInclGst: policy.entersRevenue ? returnValue : 0,
+      outputGstOnSales: policy.entersRevenue ? outputGst : 0,
 
-      if (policy.entersRevenue) {
-        f.grossSalesInclGst += saleAmount
-        f.salesReturnsInclGst += returnValue
-        f.outputGstOnSales += outputGst
-      }
-      if (policy.entersCogs) {
-        f.cogsUnitsSold += cogsUnitsSold
-        f.cogsRtoWriteOff += cogsRtoWriteOff
-        f.cogsReturnWriteOff += cogsReturnWriteOff
-      }
+      cogsUnitsSold: policy.entersCogs ? cogsUnitsSold : 0,
+      cogsRtoWriteOff: policy.entersCogs ? cogsRtoWriteOff : 0,
+      cogsReturnWriteOff: policy.entersCogs ? cogsReturnWriteOff : 0,
 
-      f.forwardShipping += forwardShipping
-      f.returnShipping += returnShipping
-      f.otherMarketplaceFees += otherFees
-      f.gstOnMarketplaceFees +=
+      forwardShipping,
+      returnShipping,
+      otherMarketplaceFees: otherFees,
+      gstOnMarketplaceFees:
         (forwardShipping + returnShipping + otherFees) *
-        (MEESHO_ASSUMPTIONS.gstOnMarketplaceFeesPct / (1 + MEESHO_ASSUMPTIONS.gstOnMarketplaceFeesPct))
+        (MEESHO_ASSUMPTIONS.gstOnMarketplaceFeesPct / (1 + MEESHO_ASSUMPTIONS.gstOnMarketplaceFeesPct)),
 
-      f.affiliateFee += affiliate + affiliateOnSaleRow
-      f.recovery += otherRecovery
-      f.compensation += compensation
-      f.claims += claims
+      affiliateFee: affiliate + affiliateOnSaleRow,
+      recovery: otherRecovery,
+      compensation,
+      claims,
 
-      f.tcs += cost(transaction.tcs)
-      f.tds += cost(transaction.tds)
-      f.netSettlementPerFile += settlementAmount
+      tcs: cost(transaction.tcs),
+      tds: cost(transaction.tds),
+      netSettlementPerFile: settlementAmount,
 
-      if (classification.eventType === 'unclassified' || classification.eventType === 'settlement_adjustment') {
-        f.unclassifiedSettlement += settlementAmount
-        f.unclassifiedRows += 1
-      }
+      unclassifiedSettlement: heldOut ? settlementAmount : 0,
+      unclassifiedRows: heldOut ? 1 : 0,
 
       // Volume is the fix that mattered most: only a real dispatch counts, so
       // an affiliate fee or a return row can no longer invent a shipment.
-      if (policy.entersVolume) {
-        f.subOrdersDispatched += 1
-        f.unitsDispatched += quantity
-        if (isRto) f.unitsRto += quantity
-        else f.unitsDelivered += quantity
-      }
-      if (isReturn) f.unitsReturned += quantity
+      subOrdersDispatched: policy.entersVolume ? 1 : 0,
+      unitsDispatched: policy.entersVolume ? quantity : 0,
+      unitsRto: policy.entersVolume && isRto ? quantity : 0,
+      unitsDelivered: policy.entersVolume && !isRto ? quantity : 0,
+      unitsReturned: isReturn ? quantity : 0,
     }
+    transaction.contribution = rowContribution
+    contributions.push({ orderDate, paymentDate: paymentDate ?? '', contribution: rowContribution })
 
     if (policy.entersRevenue || policy.entersVolume) {
       validRecords.push({
@@ -417,8 +413,10 @@ export function normalizeMeeshoOrderPayments(
     }
   })
 
-  applyAdsSheet(adsSheet, factsFor)
-  const platformRecoveryRows = applyPlatformRecoverySheet(recoverySheet, factsFor)
+  const adsRows: MeeshoAdsRow[] = []
+  const recoveryRows: MeeshoRecoveryRow[] = []
+  applyAdsSheet(adsSheet, contributions, adsRows)
+  const platformRecoveryRows = applyPlatformRecoverySheet(recoverySheet, contributions, recoveryRows)
 
   const warnings: string[] = []
   if (unknownSkuCount > 0) {
@@ -446,13 +444,15 @@ export function normalizeMeeshoOrderPayments(
     totalRows: dataRows.length,
     invalidRows,
     warnings,
-    factsByMonth: Array.from(facts.values()),
+    factsByMonth: factsFromContributions(contributions),
     transactions,
+    adsRows,
+    recoveryRows,
     exceptions,
     unmappedColumns,
     checks: buildChecks({
       rawRows: dataRows.length, transactions: transactions.length, excluded: invalidRows.length,
-      rawSettlementTotal, rawSaleTotal, facts: Array.from(facts.values()), exceptions: exceptions.length,
+      rawSettlementTotal, rawSaleTotal, facts: factsFromContributions(contributions), exceptions: exceptions.length,
     }),
   }
 }
@@ -468,11 +468,14 @@ export function normalizeMeeshoOrderPayments(
  */
 function applyAdsSheet(
   adsSheet: RawSheet | undefined,
-  factsFor: (basis: MeeshoPnlFacts['basis'], month: string) => MeeshoPnlFacts,
-): void {
-  if (!adsSheet) return
+  contributions: DatedContribution[],
+  out: MeeshoAdsRow[],
+): number {
+  if (!adsSheet) return 0
   const index = locateHeader(adsSheet, [normaliseHeader('Ad Cost'), normaliseHeader('Deduction Date')])
-  if (!index) return
+  if (!index) return 0
+  const durationAt = columnAt(index, 'Deduction Duration')
+  const campaignAt = columnAt(index, 'Campaign ID')
 
   const dateAt = columnAt(index, 'Deduction Date')
   const exGstAt = columnAt(index, 'Ad Cost incl. Credits/Waivers/Discounts')
@@ -480,26 +483,34 @@ function applyAdsSheet(
   const creditsAt = columnAt(index, 'Credits / Waivers / Discounts')
   const gstAt = columnAt(index, 'GST')
 
+  let applied = 0
   for (const row of adsSheet.slice(index.dataStartRow)) {
     const date = isoDate(text(row, dateAt))
     if (!date) continue
-    const month = toMonthKey(date)
     // Prefer the net column; fall back to gross plus credits when a future
     // file drops it.
     const spend = exGstAt >= 0 ? Math.abs(num(row, exGstAt)) : Math.abs(num(row, grossAt)) - Math.abs(num(row, creditsAt))
     const gst = Math.abs(num(row, gstAt))
     const credits = Math.abs(num(row, creditsAt))
+    if (spend === 0 && gst === 0 && credits === 0) continue
 
     // Meesho reports advertising only by the date it deducted the money, so
     // the same figure lands in both statements on that month. Splitting it
     // across order months would invent a distribution the report lacks.
-    for (const basis of ['order', 'settlement'] as const) {
-      const f = factsFor(basis, month)
-      f.adsSpendExGst += spend
-      f.adCredits += credits
-      f.gstOnAds += gst
-    }
+    contributions.push({
+      orderDate: date,
+      paymentDate: date,
+      contribution: { adsSpendExGst: spend, adCredits: credits, gstOnAds: gst },
+    })
+    out.push({
+      deductionDuration: text(row, durationAt),
+      deductionDate: date,
+      campaignId: text(row, campaignAt),
+      spendExGst: spend, credits, gst,
+    })
+    applied++
   }
+  return applied
 }
 
 /**
@@ -515,13 +526,16 @@ function applyAdsSheet(
  */
 function applyPlatformRecoverySheet(
   sheet: RawSheet | undefined,
-  factsFor: (basis: MeeshoPnlFacts['basis'], month: string) => MeeshoPnlFacts,
+  contributions: DatedContribution[],
+  out: MeeshoRecoveryRow[],
 ): number {
   if (!sheet) return 0
   const index = locateHeader(sheet, [normaliseHeader('Date'), normaliseHeader('Program Name')])
   if (!index) return 0
 
   const dateAt = columnAt(index, 'Date')
+  const programAt = columnAt(index, 'Program Name')
+  const reasonAt = columnAt(index, 'Reason')
   const amountAt = columnAt(index, 'Amount (inc GST) INR')
   if (amountAt < 0) return 0
 
@@ -531,10 +545,12 @@ function applyPlatformRecoverySheet(
     if (!date) continue // the "No data is available" line, and any blank row
     const amount = -num(row, amountAt) // charged negative, held as a positive cost
     if (amount === 0) continue
-    const month = toMonthKey(date)
-    for (const basis of ['order', 'settlement'] as const) {
-      factsFor(basis, month).platformRecoverySubscriptions += amount
-    }
+    contributions.push({
+      orderDate: date,
+      paymentDate: date,
+      contribution: { platformRecoverySubscriptions: amount },
+    })
+    out.push({ entryDate: date, programName: text(row, programAt), amount, reason: text(row, reasonAt) })
     applied++
   }
   return applied

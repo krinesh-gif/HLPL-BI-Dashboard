@@ -1,4 +1,5 @@
 import type { EventConfidence, MeeshoEventType } from './events'
+import type { MeeshoContribution } from './contribution'
 
 /**
  * One financial event from the Meesho Payment-to-Order report, normalised but
@@ -71,6 +72,11 @@ export interface MeeshoTransaction {
   recoveryReason: string
 
   settlementAmount: number
+
+  /** What this row adds to its month. Held per row rather than pre-aggregated
+   * per file, because Meesho's "previous aggregated payment" downloads repeat
+   * earlier rows — summing files double-counted every month they shared. */
+  contribution: Partial<MeeshoContribution>
 
   /** Where this came from, for the Finance audit view. */
   sourceFile: string

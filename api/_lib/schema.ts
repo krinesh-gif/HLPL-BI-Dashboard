@@ -174,34 +174,12 @@ BEGIN
   -- order date and by payment date. Keying on month alone made the second one
   -- written overwrite the first, so only one basis ever survived and the
   -- page's basis toggle had nothing to switch between.
-  -- A payment file is cut on payment date, so it spans two order months and
-  -- holds only the part of each it happened to settle. Keying on month alone
-  -- meant the next file's partial month replaced the complete one already
-  -- stored; each file therefore keeps its own contribution and the app adds
-  -- them up.
-  CREATE TABLE IF NOT EXISTS meesho_facts (
-    month       TEXT NOT NULL,
-    basis       TEXT NOT NULL DEFAULT 'order',   -- order | settlement
-    source_file TEXT NOT NULL DEFAULT '',
-    data        JSONB NOT NULL,
-    PRIMARY KEY (month, basis, source_file)
-  );
+  -- Meesho's monthly figures are no longer stored: they are summed from the
+  -- individual events in meesho_transactions, so a row repeated across uploads
+  -- cannot be counted twice. The table is dropped so nothing can read a stale
+  -- pre-aggregated copy alongside the live one.
+  DROP TABLE IF EXISTS meesho_facts;
 
-  -- Migrate a database created before Meesho carried two bases. The column is
-  -- backfilled from the stored object so a row already tagged with a basis
-  -- keeps it, and the single-column primary key is swapped for the pair.
-  ALTER TABLE meesho_facts ADD COLUMN IF NOT EXISTS basis TEXT NOT NULL DEFAULT 'order';
-  UPDATE meesho_facts SET basis = COALESCE(data->>'basis', 'order')
-   WHERE basis IS DISTINCT FROM COALESCE(data->>'basis', 'order');
-  ALTER TABLE meesho_facts ADD COLUMN IF NOT EXISTS source_file TEXT NOT NULL DEFAULT '';
-  IF EXISTS (
-    SELECT 1 FROM pg_index i
-      JOIN pg_class c ON c.oid = i.indrelid
-     WHERE c.relname = 'meesho_facts' AND i.indisprimary AND i.indnatts < 3
-  ) THEN
-    ALTER TABLE meesho_facts DROP CONSTRAINT meesho_facts_pkey;
-    ALTER TABLE meesho_facts ADD PRIMARY KEY (month, basis, source_file);
-  END IF;
 
   -- ---------------------------------------------------------------------------
   -- The individual Meesho events behind the monthly facts above.
@@ -213,41 +191,85 @@ BEGIN
   -- covering overlapping orders does not silently double them.
   -- ---------------------------------------------------------------------------
   CREATE TABLE IF NOT EXISTS meesho_transactions (
-    source_file   TEXT NOT NULL,
-    source_row    INTEGER NOT NULL,
-    sub_order_id  TEXT NOT NULL,
-    sku           TEXT NOT NULL DEFAULT '',
-    order_date    TEXT NOT NULL DEFAULT '',
-    dispatch_date TEXT NOT NULL DEFAULT '',
-    payment_date  TEXT NOT NULL DEFAULT '',
-    order_status  TEXT NOT NULL DEFAULT '',
-    event_type    TEXT NOT NULL,
-    confidence    TEXT NOT NULL,
-    -- Set by the importer, not re-derived here: a cancelled row is certain
-    -- about what it is and still needs a person to confirm its treatment.
-    flagged       BOOLEAN NOT NULL DEFAULT false,
+    -- A row's own identity, not the file it arrived in. Meesho's "previous
+    -- aggregated payment" downloads repeat earlier rows, so the same event
+    -- arrives in several files; keyed this way it is stored once however many
+    -- times it is uploaded. Sub-order alone is not enough — a sub-order
+    -- legitimately has a sale row and a return row.
+    sub_order_id    TEXT NOT NULL,
+    transaction_ref TEXT NOT NULL,
+    sku             TEXT NOT NULL DEFAULT '',
+    order_date      TEXT NOT NULL DEFAULT '',
+    dispatch_date   TEXT NOT NULL DEFAULT '',
+    payment_date    TEXT NOT NULL DEFAULT '',
+    order_status    TEXT NOT NULL DEFAULT '',
+    event_type      TEXT NOT NULL,
+    confidence      TEXT NOT NULL,
+    flagged         BOOLEAN NOT NULL DEFAULT false,
     classification_reason TEXT NOT NULL DEFAULT '',
-    quantity      DOUBLE PRECISION NOT NULL DEFAULT 0,
-    sale_amount   DOUBLE PRECISION NOT NULL DEFAULT 0,
-    return_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+    quantity        DOUBLE PRECISION NOT NULL DEFAULT 0,
+    sale_amount     DOUBLE PRECISION NOT NULL DEFAULT 0,
+    return_amount   DOUBLE PRECISION NOT NULL DEFAULT 0,
     settlement_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
-    recovery      DOUBLE PRECISION NOT NULL DEFAULT 0,
+    recovery        DOUBLE PRECISION NOT NULL DEFAULT 0,
     recovery_reason TEXT NOT NULL DEFAULT '',
-    import_id     TEXT NOT NULL DEFAULT '',
-    -- The whole normalized transaction plus its untouched original row, so a
-    -- figure can always be traced to the cell it came from.
-    data          JSONB NOT NULL,
-    PRIMARY KEY (source_file, source_row)
+    source_file     TEXT NOT NULL DEFAULT '',
+    source_row      INTEGER NOT NULL DEFAULT 0,
+    -- What this row adds to its month. A month is the sum of these.
+    contribution    JSONB NOT NULL DEFAULT '{}'::jsonb,
+    -- The whole normalized transaction plus its untouched original row.
+    data            JSONB NOT NULL,
+    PRIMARY KEY (sub_order_id, transaction_ref)
   );
 
-  -- Columns added after this table first shipped. CREATE TABLE IF NOT EXISTS
-  -- silently skips an existing table, so a new column has to be added
-  -- explicitly or it never reaches a database that already has the table.
+  -- Advertising and platform recovery hang off dates rather than orders, and
+  -- repeat across files for the same reason, so each gets the natural key of
+  -- the row it came from.
+  CREATE TABLE IF NOT EXISTS meesho_ads (
+    deduction_duration TEXT NOT NULL,
+    deduction_date     TEXT NOT NULL,
+    campaign_id        TEXT NOT NULL,
+    spend_ex_gst       DOUBLE PRECISION NOT NULL DEFAULT 0,
+    credits            DOUBLE PRECISION NOT NULL DEFAULT 0,
+    gst                DOUBLE PRECISION NOT NULL DEFAULT 0,
+    PRIMARY KEY (deduction_duration, deduction_date, campaign_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS meesho_platform_recovery (
+    entry_date   TEXT NOT NULL,
+    program_name TEXT NOT NULL,
+    amount       DOUBLE PRECISION NOT NULL DEFAULT 0,
+    reason       TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (entry_date, program_name)
+  );
+
+  -- Migrations for a database that already has these tables. CREATE TABLE IF
+  -- NOT EXISTS skips an existing one, so anything added later has to be added
+  -- explicitly. These run before the indexes below, because an index over a
+  -- column that has not been added yet fails outright.
   ALTER TABLE meesho_transactions ADD COLUMN IF NOT EXISTS flagged BOOLEAN NOT NULL DEFAULT false;
+  ALTER TABLE meesho_transactions ADD COLUMN IF NOT EXISTS transaction_ref TEXT NOT NULL DEFAULT '';
+  ALTER TABLE meesho_transactions ADD COLUMN IF NOT EXISTS contribution JSONB NOT NULL DEFAULT '{}'::jsonb;
+  ALTER TABLE meesho_transactions ADD COLUMN IF NOT EXISTS source_file TEXT NOT NULL DEFAULT '';
+  ALTER TABLE meesho_transactions ADD COLUMN IF NOT EXISTS source_row INTEGER NOT NULL DEFAULT 0;
+
+  -- Re-key a table that identified a row by the file it arrived in. Rows
+  -- stored that way may already be duplicated across Meesho's overlapping
+  -- downloads, so they are cleared rather than migrated: the figures they
+  -- carry cannot be trusted, and re-uploading the files rebuilds them.
+  IF EXISTS (
+    SELECT 1 FROM pg_index i
+      JOIN pg_class c ON c.oid = i.indrelid
+      JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = ANY(i.indkey)
+     WHERE c.relname = 'meesho_transactions' AND i.indisprimary AND a.attname = 'source_file'
+  ) THEN
+    DELETE FROM meesho_transactions;
+    ALTER TABLE meesho_transactions DROP CONSTRAINT meesho_transactions_pkey;
+    ALTER TABLE meesho_transactions ADD PRIMARY KEY (sub_order_id, transaction_ref);
+  END IF;
 
   CREATE INDEX IF NOT EXISTS meesho_transactions_order_month_idx ON meesho_transactions (left(order_date, 7));
   CREATE INDEX IF NOT EXISTS meesho_transactions_payment_month_idx ON meesho_transactions (left(payment_date, 7));
-  CREATE INDEX IF NOT EXISTS meesho_transactions_confidence_idx ON meesho_transactions (confidence);
   CREATE INDEX IF NOT EXISTS meesho_transactions_flagged_idx ON meesho_transactions (flagged) WHERE flagged;
 
   -- ---------------------------------------------------------------------------

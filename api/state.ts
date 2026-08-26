@@ -1,5 +1,6 @@
 import { createHandler } from './_lib/handler.js'
 import { ensureSchema, sql } from './_lib/db.js'
+import { meeshoFactsFromEvents } from './_lib/meeshoFacts.js'
 import { requireSession } from './_lib/auth.js'
 import { json } from './_lib/http.js'
 import {
@@ -39,7 +40,7 @@ export async function GET(request: Request): Promise<Response> {
       sql`SELECT * FROM fixed_expenses`,
       sql`SELECT data FROM flipkart_facts ORDER BY month`,
       sql`SELECT data FROM amazon_usa_facts ORDER BY month`,
-      sql`SELECT data FROM meesho_facts ORDER BY month, basis`,
+      meeshoFactsFromEvents(),
       sql`SELECT channel, month, amount, file_name, note, entered_at FROM manual_ad_spend ORDER BY month`,
     ])
 
@@ -57,7 +58,9 @@ export async function GET(request: Request): Promise<Response> {
     fixedExpenses: (expenseRows as Row[]).map(toFixedExpense),
     flipkartFacts: (flipkart as Row[]).map((r) => r.data),
     amazonUsaFacts: (amazonUsa as Row[]).map((r) => r.data),
-    meeshoFacts: (meesho as Row[]).map((r) => r.data),
+    // Summed from the stored events, never from a pre-aggregated copy: the
+    // same event arrives in several of Meesho's overlapping downloads.
+    meeshoFacts: meesho,
     manualAdSpend: (manualAds as Row[]).map((r) => ({
       channel: String(r.channel),
       month: String(r.month),

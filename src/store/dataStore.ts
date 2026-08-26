@@ -6,7 +6,7 @@ import type { ComboComponent, SkuMapping } from '@/data/skuMapping'
 import type { SkuMapWorkbookResult } from '@/data/normalize/skuMapWorkbook'
 import type { CostVersion } from '@/data/costVersions'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
-import { mergeMeeshoFacts } from '@/data/meesho/mergeFacts'
+import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
 import type {
   AdsRecord,
   AmazonUsaPnlFacts,
@@ -61,9 +61,12 @@ export interface ReportImport {
   flipkartFacts?: FlipkartPnlFacts
   amazonUsaFacts?: AmazonUsaPnlFacts
   meeshoFactsByMonth?: MeeshoPnlFacts[]
-  /** The individual events behind those facts, stored for the review queue and
-   * the drill-down from a P&L line back to its source rows. */
+  /** The individual events behind those facts. These are what is stored: a
+   * month is summed from them, so an event repeated across uploads cannot be
+   * counted twice. */
   meeshoTransactions?: MeeshoTransaction[]
+  meeshoAdsRows?: MeeshoAdsRow[]
+  meeshoRecoveryRows?: MeeshoRecoveryRow[]
 }
 
 export interface ImportProgress {
@@ -186,17 +189,12 @@ export const useDataStore = create<DataState>((set, get) => {
           api.get<Omit<MappingTablesState, 'costVersions'>>('/api/sku-map'),
           api.get<{ versions: CostVersion[] }>('/api/cost-versions'),
         ])
-        // Meesho's facts are stored per payment file, because a file spans two
-        // order months and holds only the slice of each it settled. They are
-        // added back into one figure per month here, so everything downstream
-        // sees a whole month exactly as it did before.
-        const merged: SharedDataset = { ...dataset, meeshoFacts: mergeMeeshoFacts(dataset.meeshoFacts) }
-        set({ ...merged, ...mapping, costVersions: costs.versions, loading: false, error: null })
+        set({ ...dataset, ...mapping, costVersions: costs.versions, loading: false, error: null })
         // Point the dashboard at the newest month that has data. Left on the
         // current calendar month, every page reads as empty whenever the
         // latest upload covers an earlier period — which looks exactly like
         // the import having failed.
-        const latest = latestMonthWithData(merged)
+        const latest = latestMonthWithData(dataset)
         if (latest) useFilterStore.getState().defaultMonthTo(latest)
       } catch (e) {
         set({ loading: false, error: e instanceof Error ? e.message : 'Could not load the shared dataset.' })
@@ -210,7 +208,7 @@ export const useDataStore = create<DataState>((set, get) => {
      * file (rows, then one facts call per month) downloaded everything three
      * or more times over, and a large file could not get through at all.
      */
-    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, meeshoFactsByMonth, meeshoTransactions }) => {
+    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, meeshoFactsByMonth, meeshoTransactions, meeshoAdsRows, meeshoRecoveryRows }) => {
       const total = salesRecords.length + adsRecords.length
       set({ importProgress: { sent: 0, total } })
       try {
@@ -256,18 +254,17 @@ export const useDataStore = create<DataState>((set, get) => {
           await api.post('/api/facts/amazon-usa', { facts: amazonUsaFacts })
           monthsUpdated.push(amazonUsaFacts.month)
         }
-        if (meeshoFactsByMonth && meeshoFactsByMonth.length > 0) {
-          // Sent as one request per file, not one per month. A payment file
-          // spans two order months and holds only the slice of each it
-          // settled, so its months are stored against the file and added up
-          // when read — otherwise the next file's partial month would replace
-          // the complete one already there.
+        if (meeshoTransactions && meeshoTransactions.length > 0) {
+          // Events are sent, never months. Meesho's downloads carry earlier
+          // rows forward, so the same event arrives in several files; stored
+          // by its own identity it lands once however often it is uploaded,
+          // and a month is summed from its rows when read.
           await api.post('/api/facts/meesho', {
-            factsList: meeshoFactsByMonth,
-            sourceFile: importRecord.fileName,
             transactions: meeshoTransactions,
+            adsRows: meeshoAdsRows ?? [],
+            recoveryRows: meeshoRecoveryRows ?? [],
           })
-          for (const facts of meeshoFactsByMonth) monthsUpdated.push(facts.month)
+          for (const facts of meeshoFactsByMonth ?? []) monthsUpdated.push(facts.month)
         }
 
         await get().loadState()

@@ -16,6 +16,7 @@ import { useFilterStore } from '@/store/filterStore'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
 import type { AdsRecord, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, MeeshoPnlFacts } from '@/data/models'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
+import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
 
 type ReportKind =
   | 'amazon_seller_central'
@@ -64,6 +65,8 @@ interface PreviewState {
   amazonUsaFacts?: AmazonUsaPnlFacts
   meeshoFactsByMonth?: MeeshoPnlFacts[]
   meeshoTransactions?: MeeshoTransaction[]
+  meeshoAdsRows?: MeeshoAdsRow[]
+  meeshoRecoveryRows?: MeeshoRecoveryRow[]
 }
 
 export function UploadReportsPage() {
@@ -156,6 +159,8 @@ export function UploadReportsPage() {
             validRecords: r.validRecords, invalidCount: r.invalidRows.length,
             warnings: [...failed, ...r.warnings], meeshoFactsByMonth: r.factsByMonth,
             meeshoTransactions: r.transactions,
+            meeshoAdsRows: r.adsRows,
+            meeshoRecoveryRows: r.recoveryRows,
           })
           return
         }
