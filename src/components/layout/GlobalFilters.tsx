@@ -25,7 +25,7 @@ export function GlobalFilters() {
   const isDefault = channel === 'all' && category === 'all'
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-6 py-3">
+    <div className="flex flex-wrap items-center gap-2.5 border-b border-[var(--line)] bg-[var(--surface)] px-6 py-3">
       <FilterSelect
         label="Month"
         value={month}
@@ -48,7 +48,7 @@ export function GlobalFilters() {
         <button
           type="button"
           onClick={reset}
-          className="ml-auto rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          className="ml-auto rounded-full border border-[var(--line)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--ink)]"
         >
           Reset Filters
         </button>
@@ -69,12 +69,12 @@ function FilterSelect({
   options: { value: string; label: string }[]
 }) {
   return (
-    <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+    <label className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surface-2)] py-1 pr-1 pl-3 text-[11px] font-semibold tracking-wide text-[var(--ink-3)] uppercase">
       {label}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none"
+        className="cursor-pointer rounded-full border-0 bg-transparent py-1 pr-2 text-[13px] font-medium text-[var(--ink)] normal-case focus:outline-none"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>

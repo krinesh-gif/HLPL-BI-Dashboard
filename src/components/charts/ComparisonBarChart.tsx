@@ -1,5 +1,5 @@
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { CHART_AXIS_COLOR, CHART_COLORS, CHART_GRID_COLOR } from './theme'
+import { CHART_AXIS_PROPS, CHART_COLORS, CHART_GRID_COLOR, CHART_TOOLTIP_STYLE } from './theme'
 
 export function ComparisonBarChart({
   data,
@@ -26,16 +26,16 @@ export function ComparisonBarChart({
         <CartesianGrid stroke={CHART_GRID_COLOR} strokeDasharray="3 3" horizontal={!horizontal} vertical={horizontal} />
         {horizontal ? (
           <>
-            <XAxis type="number" tick={{ fontSize: 12, fill: CHART_AXIS_COLOR }} axisLine={false} tickLine={false} tickFormatter={(v) => (valueFormatter ? valueFormatter(v) : String(v))} />
-            <YAxis type="category" dataKey={xKey} tick={{ fontSize: 12, fill: CHART_AXIS_COLOR }} axisLine={false} tickLine={false} width={80} />
+            <XAxis type="number" {...CHART_AXIS_PROPS} axisLine={false} tickFormatter={(v) => (valueFormatter ? valueFormatter(v) : String(v))} />
+            <YAxis type="category" dataKey={xKey} {...CHART_AXIS_PROPS} axisLine={false} width={80} />
           </>
         ) : (
           <>
-            <XAxis dataKey={xKey} tick={{ fontSize: 12, fill: CHART_AXIS_COLOR }} axisLine={{ stroke: CHART_GRID_COLOR }} tickLine={false} />
-            <YAxis tick={{ fontSize: 12, fill: CHART_AXIS_COLOR }} axisLine={false} tickLine={false} tickFormatter={(v) => (valueFormatter ? valueFormatter(v) : String(v))} />
+            <XAxis dataKey={xKey} {...CHART_AXIS_PROPS} />
+            <YAxis {...CHART_AXIS_PROPS} axisLine={false} tickFormatter={(v) => (valueFormatter ? valueFormatter(v) : String(v))} />
           </>
         )}
-        <Tooltip formatter={(v) => (valueFormatter ? valueFormatter(Number(v)) : String(v))} />
+        <Tooltip {...CHART_TOOLTIP_STYLE} formatter={(v) => (valueFormatter ? valueFormatter(Number(v)) : String(v))} />
         <Bar dataKey={yKey} radius={[4, 4, 4, 4]}>
           {data.map((_, i) => (
             <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />

@@ -40,13 +40,13 @@ export function PnlPage() {
   return (
     <PageShell title="P&L" subtitle="Management accounts by month, for the company and each channel" showFilters={false}>
       {/* ---- Header controls ------------------------------------------- */}
-      <div className="flex flex-wrap items-end gap-4 rounded-lg border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-end gap-4 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-500">View</span>
+          <span className="text-xs font-medium text-[var(--ink-3)]">View</span>
           <select
             value={r.view}
             onChange={(e) => r.setView(e.target.value as PnlView)}
-            className="min-w-48 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 focus:border-indigo-500 focus:outline-none"
+            className="min-w-48 rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-3 py-1.5 text-sm font-medium text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
           >
             <option value="master">Master Company</option>
             {BUSINESS_CHANNELS.map((c) => (
@@ -57,8 +57,8 @@ export function PnlPage() {
 
         {r.view === 'meesho' && (
           <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-slate-500">Basis</span>
-            <div className="flex rounded-md border border-slate-300 bg-white p-0.5">
+            <span className="text-xs font-medium text-[var(--ink-3)]">Basis</span>
+            <div className="flex rounded-md border border-[var(--line-2)] bg-[var(--surface)] p-0.5">
               {([
                 { key: 'order', label: 'Order date' },
                 { key: 'settlement', label: 'Payment date' },
@@ -68,7 +68,7 @@ export function PnlPage() {
                   type="button"
                   onClick={() => r.setMeeshoBasis(b.key)}
                   className={`rounded px-3 py-1 text-sm font-medium transition ${
-                    r.meeshoBasis === b.key ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+                    r.meeshoBasis === b.key ? 'bg-[var(--accent)] text-[var(--accent-ink)]' : 'text-[var(--ink-2)] hover:bg-[var(--surface-hover)]'
                   }`}
                 >
                   {b.label}
@@ -79,17 +79,18 @@ export function PnlPage() {
         )}
 
         <div className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-500">Quick select</span>
-          <div className="flex flex-wrap gap-1">
+          <span className="text-xs font-medium text-[var(--ink-3)]">Quick select</span>
+          <div className="flex flex-wrap gap-0.5 rounded-full border border-[var(--line)] bg-[var(--surface-2)] p-0.5">
             {QUICK_PERIODS.map((p) => (
               <button
                 key={p.key}
                 type="button"
                 onClick={() => r.setPeriod({ ...r.period, mode: 'quick', quick: p.key as QuickPeriod })}
-                className={`rounded-md border px-2.5 py-1.5 text-xs font-medium transition ${
+                aria-pressed={r.period.mode === 'quick' && r.period.quick === p.key}
+                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                   r.period.mode === 'quick' && r.period.quick === p.key
-                    ? 'border-indigo-600 bg-indigo-600 text-white'
-                    : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                    ? 'bg-[var(--accent)] text-[var(--accent-ink)] shadow-[0_1px_4px_color-mix(in_oklab,var(--accent)_40%,transparent)]'
+                    : 'text-[var(--ink-3)] hover:text-[var(--ink)]'
                 }`}
               >
                 {p.label}
@@ -99,11 +100,11 @@ export function PnlPage() {
         </div>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-500">From</span>
+          <span className="text-xs font-medium text-[var(--ink-3)]">From</span>
           <select
             value={r.period.mode === 'custom' ? r.period.from : r.months[0]}
             onChange={(e) => r.setPeriod({ ...r.period, mode: 'custom', from: e.target.value, to: r.period.mode === 'custom' ? r.period.to : r.months[r.months.length - 1] })}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none"
+            className="cursor-pointer rounded-full border border-[var(--line-2)] bg-[var(--surface)] px-3.5 py-1.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
           >
             {monthOptions.map((m) => (
               <option key={m} value={m}>{monthLabel(m)}</option>
@@ -112,11 +113,11 @@ export function PnlPage() {
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-500">To</span>
+          <span className="text-xs font-medium text-[var(--ink-3)]">To</span>
           <select
             value={r.period.mode === 'custom' ? r.period.to : r.months[r.months.length - 1]}
             onChange={(e) => r.setPeriod({ ...r.period, mode: 'custom', to: e.target.value, from: r.period.mode === 'custom' ? r.period.from : r.months[0] })}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none"
+            className="cursor-pointer rounded-full border border-[var(--line-2)] bg-[var(--surface)] px-3.5 py-1.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
           >
             {monthOptions.map((m) => (
               <option key={m} value={m}>{monthLabel(m)}</option>
@@ -127,26 +128,28 @@ export function PnlPage() {
         <button
           type="button"
           onClick={handleExport}
-          className="ml-auto rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-[var(--line-2)] px-3.5 py-1.5 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--ink)]"
         >
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8"
+            strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg>
           Export CSV
         </button>
       </div>
 
       {/* ---- The report -------------------------------------------------- */}
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
         <table className="w-full min-w-max text-sm">
           <thead>
-            <tr className="border-b-2 border-slate-300 bg-slate-50">
-              <th className="sticky left-0 z-20 min-w-56 bg-slate-50 px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <tr className="border-b-2 border-[var(--line-2)] bg-[var(--surface-2)]">
+              <th className="sticky left-0 z-20 min-w-56 bg-[var(--surface-2)] px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">
                 {r.view === 'master' ? 'Master Company' : channelLabel(r.view)}
               </th>
               {r.months.map((m) => (
-                <th key={m} className="min-w-28 px-4 py-2.5 text-right text-xs font-semibold text-slate-600">
+                <th key={m} className="min-w-28 px-4 py-2.5 text-right text-xs font-semibold text-[var(--ink-2)]">
                   {monthLabel(m)}
                 </th>
               ))}
-              <th className="min-w-32 border-l-2 border-slate-300 bg-slate-100 px-4 py-2.5 text-right text-xs font-bold uppercase tracking-wide text-slate-700">
+              <th className="min-w-32 border-l-2 border-[var(--line-2)] bg-[var(--surface-2)] px-4 py-2.5 text-right text-xs font-bold uppercase tracking-wide text-[var(--ink-2)]">
                 Total
               </th>
             </tr>
@@ -163,12 +166,12 @@ export function PnlPage() {
               return (
                 <tr
                   key={row.def.key}
-                  className={`border-b border-slate-100 ${isSubtotal ? 'bg-slate-50 font-semibold' : ''} ${isPercent ? 'italic text-slate-600' : ''}`}
+                  className={`border-b border-[var(--line)] ${isSubtotal ? 'bg-[var(--surface-2)] font-semibold' : ''} ${isPercent ? 'italic text-[var(--ink-2)]' : ''}`}
                 >
                   <th
                     className={`sticky left-0 z-10 px-4 py-2 text-left font-normal ${
-                      isSubtotal ? 'bg-slate-50 font-semibold text-slate-900' : 'bg-white text-slate-700'
-                    } ${row.def.indent ? 'pl-8 text-slate-500' : ''}`}
+                      isSubtotal ? 'bg-[var(--surface-2)] font-semibold text-[var(--ink)]' : 'bg-[var(--surface)] text-[var(--ink-2)]'
+                    } ${row.def.indent ? 'pl-8 text-[var(--ink-3)]' : ''}`}
                   >
                     {row.def.label}
                   </th>
@@ -176,15 +179,15 @@ export function PnlPage() {
                     <td
                       key={r.months[i]}
                       className={`px-4 py-2 text-right tabular-nums ${
-                        v !== null && v < 0 ? 'text-rose-600' : ''
+                        v !== null && v < 0 ? 'text-[var(--critical-ink)]' : ''
                       }`}
                     >
                       {v === 0 && !isPercent ? '—' : format(v)}
                     </td>
                   ))}
                   <td
-                    className={`border-l-2 border-slate-300 bg-slate-50 px-4 py-2 text-right font-semibold tabular-nums ${
-                      row.total !== null && row.total < 0 ? 'text-rose-600' : 'text-slate-900'
+                    className={`border-l-2 border-[var(--line-2)] bg-[var(--surface-2)] px-4 py-2 text-right font-semibold tabular-nums ${
+                      row.total !== null && row.total < 0 ? 'text-[var(--critical-ink)]' : 'text-[var(--ink)]'
                     }`}
                   >
                     {row.total === 0 && !isPercent ? '—' : format(row.total)}
@@ -196,13 +199,13 @@ export function PnlPage() {
         </table>
       </div>
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-[var(--ink-3)]">
         Percentages in the Total column are recomputed from the period's totals, not averaged across months — the average of monthly
         margins is not the margin of the period.
       </p>
 
       {r.view === 'meesho' && (
-        <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+        <p className="rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--ink-2)]">
           {r.meeshoBasis === 'order' ? (
             <>
               <strong>Order-date basis.</strong> Every order counted in the month the customer placed it — what a month's trading
@@ -220,7 +223,7 @@ export function PnlPage() {
       )}
 
       {r.view === 'meesho' && !r.native && (
-        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <p className="rounded-md border border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] px-3 py-2 text-xs text-[var(--ink)]">
           <strong>No Meesho statement stored for this period yet</strong>, so the figures above come from order rows alone and the
           Order date / Payment date toggle has nothing to switch between. Upload the aggregated payment workbook (Payments ▸ Order
           Payments) on Upload Reports — one upload produces both statements.
@@ -229,11 +232,11 @@ export function PnlPage() {
 
       {r.native && (
         <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--ink-3)]">
             {channelLabel(r.view as Exclude<PnlView, 'master'>)} — full statement, {monthLabel(r.nativeMonth)}
           </h2>
           {r.nativeNotes.map((note) => (
-            <p key={note} className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <p key={note} className="mb-3 rounded-md border border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] px-3 py-2 text-xs text-[var(--ink)]">
               {note}
             </p>
           ))}
@@ -243,33 +246,33 @@ export function PnlPage() {
 
       {/* ---- Channel drill-down ------------------------------------------ */}
       {r.channelBreakdown.length > 0 && (
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="text-sm font-semibold text-slate-700">Net Sales by channel — {monthLabel(r.latestMonth)}</h3>
+        <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+          <h3 className="text-sm font-semibold text-[var(--ink-2)]">Net Sales by channel — {monthLabel(r.latestMonth)}</h3>
           <table className="mt-3 w-full text-sm">
             <tbody>
               {r.channelBreakdown.map((c) => (
-                <tr key={c.channel} className="border-b border-slate-100 last:border-0">
-                  <td className="py-1.5 text-slate-700">{channelLabel(c.channel)}</td>
-                  <td className="py-1.5 text-right tabular-nums text-slate-800">{formatCurrencyFull(c.netSales)}</td>
+                <tr key={c.channel} className="border-b border-[var(--line)] last:border-0">
+                  <td className="py-1.5 text-[var(--ink-2)]">{channelLabel(c.channel)}</td>
+                  <td className="py-1.5 text-right tabular-nums text-[var(--ink)]">{formatCurrencyFull(c.netSales)}</td>
                   <td className="w-24 py-1.5 text-right">
                     <button
                       type="button"
                       onClick={() => r.setView(c.channel)}
-                      className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                      className="text-xs font-medium text-[var(--accent)] hover:opacity-80"
                     >
                       View P&amp;L
                     </button>
                   </td>
                   <td className="w-20 py-1.5 text-right">
-                    <Link to={`/channels/${c.channel}`} className="text-xs font-medium text-slate-500 hover:text-slate-700">
+                    <Link to={`/channels/${c.channel}`} className="text-xs font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)]">
                       Channel
                     </Link>
                   </td>
                 </tr>
               ))}
-              <tr className="border-t-2 border-slate-300 font-semibold">
-                <td className="py-1.5 text-slate-900">Total</td>
-                <td className="py-1.5 text-right tabular-nums text-slate-900">
+              <tr className="border-t-2 border-[var(--line-2)] font-semibold">
+                <td className="py-1.5 text-[var(--ink)]">Total</td>
+                <td className="py-1.5 text-right tabular-nums text-[var(--ink)]">
                   {formatCurrencyFull(r.channelBreakdown.reduce((s, c) => s + c.netSales, 0))}
                 </td>
                 <td colSpan={2} />
@@ -281,19 +284,19 @@ export function PnlPage() {
 
       {/* ---- Comparison --------------------------------------------------- */}
       {r.comparison && (
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="text-sm font-semibold text-slate-700">
+        <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+          <h3 className="text-sm font-semibold text-[var(--ink-2)]">
             {monthLabel(r.comparison.laterMonth)} vs {monthLabel(r.comparison.earlierMonth)}
           </h3>
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="py-1.5 text-left text-xs font-semibold text-slate-500">Particular</th>
-                  <th className="py-1.5 text-right text-xs font-semibold text-slate-500">{monthLabel(r.comparison.earlierMonth)}</th>
-                  <th className="py-1.5 text-right text-xs font-semibold text-slate-500">{monthLabel(r.comparison.laterMonth)}</th>
-                  <th className="py-1.5 text-right text-xs font-semibold text-slate-500">Change</th>
-                  <th className="py-1.5 text-right text-xs font-semibold text-slate-500">Growth</th>
+                <tr className="border-b border-[var(--line)]">
+                  <th className="py-1.5 text-left text-xs font-semibold text-[var(--ink-3)]">Particular</th>
+                  <th className="py-1.5 text-right text-xs font-semibold text-[var(--ink-3)]">{monthLabel(r.comparison.earlierMonth)}</th>
+                  <th className="py-1.5 text-right text-xs font-semibold text-[var(--ink-3)]">{monthLabel(r.comparison.laterMonth)}</th>
+                  <th className="py-1.5 text-right text-xs font-semibold text-[var(--ink-3)]">Change</th>
+                  <th className="py-1.5 text-right text-xs font-semibold text-[var(--ink-3)]">Growth</th>
                 </tr>
               </thead>
               <tbody>
@@ -303,16 +306,16 @@ export function PnlPage() {
                     const pct = row.def.kind === 'percent'
                     const fmt = (v: number | null) => (v === null ? '—' : pct ? formatPercent(v) : formatCurrencyFull(v))
                     return (
-                      <tr key={row.def.key} className="border-b border-slate-100 last:border-0">
-                        <td className="py-1.5 text-slate-700">{row.def.label}</td>
-                        <td className="py-1.5 text-right tabular-nums text-slate-500">{fmt(row.earlier)}</td>
-                        <td className="py-1.5 text-right tabular-nums font-medium text-slate-900">{fmt(row.later)}</td>
-                        <td className={`py-1.5 text-right tabular-nums ${row.change === null ? 'text-slate-400' : row.change >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      <tr key={row.def.key} className="border-b border-[var(--line)] last:border-0">
+                        <td className="py-1.5 text-[var(--ink-2)]">{row.def.label}</td>
+                        <td className="py-1.5 text-right tabular-nums text-[var(--ink-3)]">{fmt(row.earlier)}</td>
+                        <td className="py-1.5 text-right tabular-nums font-medium text-[var(--ink)]">{fmt(row.later)}</td>
+                        <td className={`py-1.5 text-right tabular-nums ${row.change === null ? 'text-[var(--ink-3)]' : row.change >= 0 ? 'text-[var(--good-ink)]' : 'text-[var(--critical-ink)]'}`}>
                           {row.change === null
                             ? '—'
                             : `${row.change >= 0 ? '+' : ''}${pct ? `${row.change.toFixed(1)} pp` : formatCurrencyFull(row.change)}`}
                         </td>
-                        <td className={`py-1.5 text-right tabular-nums ${row.growthPct === null ? 'text-slate-400' : row.growthPct >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        <td className={`py-1.5 text-right tabular-nums ${row.growthPct === null ? 'text-[var(--ink-3)]' : row.growthPct >= 0 ? 'text-[var(--good-ink)]' : 'text-[var(--critical-ink)]'}`}>
                           {row.growthPct === null ? '—' : `${row.growthPct >= 0 ? '+' : ''}${formatPercent(row.growthPct)}`}
                         </td>
                       </tr>
@@ -321,7 +324,7 @@ export function PnlPage() {
               </tbody>
             </table>
           </div>
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-xs text-[var(--ink-3)]">
             Margin rows change in percentage points (pp), which is not the same quantity as growth and is shown separately for that
             reason.
           </p>
@@ -393,8 +396,8 @@ export function PnlPage() {
 
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
-      <h3 className="mb-2 text-sm font-semibold text-slate-700">{title}</h3>
+    <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+      <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">{title}</h3>
       {children}
     </div>
   )

@@ -16,9 +16,9 @@ const PRIORITY: Record<RiskStatus, 'High' | 'Medium' | 'Low'> = {
 }
 
 const PRIORITY_STYLE: Record<'High' | 'Medium' | 'Low', string> = {
-  High: 'bg-rose-100 text-rose-700',
-  Medium: 'bg-amber-100 text-amber-700',
-  Low: 'bg-emerald-100 text-emerald-700',
+  High: 'bg-[color-mix(in_oklab,var(--critical)_16%,transparent)] text-[var(--critical-ink)]',
+  Medium: 'bg-[color-mix(in_oklab,var(--warning)_20%,transparent)] text-[var(--ink-2)]',
+  Low: 'bg-[color-mix(in_oklab,var(--good)_16%,transparent)] text-[var(--good-ink)]',
 }
 
 export function ProcurementPlanningPage() {
@@ -54,7 +54,7 @@ export function ProcurementPlanningPage() {
         <button
           type="button"
           onClick={handleExport}
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          className="rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--surface-hover)]"
         >
           Export Procurement Report
         </button>

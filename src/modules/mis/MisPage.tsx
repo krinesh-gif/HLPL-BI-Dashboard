@@ -23,22 +23,22 @@ export function MisPage() {
 
   return (
     <PageShell title="Investor MIS" subtitle={`Management-level reporting for ${monthLabel(month)}`}>
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50">
+          <thead className="bg-[var(--surface-2)]">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Particular</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">Current Month</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">Previous Month</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">MoM</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">YTD</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">YoY</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ink-3)]">Particular</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--ink-3)]">Current Month</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--ink-3)]">Previous Month</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--ink-3)]">MoM</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--ink-3)]">YTD</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--ink-3)]">YoY</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.particular} className="border-t border-slate-100">
-                <td className={clsx('px-4 py-2.5', row.isPercent ? 'text-slate-500' : 'font-medium text-slate-800')}>{row.particular}</td>
+              <tr key={row.particular} className="border-t border-[var(--line)]">
+                <td className={clsx('px-4 py-2.5', row.isPercent ? 'text-[var(--ink-3)]' : 'font-medium text-[var(--ink)]')}>{row.particular}</td>
                 <Cell value={row.currentMonth} isPercent={row.isPercent} />
                 <Cell value={row.previousMonth} isPercent={row.isPercent} />
                 <DeltaCell value={row.momPct} isPercent={row.isPercent} />
@@ -54,12 +54,12 @@ export function MisPage() {
 }
 
 function Cell({ value, isPercent }: { value: number; isPercent: boolean }) {
-  return <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">{isPercent ? formatPercent(value) : formatCurrencyFull(value)}</td>
+  return <td className="px-4 py-2.5 text-right tabular-nums text-[var(--ink-2)]">{isPercent ? formatPercent(value) : formatCurrencyFull(value)}</td>
 }
 
 function DeltaCell({ value, isPercent }: { value: number | null; isPercent: boolean }) {
-  if (value === null) return <td className="px-4 py-2.5 text-right text-slate-400">—</td>
-  const tone = value >= 0 ? 'text-emerald-600' : 'text-rose-600'
+  if (value === null) return <td className="px-4 py-2.5 text-right text-[var(--ink-3)]">—</td>
+  const tone = value >= 0 ? 'text-[var(--good-ink)]' : 'text-[var(--critical-ink)]'
   const suffix = isPercent ? ' pts' : '%'
   return (
     <td className={clsx('px-4 py-2.5 text-right tabular-nums font-medium', tone)}>

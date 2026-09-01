@@ -25,19 +25,19 @@ export function InsightPage() {
   return (
     <PageShell title="Business Insight" subtitle="What happened, why, and what to do about it">
       {Object.keys(byCategory).length === 0 && (
-        <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-500">
+        <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6 text-sm text-[var(--ink-3)]">
           No significant movements detected for the current filters. Insights only appear when data crosses a
           configured threshold — this keeps every statement traceable back to a number.
         </div>
       )}
       {Object.entries(byCategory).map(([category, insights]) => (
         <section key={category}>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--ink-3)]">
             {CATEGORY_LABEL[category as Insight['category']]}
           </h2>
-          <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
+          <div className="space-y-2 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
             {insights.map((insight, i) => (
-              <div key={i} className="flex items-start gap-2 text-sm text-slate-700">
+              <div key={i} className="flex items-start gap-2 text-sm text-[var(--ink-2)]">
                 <span aria-hidden>{SEVERITY_ICON[insight.severity]}</span>
                 <span>{insight.message}</span>
               </div>

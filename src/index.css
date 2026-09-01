@@ -1,19 +1,141 @@
 @import "tailwindcss";
 
+/* Dark mode is a deliberate choice, not the OS's. `data-theme` on <html> wins
+   both ways so the in-app toggle always beats the system setting. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 @theme {
-  --font-sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Radii — generous, but not so round that dense tables look like toys. */
+  --radius-card: 16px;
+  --radius-control: 10px;
 }
 
+/*
+ * One set of role tokens, two palettes.
+ *
+ * Everything downstream — chrome, cards, charts — reads roles rather than raw
+ * hex, so the two modes stay in step and a colour is changed in one place.
+ * The series slots are the validated categorical order: run
+ * `validate_palette.js` before touching any of them.
+ */
 :root {
   color-scheme: light;
+
+  --plane: #f6f7f9;          /* page behind the cards */
+  --surface: #ffffff;        /* card / chart surface */
+  --surface-2: #f8f9fb;      /* nested panel, table header */
+  --surface-hover: #f1f3f7;
+
+  --ink: #0f1115;            /* primary text */
+  --ink-2: #4b5563;          /* secondary */
+  --ink-3: #8b93a1;          /* muted: axis, captions */
+
+  --line: #e6e8ee;           /* hairline border */
+  --line-2: #d7dae2;         /* stronger divider */
+
+  --accent: #5b5bd6;         /* UI accent — deliberately not a series colour,
+                                so chrome never competes with the data */
+  --accent-ink: #ffffff;
+  --accent-soft: #eeeefc;
+
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --good-ink: #006300;       /* success text on light needs a darker step */
+  --critical-ink: #b02a2a;
+
+  --grid: #e6e8ee;
+  --axis: #c9cdd6;
+
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
+
+  --shadow-card: 0 1px 2px rgb(15 17 21 / 0.04), 0 4px 16px rgb(15 17 21 / 0.04);
+  --shadow-pop: 0 8px 32px rgb(15 17 21 / 0.10);
 }
 
-html, body, #root {
-  height: 100%;
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --plane: #0e1014;
+  --surface: #16181d;
+  --surface-2: #1c1f26;
+  --surface-hover: #22252d;
+
+  --ink: #f5f6f7;
+  --ink-2: #b6bcc7;
+  --ink-3: #7f8797;
+
+  --line: #262a33;
+  --line-2: #333845;
+
+  --accent: #7b7bf0;
+  --accent-ink: #0e1014;
+  --accent-soft: #1e1f3d;
+
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --good-ink: #35c435;
+  --critical-ink: #ef6b6b;
+
+  --grid: #23272f;
+  --axis: #3a3f4a;
+
+  /* The same eight hues, re-stepped for the dark surface — not an auto-flip. */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.3);
+  --shadow-pop: 0 8px 32px rgb(0 0 0 / 0.5);
 }
+
+html, body, #root { height: 100%; }
 
 body {
   margin: 0;
   font-family: var(--font-sans);
+  background: var(--plane);
+  color: var(--ink);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Headings read tighter than body copy at these sizes. */
+h1, h2, h3 { letter-spacing: -0.011em; }
+
+/* A scrollbar that doesn't shout on either surface. */
+* { scrollbar-color: var(--line-2) transparent; scrollbar-width: thin; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+  background: var(--line-2); border-radius: 999px;
+  border: 3px solid transparent; background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--ink-3); background-clip: content-box; }
+
+/* Focus that is visible on both planes without a hard ring everywhere. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

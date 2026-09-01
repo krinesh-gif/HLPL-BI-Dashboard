@@ -34,6 +34,25 @@ export function useOverviewData() {
     const masterCurrent = buildMasterPnl(currentChannelPnls, month)
     const masterPrevious = buildMasterPnl(previousChannelPnls, previousMonth)
 
+    // The last six months, for the sparklines and the headline trend. Built
+    // from the same engine as every other figure on the page, so the shape
+    // beside a number and the number itself can never disagree.
+    const trendMonths = Array.from({ length: 6 }, (_, i) => addMonths(month, i - 5))
+    const trend = trendMonths.map((m) => {
+      const f = netSalesForMonth(salesRecords, m, facts, channelIds)
+      const master = buildMasterPnl(
+        buildAllChannelPnlViews(channelIds, m, forMonth(m)).map((v) => v.canonical), m,
+      )
+      return {
+        month: m,
+        netSales: f.netSales,
+        orders: f.orders,
+        units: f.units,
+        grossProfit: master.lines.grossProfit ?? 0,
+        ebitda: master.lines.ebitda ?? 0,
+      }
+    })
+
     const ytdMonths = ytdMonthKeys(month)
     const ytdNetSales = ytdMonths.reduce(
       (sum, m) => sum + netSalesForMonth(salesRecords, m, facts, channelIds).netSales, 0)
@@ -135,6 +154,7 @@ export function useOverviewData() {
       previousFacts,
       masterCurrent,
       masterPrevious,
+      trend,
       ytdNetSales,
       previousYtdNetSales,
       ytdGrowth: growthPct(ytdNetSales, previousYtdNetSales),

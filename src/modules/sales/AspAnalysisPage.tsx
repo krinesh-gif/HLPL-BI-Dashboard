@@ -58,8 +58,8 @@ export function AspAnalysisPage() {
         <KPICard label={`Units — ${monthLabel(m.month)}`} value={formatNumber(m.master.current.units)} />
       </KPIGrid>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h3 className="mb-2 text-sm font-semibold text-slate-700">ASP trend</h3>
+      <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+        <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">ASP trend</h3>
         <TrendLineChart
           data={chartData}
           xKey="month"
@@ -72,57 +72,57 @@ export function AspAnalysisPage() {
         <button
           type="button"
           onClick={exportRows}
-          className="ml-auto rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="ml-auto rounded-md border border-[var(--line-2)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--surface-hover)]"
         >
           Export CSV
         </button>
       </MomControls>
 
       {m.rows.length === 0 ? (
-        <p className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+        <p className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6 text-center text-sm text-[var(--ink-3)]">
           No sales in {monthLabel(m.month)} or {monthLabel(m.compareMonth)} at this level.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50">
+            <thead className="bg-[var(--surface-2)]">
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">
+                <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">
                   {m.level === 'channel' ? 'Channel' : m.level === 'category' ? 'Category' : m.level === 'sku' ? 'SKU' : 'Scope'}
                 </th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Net Sales</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Units</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">ASP {monthLabel(m.compareMonth)}</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-slate-700">ASP {monthLabel(m.month)}</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Change</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Growth %</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Net Sales</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Units</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">ASP {monthLabel(m.compareMonth)}</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-2)]">ASP {monthLabel(m.month)}</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Change</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Growth %</th>
               </tr>
             </thead>
             <tbody>
               {m.rows.map((r) => (
-                <tr key={r.key} className="border-t border-slate-100">
+                <tr key={r.key} className="border-t border-[var(--line)]">
                   <td className="px-3 py-2">
-                    <div className="text-slate-800">{r.label}</div>
-                    {m.level === 'sku' && r.label !== r.key && <div className="font-mono text-xs text-slate-400">{r.key}</div>}
+                    <div className="text-[var(--ink)]">{r.label}</div>
+                    {m.level === 'sku' && r.label !== r.key && <div className="font-mono text-xs text-[var(--ink-3)]">{r.key}</div>}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-700">{formatCurrencyFull(r.current.netSales)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-600">{formatNumber(r.current.units)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-500">
+                  <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">{formatCurrencyFull(r.current.netSales)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">{formatNumber(r.current.units)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-3)]">
                     {r.previousAsp === null ? '—' : formatCurrencyFull(r.previousAsp)}
                   </td>
-                  <td className="px-3 py-2 text-right font-medium tabular-nums text-slate-900">
+                  <td className="px-3 py-2 text-right font-medium tabular-nums text-[var(--ink)]">
                     {r.currentAsp === null ? '—' : formatCurrencyFull(r.currentAsp)}
                   </td>
                   <td
                     className={`px-3 py-2 text-right tabular-nums ${
-                      r.aspChange === null ? 'text-slate-400' : r.aspChange >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                      r.aspChange === null ? 'text-[var(--ink-3)]' : r.aspChange >= 0 ? 'text-[var(--good-ink)]' : 'text-[var(--critical-ink)]'
                     }`}
                   >
                     {r.aspChange === null ? '—' : `${r.aspChange >= 0 ? '+' : ''}${formatCurrencyFull(r.aspChange)}`}
                   </td>
                   <td
                     className={`px-3 py-2 text-right tabular-nums ${
-                      r.aspGrowthPct === null ? 'text-slate-400' : r.aspGrowthPct >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                      r.aspGrowthPct === null ? 'text-[var(--ink-3)]' : r.aspGrowthPct >= 0 ? 'text-[var(--good-ink)]' : 'text-[var(--critical-ink)]'
                     }`}
                   >
                     {r.aspGrowthPct === null ? '—' : `${r.aspGrowthPct >= 0 ? '▲' : '▼'} ${formatPercent(Math.abs(r.aspGrowthPct))}`}
@@ -134,7 +134,7 @@ export function AspAnalysisPage() {
         </div>
       )}
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-[var(--ink-3)]">
         A dash means there were no units in that month, which is a different answer from an ASP of zero.
       </p>
     </PageShell>

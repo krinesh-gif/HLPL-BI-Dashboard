@@ -28,15 +28,15 @@ export function MomControls({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs font-medium text-slate-500">Level</span>
-      <div className="flex rounded-md border border-slate-300 bg-white p-0.5">
+      <span className="text-xs font-medium text-[var(--ink-3)]">Level</span>
+      <div className="flex rounded-md border border-[var(--line-2)] bg-[var(--surface)] p-0.5">
         {LEVELS.map((l) => (
           <button
             key={l.key}
             type="button"
             onClick={() => setLevel(l.key)}
             className={`rounded px-3 py-1 text-sm font-medium transition ${
-              level === l.key ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+              level === l.key ? 'bg-[var(--accent)] text-[var(--accent-ink)]' : 'text-[var(--ink-2)] hover:bg-[var(--surface-hover)]'
             }`}
           >
             {l.label}
@@ -44,12 +44,12 @@ export function MomControls({
         ))}
       </div>
 
-      <label className="ml-2 flex items-center gap-2 text-xs font-medium text-slate-500">
+      <label className="ml-2 flex items-center gap-2 text-xs font-medium text-[var(--ink-3)]">
         Compare {monthLabel(month)} with
         <select
           value={compareMonth}
           onChange={(e) => setCompareMonth(e.target.value)}
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none"
+          className="rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
         >
           {monthOptions
             .filter((m) => m !== month)

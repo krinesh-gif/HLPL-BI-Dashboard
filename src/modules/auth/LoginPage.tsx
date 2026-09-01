@@ -50,19 +50,29 @@ export function LoginPage() {
   }
 
   if (mode === 'checking') {
-    return <div className="flex min-h-screen items-center justify-center bg-slate-100 text-sm text-slate-500">Loading…</div>
+    return <div className="flex min-h-screen items-center justify-center bg-[var(--plane)] text-sm text-[var(--ink-3)]">Loading…</div>
   }
 
   if (mode === 'no-database' || mode === 'blocked') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
-        <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
-          <h1 className="text-xl font-bold text-slate-900">HLPL</h1>
-          <p className="mt-1 text-sm text-slate-500">Business Intelligence</p>
+      <div className="flex min-h-screen items-center justify-center bg-[var(--plane)] px-4">
+        <div className="w-full max-w-md rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-8 shadow-[var(--shadow-pop)]">
+          <div className="mb-5 flex items-center gap-3">
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-[12px] text-sm font-bold text-white"
+              style={{ background: 'linear-gradient(135deg, var(--accent), var(--series-5))' }}
+              aria-hidden
+            >H</div>
+            <div>
+              <h1 className="text-lg leading-tight font-bold text-[var(--ink)]">HLPL</h1>
+              <p className="text-xs text-[var(--ink-3)]">Business Intelligence</p>
+            </div>
+          </div>
+          <p className="mt-1 text-sm text-[var(--ink-3)]">Business Intelligence</p>
 
-          <div className="mt-5 rounded-md bg-amber-50 px-4 py-3">
-            <p className="text-sm font-semibold text-amber-900">Setup isn&apos;t finished yet</p>
-            <p className="mt-1 text-sm text-amber-800">
+          <div className="mt-5 rounded-md bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] px-4 py-3">
+            <p className="text-sm font-semibold text-[var(--ink)]">Setup isn&apos;t finished yet</p>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">
               {mode === 'no-database'
                 ? 'No database is connected to this project yet, so there is nothing to sign in to.'
                 : blockedReason}
@@ -70,7 +80,7 @@ export function LoginPage() {
           </div>
 
           {mode === 'no-database' && (
-            <ol className="mt-4 list-decimal space-y-1.5 pl-5 text-sm text-slate-600">
+            <ol className="mt-4 list-decimal space-y-1.5 pl-5 text-sm text-[var(--ink-2)]">
               <li>In Vercel, open this project and click the <strong>Storage</strong> tab.</li>
               <li>
                 <strong>Create Database</strong> → choose <strong>Neon</strong> → accept the free plan.
@@ -85,7 +95,7 @@ export function LoginPage() {
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="mt-6 w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            className="mt-6 w-full rounded-[var(--radius-control)] bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-ink)] transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             Check again
           </button>
@@ -97,48 +107,58 @@ export function LoginPage() {
   const isSetup = mode === 'setup'
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="text-xl font-bold text-slate-900">HLPL</h1>
-        <p className="mt-1 text-sm text-slate-500">Business Intelligence</p>
+    <div className="flex min-h-screen items-center justify-center bg-[var(--plane)] px-4">
+      <form onSubmit={handleSubmit} className="w-full max-w-sm rounded-lg border border-[var(--line)] bg-[var(--surface)] p-8 shadow-sm">
+        <div className="mb-5 flex items-center gap-3">
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-[12px] text-sm font-bold text-white"
+              style={{ background: 'linear-gradient(135deg, var(--accent), var(--series-5))' }}
+              aria-hidden
+            >H</div>
+            <div>
+              <h1 className="text-lg leading-tight font-bold text-[var(--ink)]">HLPL</h1>
+              <p className="text-xs text-[var(--ink-3)]">Business Intelligence</p>
+            </div>
+          </div>
+        <p className="mt-1 text-sm text-[var(--ink-3)]">Business Intelligence</p>
 
         {isSetup && (
-          <div className="mt-5 rounded-md bg-indigo-50 px-3 py-3">
-            <p className="text-sm font-semibold text-indigo-900">Welcome — let&apos;s set up your dashboard</p>
-            <p className="mt-1 text-xs text-indigo-800">
+          <div className="mt-5 rounded-md bg-[var(--accent-soft)] px-3 py-3">
+            <p className="text-sm font-semibold text-[var(--accent)]">Welcome — let&apos;s set up your dashboard</p>
+            <p className="mt-1 text-xs text-[var(--accent)]">
               Choose the email and password you&apos;ll sign in with. This creates the database tables and loads your
               product list. You can add your team afterwards from Settings.
             </p>
           </div>
         )}
 
-        <label className="mt-6 block text-xs font-semibold text-slate-600" htmlFor="email">Email</label>
+        <label className="mt-6 block text-xs font-semibold text-[var(--ink-2)]" htmlFor="email">Email</label>
         <input
           id="email" type="email" autoComplete="username" required value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+          className="mt-1 w-full rounded-[var(--radius-control)] border border-[var(--line-2)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
         />
 
-        <label className="mt-4 block text-xs font-semibold text-slate-600" htmlFor="password">Password</label>
+        <label className="mt-4 block text-xs font-semibold text-[var(--ink-2)]" htmlFor="password">Password</label>
         <input
           id="password" type="password" required minLength={isSetup ? 8 : undefined}
           autoComplete={isSetup ? 'new-password' : 'current-password'}
           value={password} onChange={(e) => setPassword(e.target.value)}
-          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+          className="mt-1 w-full rounded-[var(--radius-control)] border border-[var(--line-2)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
         />
-        {isSetup && <p className="mt-1 text-xs text-slate-500">At least 8 characters.</p>}
+        {isSetup && <p className="mt-1 text-xs text-[var(--ink-3)]">At least 8 characters.</p>}
 
-        {error && <p className="mt-4 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+        {error && <p className="mt-4 rounded-md bg-[color-mix(in_oklab,var(--critical)_10%,transparent)] px-3 py-2 text-sm text-[var(--critical-ink)]">{error}</p>}
 
         <button
           type="submit" disabled={submitting}
-          className="mt-6 w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+          className="mt-6 w-full rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
         >
           {submitting ? (isSetup ? 'Setting up…' : 'Signing in…') : isSetup ? 'Create my account' : 'Sign in'}
         </button>
 
         {!isSetup && (
-          <p className="mt-4 text-center text-xs text-slate-400">
+          <p className="mt-4 text-center text-xs text-[var(--ink-3)]">
             Accounts are created by an administrator — there is no self-signup.
           </p>
         )}

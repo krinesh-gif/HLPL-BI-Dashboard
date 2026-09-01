@@ -21,7 +21,7 @@ function App() {
 
   if (checking) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-100 text-sm text-slate-500">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--surface-2)] text-sm text-[var(--ink-3)]">
         Loading…
       </div>
     )

@@ -66,12 +66,12 @@ export function AdsChannelPage() {
 
   return (
     <PageShell title={`${def.label} Ads`} subtitle={monthLabel(month)}>
-      <label className="flex items-center gap-2 text-xs font-medium text-slate-500">
+      <label className="flex items-center gap-2 text-xs font-medium text-[var(--ink-3)]">
         Ads channel
         <select
           value={channel}
           onChange={(e) => navigate(`/marketing/ads/${e.target.value}`)}
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none"
+          className="rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
         >
           {ADS_CHANNELS.map((c) => (
             <option key={c.id} value={c.id}>{c.label}</option>
@@ -80,7 +80,7 @@ export function AdsChannelPage() {
       </label>
 
       {figure.source === 'manual' && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+        <div className="rounded-lg border border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] p-3 text-xs text-[var(--ink)]">
           This month's spend was entered by hand, not taken from a campaign report. It counts as real spend, but there are no
           impressions, clicks or attributed sales behind it, so ROAS, ACOS and CTR cannot be calculated.
         </div>
@@ -105,12 +105,12 @@ export function AdsChannelPage() {
       {def.usesMonthlyInvoice && <ManualAdSpendForm channel={channel} def={def} month={month} current={figure} />}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="mb-2 text-sm font-semibold text-slate-700">Ad spend trend</h3>
+        <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+          <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">Ad spend trend</h3>
           <TrendLineChart data={trend} xKey="month" series={[{ key: 'spend', label: 'Spend' }]} valueFormatter={(v) => formatCurrencyCompact(v)} />
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="mb-2 text-sm font-semibold text-slate-700">ROAS trend</h3>
+        <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+          <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">ROAS trend</h3>
           <TrendLineChart data={trend} xKey="month" series={[{ key: 'roas', label: 'ROAS' }]} valueFormatter={(v) => `${v.toFixed(2)}x`} />
         </div>
       </div>

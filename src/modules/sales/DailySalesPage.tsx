@@ -75,16 +75,16 @@ export function DailySalesPage() {
 
   return (
     <PageShell title="Daily Sales" subtitle="Day-level revenue, units, orders, ASP and RTO" showFilters={false}>
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
         <Field label="Level">
-          <div className="flex rounded-md border border-slate-300 bg-white p-0.5">
+          <div className="flex rounded-md border border-[var(--line-2)] bg-[var(--surface)] p-0.5">
             {LEVELS.map((l) => (
               <button
                 key={l.key}
                 type="button"
                 onClick={() => setLevel(l.key)}
                 className={`rounded px-3 py-1 text-sm font-medium transition ${
-                  level === l.key ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+                  level === l.key ? 'bg-[var(--accent)] text-[var(--accent-ink)]' : 'text-[var(--ink-2)] hover:bg-[var(--surface-hover)]'
                 }`}
               >
                 {l.label}
@@ -99,7 +99,7 @@ export function DailySalesPage() {
             value={d.filters.from}
             max={d.filters.to}
             onChange={(e) => d.setFilters({ ...d.filters, from: e.target.value })}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+            className="rounded-md border border-[var(--line-2)] px-2 py-1.5 text-sm focus:border-[var(--accent)] focus:outline-none"
           />
         </Field>
         <Field label="To">
@@ -108,7 +108,7 @@ export function DailySalesPage() {
             value={d.filters.to}
             min={d.filters.from}
             onChange={(e) => d.setFilters({ ...d.filters, to: e.target.value })}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+            className="rounded-md border border-[var(--line-2)] px-2 py-1.5 text-sm focus:border-[var(--accent)] focus:outline-none"
           />
         </Field>
 
@@ -116,7 +116,7 @@ export function DailySalesPage() {
           <select
             value={d.filters.channel}
             onChange={(e) => d.setFilters({ ...d.filters, channel: e.target.value as ChannelId | 'all' })}
-            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+            className="rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-2 py-1.5 text-sm focus:border-[var(--accent)] focus:outline-none"
           >
             <option value="all">All channels</option>
             {Object.values(CHANNEL_MAP).map((c) => (
@@ -129,7 +129,7 @@ export function DailySalesPage() {
           <select
             value={d.filters.category}
             onChange={(e) => d.setFilters({ ...d.filters, category: e.target.value })}
-            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+            className="rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-2 py-1.5 text-sm focus:border-[var(--accent)] focus:outline-none"
           >
             <option value="all">All categories</option>
             {d.options.categories.map((c) => (
@@ -142,7 +142,7 @@ export function DailySalesPage() {
           <select
             value={d.filters.sku}
             onChange={(e) => d.setFilters({ ...d.filters, sku: e.target.value })}
-            className="w-56 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+            className="w-56 rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-2 py-1.5 text-sm focus:border-[var(--accent)] focus:outline-none"
           >
             <option value="all">All SKUs</option>
             {d.options.skus.map((s) => (
@@ -156,7 +156,7 @@ export function DailySalesPage() {
             <select
               value={metric}
               onChange={(e) => setMetric(e.target.value as Metric)}
-              className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+              className="rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-2 py-1.5 text-sm focus:border-[var(--accent)] focus:outline-none"
             >
               {METRICS.map((m) => (
                 <option key={m.key} value={m.key}>{m.label}</option>
@@ -168,21 +168,21 @@ export function DailySalesPage() {
         <button
           type="button"
           onClick={() => d.setFilters({ from: '', to: '', channel: 'all', category: 'all', sku: 'all' })}
-          className="ml-auto rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          className="ml-auto rounded-md border border-[var(--line-2)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--surface-hover)]"
         >
           Reset
         </button>
         <button
           type="button"
           onClick={exportRows}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="rounded-md border border-[var(--line-2)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--surface-hover)]"
         >
           Export CSV
         </button>
       </div>
 
       {d.rows.length === 0 ? (
-        <p className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+        <p className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6 text-center text-sm text-[var(--ink-3)]">
           No sales between {formatDate(d.filters.from)} and {formatDate(d.filters.to)} for this selection.
         </p>
       ) : (
@@ -200,8 +200,8 @@ export function DailySalesPage() {
             <KPICard label="ASP in range" value={d.total.units > 0 ? formatCurrencyFull(d.total.netSales / d.total.units) : '—'} />
           </KPIGrid>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <h3 className="mb-2 text-sm font-semibold text-slate-700">
+          <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+            <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">
               {level === 'channel' ? 'Daily revenue by channel' : METRICS.find((m) => m.key === metric)!.label}
             </h3>
             <TrendLineChart
@@ -212,44 +212,44 @@ export function DailySalesPage() {
             />
           </div>
 
-          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50">
+              <thead className="bg-[var(--surface-2)]">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Date</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Date</th>
                   {level === 'channel' &&
                     d.activeChannels.map((c) => (
-                      <th key={c.id} className="px-3 py-2 text-right text-xs font-semibold text-slate-500">{c.label}</th>
+                      <th key={c.id} className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">{c.label}</th>
                     ))}
-                  <th className="px-3 py-2 text-right text-xs font-semibold text-slate-700">Revenue</th>
-                  <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Units</th>
-                  <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Orders</th>
-                  <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">ASP</th>
-                  <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">RTO %</th>
-                  <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">DoD</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-2)]">Revenue</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Units</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Orders</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">ASP</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">RTO %</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">DoD</th>
                 </tr>
               </thead>
               <tbody>
                 {[...d.rows].reverse().map((r) => (
-                  <tr key={r.date} className="border-t border-slate-100">
-                    <td className="px-3 py-2 text-slate-700">{formatDate(r.date)}</td>
+                  <tr key={r.date} className="border-t border-[var(--line)]">
+                    <td className="px-3 py-2 text-[var(--ink-2)]">{formatDate(r.date)}</td>
                     {level === 'channel' &&
                       d.activeChannels.map((c) => {
                         const value = r.byChannel.get(c.id as ChannelId) ?? 0
                         return (
-                          <td key={c.id} className={`px-3 py-2 text-right tabular-nums ${value === 0 ? 'text-slate-300' : 'text-slate-600'}`}>
+                          <td key={c.id} className={`px-3 py-2 text-right tabular-nums ${value === 0 ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'}`}>
                             {value === 0 ? '—' : formatCurrencyFull(value)}
                           </td>
                         )
                       })}
-                    <td className="px-3 py-2 text-right font-medium tabular-nums text-slate-900">{formatCurrencyFull(r.revenue)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-slate-600">{formatNumber(r.units)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-slate-600">{formatNumber(r.orders)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-slate-600">{r.asp === null ? '—' : formatCurrencyFull(r.asp)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-slate-600">{r.rtoPct === null ? '—' : formatPercent(r.rtoPct)}</td>
+                    <td className="px-3 py-2 text-right font-medium tabular-nums text-[var(--ink)]">{formatCurrencyFull(r.revenue)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">{formatNumber(r.units)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">{formatNumber(r.orders)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">{r.asp === null ? '—' : formatCurrencyFull(r.asp)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">{r.rtoPct === null ? '—' : formatPercent(r.rtoPct)}</td>
                     <td
                       className={`px-3 py-2 text-right tabular-nums ${
-                        r.dodGrowthPct === null ? 'text-slate-400' : r.dodGrowthPct >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                        r.dodGrowthPct === null ? 'text-[var(--ink-3)]' : r.dodGrowthPct >= 0 ? 'text-[var(--good-ink)]' : 'text-[var(--critical-ink)]'
                       }`}
                     >
                       {r.dodGrowthPct === null ? '—' : `${r.dodGrowthPct >= 0 ? '▲' : '▼'} ${formatPercent(Math.abs(r.dodGrowthPct))}`}
@@ -260,7 +260,7 @@ export function DailySalesPage() {
             </table>
           </div>
 
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-[var(--ink-3)]">
             Daily figures are summed from order-level rows, because settlement reports are monthly totals and cannot be split by day.
             For a channel whose month is settled, these daily figures will therefore not add up exactly to that month's P&amp;L — see
             Net Sales Reconciliation for why.
@@ -274,7 +274,7 @@ export function DailySalesPage() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs font-medium text-slate-500">{label}</span>
+      <span className="text-xs font-medium text-[var(--ink-3)]">{label}</span>
       {children}
     </label>
   )

@@ -11,7 +11,7 @@ export function PnlTable({ lines, currency = 'INR' }: { lines: PnlLineValues; cu
   }))
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+    <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
       <table className="w-full text-sm">
         <tbody>
           {rowsWithHeaderFlag.map(({ def, showSectionHeader }) => {
@@ -20,19 +20,19 @@ export function PnlTable({ lines, currency = 'INR' }: { lines: PnlLineValues; cu
             return (
               <Fragment key={def.key}>
                 {showSectionHeader && (
-                  <tr key={`${def.section}-header`} className="bg-slate-50">
-                    <td colSpan={2} className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <tr key={`${def.section}-header`} className="bg-[var(--surface-2)]">
+                    <td colSpan={2} className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">
                       {SECTION_LABELS[def.section as PnlSection]}
                     </td>
                   </tr>
                 )}
                 <tr
                   className={clsx(
-                    'border-t border-slate-100',
-                    def.kind === 'subtotal' && 'bg-indigo-50/50 font-semibold text-slate-900',
+                    'border-t border-[var(--line)]',
+                    def.kind === 'subtotal' && 'bg-[var(--accent-soft)]/50 font-semibold text-[var(--ink)]',
                   )}
                 >
-                  <td className={clsx('px-4 py-2', def.kind === 'input' && 'pl-8 text-slate-600', def.kind === 'percent' && 'pl-8 text-slate-500 italic')}>
+                  <td className={clsx('px-4 py-2', def.kind === 'input' && 'pl-8 text-[var(--ink-2)]', def.kind === 'percent' && 'pl-8 text-[var(--ink-3)] italic')}>
                     {def.label}
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums">

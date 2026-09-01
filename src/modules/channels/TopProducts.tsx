@@ -138,7 +138,7 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
 
   if (rows.all.length === 0) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+      <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6 text-center text-sm text-[var(--ink-3)]">
         No product-level sales for this channel in this month.
       </div>
     )
@@ -153,12 +153,12 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
+        <label className="flex flex-col gap-1 text-xs font-medium text-[var(--ink-3)]">
           Top
           <select
             value={topN}
             onChange={(e) => setTopN(Number(e.target.value))}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none"
+            className="rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
           >
             {TOP_N_OPTIONS.map((n) => (
               <option key={n} value={n}>{n}</option>
@@ -166,12 +166,12 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
           </select>
         </label>
 
-        <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
+        <label className="flex flex-col gap-1 text-xs font-medium text-[var(--ink-3)]">
           Rank by
           <select
             value={rankBy}
             onChange={(e) => setRankBy(e.target.value as RankBy)}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none"
+            className="rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
           >
             {RANKINGS.map((r) => (
               <option key={r.key} value={r.key}>{r.label}</option>
@@ -179,20 +179,20 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
           </select>
         </label>
 
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-[var(--ink-3)]">
           {rows.top.length} of {rows.all.length} products
         </span>
 
         <button
           type="button"
           onClick={exportRows}
-          className="ml-auto rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="ml-auto rounded-md border border-[var(--line-2)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--surface-hover)]"
         >
           Export CSV
         </button>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
         <ComparisonBarChart
           data={rows.top.map((r) => ({ name: r.productName, value: chartValue(r) }))}
           xKey="name"
@@ -202,37 +202,37 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
         />
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50">
+          <thead className="bg-[var(--surface-2)]">
             <tr>
-              <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">#</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Product</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Net Sales</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Share</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Units</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Orders</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Contribution</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Growth</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">#</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Product</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Net Sales</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Share</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Units</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Orders</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Contribution</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Growth</th>
             </tr>
           </thead>
           <tbody>
             {rows.top.map((r, i) => (
-              <tr key={r.sku} className="border-t border-slate-100">
-                <td className="px-3 py-2 text-right tabular-nums text-slate-400">{i + 1}</td>
+              <tr key={r.sku} className="border-t border-[var(--line)]">
+                <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-3)]">{i + 1}</td>
                 <td className="px-3 py-2">
-                  <div className="text-slate-800">{r.productName}</div>
-                  <div className="font-mono text-xs text-slate-400">{r.sku}</div>
+                  <div className="text-[var(--ink)]">{r.productName}</div>
+                  <div className="font-mono text-xs text-[var(--ink-3)]">{r.sku}</div>
                 </td>
-                <td className="px-3 py-2 text-right font-medium tabular-nums text-slate-900">{formatCurrencyFull(r.netSales)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-slate-500">
+                <td className="px-3 py-2 text-right font-medium tabular-nums text-[var(--ink)]">{formatCurrencyFull(r.netSales)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-3)]">
                   {rows.total > 0 ? formatPercent((r.netSales / rows.total) * 100) : '—'}
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums text-slate-600">{formatNumber(r.units)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-slate-600">{formatNumber(r.orders)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">{formatNumber(r.units)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">{formatNumber(r.orders)}</td>
                 <td
                   className={`px-3 py-2 text-right tabular-nums ${
-                    r.contribution === null ? 'text-slate-400' : r.contribution >= 0 ? 'text-slate-700' : 'text-rose-600'
+                    r.contribution === null ? 'text-[var(--ink-3)]' : r.contribution >= 0 ? 'text-[var(--ink-2)]' : 'text-[var(--critical-ink)]'
                   }`}
                   title={r.contribution === null ? 'No cost on file for this SKU' : undefined}
                 >
@@ -240,7 +240,7 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
                 </td>
                 <td
                   className={`px-3 py-2 text-right tabular-nums ${
-                    r.growth === null ? 'text-slate-400' : r.growth >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                    r.growth === null ? 'text-[var(--ink-3)]' : r.growth >= 0 ? 'text-[var(--good-ink)]' : 'text-[var(--critical-ink)]'
                   }`}
                 >
                   {r.growth === null ? 'new' : `${r.growth >= 0 ? '▲' : '▼'} ${formatPercent(Math.abs(r.growth))}`}

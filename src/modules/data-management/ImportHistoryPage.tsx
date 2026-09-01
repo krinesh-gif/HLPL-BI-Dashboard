@@ -28,7 +28,7 @@ export function ImportHistoryPage() {
               render: (r) => (
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                    r.status === 'success' ? 'bg-emerald-100 text-emerald-700' : r.status === 'partial' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
+                    r.status === 'success' ? 'bg-[color-mix(in_oklab,var(--good)_16%,transparent)] text-[var(--good-ink)]' : r.status === 'partial' ? 'bg-[color-mix(in_oklab,var(--warning)_20%,transparent)] text-[var(--ink-2)]' : 'bg-[color-mix(in_oklab,var(--critical)_16%,transparent)] text-[var(--critical-ink)]'
                   }`}
                 >
                   {r.status}

@@ -5,12 +5,12 @@ import { useFilterStore } from '@/store/filterStore'
 import { useSkuAnalytics, type SkuGrowthBucket } from './useSkuAnalytics'
 
 const BUCKET_STYLE: Record<SkuGrowthBucket, string> = {
-  'fast-growing': 'bg-emerald-100 text-emerald-700',
-  stable: 'bg-slate-100 text-slate-600',
-  declining: 'bg-amber-100 text-amber-700',
-  'high-volume-declining': 'bg-rose-100 text-rose-700',
+  'fast-growing': 'bg-[color-mix(in_oklab,var(--good)_16%,transparent)] text-[var(--good-ink)]',
+  stable: 'bg-[var(--surface-2)] text-[var(--ink-2)]',
+  declining: 'bg-[color-mix(in_oklab,var(--warning)_20%,transparent)] text-[var(--ink-2)]',
+  'high-volume-declining': 'bg-[color-mix(in_oklab,var(--critical)_16%,transparent)] text-[var(--critical-ink)]',
   'low-volume-high-growth': 'bg-sky-100 text-sky-700',
-  'zero-sales': 'bg-slate-200 text-slate-500',
+  'zero-sales': 'bg-[var(--surface-2)] text-[var(--ink-3)]',
 }
 
 const BUCKET_LABEL: Record<SkuGrowthBucket, string> = {

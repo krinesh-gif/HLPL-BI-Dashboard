@@ -25,7 +25,7 @@ export function FixedExpensesPage() {
   return (
     <PageShell title="Fixed Expenses" subtitle={`Monthly fixed cost entry and sales-contribution allocation — ${monthLabel(month)}`}>
       <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Fixed Expense Entries</h2>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--ink-3)]">Fixed Expense Entries</h2>
         <DataTable
           columns={[
             { key: 'category', header: 'Category', accessor: (r) => r.category },
@@ -38,7 +38,7 @@ export function FixedExpensesPage() {
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--ink-3)]">
           Allocation — Sales Contribution Method (Total: {formatCurrencyFull(totalExpense)})
         </h2>
         <DataTable

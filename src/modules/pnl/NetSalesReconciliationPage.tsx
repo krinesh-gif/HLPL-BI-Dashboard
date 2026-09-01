@@ -38,16 +38,16 @@ export function NetSalesReconciliationPage() {
       title="Net Sales Reconciliation"
       subtitle={`Order reports against settlement reports — ${monthLabel(month)}`}
     >
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
-        <h3 className="text-sm font-semibold text-slate-800">How Net Sales is calculated</h3>
-        <p className="mt-1 text-sm text-slate-600">
+      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+        <h3 className="text-sm font-semibold text-[var(--ink)]">How Net Sales is calculated</h3>
+        <p className="mt-1 text-sm text-[var(--ink-2)]">
           Every screen in this dashboard — Overview, channel pages, P&amp;L, Investor MIS, Business Insight — now reads Net Sales from one
           engine. The definition it applies is:
         </p>
-        <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700">
+        <p className="mt-2 rounded-md bg-[var(--surface-2)] px-3 py-2 font-mono text-xs text-[var(--ink-2)]">
           Net Sales = Gross Sales − Discounts − Returns − Other revenue adjustments
         </p>
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--ink-2)]">
           <li>Cancelled orders are excluded — they never shipped and are never settled.</li>
           <li>Amazon USA rows are converted from USD to INR before being added to any consolidated figure.</li>
           <li>
@@ -58,19 +58,19 @@ export function NetSalesReconciliationPage() {
       </section>
 
       {comparable.length === 0 ? (
-        <p className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+        <p className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6 text-center text-sm text-[var(--ink-3)]">
           No channel has both an order report and a settlement report for {monthLabel(month)}, so there is nothing to reconcile.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50">
+            <thead className="bg-[var(--surface-2)]">
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Channel</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">From order rows</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">From settlement</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Difference</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Status</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Channel</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">From order rows</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">From settlement</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Difference</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Status</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
@@ -89,15 +89,15 @@ export function NetSalesReconciliationPage() {
       )}
 
       {orderOnly.length > 0 && (
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="text-sm font-semibold text-slate-800">Order reports only</h3>
-          <p className="mt-1 text-sm text-slate-600">
+        <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+          <h3 className="text-sm font-semibold text-[var(--ink)]">Order reports only</h3>
+          <p className="mt-1 text-sm text-[var(--ink-2)]">
             These channels have no settlement report for {monthLabel(month)}, so their Net Sales comes from order rows and there is
             nothing to compare it against.
           </p>
-          <ul className="mt-2 space-y-1 text-sm text-slate-700">
+          <ul className="mt-2 space-y-1 text-sm text-[var(--ink-2)]">
             {orderOnly.map((r) => (
-              <li key={r.channel} className="flex justify-between border-b border-slate-100 py-1 last:border-0">
+              <li key={r.channel} className="flex justify-between border-b border-[var(--line)] py-1 last:border-0">
                 <span>{BUSINESS_CHANNELS.find((c) => c.id === r.channel)?.label ?? r.channel}</span>
                 <span className="tabular-nums">{formatCurrencyFull(r.orderBasis.netSales)}</span>
               </li>
@@ -110,10 +110,10 @@ export function NetSalesReconciliationPage() {
 }
 
 const STATUS_STYLE: Record<ChannelReconciliation['status'], { label: string; className: string }> = {
-  reconciled: { label: 'Reconciled', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  gap: { label: 'Gap to review', className: 'bg-amber-50 text-amber-800 border-amber-200' },
-  'no-order-report': { label: 'Order report missing', className: 'bg-rose-50 text-rose-700 border-rose-200' },
-  'no-settlement-report': { label: 'No settlement report', className: 'bg-slate-50 text-slate-600 border-slate-200' },
+  reconciled: { label: 'Reconciled', className: 'bg-[color-mix(in_oklab,var(--good)_10%,transparent)] text-[var(--good-ink)] border-[color-mix(in_oklab,var(--good)_35%,transparent)]' },
+  gap: { label: 'Gap to review', className: 'bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] text-[var(--ink-2)] border-[color-mix(in_oklab,var(--warning)_35%,transparent)]' },
+  'no-order-report': { label: 'Order report missing', className: 'bg-[color-mix(in_oklab,var(--critical)_10%,transparent)] text-[var(--critical-ink)] border-[color-mix(in_oklab,var(--critical)_35%,transparent)]' },
+  'no-settlement-report': { label: 'No settlement report', className: 'bg-[var(--surface-2)] text-[var(--ink-2)] border-[var(--line)]' },
 }
 
 function ReconciliationRow({ row, open, onToggle }: { row: ChannelReconciliation; open: boolean; onToggle: () => void }) {
@@ -125,44 +125,44 @@ function ReconciliationRow({ row, open, onToggle }: { row: ChannelReconciliation
 
   return (
     <>
-      <tr className="border-t border-slate-100">
-        <td className="px-3 py-2 font-medium text-slate-800">{label}</td>
-        <td className="px-3 py-2 text-right tabular-nums text-slate-700">{formatCurrencyFull(row.orderBasis.netSales)}</td>
-        <td className="px-3 py-2 text-right tabular-nums text-slate-700">
+      <tr className="border-t border-[var(--line)]">
+        <td className="px-3 py-2 font-medium text-[var(--ink)]">{label}</td>
+        <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">{formatCurrencyFull(row.orderBasis.netSales)}</td>
+        <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">
           {row.settlementBasis ? formatCurrencyFull(row.settlementBasis.netSales) : '—'}
         </td>
         <td
           className={`px-3 py-2 text-right font-semibold tabular-nums ${
-            Math.abs(row.differencePct ?? 0) <= 0.5 ? 'text-slate-500' : 'text-amber-700'
+            Math.abs(row.differencePct ?? 0) <= 0.5 ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'
           }`}
         >
           {formatCurrencyFull(row.difference)}
           {row.differencePct !== null && (
-            <span className="ml-1 text-xs font-normal text-slate-400">({formatPercent(row.differencePct)})</span>
+            <span className="ml-1 text-xs font-normal text-[var(--ink-3)]">({formatPercent(row.differencePct)})</span>
           )}
         </td>
         <td className="px-3 py-2">
           <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${status.className}`}>{status.label}</span>
         </td>
         <td className="px-3 py-2 text-right">
-          <button type="button" onClick={onToggle} className="text-xs font-medium text-indigo-600 hover:text-indigo-800">
+          <button type="button" onClick={onToggle} className="text-xs font-medium text-[var(--accent)] hover:opacity-80">
             {open ? 'Hide' : 'Why?'}
           </button>
         </td>
       </tr>
 
       {row.partialSettlementWarning && (
-        <tr className="border-t border-amber-200 bg-amber-50">
-          <td colSpan={6} className="px-4 py-2 text-xs text-amber-900">
+        <tr className="border-t border-[color-mix(in_oklab,var(--warning)_35%,transparent)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)]">
+          <td colSpan={6} className="px-4 py-2 text-xs text-[var(--ink)]">
             <strong>⚠ Settlement report may be incomplete.</strong> {row.partialSettlementWarning}
           </td>
         </tr>
       )}
 
       {open && (
-        <tr className="border-t border-slate-100 bg-slate-50/60">
+        <tr className="border-t border-[var(--line)] bg-[var(--surface-2)]/60">
           <td colSpan={6} className="px-4 py-3">
-            <p className="text-xs text-slate-600">
+            <p className="text-xs text-[var(--ink-2)]">
               Settlement is <strong>{formatCurrencyFull(row.settlementBasis?.netSales ?? 0)}</strong> against{' '}
               <strong>{formatCurrencyFull(row.orderBasis.netSales)}</strong> of orders — a difference of{' '}
               <strong>{formatCurrencyFull(row.difference)}</strong>.
@@ -189,21 +189,21 @@ function ReconciliationRow({ row, open, onToggle }: { row: ChannelReconciliation
 function CauseList({ title, note, causes }: { title: string; note?: string; causes: ReconciliationCause[] }) {
   return (
     <div className="mt-3">
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h4>
-      {note && <p className="mt-0.5 text-xs text-slate-500">{note}</p>}
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">{title}</h4>
+      {note && <p className="mt-0.5 text-xs text-[var(--ink-3)]">{note}</p>}
       <ul className="mt-1.5 space-y-1.5">
         {causes.map((c) => (
-          <li key={c.key} className="rounded-md border border-slate-200 bg-white px-3 py-2">
+          <li key={c.key} className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-2">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-xs font-medium text-slate-800">{c.label}</span>
+              <span className="text-xs font-medium text-[var(--ink)]">{c.label}</span>
               {c.measurable && c.amount !== 0 && (
-                <span className={`shrink-0 text-xs font-semibold tabular-nums ${c.amount < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                <span className={`shrink-0 text-xs font-semibold tabular-nums ${c.amount < 0 ? 'text-[var(--critical-ink)]' : 'text-[var(--good-ink)]'}`}>
                   {c.amount > 0 ? '+' : ''}
                   {formatCurrencyFull(c.amount)}
                 </span>
               )}
             </div>
-            <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{c.explanation}</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-[var(--ink-3)]">{c.explanation}</p>
           </li>
         ))}
       </ul>

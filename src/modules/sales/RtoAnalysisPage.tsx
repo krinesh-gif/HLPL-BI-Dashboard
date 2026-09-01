@@ -75,30 +75,30 @@ export function RtoAnalysisPage() {
         <KPICard label="Shipped Units" value={formatNumber(m.master.current.shippedUnits)} />
       </KPIGrid>
 
-      <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+      <p className="rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--ink-2)]">
         <strong>Change in percentage points</strong> and <strong>RTO unit growth</strong> answer different questions and can point
         opposite ways. If volume grows while the rate improves, fewer parcels come back per hundred shipped but more come back in
         total.
       </p>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="mb-2 text-sm font-semibold text-slate-700">RTO % trend</h3>
+        <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+          <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">RTO % trend</h3>
           <TrendLineChart data={chartData} xKey="month" series={[{ key: 'rtoPct', label: 'RTO %' }]} valueFormatter={(v) => formatPercent(v)} />
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="mb-2 text-sm font-semibold text-slate-700">RTO units trend</h3>
+        <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+          <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">RTO units trend</h3>
           <TrendLineChart data={chartData} xKey="month" series={[{ key: 'rtoUnits', label: 'RTO Units' }]} valueFormatter={(v) => formatNumber(v)} />
         </div>
       </div>
 
       {deteriorating.length > 0 && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4">
-          <h3 className="text-sm font-semibold text-rose-900">
+        <div className="rounded-lg border border-[color-mix(in_oklab,var(--critical)_35%,transparent)] bg-[color-mix(in_oklab,var(--critical)_10%,transparent)] p-4">
+          <h3 className="text-sm font-semibold text-[var(--critical-ink)]">
             ⚠ RTO worsened in {deteriorating.length} {m.level === 'channel' ? 'channel' : m.level === 'category' ? 'category' : 'SKU'}
             {deteriorating.length === 1 ? '' : 's'}
           </h3>
-          <ul className="mt-2 space-y-1 text-xs text-rose-800">
+          <ul className="mt-2 space-y-1 text-xs text-[var(--critical-ink)]">
             {deteriorating
               .slice()
               .sort((a, b) => (b.rtoPointChange ?? 0) - (a.rtoPointChange ?? 0))
@@ -118,57 +118,57 @@ export function RtoAnalysisPage() {
         <button
           type="button"
           onClick={exportRows}
-          className="ml-auto rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="ml-auto rounded-md border border-[var(--line-2)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--surface-hover)]"
         >
           Export CSV
         </button>
       </MomControls>
 
       {m.rows.length === 0 ? (
-        <p className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+        <p className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6 text-center text-sm text-[var(--ink-3)]">
           No shipments in {monthLabel(m.month)} or {monthLabel(m.compareMonth)} at this level.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50">
+            <thead className="bg-[var(--surface-2)]">
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">
+                <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">
                   {m.level === 'channel' ? 'Channel' : m.level === 'category' ? 'Category' : m.level === 'sku' ? 'SKU' : 'Scope'}
                 </th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Shipped</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">RTO Units</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">RTO % {monthLabel(m.compareMonth)}</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-slate-700">RTO % {monthLabel(m.month)}</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Change (pp)</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Unit Growth %</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Shipped</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">RTO Units</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">RTO % {monthLabel(m.compareMonth)}</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-2)]">RTO % {monthLabel(m.month)}</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Change (pp)</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Unit Growth %</th>
               </tr>
             </thead>
             <tbody>
               {m.rows.map((r) => (
-                <tr key={r.key} className={`border-t border-slate-100 ${r.rtoDeteriorated ? 'bg-rose-50/50' : ''}`}>
+                <tr key={r.key} className={`border-t border-[var(--line)] ${r.rtoDeteriorated ? 'bg-[color-mix(in_oklab,var(--critical)_10%,transparent)]/50' : ''}`}>
                   <td className="px-3 py-2">
-                    <div className="text-slate-800">{r.label}</div>
-                    {m.level === 'sku' && r.label !== r.key && <div className="font-mono text-xs text-slate-400">{r.key}</div>}
+                    <div className="text-[var(--ink)]">{r.label}</div>
+                    {m.level === 'sku' && r.label !== r.key && <div className="font-mono text-xs text-[var(--ink-3)]">{r.key}</div>}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-600">{formatNumber(r.current.shippedUnits)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-700">{formatNumber(r.current.rtoUnits)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-500">
+                  <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">{formatNumber(r.current.shippedUnits)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">{formatNumber(r.current.rtoUnits)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-3)]">
                     {r.previousRtoPct === null ? '—' : formatPercent(r.previousRtoPct)}
                   </td>
-                  <td className="px-3 py-2 text-right font-medium tabular-nums text-slate-900">
+                  <td className="px-3 py-2 text-right font-medium tabular-nums text-[var(--ink)]">
                     {r.currentRtoPct === null ? '—' : formatPercent(r.currentRtoPct)}
                   </td>
                   <td
                     className={`px-3 py-2 text-right tabular-nums ${
-                      r.rtoPointChange === null ? 'text-slate-400' : r.rtoPointChange > 0 ? 'font-semibold text-rose-600' : 'text-emerald-600'
+                      r.rtoPointChange === null ? 'text-[var(--ink-3)]' : r.rtoPointChange > 0 ? 'font-semibold text-[var(--critical-ink)]' : 'text-[var(--good-ink)]'
                     }`}
                   >
                     {r.rtoPointChange === null ? '—' : `${r.rtoPointChange >= 0 ? '+' : ''}${r.rtoPointChange.toFixed(1)}`}
                   </td>
                   <td
                     className={`px-3 py-2 text-right tabular-nums ${
-                      r.rtoUnitGrowthPct === null ? 'text-slate-400' : r.rtoUnitGrowthPct > 0 ? 'text-rose-600' : 'text-emerald-600'
+                      r.rtoUnitGrowthPct === null ? 'text-[var(--ink-3)]' : r.rtoUnitGrowthPct > 0 ? 'text-[var(--critical-ink)]' : 'text-[var(--good-ink)]'
                     }`}
                   >
                     {r.rtoUnitGrowthPct === null ? '—' : `${r.rtoUnitGrowthPct >= 0 ? '+' : ''}${formatPercent(r.rtoUnitGrowthPct)}`}
@@ -180,7 +180,7 @@ export function RtoAnalysisPage() {
         </div>
       )}
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-[var(--ink-3)]">
         RTO % is measured against units that actually shipped. Cancelled orders never shipped and are excluded from both sides, so
         cancellations cannot flatter the rate. A dash means there was nothing shipped in that month to measure.
       </p>

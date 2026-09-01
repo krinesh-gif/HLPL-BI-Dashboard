@@ -6,10 +6,10 @@ import { useInventoryPlan } from './useInventoryPlan'
 import type { RiskStatus } from '@/engine/forecast'
 
 const RISK_STYLE: Record<RiskStatus, string> = {
-  BUY_NOW: 'bg-rose-100 text-rose-700',
-  STOCK_OUT_RISK: 'bg-rose-100 text-rose-700',
-  PLAN_PURCHASE: 'bg-amber-100 text-amber-700',
-  HEALTHY: 'bg-emerald-100 text-emerald-700',
+  BUY_NOW: 'bg-[color-mix(in_oklab,var(--critical)_16%,transparent)] text-[var(--critical-ink)]',
+  STOCK_OUT_RISK: 'bg-[color-mix(in_oklab,var(--critical)_16%,transparent)] text-[var(--critical-ink)]',
+  PLAN_PURCHASE: 'bg-[color-mix(in_oklab,var(--warning)_20%,transparent)] text-[var(--ink-2)]',
+  HEALTHY: 'bg-[color-mix(in_oklab,var(--good)_16%,transparent)] text-[var(--good-ink)]',
   EXCESS_INVENTORY: 'bg-sky-100 text-sky-700',
 }
 

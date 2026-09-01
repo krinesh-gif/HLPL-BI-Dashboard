@@ -273,7 +273,7 @@ export function UploadReportsPage() {
 
   return (
     <PageShell title="Upload Reports" subtitle="Upload marketplace reports for normalization and import" showFilters={false}>
-      <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
+      <div className="rounded-lg border border-dashed border-[var(--line-2)] bg-[var(--surface)] p-8 text-center">
         <input
           type="file"
           accept=".csv,.xlsx,.xls,.json"
@@ -282,9 +282,9 @@ export function UploadReportsPage() {
             if (file) handleFile(file)
             e.target.value = ''
           }}
-          className="mx-auto block text-sm text-slate-600"
+          className="mx-auto block text-sm text-[var(--ink-2)]"
         />
-        <p className="mt-3 text-xs text-slate-400">
+        <p className="mt-3 text-xs text-[var(--ink-3)]">
           Supported: Amazon India Seller Central order reports, Flipkart SKU-level P&L exports (or the full P&L
           workbook), Amazon USA Product Profitability exports, Amazon Ads Sponsored Products campaign reports, Meesho
           Order Summary reports, the Meesho aggregated payment file, and Meesho Settlement Data (.json).
@@ -292,34 +292,34 @@ export function UploadReportsPage() {
       </div>
 
       {stage === 'error' && error && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div>
+        <div className="rounded-lg border border-[color-mix(in_oklab,var(--critical)_35%,transparent)] bg-[color-mix(in_oklab,var(--critical)_10%,transparent)] p-4 text-sm text-[var(--critical-ink)]">{error}</div>
       )}
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-700">Start Meesho over</h2>
-        <p className="mt-1 text-xs text-slate-500">
+      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+        <h2 className="text-sm font-semibold text-[var(--ink-2)]">Start Meesho over</h2>
+        <p className="mt-1 text-xs text-[var(--ink-3)]">
           Uploading a Meesho payment file adds to what is stored, because a month arrives across several files. That
           leaves no way back if what is stored is wrong — figures from an earlier upload stay whatever you upload next.
           This removes every Meesho event so the channel is rebuilt from the files alone. Nothing else is touched.
         </p>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-[var(--ink-3)]">
           Currently holding {meeshoMonths} Meesho month(s) on the order-date basis.
         </p>
         <button
           type="button"
           onClick={resetMeesho}
           disabled={resetting}
-          className="mt-3 rounded-md border border-rose-300 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+          className="mt-3 rounded-md border border-[color-mix(in_oklab,var(--critical)_45%,transparent)] px-3 py-1.5 text-xs font-medium text-[var(--critical-ink)] hover:bg-[color-mix(in_oklab,var(--critical)_10%,transparent)] disabled:opacity-50"
         >
           {resetting ? 'Removing…' : 'Remove all Meesho data'}
         </button>
-        {resetResult && <p className="mt-2 text-xs text-slate-700">{resetResult}</p>}
+        {resetResult && <p className="mt-2 text-xs text-[var(--ink-2)]">{resetResult}</p>}
       </section>
 
       {outcome && stage === 'idle' && (
-        <div className="mb-6 rounded-lg border border-emerald-300 bg-emerald-50 p-4">
-          <h3 className="text-sm font-semibold text-emerald-900">✓ Imported {outcome.fileName}</h3>
-          <ul className="mt-2 space-y-0.5 text-sm text-emerald-800">
+        <div className="mb-6 rounded-lg border border-[color-mix(in_oklab,var(--good)_45%,transparent)] bg-[color-mix(in_oklab,var(--good)_10%,transparent)] p-4">
+          <h3 className="text-sm font-semibold text-[var(--good-ink)]">✓ Imported {outcome.fileName}</h3>
+          <ul className="mt-2 space-y-0.5 text-sm text-[var(--good-ink)]">
             {outcome.mapping ? (
               <>
                 <li>{outcome.mapping.mappingsSaved.toLocaleString()} SKU mapping(s) saved.</li>
@@ -341,7 +341,7 @@ export function UploadReportsPage() {
                   </li>
                 )}
                 {outcome.mapping.warnings.slice(0, 4).map((w) => (
-                  <li key={w} className="text-amber-800">⚠ {w}</li>
+                  <li key={w} className="text-[var(--ink-2)]">⚠ {w}</li>
                 ))}
                 <li className="pt-1 font-medium">
                   Check the results under Products → SKU Mapping.
@@ -366,7 +366,7 @@ export function UploadReportsPage() {
           <button
             type="button"
             onClick={() => setOutcome(null)}
-            className="mt-3 text-xs font-medium text-emerald-700 hover:text-emerald-900"
+            className="mt-3 text-xs font-medium text-[var(--good-ink)] hover:text-[var(--good-ink)]"
           >
             Dismiss
           </button>
@@ -374,9 +374,9 @@ export function UploadReportsPage() {
       )}
 
       {stage === 'needs-month' && pendingFile && (
-        <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-5">
-          <div className="text-sm font-semibold text-slate-800">{pendingFile.fileName}</div>
-          <p className="text-sm text-slate-600">
+        <div className="space-y-3 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-5">
+          <div className="text-sm font-semibold text-[var(--ink)]">{pendingFile.fileName}</div>
+          <p className="text-sm text-[var(--ink-2)]">
             Flipkart's SKU-level P&L report is a monthly total per SKU — it doesn't carry its own date column. Which
             month does this file cover?
           </p>
@@ -384,13 +384,13 @@ export function UploadReportsPage() {
             type="month"
             value={flipkartMonth}
             onChange={(e) => setFlipkartMonth(e.target.value)}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+            className="rounded-md border border-[var(--line-2)] px-3 py-1.5 text-sm focus:border-[var(--accent)] focus:outline-none"
           />
           <div className="flex gap-2">
-            <button type="button" onClick={confirmFlipkartMonth} className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+            <button type="button" onClick={confirmFlipkartMonth} className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90">
               Continue
             </button>
-            <button type="button" onClick={cancel} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+            <button type="button" onClick={cancel} className="rounded-md border border-[var(--line-2)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--surface-hover)]">
               Cancel
             </button>
           </div>
@@ -398,27 +398,27 @@ export function UploadReportsPage() {
       )}
 
       {preview && (
-        <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
-          <div className="text-sm font-semibold text-slate-800">{preview.fileName}</div>
-          <div className="text-sm text-slate-600">
+        <div className="space-y-4 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-5">
+          <div className="text-sm font-semibold text-[var(--ink)]">{preview.fileName}</div>
+          <div className="text-sm text-[var(--ink-2)]">
             {REPORT_LABELS[preview.reportKind]}
             {preview.adsRecords.length === 0 && ` — ${CHANNEL_MAP[REPORT_CHANNEL[preview.reportKind]].label}`}
           </div>
 
           <ul className="space-y-1 text-sm">
-            <li className="text-slate-700">✓ {preview.totalRows.toLocaleString()} records detected</li>
-            <li className="text-emerald-700">✓ {totalValid.toLocaleString()} valid</li>
-            {preview.invalidCount > 0 && <li className="text-amber-700">⚠ {preview.invalidCount.toLocaleString()} records failed validation and will be skipped</li>}
-            {preview.duplicateCount > 0 && <li className="text-amber-700">⚠ {preview.duplicateCount.toLocaleString()} duplicate record(s) already imported previously</li>}
+            <li className="text-[var(--ink-2)]">✓ {preview.totalRows.toLocaleString()} records detected</li>
+            <li className="text-[var(--good-ink)]">✓ {totalValid.toLocaleString()} valid</li>
+            {preview.invalidCount > 0 && <li className="text-[var(--ink-2)]">⚠ {preview.invalidCount.toLocaleString()} records failed validation and will be skipped</li>}
+            {preview.duplicateCount > 0 && <li className="text-[var(--ink-2)]">⚠ {preview.duplicateCount.toLocaleString()} duplicate record(s) already imported previously</li>}
             {preview.warnings.map((w, i) => (
-              <li key={i} className="text-amber-700">
+              <li key={i} className="text-[var(--ink-2)]">
                 ⚠ {w}
               </li>
             ))}
           </ul>
 
           {preview.isLikelyReupload && (
-            <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+            <div className="rounded-md bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] p-3 text-sm text-[var(--ink-2)]">
               This file looks like it has already been imported (≥90% of rows match existing records). Review before
               proceeding — importing again will add duplicate rows to Sales/SKU analytics.
             </div>
@@ -429,7 +429,7 @@ export function UploadReportsPage() {
               type="button"
               onClick={confirmImport}
               disabled={totalValid === 0 || stage === 'importing'}
-              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+              className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
             >
               {stage === 'importing'
                 ? importProgress && importProgress.total > 0
@@ -437,7 +437,7 @@ export function UploadReportsPage() {
                   : 'Importing…'
                 : `Import ${totalValid.toLocaleString()} Records`}
             </button>
-            <button type="button" onClick={cancel} disabled={stage === 'importing'} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+            <button type="button" onClick={cancel} disabled={stage === 'importing'} className="rounded-md border border-[var(--line-2)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--surface-hover)] disabled:opacity-40">
               Cancel
             </button>
           </div>

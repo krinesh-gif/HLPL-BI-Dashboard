@@ -64,56 +64,56 @@ export function AdsOverviewPage() {
         <button
           type="button"
           onClick={handleExport}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="rounded-md border border-[var(--line-2)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--surface-hover)]"
         >
           Export CSV
         </button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50">
+          <thead className="bg-[var(--surface-2)]">
             <tr>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Ads Channel</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Spend</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Ad Sales</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">ROAS</th>
-              <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">ACOS</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Source</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Ads Channel</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Spend</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Ad Sales</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">ROAS</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">ACOS</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Source</th>
               <th className="px-3 py-2" />
             </tr>
           </thead>
           <tbody>
             {figures.map((f) => (
-              <tr key={f.channel} className="border-t border-slate-100">
-                <td className="px-3 py-2 font-medium text-slate-800">{label(f.channel)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-slate-800">
+              <tr key={f.channel} className="border-t border-[var(--line)]">
+                <td className="px-3 py-2 font-medium text-[var(--ink)]">{label(f.channel)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-[var(--ink)]">
                   {f.spend === 0 ? '—' : formatCurrencyFull(f.spend)}
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums text-slate-600">
-                  {f.adSales === null ? <span className="text-xs italic text-slate-400">not measured</span> : formatCurrencyFull(f.adSales)}
+                <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">
+                  {f.adSales === null ? <span className="text-xs italic text-[var(--ink-3)]">not measured</span> : formatCurrencyFull(f.adSales)}
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums text-slate-600">
+                <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">
                   {f.adSales !== null && f.spend > 0 ? `${(f.adSales / f.spend).toFixed(2)}x` : '—'}
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums text-slate-600">
+                <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">
                   {f.adSales !== null && f.adSales > 0 ? formatPercent((f.spend / f.adSales) * 100) : '—'}
                 </td>
                 <td className="px-3 py-2">
                   <span
                     className={`rounded-full border px-2 py-0.5 text-xs ${
                       f.source === 'report'
-                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                        ? 'border-[color-mix(in_oklab,var(--good)_35%,transparent)] bg-[color-mix(in_oklab,var(--good)_10%,transparent)] text-[var(--good-ink)]'
                         : f.source === 'manual'
-                          ? 'border-amber-200 bg-amber-50 text-amber-800'
-                          : 'border-slate-200 bg-slate-50 text-slate-400'
+                          ? 'border-[color-mix(in_oklab,var(--warning)_35%,transparent)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] text-[var(--ink-2)]'
+                          : 'border-[var(--line)] bg-[var(--surface-2)] text-[var(--ink-3)]'
                     }`}
                   >
                     {f.sourceLabel}
                   </span>
                 </td>
                 <td className="px-3 py-2 text-right">
-                  <Link to={`/marketing/ads/${f.channel}`} className="text-xs font-medium text-indigo-600 hover:text-indigo-800">
+                  <Link to={`/marketing/ads/${f.channel}`} className="text-xs font-medium text-[var(--accent)] hover:opacity-80">
                     Open
                   </Link>
                 </td>
@@ -121,16 +121,16 @@ export function AdsOverviewPage() {
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t-2 border-slate-300 bg-slate-50 font-semibold">
-              <td className="px-3 py-2 text-slate-900">Total</td>
-              <td className="px-3 py-2 text-right tabular-nums text-slate-900">{formatCurrencyFull(totals.spend)}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-slate-700">
+            <tr className="border-t-2 border-[var(--line-2)] bg-[var(--surface-2)] font-semibold">
+              <td className="px-3 py-2 text-[var(--ink)]">Total</td>
+              <td className="px-3 py-2 text-right tabular-nums text-[var(--ink)]">{formatCurrencyFull(totals.spend)}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">
                 {totals.adSales === null ? '—' : formatCurrencyFull(totals.adSales)}
               </td>
-              <td className="px-3 py-2 text-right tabular-nums text-slate-700">
+              <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">
                 {totals.roas === null ? '—' : `${totals.roas.toFixed(2)}x`}
               </td>
-              <td className="px-3 py-2 text-right tabular-nums text-slate-700">
+              <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">
                 {totals.acos === null ? '—' : formatPercent(totals.acos)}
               </td>
               <td colSpan={2} />
@@ -140,7 +140,7 @@ export function AdsOverviewPage() {
       </div>
 
       {totals.includesManual && (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-[var(--ink-3)]">
           ROAS and ACOS are measured only against spend that came with attributed sales. A manually entered figure is real money and
           counts towards total spend and TACOS, but it carries no attributed sales, so including it in ROAS would understate the
           return on the campaigns that were actually measured.
@@ -148,8 +148,8 @@ export function AdsOverviewPage() {
       )}
 
       {figures.some((f) => f.spend > 0) && (
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="mb-2 text-sm font-semibold text-slate-700">Ad spend by channel</h3>
+        <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+          <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">Ad spend by channel</h3>
           <ComparisonBarChart
             data={figures.filter((f) => f.spend > 0).map((f) => ({ name: label(f.channel), value: f.spend }))}
             xKey="name" yKey="value" horizontal

@@ -8,8 +8,8 @@ export function DemandForecastPage() {
 
   return (
     <PageShell title="Demand Forecast" subtitle="3-month unit forecast per SKU" showFilters={false}>
-      <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
-        <strong className="text-slate-800">Methodology:</strong> {rows[0]?.methodology ?? 'No sales history available yet.'}
+      <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4 text-sm text-[var(--ink-2)]">
+        <strong className="text-[var(--ink)]">Methodology:</strong> {rows[0]?.methodology ?? 'No sales history available yet.'}
       </div>
       <DataTable
         exportFileName="HLPL_DemandForecast"

@@ -31,9 +31,9 @@ const EVENT_LABELS: Record<MeeshoEventType, string> = {
 }
 
 const CONFIDENCE_STYLE: Record<string, string> = {
-  certain: 'bg-slate-100 text-slate-600',
-  probable: 'bg-amber-100 text-amber-800',
-  needs_review: 'bg-rose-100 text-rose-800',
+  certain: 'bg-[var(--surface-2)] text-[var(--ink-2)]',
+  probable: 'bg-[color-mix(in_oklab,var(--warning)_20%,transparent)] text-[var(--ink-2)]',
+  needs_review: 'bg-[color-mix(in_oklab,var(--critical)_16%,transparent)] text-[var(--critical-ink)]',
 }
 
 export function TransactionReviewPage() {
@@ -54,44 +54,44 @@ export function TransactionReviewPage() {
       subtitle={`Rows the importer could not place on its own — ${monthLabel(month)}, ${basis === 'order' ? 'order date' : 'payment date'}`}
     >
       <div className="flex flex-wrap items-center gap-3">
-        <div className="inline-flex rounded-md border border-slate-200 bg-white p-0.5 text-xs font-medium">
+        <div className="inline-flex rounded-md border border-[var(--line)] bg-[var(--surface)] p-0.5 text-xs font-medium">
           {([['order', 'Order date'], ['settlement', 'Payment date']] as const).map(([key, label]) => (
             <button
               key={key} type="button" onClick={() => setBasis(key)}
-              className={`rounded px-3 py-1.5 ${basis === key ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+              className={`rounded px-3 py-1.5 ${basis === key ? 'bg-[var(--accent)] text-[var(--accent-ink)]' : 'text-[var(--ink-2)] hover:bg-[var(--surface-hover)]'}`}
             >{label}</button>
           ))}
         </div>
         <select
           value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)}
-          className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700"
+          className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--ink-2)]"
         >
           <option value="flagged">Needs a look</option>
           <option value="needs_review">Could not be classified</option>
           <option value="all">Every row this month</option>
         </select>
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-[var(--ink-3)]">
           {loading ? 'Loading…' : `${total.toLocaleString('en-IN')} row(s)`}
         </span>
       </div>
 
       {error && (
-        <p className="rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-900">
+        <p className="rounded-md border border-[color-mix(in_oklab,var(--critical)_45%,transparent)] bg-[color-mix(in_oklab,var(--critical)_10%,transparent)] px-3 py-2 text-xs text-[var(--critical-ink)]">
           Could not load transactions: {error}
         </p>
       )}
 
       {!loading && !error && rows.length === 0 && (
-        <p className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+        <p className="rounded-md border border-[color-mix(in_oklab,var(--good)_45%,transparent)] bg-[color-mix(in_oklab,var(--good)_10%,transparent)] px-3 py-2 text-xs text-[var(--good-ink)]">
           Nothing needs review for this month. Every row the file carried was classified with confidence, so no money is
           sitting outside the figures.
         </p>
       )}
 
       {rows.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
           <table className="w-full min-w-[64rem] text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <thead className="bg-[var(--surface-2)] text-xs uppercase tracking-wide text-[var(--ink-3)]">
               <tr>
                 <th className="px-3 py-2 text-left">Sub-order</th>
                 <th className="px-3 py-2 text-left">Order date</th>
@@ -105,7 +105,7 @@ export function TransactionReviewPage() {
                 <th className="px-3 py-2 text-right">Row</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[var(--line)]">
               {rows.map((t) => {
                 const open = expanded === t.transactionId
                 const policy = MEESHO_REVENUE_POLICY[t.eventType]
@@ -114,13 +114,13 @@ export function TransactionReviewPage() {
                     <tr
                       key={t.transactionId}
                       onClick={() => setExpanded(open ? null : t.transactionId)}
-                      className="cursor-pointer hover:bg-slate-50"
+                      className="cursor-pointer hover:bg-[var(--surface-hover)]"
                     >
-                      <td className="px-3 py-2 font-mono text-xs text-slate-700">{t.subOrderId}</td>
-                      <td className="px-3 py-2 text-xs text-slate-600">{t.orderDate}</td>
-                      <td className="px-3 py-2 text-xs text-slate-600">{t.paymentDate || '—'}</td>
-                      <td className="px-3 py-2 text-xs text-slate-600">{t.orderStatus || <em className="text-slate-400">blank</em>}</td>
-                      <td className="px-3 py-2 text-xs text-slate-700">{EVENT_LABELS[t.eventType] ?? t.eventType}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-[var(--ink-2)]">{t.subOrderId}</td>
+                      <td className="px-3 py-2 text-xs text-[var(--ink-2)]">{t.orderDate}</td>
+                      <td className="px-3 py-2 text-xs text-[var(--ink-2)]">{t.paymentDate || '—'}</td>
+                      <td className="px-3 py-2 text-xs text-[var(--ink-2)]">{t.orderStatus || <em className="text-[var(--ink-3)]">blank</em>}</td>
+                      <td className="px-3 py-2 text-xs text-[var(--ink-2)]">{EVENT_LABELS[t.eventType] ?? t.eventType}</td>
                       <td className="px-3 py-2">
                         <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${CONFIDENCE_STYLE[t.confidence] ?? ''}`}>
                           {t.confidence.replace('_', ' ')}
@@ -129,23 +129,23 @@ export function TransactionReviewPage() {
                       <td className="px-3 py-2 text-right tabular-nums">{formatCurrencyFull(t.totalSaleAmount)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{formatCurrencyFull(t.settlementAmount)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{formatCurrencyFull(t.recovery)}</td>
-                      <td className="px-3 py-2 text-right text-xs text-slate-400">{t.sourceRowNumber}</td>
+                      <td className="px-3 py-2 text-right text-xs text-[var(--ink-3)]">{t.sourceRowNumber}</td>
                     </tr>
                     {open && (
-                      <tr key={`${t.transactionId}-detail`} className="bg-slate-50">
+                      <tr key={`${t.transactionId}-detail`} className="bg-[var(--surface-2)]">
                         <td colSpan={10} className="px-4 py-3">
-                          <p className="text-xs text-slate-700"><strong>Why this was flagged:</strong> {t.classificationReason}</p>
-                          {policy && <p className="mt-1 text-xs text-slate-600"><strong>How it is treated:</strong> {policy.note}</p>}
-                          <p className="mt-1 text-xs text-slate-500">
+                          <p className="text-xs text-[var(--ink-2)]"><strong>Why this was flagged:</strong> {t.classificationReason}</p>
+                          {policy && <p className="mt-1 text-xs text-[var(--ink-2)]"><strong>How it is treated:</strong> {policy.note}</p>}
+                          <p className="mt-1 text-xs text-[var(--ink-3)]">
                             Source: {t.sourceFile || 'unknown file'} ▸ {t.sourceSheet} ▸ row {t.sourceRowNumber}
                           </p>
                           <details className="mt-2">
-                            <summary className="cursor-pointer text-xs text-indigo-600">Original row, exactly as uploaded</summary>
+                            <summary className="cursor-pointer text-xs text-[var(--accent)]">Original row, exactly as uploaded</summary>
                             <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] md:grid-cols-3">
                               {Object.entries(t.raw ?? {}).filter(([, v]) => v !== '' && v !== '0').map(([k, v]) => (
-                                <div key={k} className="flex justify-between gap-2 border-b border-slate-200 py-0.5">
-                                  <dt className="text-slate-500">{k}</dt>
-                                  <dd className="font-mono text-slate-800">{v}</dd>
+                                <div key={k} className="flex justify-between gap-2 border-b border-[var(--line)] py-0.5">
+                                  <dt className="text-[var(--ink-3)]">{k}</dt>
+                                  <dd className="font-mono text-[var(--ink)]">{v}</dd>
                                 </div>
                               ))}
                             </dl>
@@ -161,7 +161,7 @@ export function TransactionReviewPage() {
         </div>
       )}
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-[var(--ink-3)]">
         A row listed here is held out of Net Sales, volume and cost of goods until its event is confirmed. Correcting one
         means fixing it at source — in the Meesho file or the Product Master — and re-uploading; the figures then move.
       </p>

@@ -72,27 +72,27 @@ export function ManualAdSpendForm({
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
-      <h3 className="text-sm font-semibold text-slate-800">{def.label} {def.invoiceLabel ?? 'monthly value'}</h3>
-      <p className="mt-1 text-sm text-slate-600">
+    <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+      <h3 className="text-sm font-semibold text-[var(--ink)]">{def.label} {def.invoiceLabel ?? 'monthly value'}</h3>
+      <p className="mt-1 text-sm text-[var(--ink-2)]">
         {def.label} bills by monthly invoice rather than publishing a campaign report, so the figure is entered here. It counts as
         advertising spend in the P&amp;L and in total ad investment, and is labelled as manually entered wherever it appears.
       </p>
 
       {current.source === 'report' && (
-        <p className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+        <p className="mt-2 rounded-md border border-[color-mix(in_oklab,var(--good)_35%,transparent)] bg-[color-mix(in_oklab,var(--good)_10%,transparent)] px-3 py-2 text-xs text-[var(--good-ink)]">
           An uploaded report already covers {monthLabel(month)}, and a report takes priority over a manual figure. Anything entered
           here for that month will be stored but not used until the report is removed.
         </p>
       )}
 
       <div className="mt-3 flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
+        <label className="flex flex-col gap-1 text-xs font-medium text-[var(--ink-3)]">
           Month
           <select
             value={entryMonth}
             onChange={(e) => setEntryMonth(e.target.value)}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none"
+            className="rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
           >
             {monthOptions.map((m) => (
               <option key={m} value={m}>{monthLabel(m)}</option>
@@ -100,7 +100,7 @@ export function ManualAdSpendForm({
           </select>
         </label>
 
-        <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
+        <label className="flex flex-col gap-1 text-xs font-medium text-[var(--ink-3)]">
           {def.invoiceLabel ?? 'Amount'}
           <input
             value={amount}
@@ -108,27 +108,27 @@ export function ManualAdSpendForm({
             onKeyDown={(e) => { if (e.key === 'Enter') void submit() }}
             placeholder="125000"
             inputMode="decimal"
-            className="w-40 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+            className="w-40 rounded-md border border-[var(--line-2)] px-3 py-1.5 text-sm focus:border-[var(--accent)] focus:outline-none"
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
+        <label className="flex flex-col gap-1 text-xs font-medium text-[var(--ink-3)]">
           Invoice reference
           <input
             value={fileName}
             onChange={(e) => setFileName(e.target.value)}
             placeholder="NYK-MI-Aug-2026.pdf"
-            className="w-56 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+            className="w-56 rounded-md border border-[var(--line-2)] px-3 py-1.5 text-sm focus:border-[var(--accent)] focus:outline-none"
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
+        <label className="flex flex-col gap-1 text-xs font-medium text-[var(--ink-3)]">
           Note
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Optional"
-            className="w-56 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+            className="w-56 rounded-md border border-[var(--line-2)] px-3 py-1.5 text-sm focus:border-[var(--accent)] focus:outline-none"
           />
         </label>
 
@@ -136,41 +136,41 @@ export function ManualAdSpendForm({
           type="button"
           onClick={() => void submit()}
           disabled={busy || !amount.trim()}
-          className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+          className="rounded-md bg-[var(--accent)] px-4 py-1.5 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
         >
           {busy ? 'Saving…' : 'Save'}
         </button>
       </div>
 
-      {error && <p className="mt-2 text-xs text-rose-600">{error}</p>}
-      {saved && <p className="mt-2 text-xs text-emerald-700">{saved}</p>}
+      {error && <p className="mt-2 text-xs text-[var(--critical-ink)]">{error}</p>}
+      {saved && <p className="mt-2 text-xs text-[var(--good-ink)]">{saved}</p>}
 
       {history.length > 0 && (
-        <div className="mt-4 overflow-x-auto rounded-md border border-slate-200">
+        <div className="mt-4 overflow-x-auto rounded-md border border-[var(--line)]">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50">
+            <thead className="bg-[var(--surface-2)]">
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Month</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Amount</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Invoice</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Note</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Entered</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Month</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Amount</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Invoice</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Note</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Entered</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
             <tbody>
               {history.map((e) => (
-                <tr key={e.month} className="border-t border-slate-100">
-                  <td className="px-3 py-2 text-slate-700">{monthLabel(e.month)}</td>
-                  <td className="px-3 py-2 text-right font-medium tabular-nums text-slate-900">{formatCurrencyFull(e.amount)}</td>
-                  <td className="px-3 py-2 text-xs text-slate-500">{e.fileName ?? '—'}</td>
-                  <td className="px-3 py-2 text-xs text-slate-500">{e.note ?? '—'}</td>
-                  <td className="px-3 py-2 text-xs text-slate-400">{formatDate(e.enteredAt)}</td>
+                <tr key={e.month} className="border-t border-[var(--line)]">
+                  <td className="px-3 py-2 text-[var(--ink-2)]">{monthLabel(e.month)}</td>
+                  <td className="px-3 py-2 text-right font-medium tabular-nums text-[var(--ink)]">{formatCurrencyFull(e.amount)}</td>
+                  <td className="px-3 py-2 text-xs text-[var(--ink-3)]">{e.fileName ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs text-[var(--ink-3)]">{e.note ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs text-[var(--ink-3)]">{formatDate(e.enteredAt)}</td>
                   <td className="px-3 py-2 text-right">
                     <button
                       type="button"
                       onClick={() => void removeManualAdSpend(channel, e.month)}
-                      className="text-xs font-medium text-rose-600 hover:text-rose-800"
+                      className="text-xs font-medium text-[var(--critical-ink)] hover:text-[var(--critical-ink)]"
                     >
                       Remove
                     </button>

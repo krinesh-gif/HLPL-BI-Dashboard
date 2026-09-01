@@ -6,14 +6,14 @@ import { DEFAULT_CHANNEL_FEE_RATES } from '@/config/marketplaceFees'
 
 function ConfigTable({ title, rows }: { title: string; rows: { key: string; value: string }[] }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
-      <h3 className="mb-2 text-sm font-semibold text-slate-700">{title}</h3>
+    <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+      <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">{title}</h3>
       <table className="w-full text-sm">
         <tbody>
           {rows.map((r) => (
-            <tr key={r.key} className="border-t border-slate-100">
-              <td className="py-1.5 pr-4 text-slate-500">{r.key}</td>
-              <td className="py-1.5 text-right font-medium tabular-nums text-slate-800">{r.value}</td>
+            <tr key={r.key} className="border-t border-[var(--line)]">
+              <td className="py-1.5 pr-4 text-[var(--ink-3)]">{r.key}</td>
+              <td className="py-1.5 text-right font-medium tabular-nums text-[var(--ink)]">{r.value}</td>
             </tr>
           ))}
         </tbody>
@@ -25,8 +25,8 @@ function ConfigTable({ title, rows }: { title: string; rows: { key: string; valu
 export function SettingsPage() {
   return (
     <PageShell title="Settings" subtitle="Business-rule configuration — thresholds and assumptions driving every engine" showFilters={false}>
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-        These values live in <code className="rounded bg-amber-100 px-1 py-0.5">src/config/</code> and are read by every
+      <div className="rounded-lg border border-[color-mix(in_oklab,var(--warning)_35%,transparent)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] p-4 text-sm text-[var(--ink-2)]">
+        These values live in <code className="rounded bg-[color-mix(in_oklab,var(--warning)_20%,transparent)] px-1 py-0.5">src/config/</code> and are read by every
         calculation engine (business insight, Amazon Ads actions, inventory forecast, fixed-expense allocation). This
         milestone ships them as reviewable configuration; an in-app editor is a follow-up.
       </div>
@@ -58,12 +58,12 @@ export function SettingsPage() {
         />
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h3 className="mb-2 text-sm font-semibold text-slate-700">Default Marketplace Fee Rates (used until an actual charge report is uploaded)</h3>
+      <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+        <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">Default Marketplace Fee Rates (used until an actual charge report is uploaded)</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs font-semibold text-slate-500">
+              <tr className="text-left text-xs font-semibold text-[var(--ink-3)]">
                 <th className="py-1.5 pr-4">Channel</th>
                 <th className="py-1.5 pr-4 text-right">Commission %</th>
                 <th className="py-1.5 pr-4 text-right">Fulfilment %</th>
@@ -75,8 +75,8 @@ export function SettingsPage() {
             </thead>
             <tbody>
               {Object.entries(DEFAULT_CHANNEL_FEE_RATES).map(([channel, rates]) => (
-                <tr key={channel} className="border-t border-slate-100">
-                  <td className="py-1.5 pr-4 text-slate-700">
+                <tr key={channel} className="border-t border-[var(--line)]">
+                  <td className="py-1.5 pr-4 text-[var(--ink-2)]">
                     {(() => {
                       const source = channel as SalesSourceId
                       const owner = channelLabel(channelOfSource(source))

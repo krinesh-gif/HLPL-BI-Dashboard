@@ -1,5 +1,5 @@
 import { CartesianGrid, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from 'recharts'
-import { CHART_AXIS_COLOR, CHART_COLORS, CHART_GRID_COLOR } from './theme'
+import { CHART_AXIS_PROPS, CHART_COLORS, CHART_GRID_COLOR, CHART_TOOLTIP_STYLE } from './theme'
 
 export interface ScatterPoint {
   x: number
@@ -22,10 +22,11 @@ export function CorrelationScatterChart({
     <ResponsiveContainer width="100%" height={height}>
       <ScatterChart margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
         <CartesianGrid stroke={CHART_GRID_COLOR} strokeDasharray="3 3" />
-        <XAxis type="number" dataKey="x" name={xLabel} tick={{ fontSize: 12, fill: CHART_AXIS_COLOR }} axisLine={{ stroke: CHART_GRID_COLOR }} tickLine={false} />
-        <YAxis type="number" dataKey="y" name={yLabel} tick={{ fontSize: 12, fill: CHART_AXIS_COLOR }} axisLine={false} tickLine={false} />
+        <XAxis type="number" dataKey="x" name={xLabel} {...CHART_AXIS_PROPS} />
+        <YAxis type="number" dataKey="y" name={yLabel} {...CHART_AXIS_PROPS} axisLine={false} />
         <ZAxis range={[80, 80]} />
         <Tooltip
+          {...CHART_TOOLTIP_STYLE}
           cursor={{ strokeDasharray: '3 3' }}
           formatter={(value, name) => [String(value), String(name)]}
           labelFormatter={() => ''}

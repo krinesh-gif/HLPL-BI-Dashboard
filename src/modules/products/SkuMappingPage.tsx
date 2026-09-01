@@ -161,7 +161,7 @@ export function SkuMappingPage() {
       subtitle="Link marketplace codes to your Product Master so combo sales get a real cost instead of an estimate"
       showFilters={false}
     >
-      {error && <p className="mb-4 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+      {error && <p className="mb-4 rounded-md bg-[color-mix(in_oklab,var(--critical)_10%,transparent)] px-3 py-2 text-sm text-[var(--critical-ink)]">{error}</p>}
 
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Stat label="Still estimated" value={formatCurrencyFull(work.unmappedNetSales)} note={`${formatPercent(unmappedShare)} of net sales · ${work.unmapped.length} SKUs`} tone="amber" />
@@ -179,13 +179,13 @@ export function SkuMappingPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search SKU, product, or marketplace…"
-          className="ml-auto w-72 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+          className="ml-auto w-72 rounded-md border border-[var(--line-2)] px-3 py-1.5 text-sm focus:border-[var(--accent)] focus:outline-none"
         />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {rows.length > 0 && (
-          <label className="flex items-center gap-2 text-sm text-slate-600">
+          <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
             <input type="checkbox" checked={allInViewSelected} onChange={() => setSelected(allInViewSelected ? new Set() : new Set(rows.map((r) => r.channelSku)))} />
             Select all {search ? 'shown' : ''} ({rows.length})
           </label>
@@ -196,11 +196,11 @@ export function SkuMappingPage() {
               type="button"
               onClick={() => markVerified(selectedInView)}
               disabled={busy}
-              className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
+              className="rounded-md bg-[var(--good)] px-3 py-1.5 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
             >
               Mark {selectedInView.length} as verified
             </button>
-            <button type="button" onClick={() => setSelected(new Set())} className="text-sm text-slate-500 hover:text-slate-700">
+            <button type="button" onClick={() => setSelected(new Set())} className="text-sm text-[var(--ink-3)] hover:text-[var(--ink-2)]">
               Clear selection
             </button>
           </>
@@ -210,7 +210,7 @@ export function SkuMappingPage() {
             type="button"
             onClick={acceptAllSuggestions}
             disabled={busy}
-            className="ml-auto rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+            className="ml-auto rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
           >
             Accept all {suggestionCount} suggestion{suggestionCount === 1 ? '' : 's'}
           </button>
@@ -218,7 +218,7 @@ export function SkuMappingPage() {
       </div>
 
       {rows.length === 0 ? (
-        <p className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+        <p className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6 text-center text-sm text-[var(--ink-3)]">
           {search
             ? `Nothing matches “${search}” in this tab.`
             : tab === 'unmapped'
@@ -226,59 +226,59 @@ export function SkuMappingPage() {
               : 'Nothing here yet.'}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50">
+            <thead className="bg-[var(--surface-2)]">
               <tr>
                 <th className="w-8 px-3 py-2" />
-                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Marketplace SKU</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Marketplace</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Orders</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-slate-500">Net Sales</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Cost basis</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Action</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Marketplace SKU</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Marketplace</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Orders</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Net Sales</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Cost basis</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Action</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.channelSku} className="border-t border-slate-100 align-top">
+                <tr key={row.channelSku} className="border-t border-[var(--line)] align-top">
                   <td className="px-3 py-2">
                     <input type="checkbox" checked={selected.has(row.channelSku)} onChange={() => toggle(row.channelSku)} />
                   </td>
                   <td className="px-3 py-2">
-                    <div className="font-mono text-xs text-slate-700">{row.channelSku}</div>
-                    <div className="mt-0.5 text-xs text-slate-500">{row.productName}</div>
+                    <div className="font-mono text-xs text-[var(--ink-2)]">{row.channelSku}</div>
+                    <div className="mt-0.5 text-xs text-[var(--ink-3)]">{row.productName}</div>
                     {row.mapping && (
-                      <div className="mt-0.5 text-xs text-indigo-700">
-                        → {row.mapping.internalSku} <span className="text-slate-400">({row.mapping.kind.toLowerCase()})</span>
+                      <div className="mt-0.5 text-xs text-[var(--accent)]">
+                        → {row.mapping.internalSku} <span className="text-[var(--ink-3)]">({row.mapping.kind.toLowerCase()})</span>
                       </div>
                     )}
-                    {row.mapping?.note && <div className="mt-0.5 text-xs text-amber-700">{row.mapping.note}</div>}
+                    {row.mapping?.note && <div className="mt-0.5 text-xs text-[var(--ink-2)]">{row.mapping.note}</div>}
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap gap-1">
                       {row.channels.map((c) => (
-                        <span key={c} className="whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+                        <span key={c} className="whitespace-nowrap rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-xs text-[var(--ink-2)]">
                           {CHANNEL_MAP[c]?.label ?? c}
                         </span>
                       ))}
                     </div>
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-600">{row.orders.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right tabular-nums font-medium text-slate-800">{formatCurrencyFull(row.netSales)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">{row.orders.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right tabular-nums font-medium text-[var(--ink)]">{formatCurrencyFull(row.netSales)}</td>
                   <td className="px-3 py-2">
                     {row.resolvedCogs === null ? (
-                      <span className="text-amber-700">estimated at 25% of sales</span>
+                      <span className="text-[var(--ink-2)]">estimated at 25% of sales</span>
                     ) : (
                       <>
-                        <span className="text-slate-700">{formatCurrencyFull(row.resolvedCogs)} / unit</span>
+                        <span className="text-[var(--ink-2)]">{formatCurrencyFull(row.resolvedCogs)} / unit</span>
                         {row.components.length > 0 && (
-                          <div className="mt-0.5 text-xs text-slate-500">
+                          <div className="mt-0.5 text-xs text-[var(--ink-3)]">
                             {row.components.map((c) => `${c.componentSku}${c.quantity > 1 ? ` ×${c.quantity}` : ''}`).join(' + ')}
                           </div>
                         )}
                         {row.missingComponents.length > 0 && (
-                          <div className="mt-0.5 text-xs text-rose-700">
+                          <div className="mt-0.5 text-xs text-[var(--critical-ink)]">
                             no cost on file for {row.missingComponents.join(', ')} — this is understated
                           </div>
                         )}
@@ -302,7 +302,7 @@ export function SkuMappingPage() {
                             type="button"
                             onClick={() => acceptSuggestion(row)}
                             disabled={busy}
-                            className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+                            className="rounded-md bg-[var(--accent)] px-2.5 py-1 text-xs font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
                             title={row.suggestion.mapping.note}
                           >
                             Use: {row.suggestion.components.length > 0
@@ -316,7 +316,7 @@ export function SkuMappingPage() {
                             type="button"
                             onClick={() => markVerified([row])}
                             disabled={busy}
-                            className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
+                            className="rounded-md bg-[var(--good)] px-2.5 py-1 text-xs font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
                           >
                             Looks right
                           </button>
@@ -333,7 +333,7 @@ export function SkuMappingPage() {
                           type="button"
                           onClick={() => startComboEdit(row)}
                           disabled={busy}
-                          className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                          className="rounded-md border border-[var(--line-2)] px-2.5 py-1 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--surface-hover)] disabled:opacity-40"
                         >
                           {row.components.length > 0 ? 'Edit combo' : 'Build combo'}
                         </button>
@@ -343,7 +343,7 @@ export function SkuMappingPage() {
                             type="button"
                             onClick={() => void run(() => removeMapping(row.channelSku))}
                             disabled={busy}
-                            className="text-xs font-medium text-rose-600 hover:text-rose-800 disabled:opacity-40"
+                            className="text-xs font-medium text-[var(--critical-ink)] hover:text-[var(--critical-ink)] disabled:opacity-40"
                             title="Remove this mapping and start again"
                           >
                             Unmap
@@ -404,7 +404,7 @@ function ProductPicker({
         onKeyDown={(e) => {
           if (e.key === 'Enter') commit(value)
         }}
-        className="w-48 rounded-md border border-slate-300 px-2 py-1 text-xs focus:border-indigo-500 focus:outline-none disabled:opacity-40"
+        className="w-48 rounded-md border border-[var(--line-2)] px-2 py-1 text-xs focus:border-[var(--accent)] focus:outline-none disabled:opacity-40"
       />
       <datalist id={listId}>
         {skuMaster.map((s) => (
@@ -417,9 +417,9 @@ function ProductPicker({
 
 function Stat({ label, value, note, tone }: { label: string; value: string; note: string; tone: 'amber' | 'indigo' | 'emerald' }) {
   const tones = {
-    amber: 'border-amber-300 bg-amber-50 text-amber-900',
-    indigo: 'border-indigo-300 bg-indigo-50 text-indigo-900',
-    emerald: 'border-emerald-300 bg-emerald-50 text-emerald-900',
+    amber: 'border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] text-[var(--ink)]',
+    indigo: 'border-[color-mix(in_oklab,var(--accent)_45%,transparent)] bg-[var(--accent-soft)] text-[var(--accent)]',
+    emerald: 'border-[color-mix(in_oklab,var(--good)_45%,transparent)] bg-[color-mix(in_oklab,var(--good)_10%,transparent)] text-[var(--good-ink)]',
   }
   return (
     <div className={`rounded-lg border p-4 ${tones[tone]}`}>
@@ -435,7 +435,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-md px-3 py-1.5 text-sm font-medium ${active ? 'bg-indigo-600 text-white' : 'border border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+      className={`rounded-md px-3 py-1.5 text-sm font-medium ${active ? 'bg-[var(--accent)] text-[var(--accent-ink)]' : 'border border-[var(--line-2)] text-[var(--ink-2)] hover:bg-[var(--surface-hover)]'}`}
     >
       {children}
     </button>
@@ -458,8 +458,8 @@ function ComboEditor({
   onCancel: () => void
 }) {
   return (
-    <div className="min-w-80 space-y-2 rounded-md border border-indigo-200 bg-indigo-50 p-3">
-      <p className="text-xs font-semibold text-indigo-900">What is in this pack?</p>
+    <div className="min-w-80 space-y-2 rounded-md border border-[var(--accent)] bg-[var(--accent-soft)] p-3">
+      <p className="text-xs font-semibold text-[var(--accent)]">What is in this pack?</p>
       {draft.map((component, i) => (
         <div key={i} className="flex items-center gap-2">
           <div className="flex-1">
@@ -469,18 +469,18 @@ function ComboEditor({
               label={component.componentSku || 'Search for a product…'}
               onPick={(sku) => setDraft(draft.map((d, j) => (j === i ? { ...d, componentSku: sku } : d)))}
             />
-            {component.componentSku && <div className="mt-0.5 font-mono text-xs text-indigo-800">{component.componentSku}</div>}
+            {component.componentSku && <div className="mt-0.5 font-mono text-xs text-[var(--accent)]">{component.componentSku}</div>}
           </div>
           <input
             type="number"
             min={1}
             value={component.quantity}
             onChange={(e) => setDraft(draft.map((d, j) => (j === i ? { ...d, quantity: Number(e.target.value) || 1 } : d)))}
-            className="w-16 rounded-md border border-slate-300 px-2 py-1 text-right text-xs focus:border-indigo-500 focus:outline-none"
+            className="w-16 rounded-md border border-[var(--line-2)] px-2 py-1 text-right text-xs focus:border-[var(--accent)] focus:outline-none"
             title="How many of this product are in the pack"
           />
           {draft.length > 1 && (
-            <button type="button" onClick={() => setDraft(draft.filter((_, j) => j !== i))} className="text-xs text-rose-600 hover:text-rose-800">
+            <button type="button" onClick={() => setDraft(draft.filter((_, j) => j !== i))} className="text-xs text-[var(--critical-ink)] hover:text-[var(--critical-ink)]">
               ×
             </button>
           )}
@@ -489,7 +489,7 @@ function ComboEditor({
       <button
         type="button"
         onClick={() => setDraft([...draft, { componentSku: '', quantity: 1 }])}
-        className="text-xs font-medium text-indigo-700 hover:text-indigo-900"
+        className="text-xs font-medium text-[var(--accent)] hover:text-[var(--accent)]"
       >
         + Add another product
       </button>
@@ -498,11 +498,11 @@ function ComboEditor({
           type="button"
           onClick={onSave}
           disabled={busy}
-          className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+          className="rounded-md bg-[var(--accent)] px-3 py-1 text-xs font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
         >
           Save combo
         </button>
-        <button type="button" onClick={onCancel} disabled={busy} className="rounded-md border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-white disabled:opacity-40">
+        <button type="button" onClick={onCancel} disabled={busy} className="rounded-md border border-[var(--line-2)] px-3 py-1 text-xs text-[var(--ink-2)] hover:bg-[var(--surface)] disabled:opacity-40">
           Cancel
         </button>
       </div>

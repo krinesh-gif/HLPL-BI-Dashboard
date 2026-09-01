@@ -28,13 +28,13 @@ export function UncategorizedPanel() {
   const needCategory = work.skus.filter((s) => s.inProductMaster)
 
   return (
-    <section className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+    <section className="rounded-lg border border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-amber-900">
+          <h3 className="text-sm font-semibold text-[var(--ink)]">
             ⚠ {formatNumber(work.skus.length)} SKU{work.skus.length === 1 ? ' is' : 's are'} currently Uncategorized.
           </h3>
-          <p className="mt-1 text-xs text-amber-800">
+          <p className="mt-1 text-xs text-[var(--ink-2)]">
             {work.netSales > 0 && (
               <>
                 They account for {formatCurrencyFull(work.netSales)} ({formatPercent(work.sharePct)}) of net sales, which is missing
@@ -53,7 +53,7 @@ export function UncategorizedPanel() {
           {needMapping.length > 0 && (
             <Link
               to="/products/sku-mapping"
-              className="rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700"
+              className="rounded-md bg-[var(--warning)] text-[#0f1115] px-3 py-1.5 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90"
             >
               Map {formatNumber(needMapping.length)} codes
             </Link>
@@ -61,7 +61,7 @@ export function UncategorizedPanel() {
           <button
             type="button"
             onClick={() => setOpen(!open)}
-            className="rounded-md border border-amber-400 bg-white px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100"
+            className="rounded-md border border-[color-mix(in_oklab,var(--warning)_55%,transparent)] bg-[var(--surface)] px-3 py-1.5 text-sm font-medium text-[var(--ink)] hover:bg-[color-mix(in_oklab,var(--warning)_20%,transparent)]"
           >
             {open ? 'Hide' : 'Show all'}
           </button>
@@ -69,14 +69,14 @@ export function UncategorizedPanel() {
       </div>
 
       {open && (
-        <div className="mt-3 max-h-[30rem] overflow-auto rounded-md border border-amber-200 bg-white">
+        <div className="mt-3 max-h-[30rem] overflow-auto rounded-md border border-[color-mix(in_oklab,var(--warning)_35%,transparent)] bg-[var(--surface)]">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-amber-50">
+            <thead className="sticky top-0 bg-[color-mix(in_oklab,var(--warning)_12%,transparent)]">
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-amber-900">SKU</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-amber-900">Units</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-amber-900">Net Sales</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-amber-900">Action</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink)]">SKU</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink)]">Units</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink)]">Net Sales</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink)]">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -123,22 +123,22 @@ function Row({ row, categories }: { row: UncategorizedSku; categories: string[] 
   const showInput = row.inProductMaster || adding
 
   return (
-    <tr className="border-t border-amber-100 align-top">
+    <tr className="border-t border-[color-mix(in_oklab,var(--warning)_30%,transparent)] align-top">
       <td className="px-3 py-2">
-        <div className="font-mono text-xs text-slate-700">{row.sku}</div>
+        <div className="font-mono text-xs text-[var(--ink-2)]">{row.sku}</div>
         {row.productName && row.productName !== row.sku && (
-          <div className="text-xs text-slate-500">{row.productName}</div>
+          <div className="text-xs text-[var(--ink-3)]">{row.productName}</div>
         )}
         {!row.inProductMaster && (
-          <div className="mt-0.5 text-xs text-slate-500">
+          <div className="mt-0.5 text-xs text-[var(--ink-3)]">
             {row.mapped
               ? 'Mapped, but the product it points at has no category either.'
               : 'A marketplace code with no Product Master entry.'}
           </div>
         )}
       </td>
-      <td className="px-3 py-2 text-right tabular-nums text-slate-600">{formatNumber(row.units)}</td>
-      <td className="px-3 py-2 text-right font-medium tabular-nums text-slate-800">{formatCurrencyFull(row.netSales)}</td>
+      <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">{formatNumber(row.units)}</td>
+      <td className="px-3 py-2 text-right font-medium tabular-nums text-[var(--ink)]">{formatCurrencyFull(row.netSales)}</td>
       <td className="px-3 py-2">
         {showInput ? (
           <div className="flex flex-wrap items-center gap-2">
@@ -150,7 +150,7 @@ function Row({ row, categories }: { row: UncategorizedSku; categories: string[] 
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') void apply() }}
               placeholder="Type or pick a category…"
-              className="w-52 rounded-md border border-slate-300 px-2 py-1 text-xs focus:border-indigo-500 focus:outline-none disabled:opacity-50"
+              className="w-52 rounded-md border border-[var(--line-2)] px-2 py-1 text-xs focus:border-[var(--accent)] focus:outline-none disabled:opacity-50"
             />
             {/* Existing categories are offered so the team does not end up with
                 six spellings of the same thing; a new one can still be typed. */}
@@ -163,12 +163,12 @@ function Row({ row, categories }: { row: UncategorizedSku; categories: string[] 
               type="button"
               onClick={() => void apply()}
               disabled={busy || !value.trim()}
-              className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+              className="rounded-md bg-[var(--accent)] px-2.5 py-1 text-xs font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
             >
               {busy ? 'Saving…' : adding ? 'Add product' : 'Save'}
             </button>
             {adding && (
-              <button type="button" onClick={() => setAdding(false)} className="text-xs text-slate-500 hover:text-slate-700">
+              <button type="button" onClick={() => setAdding(false)} className="text-xs text-[var(--ink-3)] hover:text-[var(--ink-2)]">
                 Cancel
               </button>
             )}
@@ -177,20 +177,20 @@ function Row({ row, categories }: { row: UncategorizedSku; categories: string[] 
           <div className="flex flex-wrap items-center gap-3">
             <Link
               to={`/products/sku-mapping?q=${encodeURIComponent(row.sku)}`}
-              className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700"
+              className="rounded-md bg-[var(--accent)] px-2.5 py-1 text-xs font-medium text-[var(--accent-ink)] hover:opacity-90"
             >
               Map this code
             </Link>
             <button
               type="button"
               onClick={() => setAdding(true)}
-              className="text-xs font-medium text-slate-600 underline hover:text-slate-900"
+              className="text-xs font-medium text-[var(--ink-2)] underline hover:text-[var(--ink)]"
             >
               It is a new product — add it
             </button>
           </div>
         )}
-        {error && <div className="mt-1 text-xs text-rose-600">{error}</div>}
+        {error && <div className="mt-1 text-xs text-[var(--critical-ink)]">{error}</div>}
       </td>
     </tr>
   )

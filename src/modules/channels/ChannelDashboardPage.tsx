@@ -44,12 +44,12 @@ export function ChannelDashboardPage() {
   }
 
   const sourcePicker = hasMultipleSources(channel) && (
-    <label className="flex items-center gap-2 text-xs font-medium text-slate-500">
+    <label className="flex items-center gap-2 text-xs font-medium text-[var(--ink-3)]">
       Sales source
       <select
         value={source}
         onChange={(e) => setSource(e.target.value as SalesSourceId | 'all')}
-        className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none"
+        className="rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
       >
         <option value="all">All</option>
         {sourcesOfChannel(channel).map((s) => (
@@ -79,10 +79,10 @@ export function ChannelDashboardPage() {
       {sourcePicker && <div>{sourcePicker}</div>}
 
       {d.partialSettlementWarning && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
-          <h3 className="text-sm font-semibold text-amber-900">⚠ This month's settlement report may be incomplete</h3>
-          <p className="mt-1 text-xs text-amber-800">{d.partialSettlementWarning}</p>
-          <Link to="/pnl" className="mt-2 inline-block text-xs font-semibold text-amber-900 underline">
+        <div className="rounded-lg border border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] p-4">
+          <h3 className="text-sm font-semibold text-[var(--ink)]">⚠ This month's settlement report may be incomplete</h3>
+          <p className="mt-1 text-xs text-[var(--ink-2)]">{d.partialSettlementWarning}</p>
+          <Link to="/pnl" className="mt-2 inline-block text-xs font-semibold text-[var(--ink)] underline">
             See the full reconciliation
           </Link>
         </div>
@@ -109,20 +109,20 @@ export function ChannelDashboardPage() {
       </KPIGrid>
 
       {source === 'all' && d.sourceBreakdown.length > 0 && (
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="text-sm font-semibold text-slate-700">Sales sources</h3>
-          <p className="mt-0.5 text-xs text-slate-500">
+        <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+          <h3 className="text-sm font-semibold text-[var(--ink-2)]">Sales sources</h3>
+          <p className="mt-0.5 text-xs text-[var(--ink-3)]">
             {channelDef.label} is one business channel fed by {d.sourceBreakdown.length} reports. This is how the month splits between
             them.
           </p>
           <table className="mt-3 w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200">
-                <th className="py-1.5 text-left text-xs font-semibold text-slate-500">Source</th>
-                <th className="py-1.5 text-right text-xs font-semibold text-slate-500">Net Sales</th>
-                <th className="py-1.5 text-right text-xs font-semibold text-slate-500">Units</th>
-                <th className="py-1.5 text-right text-xs font-semibold text-slate-500">Orders</th>
-                <th className="py-1.5 text-right text-xs font-semibold text-slate-500">Share</th>
+              <tr className="border-b border-[var(--line)]">
+                <th className="py-1.5 text-left text-xs font-semibold text-[var(--ink-3)]">Source</th>
+                <th className="py-1.5 text-right text-xs font-semibold text-[var(--ink-3)]">Net Sales</th>
+                <th className="py-1.5 text-right text-xs font-semibold text-[var(--ink-3)]">Units</th>
+                <th className="py-1.5 text-right text-xs font-semibold text-[var(--ink-3)]">Orders</th>
+                <th className="py-1.5 text-right text-xs font-semibold text-[var(--ink-3)]">Share</th>
                 <th />
               </tr>
             </thead>
@@ -130,19 +130,19 @@ export function ChannelDashboardPage() {
               {d.sourceBreakdown.map((row) => {
                 const total = d.sourceBreakdown.reduce((s, r) => s + r.figure.netSales, 0)
                 return (
-                  <tr key={row.source} className="border-b border-slate-100 last:border-0">
-                    <td className="py-1.5 text-slate-800">{row.label}</td>
-                    <td className="py-1.5 text-right tabular-nums text-slate-800">{formatCurrencyFull(row.figure.netSales)}</td>
-                    <td className="py-1.5 text-right tabular-nums text-slate-600">{formatNumber(row.figure.units)}</td>
-                    <td className="py-1.5 text-right tabular-nums text-slate-600">{formatNumber(row.figure.orders)}</td>
-                    <td className="py-1.5 text-right tabular-nums text-slate-500">
+                  <tr key={row.source} className="border-b border-[var(--line)] last:border-0">
+                    <td className="py-1.5 text-[var(--ink)]">{row.label}</td>
+                    <td className="py-1.5 text-right tabular-nums text-[var(--ink)]">{formatCurrencyFull(row.figure.netSales)}</td>
+                    <td className="py-1.5 text-right tabular-nums text-[var(--ink-2)]">{formatNumber(row.figure.units)}</td>
+                    <td className="py-1.5 text-right tabular-nums text-[var(--ink-2)]">{formatNumber(row.figure.orders)}</td>
+                    <td className="py-1.5 text-right tabular-nums text-[var(--ink-3)]">
                       {total > 0 ? formatPercent((row.figure.netSales / total) * 100) : '—'}
                     </td>
                     <td className="py-1.5 text-right">
                       <button
                         type="button"
                         onClick={() => setSource(row.source)}
-                        className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                        className="text-xs font-medium text-[var(--accent)] hover:opacity-80"
                       >
                         View
                       </button>
@@ -152,7 +152,7 @@ export function ChannelDashboardPage() {
               })}
             </tbody>
           </table>
-          <p className="mt-2 text-xs text-slate-400">
+          <p className="mt-2 text-xs text-[var(--ink-3)]">
             Source figures come from order reports. The channel total above may come from a settlement report, which covers the
             channel as a whole and cannot be split between sources.
           </p>
@@ -172,12 +172,12 @@ export function ChannelDashboardPage() {
       </div>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Top Products</h2>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--ink-3)]">Top Products</h2>
         <TopProducts channel={channel} source={source === 'all' ? undefined : source} />
       </section>
 
-      <p className="text-xs text-slate-500">
-        This channel's P&amp;L is in the <Link to="/pnl" className="font-medium text-indigo-600 underline">P&amp;L</Link> section, in the
+      <p className="text-xs text-[var(--ink-3)]">
+        This channel's P&amp;L is in the <Link to="/pnl" className="font-medium text-[var(--accent)] underline">P&amp;L</Link> section, in the
         same format as every other channel.
       </p>
     </PageShell>
@@ -186,8 +186,8 @@ export function ChannelDashboardPage() {
 
 function ChartCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
-      <h3 className="mb-2 text-sm font-semibold text-slate-700">{title}</h3>
+    <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+      <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">{title}</h3>
       {children}
     </div>
   )

@@ -18,7 +18,7 @@ export function NativePnlTable({
   const rows = lineDefs.map((def, i) => ({ def, showSectionHeader: i === 0 || def.section !== lineDefs[i - 1].section }))
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+    <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
       <table className="w-full text-sm">
         <tbody>
           {rows.map(({ def, showSectionHeader }) => {
@@ -27,16 +27,16 @@ export function NativePnlTable({
             return (
               <Fragment key={def.key}>
                 {showSectionHeader && (
-                  <tr className="bg-slate-50">
-                    <td colSpan={2} className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <tr className="bg-[var(--surface-2)]">
+                    <td colSpan={2} className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">
                       {def.section}
                     </td>
                   </tr>
                 )}
-                <tr className={clsx('border-t border-slate-100', def.kind === 'subtotal' && 'bg-indigo-50/50 font-semibold text-slate-900')}>
-                  <td className={clsx('px-4 py-2', def.kind === 'input' && 'pl-8 text-slate-600', def.kind === 'percent' && 'pl-8 text-slate-500 italic')}>
+                <tr className={clsx('border-t border-[var(--line)]', def.kind === 'subtotal' && 'bg-[var(--accent-soft)]/50 font-semibold text-[var(--ink)]')}>
+                  <td className={clsx('px-4 py-2', def.kind === 'input' && 'pl-8 text-[var(--ink-2)]', def.kind === 'percent' && 'pl-8 text-[var(--ink-3)] italic')}>
                     {def.label}
-                    {def.note && <span className="ml-2 text-xs font-normal text-slate-400">{def.note}</span>}
+                    {def.note && <span className="ml-2 text-xs font-normal text-[var(--ink-3)]">{def.note}</span>}
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums">
                     {isEditable ? (
@@ -47,7 +47,7 @@ export function NativePnlTable({
                           const n = Number(e.target.value)
                           if (Number.isFinite(n)) onEditManualEntry(def.key, n)
                         }}
-                        className="w-32 rounded border border-transparent bg-transparent px-2 py-0.5 text-right tabular-nums hover:border-slate-300 focus:border-indigo-500 focus:bg-white focus:outline-none"
+                        className="w-32 rounded border border-transparent bg-transparent px-2 py-0.5 text-right tabular-nums hover:border-[var(--line-2)] focus:border-[var(--accent)] focus:bg-[var(--surface)] focus:outline-none"
                       />
                     ) : def.kind === 'percent' ? (
                       formatPercent(value)
