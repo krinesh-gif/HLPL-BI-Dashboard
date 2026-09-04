@@ -25,7 +25,7 @@ export function PnlPage() {
     // The export is built from the same rows the table renders, so what comes
     // out is what was on screen — the selected months and nothing else.
     exportRowsToCsv(
-      `HLPL_PnL_${r.view}_${r.months[0]}_to_${r.months[r.months.length - 1]}`,
+      `HLPL_PnL_${r.view}_${r.displayCurrency}_${r.months[0]}_to_${r.months[r.months.length - 1]}`,
       r.table.rows.map((row) => {
         const out: Record<string, string | number> = { Particular: row.def.label }
         const cell = (v: number | null) =>
@@ -169,6 +169,13 @@ export function PnlPage() {
             <tr className="border-b-2 border-[var(--line-2)] bg-[var(--surface-2)]">
               <th className="sticky left-0 z-20 min-w-56 bg-[var(--surface-2)] px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">
                 {r.view === 'master' ? 'Master Company' : channelLabel(r.view)}
+                {/* The figures below change currency, so the table says which
+                    one it is in rather than leaving it to the symbol. */}
+                {r.view === 'amazon_us' && (
+                  <span className="ml-2 rounded-full bg-[var(--surface)] px-2 py-0.5 text-[10px] font-medium normal-case tracking-normal text-[var(--ink-2)]">
+                    in {r.displayCurrency} · {r.fxRateLabel}
+                  </span>
+                )}
               </th>
               {r.months.map((m) => (
                 <th key={m} className="min-w-28 px-4 py-2.5 text-right text-xs font-semibold text-[var(--ink-2)]">
@@ -187,7 +194,7 @@ export function PnlPage() {
               // An undefined figure and a zero are different answers; a margin
               // in a month with no revenue is unmeasurable, not 0%.
               const format = (v: number | null) =>
-                v === null ? '—' : isPercent ? formatPercent(v) : formatCurrencyFull(v)
+                v === null ? '—' : isPercent ? formatPercent(v) : formatCurrencyFull(v, r.displayCurrency)
 
               return (
                 <tr
@@ -346,7 +353,8 @@ export function PnlPage() {
                   .filter((row) => row.def.kind !== 'input' || row.def.key === 'grossSales')
                   .map((row) => {
                     const pct = row.def.kind === 'percent'
-                    const fmt = (v: number | null) => (v === null ? '—' : pct ? formatPercent(v) : formatCurrencyFull(v))
+                    const fmt = (v: number | null) =>
+                      v === null ? '—' : pct ? formatPercent(v) : formatCurrencyFull(v, r.displayCurrency)
                     return (
                       <tr key={row.def.key} className="border-b border-[var(--line)] last:border-0">
                         <td className="py-1.5 text-[var(--ink-2)]">{row.def.label}</td>
@@ -355,7 +363,7 @@ export function PnlPage() {
                         <td className={`py-1.5 text-right tabular-nums ${row.change === null ? 'text-[var(--ink-3)]' : row.change >= 0 ? 'text-[var(--good-ink)]' : 'text-[var(--critical-ink)]'}`}>
                           {row.change === null
                             ? '—'
-                            : `${row.change >= 0 ? '+' : ''}${pct ? `${row.change.toFixed(1)} pp` : formatCurrencyFull(row.change)}`}
+                            : `${row.change >= 0 ? '+' : ''}${pct ? `${row.change.toFixed(1)} pp` : formatCurrencyFull(row.change, r.displayCurrency)}`}
                         </td>
                         <td className={`py-1.5 text-right tabular-nums ${row.growthPct === null ? 'text-[var(--ink-3)]' : row.growthPct >= 0 ? 'text-[var(--good-ink)]' : 'text-[var(--critical-ink)]'}`}>
                           {row.growthPct === null ? '—' : `${row.growthPct >= 0 ? '+' : ''}${formatPercent(row.growthPct)}`}
@@ -380,28 +388,28 @@ export function PnlPage() {
             <TrendLineChart
               data={r.trend.map((t) => ({ month: monthLabel(t.month), netSales: t.netSales }))}
               xKey="month" series={[{ key: 'netSales', label: 'Net Sales' }]}
-              valueFormatter={(v) => formatCurrencyCompact(v)}
+              valueFormatter={(v) => formatCurrencyCompact(v, r.displayCurrency)}
             />
           </ChartCard>
           <ChartCard title="Gross Profit Trend">
             <TrendLineChart
               data={r.trend.map((t) => ({ month: monthLabel(t.month), grossProfit: t.grossProfit }))}
               xKey="month" series={[{ key: 'grossProfit', label: 'Gross Profit' }]}
-              valueFormatter={(v) => formatCurrencyCompact(v)}
+              valueFormatter={(v) => formatCurrencyCompact(v, r.displayCurrency)}
             />
           </ChartCard>
           <ChartCard title="Contribution Trend">
             <TrendLineChart
               data={r.trend.map((t) => ({ month: monthLabel(t.month), contribution: t.contribution }))}
               xKey="month" series={[{ key: 'contribution', label: 'Contribution' }]}
-              valueFormatter={(v) => formatCurrencyCompact(v)}
+              valueFormatter={(v) => formatCurrencyCompact(v, r.displayCurrency)}
             />
           </ChartCard>
           <ChartCard title="EBITDA Trend">
             <TrendLineChart
               data={r.trend.map((t) => ({ month: monthLabel(t.month), ebitda: t.ebitda }))}
               xKey="month" series={[{ key: 'ebitda', label: 'EBITDA' }]}
-              valueFormatter={(v) => formatCurrencyCompact(v)}
+              valueFormatter={(v) => formatCurrencyCompact(v, r.displayCurrency)}
             />
           </ChartCard>
           <ChartCard title="Margin Trend">

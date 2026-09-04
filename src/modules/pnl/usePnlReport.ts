@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useDataStore } from '@/store/dataStore'
-import { fxRateForMonth } from '@/data/fxRates'
+import { fxRateForMonth, fxRateValue, lineValuesToUsd } from '@/data/fxRates'
 import { useFilterStore } from '@/store/filterStore'
 import { BUSINESS_CHANNEL_IDS, type BusinessChannelId } from '@/config/channels'
 import { toMonthKey } from '@/lib/format'
@@ -64,14 +64,25 @@ export function usePnlReport() {
         ? monthsBetween(period.from, period.to)
         : monthsForQuickPeriod(period.quick, month, monthsWithData)
 
-    /** One month's P&L lines for the selected view. */
+    // Amazon USA is the one channel that can be read in either currency. The
+    // Master P&L is always rupees — it sums every channel, and a report in two
+    // currencies at once is not a report.
+    const displayCurrency: 'INR' | 'USD' =
+      view === 'amazon_us' && amazonUsaCurrency === 'USD' ? 'USD' : 'INR'
+
+    /** One month's P&L lines for the selected view, in `displayCurrency`. */
     const linesFor = (m: string): PnlLineValues => {
       const inputs = { ...forMonth(m), meeshoBasis, amazonUsaCurrency }
       if (view === 'master') {
         const views = buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, m, inputs)
         return buildMasterPnl(views.map((v) => v.canonical), m).lines
       }
-      return buildChannelPnlView(view, m, inputs).canonical.lines
+      const lines = buildChannelPnlView(view, m, inputs).canonical.lines
+      // The canonical buckets are built in rupees so they can roll up into the
+      // Master P&L. Reading Amazon USA in dollars divides them back out at the
+      // same month's rate, so the round trip is exact and the margins — being
+      // ratios — do not move at all.
+      return displayCurrency === 'USD' ? lineValuesToUsd(lines, fxRateValue(m, fxRates)) : lines
     }
 
     const table = buildMultiMonthPnl(months, linesFor, computeSubtotals)
@@ -128,6 +139,7 @@ export function usePnlReport() {
       view, setView,
       meeshoBasis, setMeeshoBasis,
       amazonUsaCurrency, setAmazonUsaCurrency,
+      displayCurrency,
       fxRateLabel: `₹${fxRateForMonth(nativeMonth, fxRates).rate.toFixed(2)} per $1`,
       fxRateEntered: fxRateForMonth(nativeMonth, fxRates).entered,
       native, nativeMonth, nativeNotes,

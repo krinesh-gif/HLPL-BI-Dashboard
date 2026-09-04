@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
-import { fxRateForMonth, monthsMissingFxRate, type FxRate } from './fxRates'
+import { fxRateForMonth, lineValuesToUsd, monthsMissingFxRate, type FxRate } from './fxRates'
 
 /**
  * The rate scales an entire channel, so where it comes from has to be visible.
@@ -54,5 +54,35 @@ describe('naming the months without a rate', () => {
 
   it('is empty when every month has one', () => {
     expect(monthsMissingFxRate(['2026-06', '2026-07'], rates)).toEqual([])
+  })
+})
+
+describe('restating P&L lines into dollars', () => {
+  const inr = { grossSales: 881_000, cogs: -264_000, grossProfit: 617_000, grossMarginPct: 70.03 }
+
+  it('divides every money line by the rate', () => {
+    const usd = lineValuesToUsd(inr, 88.1)
+    expect(usd.grossSales).toBeCloseTo(10_000, 6)
+    expect(usd.cogs).toBeCloseTo(-2996.59, 2)
+  })
+
+  it('leaves margin percentages untouched', () => {
+    // A margin is a ratio, so it reads the same in either currency. Dividing
+    // 70.03% by 88.1 would have printed 0.8% the moment the toggle moved.
+    expect(lineValuesToUsd(inr, 88.1).grossMarginPct).toBe(70.03)
+  })
+
+  it('round-trips exactly against the rate the rupee figure was built at', () => {
+    const usd = lineValuesToUsd({ netSales: 9_000 * 88.1 }, 88.1)
+    expect(usd.netSales).toBeCloseTo(9_000, 6)
+  })
+
+  it('refuses a nonsense rate rather than dividing by it', () => {
+    expect(lineValuesToUsd(inr, 0)).toBe(inr)
+    expect(lineValuesToUsd(inr, Number.NaN)).toBe(inr)
+  })
+
+  it('drops nothing and invents nothing', () => {
+    expect(Object.keys(lineValuesToUsd(inr, 88.1)).sort()).toEqual(Object.keys(inr).sort())
   })
 })

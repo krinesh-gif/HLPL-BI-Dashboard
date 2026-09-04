@@ -53,3 +53,24 @@ export function fxRateValue(month: string, rates: FxRate[]): number {
 export function monthsMissingFxRate(months: string[], rates: FxRate[]): string[] {
   return months.filter((m) => !fxRateForMonth(m, rates).entered)
 }
+
+/**
+ * Restates a set of P&L line values from rupees into dollars.
+ *
+ * Percentage lines are left alone: a margin is a ratio, so it is the same
+ * number in either currency. Dividing them too would produce a "69.4%" that
+ * silently became "0.8%" the moment the reader switched currency, which is
+ * how a currency toggle turns into a wrong-decision machine.
+ */
+export function lineValuesToUsd<K extends string>(
+  values: Partial<Record<K, number>>,
+  rate: number,
+): Partial<Record<K, number>> {
+  if (!Number.isFinite(rate) || rate <= 0) return values
+  const out: Partial<Record<K, number>> = {}
+  for (const [key, value] of Object.entries(values) as [K, number | undefined][]) {
+    if (value === undefined) continue
+    out[key] = key.endsWith('Pct') ? value : value / rate
+  }
+  return out
+}

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { AmazonUsaPnlFacts, CanonicalSalesRecord, SkuMaster } from '@/data/models'
+import { lineValuesToUsd } from '@/data/fxRates'
 import { buildChannelPnlView, type ChannelPnlViewInputs } from './channelPnlRouter'
+import { buildMultiMonthPnl } from './multiMonthPnl'
+import { computeSubtotals } from './pnl'
 import { amazonUsaFactsAtRate, amazonUsaValuesInInr, computeAmazonUsaPnl } from './nativePnl/amazonUsa'
 
 /**
@@ -119,5 +122,29 @@ describe('the same statement in either currency', () => {
     const dollars = buildChannelPnlView('amazon_us', '2026-07', inputs(88, 'USD'))
     const rupees = buildChannelPnlView('amazon_us', '2026-07', inputs(88, 'INR'))
     expect(rupees.canonical.lines.grossSales).toBe(dollars.canonical.lines.grossSales)
+  })
+})
+
+describe('the multi-month table follows the currency toggle', () => {
+  // The toggle used to move only the native statement lower down the page, so
+  // switching to dollars left the main table sitting in rupees and the screen
+  // showed two currencies at once with nothing to say which was which.
+  const rate = 88.1
+  const built = buildChannelPnlView('amazon_us', '2026-07', inputs(rate, 'USD'))
+
+  it('reads the same dollars the native statement does', () => {
+    const usd = lineValuesToUsd(built.canonical.lines, rate)
+    expect(usd.grossSales).toBeCloseTo(built.native?.values.grossSalesUsd ?? 0, 4)
+  })
+
+  it('keeps the Total column and margins right after conversion', () => {
+    const inr = buildMultiMonthPnl(['2026-07'], () => built.canonical.lines, computeSubtotals)
+    const usd = buildMultiMonthPnl(['2026-07'], () => lineValuesToUsd(built.canonical.lines, rate), computeSubtotals)
+
+    const total = (t: typeof inr, key: string) => t.rows.find((r) => r.def.key === key)?.total ?? 0
+    // Money scales by the rate; margins, being ratios, do not move at all.
+    expect(total(usd, 'grossSales') * rate).toBeCloseTo(total(inr, 'grossSales'), 2)
+    expect(total(usd, 'grossMarginPct')).toBeCloseTo(total(inr, 'grossMarginPct'), 6)
+    expect(total(usd, 'ebitdaMarginPct')).toBeCloseTo(total(inr, 'ebitdaMarginPct'), 6)
   })
 })
