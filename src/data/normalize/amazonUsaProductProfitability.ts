@@ -117,14 +117,16 @@ export function normalizeAmazonUsaProductProfitability(
 
     const skuRecord = skuByCode.get(msku)
     if (!skuRecord) unknownSkuCount++
-    // The Product Master's COGS is in INR; converted here at the configured
-    // FX rate so AmazonUsaPnlFacts.cogsUsd stays in USD like every other fact.
-    const cogsPerUnitUsd = (skuRecord?.cogs ?? 0) / NATIVE_PNL_ASSUMPTIONS.usdToInrRate
+    // Cost of goods and freight are rupee costs. They are carried in rupees
+    // and converted at the month's rate when the statement is read — not
+    // converted here and frozen, which left the statement half-converted at
+    // upload day's rate and half at the reader's.
+    const cogsPerUnitInr = skuRecord?.cogs ?? 0
 
     facts.grossSalesUsd += sales
     facts.netSalesUsd += netSales
-    facts.cogsUsd += cogsPerUnitUsd * netUnitsSold
-    facts.freightUsd += (NATIVE_PNL_ASSUMPTIONS.indiaUsaFreightPerUnitInr / NATIVE_PNL_ASSUMPTIONS.usdToInrRate) * netUnitsSold
+    facts.cogsSourceInr = (facts.cogsSourceInr ?? 0) + cogsPerUnitInr * netUnitsSold
+    facts.freightSourceInr = (facts.freightSourceInr ?? 0) + NATIVE_PNL_ASSUMPTIONS.indiaUsaFreightPerUnitInr * netUnitsSold
     for (const [col, bucket] of columnBucket) {
       facts[bucket] += Math.abs(num(row, col))
     }

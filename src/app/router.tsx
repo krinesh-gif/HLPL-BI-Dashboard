@@ -6,6 +6,7 @@ import { PnlPage } from '@/modules/pnl/PnlPage'
 import { FixedExpensesPage } from '@/modules/pnl/FixedExpensesPage'
 import { NetSalesReconciliationPage } from '@/modules/pnl/NetSalesReconciliationPage'
 import { TransactionReviewPage } from '@/modules/meesho/TransactionReviewPage'
+import { FxRatesPage } from '@/modules/settings/FxRatesPage'
 import { CostSheetPage } from '@/modules/products/CostSheetPage'
 import { InsightPage } from '@/modules/insight/InsightPage'
 import { ChannelDashboardPage } from '@/modules/channels/ChannelDashboardPage'
@@ -38,6 +39,7 @@ export const router = createHashRouter([
       { path: 'pnl/fixed-expenses', element: <FixedExpensesPage /> },
       { path: 'pnl/reconciliation', element: <NetSalesReconciliationPage /> },
       { path: 'meesho/review', element: <TransactionReviewPage /> },
+      { path: 'settings/fx-rates', element: <FxRatesPage /> },
       { path: 'insight', element: <InsightPage /> },
       { path: 'channels/:channelId', element: <ChannelDashboardPage /> },
       { path: 'marketing/ads', element: <AdsOverviewPage /> },

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useDataStore } from '@/store/dataStore'
+import { fxRateForMonth } from '@/data/fxRates'
 import { useFilterStore } from '@/store/filterStore'
 import { BUSINESS_CHANNEL_IDS, type BusinessChannelId } from '@/config/channels'
 import { toMonthKey } from '@/lib/format'
@@ -34,7 +35,7 @@ export interface PnlPeriod {
  * calculated two different ways.
  */
 export function usePnlReport() {
-  const { salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts } = useDataStore()
+  const { salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, fxRates } = useDataStore()
   const { month } = useFilterStore()
   const { forMonth } = usePnlInputs()
 
@@ -42,6 +43,10 @@ export function usePnlReport() {
   // Meesho carries both an order-date and a payment-date statement. Order
   // basis is the default: it is what a month's trading is judged on.
   const [meeshoBasis, setMeeshoBasis] = useState<PnlBasis>('order')
+  // Amazon USA earns and is charged in dollars, so its own statement reads
+  // naturally in dollars. Rupees is the second view, for reading it beside the
+  // other channels. The Master P&L is always rupees — one report, one currency.
+  const [amazonUsaCurrency, setAmazonUsaCurrency] = useState<'USD' | 'INR'>('USD')
   const [period, setPeriod] = useState<PnlPeriod>({ mode: 'quick', quick: '6m', from: month, to: month })
 
   const monthsWithData = useMemo(() => {
@@ -61,7 +66,7 @@ export function usePnlReport() {
 
     /** One month's P&L lines for the selected view. */
     const linesFor = (m: string): PnlLineValues => {
-      const inputs = { ...forMonth(m), meeshoBasis }
+      const inputs = { ...forMonth(m), meeshoBasis, amazonUsaCurrency }
       if (view === 'master') {
         const views = buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, m, inputs)
         return buildMasterPnl(views.map((v) => v.canonical), m).lines
@@ -76,7 +81,7 @@ export function usePnlReport() {
     const latestMonth = months[months.length - 1] ?? month
     const channelBreakdown =
       view === 'master'
-        ? buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, latestMonth, { ...forMonth(latestMonth), meeshoBasis })
+        ? buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, latestMonth, { ...forMonth(latestMonth), meeshoBasis, amazonUsaCurrency })
             .map((v) => ({ channel: v.channel, netSales: v.canonical.lines.netSales ?? 0 }))
             .filter((c) => c.netSales !== 0)
             .sort((a, b) => b.netSales - a.netSales)
@@ -114,7 +119,7 @@ export function usePnlReport() {
     let nativeMonth = latestMonth
     if (view !== 'master') {
       for (let i = months.length - 1; i >= 0; i--) {
-        const built = buildChannelPnlView(view, months[i], { ...forMonth(months[i]), meeshoBasis })
+        const built = buildChannelPnlView(view, months[i], { ...forMonth(months[i]), meeshoBasis, amazonUsaCurrency })
         if (built.native) { native = built.native; nativeNotes = built.notes; nativeMonth = months[i]; break }
       }
     }
@@ -122,6 +127,9 @@ export function usePnlReport() {
     return {
       view, setView,
       meeshoBasis, setMeeshoBasis,
+      amazonUsaCurrency, setAmazonUsaCurrency,
+      fxRateLabel: `₹${fxRateForMonth(nativeMonth, fxRates).rate.toFixed(2)} per $1`,
+      fxRateEntered: fxRateForMonth(nativeMonth, fxRates).entered,
       native, nativeMonth, nativeNotes,
       period, setPeriod,
       months,
@@ -132,5 +140,5 @@ export function usePnlReport() {
       trend,
       latestMonth,
     }
-  }, [view, meeshoBasis, period, month, monthsWithData, forMonth])
+  }, [view, meeshoBasis, amazonUsaCurrency, period, month, monthsWithData, forMonth, fxRates])
 }

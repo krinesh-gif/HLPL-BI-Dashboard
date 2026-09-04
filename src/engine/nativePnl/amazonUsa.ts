@@ -55,6 +55,24 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm3Pct', label: 'CM3 %', section: 'FIXED OVERHEADS & FINANCE', kind: 'percent' },
 ]
 
+/**
+ * The facts with their rupee costs converted at a given rate.
+ *
+ * Cost of goods and freight are rupee amounts; every other figure is already
+ * in dollars because Amazon reports it that way. Converting them here, at read
+ * time, is what lets a month be restated when its rate is corrected. Facts
+ * imported before the rupee amounts were stored keep their frozen dollar
+ * figures, so an old month still renders rather than reading as zero cost.
+ */
+export function amazonUsaFactsAtRate(facts: AmazonUsaPnlFacts, fxRate: number): AmazonUsaPnlFacts {
+  if (fxRate <= 0) return facts
+  return {
+    ...facts,
+    cogsUsd: facts.cogsSourceInr !== undefined ? facts.cogsSourceInr / fxRate : facts.cogsUsd,
+    freightUsd: facts.freightSourceInr !== undefined ? facts.freightSourceInr / fxRate : facts.freightUsd,
+  }
+}
+
 export function computeAmazonUsaPnl(facts: AmazonUsaPnlFacts): NativeLineValues {
   const refundsReturnsUsd = facts.grossSalesUsd - facts.netSalesUsd
 
@@ -115,7 +133,7 @@ export function computeAmazonUsaPnl(facts: AmazonUsaPnlFacts): NativeLineValues 
 }
 
 /** Re-buckets into the canonical structure, converting USD to INR at the
- * configured rate so this channel rolls up correctly into the (₹) Master P&L. */
+ * month's rate so this channel rolls up correctly into the (₹) Master P&L. */
 export function amazonUsaToCanonicalBuckets(facts: AmazonUsaPnlFacts, fxRate = NATIVE_PNL_ASSUMPTIONS.usdToInrRate): PnlLineValues {
   const inr = (usd: number) => usd * fxRate
   return {
@@ -139,4 +157,19 @@ export function amazonUsaToCanonicalBuckets(facts: AmazonUsaPnlFacts, fxRate = N
       facts.agencySoftwareUsd + facts.otherOverheadUsd + facts.netSalesUsd * (facts.fxConversionCostPct / 100),
     ),
   }
+}
+
+/**
+ * The same statement in rupees.
+ *
+ * Every line is a money amount except the margin percentages, which are ratios
+ * and identical in either currency — converting them would turn 42% into 4,000%.
+ * Percentage keys are therefore passed through untouched.
+ */
+export function amazonUsaValuesInInr(values: NativeLineValues, fxRate: number): NativeLineValues {
+  const converted: NativeLineValues = {}
+  for (const [key, value] of Object.entries(values)) {
+    converted[key] = key.endsWith('Pct') ? value : value * fxRate
+  }
+  return converted
 }

@@ -7,6 +7,7 @@ import type { SkuMapWorkbookResult } from '@/data/normalize/skuMapWorkbook'
 import type { CostVersion } from '@/data/costVersions'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
+import type { FxRate } from '@/data/fxRates'
 import type {
   AdsRecord,
   AmazonUsaPnlFacts,
@@ -51,7 +52,7 @@ const EMPTY_DATASET: SharedDataset = {
   manualAdSpend: [],
 }
 
-const EMPTY_MAPPINGS: MappingTablesState = { mappings: [], comboComponents: [], costVersions: [] }
+const EMPTY_MAPPINGS: MappingTablesState = { mappings: [], comboComponents: [], costVersions: [], fxRates: [] }
 
 /** Everything one uploaded report contributes, imported as a single unit. */
 export interface ReportImport {
@@ -102,6 +103,9 @@ interface MappingTablesState {
   /** Effective-dated COGS. Every P&L reads the version in force for its own
    * month, so closed months keep the cost they were closed at. */
   costVersions: CostVersion[]
+  /** The USD→INR rate that applied in each month. Amazon USA is denominated in
+   * dollars, so this scales the whole channel wherever it rolls into rupees. */
+  fxRates: FxRate[]
 }
 
 interface DataState extends SharedDataset, MappingTablesState {
@@ -134,6 +138,10 @@ interface DataState extends SharedDataset, MappingTablesState {
    * months these versions name are affected. */
   saveCostVersions: (versions: CostVersion[]) => Promise<void>
   removeCostVersion: (sku: string, effectiveFrom: string) => Promise<void>
+  /** Saves the USD→INR rate for a month. Other months are untouched, so a
+   * closed month keeps the rate it was closed on. */
+  saveFxRate: (rate: FxRate) => Promise<void>
+  removeFxRate: (month: string) => Promise<void>
   /** Records a month's ad spend for a channel that has no report to upload. */
   saveManualAdSpend: (entry: Omit<ManualAdSpend, 'enteredAt'>) => Promise<void>
   removeManualAdSpend: (channel: string, month: string) => Promise<void>
@@ -191,10 +199,10 @@ export const useDataStore = create<DataState>((set, get) => {
       try {
         const [dataset, mapping, costs] = await Promise.all([
           api.get<SharedDataset>('/api/state'),
-          api.get<Omit<MappingTablesState, 'costVersions'>>('/api/sku-map'),
-          api.get<{ versions: CostVersion[] }>('/api/cost-versions'),
+          api.get<Omit<MappingTablesState, 'costVersions' | 'fxRates'>>('/api/sku-map'),
+          api.get<{ versions: CostVersion[]; fxRates?: FxRate[] }>('/api/cost-versions'),
         ])
-        set({ ...dataset, ...mapping, costVersions: costs.versions, loading: false, error: null })
+        set({ ...dataset, ...mapping, costVersions: costs.versions, fxRates: costs.fxRates ?? [], loading: false, error: null })
         // Point the dashboard at the newest month that has data. Left on the
         // current calendar month, every page reads as empty whenever the
         // latest upload covers an earlier period — which looks exactly like
@@ -291,6 +299,10 @@ export const useDataStore = create<DataState>((set, get) => {
       await get().loadState()
       return result
     },
+
+    saveFxRate: (rate) => writeThen(() => api.post('/api/cost-versions', { fxRates: [rate] })),
+
+    removeFxRate: (month) => writeThen(() => api.delete(`/api/cost-versions?fxMonth=${encodeURIComponent(month)}`)),
 
     removeMapping: (channelSku) =>
       writeThen(() => api.delete(`/api/sku-map?channelSku=${encodeURIComponent(channelSku)}`)),

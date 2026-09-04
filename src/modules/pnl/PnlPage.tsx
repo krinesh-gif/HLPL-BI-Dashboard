@@ -55,6 +55,32 @@ export function PnlPage() {
           </select>
         </label>
 
+        {r.view === 'amazon_us' && (
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-[var(--ink-3)]">Currency</span>
+            <div className="flex rounded-full border border-[var(--line)] bg-[var(--surface-2)] p-0.5">
+              {([
+                { key: 'USD', label: '$ USD' },
+                { key: 'INR', label: '₹ INR' },
+              ] as const).map((c) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => r.setAmazonUsaCurrency(c.key)}
+                  aria-pressed={r.amazonUsaCurrency === c.key}
+                  className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                    r.amazonUsaCurrency === c.key
+                      ? 'bg-[var(--accent)] text-[var(--accent-ink)]'
+                      : 'text-[var(--ink-3)] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {r.view === 'meesho' && (
           <div className="flex flex-col gap-1">
             <span className="text-xs font-medium text-[var(--ink-3)]">Basis</span>
@@ -203,6 +229,22 @@ export function PnlPage() {
         Percentages in the Total column are recomputed from the period's totals, not averaged across months — the average of monthly
         margins is not the margin of the period.
       </p>
+
+      {r.view === 'amazon_us' && (
+        <p className="rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--ink-2)]">
+          {r.amazonUsaCurrency === 'USD' ? (
+            <><strong>Shown in US dollars</strong>, the currency Amazon actually charges and pays in — so no exchange rate
+            stands between the report and this statement.</>
+          ) : (
+            <><strong>Shown in rupees</strong>, converted at {r.fxRateLabel}. Margin percentages are ratios and read the
+            same in either currency.</>
+          )}{' '}
+          {r.fxRateEntered
+            ? 'That is the rate entered for this month.'
+            : 'No rate has been entered for this month, so the default assumption is being used — set it on Settings ▸ Exchange Rates.'}
+          {' '}The Master P&L is always in rupees, whichever view is selected here.
+        </p>
+      )}
 
       {r.view === 'meesho' && (
         <p className="rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--ink-2)]">

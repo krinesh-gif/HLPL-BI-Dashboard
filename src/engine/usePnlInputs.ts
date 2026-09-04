@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useDataStore } from '@/store/dataStore'
 import { buildCostIndex } from '@/data/costVersions'
+import { fxRateValue } from '@/data/fxRates'
 import { marketingFromAds } from '@/engine/marketing'
 import type { ChannelPnlViewInputs } from '@/engine/channelPnlRouter'
 
@@ -23,7 +24,7 @@ export function usePnlInputs(): {
   const {
     salesRecords, adsRecords, skuMaster, fixedExpenses,
     flipkartFacts, amazonUsaFacts, meeshoFacts,
-    costVersions, mappings, comboComponents, manualAdSpend,
+    costVersions, mappings, comboComponents, manualAdSpend, fxRates,
   } = useDataStore()
 
   return useMemo(() => {
@@ -43,11 +44,18 @@ export function usePnlInputs(): {
 
     return {
       inputs,
-      forMonth: (month: string) => ({ ...inputs, marketing: marketingFromAds(adsRecords, month, manualAdSpend) }),
+      // The FX rate is per month for the same reason costs are: Amazon USA is
+      // priced in dollars, so a closed month must keep the rate it was closed
+      // on rather than being restated whenever this month's rate is entered.
+      forMonth: (month: string) => ({
+        ...inputs,
+        marketing: marketingFromAds(adsRecords, month, manualAdSpend),
+        fxRate: fxRateValue(month, fxRates),
+      }),
     }
   }, [
     salesRecords, adsRecords, skuMaster, fixedExpenses,
     flipkartFacts, amazonUsaFacts, meeshoFacts,
-    costVersions, mappings, comboComponents, manualAdSpend,
+    costVersions, mappings, comboComponents, manualAdSpend, fxRates,
   ])
 }

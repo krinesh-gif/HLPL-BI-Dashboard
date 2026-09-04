@@ -199,6 +199,67 @@ describe.skipIf(!PGTEST_URL)('clearing Meesho data', () => {
   })
 })
 
+/**
+ * The USD→INR rate belongs to its month.
+ *
+ * Amazon USA is denominated in dollars, so this one number scales the whole
+ * channel wherever it rolls into the rupee P&L. It was a constant in the code,
+ * which meant every closed month was restated the moment anyone edited it.
+ */
+describe.skipIf(!PGTEST_URL)('fx_rates', () => {
+  const upsert = (db: string, month: string, rate: number, note: string | null): string =>
+    psql(
+      db,
+      `INSERT INTO fx_rates (month, pair, rate, note, updated_by, updated_at)
+       SELECT u.month, 'USDINR', u.rate, u.note, 'tester'::text, now()
+       FROM UNNEST(ARRAY['${month}']::text[], ARRAY[${rate}]::float8[],
+                   ARRAY[${note === null ? 'NULL' : `'${note}'`}]::text[]) AS u(month, rate, note)
+       ON CONFLICT (month, pair) DO UPDATE SET
+         rate = EXCLUDED.rate, note = EXCLUDED.note, updated_at = now()`,
+    )
+  const rateOf = (db: string, month: string): string =>
+    psql(db, `SELECT coalesce(max(rate)::text, 'none') FROM fx_rates WHERE month = '${month}'`)
+
+  it('keeps one rate per month', () => {
+    const db = freshDb('hlpl_fx_test')
+    applySchema(db)
+    upsert(db, '2026-06', 88.1, 'HDFC advice')
+    upsert(db, '2026-07', 89.45, null)
+    expect(rateOf(db, '2026-06')).toBe('88.1')
+    expect(rateOf(db, '2026-07')).toBe('89.45')
+  })
+
+  it('leaves every other month alone when one is corrected', () => {
+    // The whole point of dating the rate: correcting July must not restate a
+    // June that has already been closed and reported.
+    const db = freshDb('hlpl_fx_correct_test')
+    applySchema(db)
+    upsert(db, '2026-06', 88.1, 'HDFC advice')
+    upsert(db, '2026-07', 89.45, null)
+    upsert(db, '2026-07', 90.2, 'corrected')
+    expect(rateOf(db, '2026-07')).toBe('90.2')
+    expect(rateOf(db, '2026-06')).toBe('88.1')
+  })
+
+  it('returns a removed month to no rate at all, not to a neighbour’s', () => {
+    const db = freshDb('hlpl_fx_delete_test')
+    applySchema(db)
+    upsert(db, '2026-06', 88.1, null)
+    upsert(db, '2026-07', 89.45, null)
+    psql(db, `DELETE FROM fx_rates WHERE month = '2026-07' AND pair = 'USDINR'`)
+    expect(rateOf(db, '2026-07')).toBe('none')
+    expect(rateOf(db, '2026-06')).toBe('88.1')
+  })
+
+  it('is safe to re-run the schema over', () => {
+    const db = freshDb('hlpl_fx_rerun_test')
+    applySchema(db)
+    upsert(db, '2026-06', 88.1, null)
+    applySchema(db)
+    expect(rateOf(db, '2026-06')).toBe('88.1')
+  })
+})
+
 describe('the contribution field list', () => {
   it('is identical on both sides of the network boundary', async () => {
     const client = await import('../../src/data/meesho/contribution')

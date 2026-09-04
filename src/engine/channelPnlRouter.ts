@@ -14,7 +14,7 @@ import { MEESHO_ASSUMPTIONS, NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAs
 import { toMonthKey } from '@/lib/format'
 import { allocateFixedExpensesForMonth } from './allocation'
 import { buildChannelPnl, cogsForRecords, computeSubtotals, type CogsInputs, type MarketingByChannel } from './pnl'
-import { amazonUsaToCanonicalBuckets, AMAZON_USA_LINE_DEFS, computeAmazonUsaPnl } from './nativePnl/amazonUsa'
+import { amazonUsaFactsAtRate, amazonUsaToCanonicalBuckets, amazonUsaValuesInInr, AMAZON_USA_LINE_DEFS, computeAmazonUsaPnl } from './nativePnl/amazonUsa'
 import { applyFlipkartOtherCosts, computeFlipkartPnl, flipkartToCanonicalBuckets, FLIPKART_LINE_DEFS } from './nativePnl/flipkart'
 import { applyMeeshoOtherCosts, computeMeeshoPnl, meeshoToCanonicalBuckets, MEESHO_LINE_DEFS } from './nativePnl/meesho'
 import type { NativeLineDef, NativeLineValues } from './nativePnl/types'
@@ -164,6 +164,12 @@ export interface ChannelPnlViewInputs {
   cogs?: CogsInputs
   /** Which calendar Meesho's months are cut on. Defaults to order basis. */
   meeshoBasis?: PnlBasis
+  /** INR per USD for this month. Amazon USA is denominated in dollars, so this
+   * scales the whole channel wherever it rolls into the rupee P&L. */
+  fxRate?: number
+  /** Which currency to render Amazon USA's own statement in. The canonical
+   * roll-up is always rupees regardless — the Master P&L has one currency. */
+  amazonUsaCurrency?: 'USD' | 'INR'
 }
 
 /**
@@ -195,16 +201,24 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
   if (channel === 'amazon_us') {
     const imported = inputs.facts.amazonUsaFacts.find((f) => f.month === month)
     if (imported) {
+      const fxRate = inputs.fxRate ?? NATIVE_PNL_ASSUMPTIONS.usdToInrRate
+      // Rupee costs are converted at this month's rate rather than the one
+      // that happened to be configured when the file was uploaded.
+      const atRate = amazonUsaFactsAtRate(imported, fxRate)
       const recomputed = recomputedCogs(channel, month, inputs)
-      const facts = recomputed
-        ? { ...imported, cogsUsd: recomputed.total / NATIVE_PNL_ASSUMPTIONS.usdToInrRate }
-        : imported
-      const values = computeAmazonUsaPnl(facts)
-      const canonicalLines = computeSubtotals(amazonUsaToCanonicalBuckets(facts))
+      const facts = recomputed ? { ...atRate, cogsUsd: recomputed.total / fxRate } : atRate
+
+      const usd = computeAmazonUsaPnl(facts)
+      const showInr = inputs.amazonUsaCurrency === 'INR'
+      const canonicalLines = computeSubtotals(amazonUsaToCanonicalBuckets(facts, fxRate))
       return {
         channel, month,
         canonical: { channel, month, lines: canonicalLines },
-        native: { lineDefs: AMAZON_USA_LINE_DEFS, values, currency: 'USD' },
+        native: {
+          lineDefs: AMAZON_USA_LINE_DEFS,
+          values: showInr ? amazonUsaValuesInInr(usd, fxRate) : usd,
+          currency: showInr ? 'INR' : 'USD',
+        },
         notes: [],
       }
     }

@@ -6,6 +6,32 @@ import type { CostVersion } from '../src/data/costVersions.js'
 
 interface SaveBody {
   versions?: unknown
+  /** Month-dated FX rates. They share this route rather than getting one of
+   * their own because the deployment's serverless-function budget is full, and
+   * because they are the same kind of thing: a financial parameter stamped
+   * with the month it applies to. */
+  fxRates?: unknown
+}
+
+interface FxRateInput {
+  month: string
+  rate: number
+  note?: string
+}
+
+function isFxRateArray(v: unknown): v is FxRateInput[] {
+  return (
+    Array.isArray(v) &&
+    v.every((x) => {
+      if (!x || typeof x !== 'object') return false
+      const c = x as FxRateInput
+      // A zero or negative rate would be divided by somewhere downstream.
+      return (
+        isNonEmptyString(c.month) && MONTH_PATTERN.test(c.month) &&
+        typeof c.rate === 'number' && Number.isFinite(c.rate) && c.rate > 0
+      )
+    })
+  )
 }
 
 const CHUNK_SIZE = 500
@@ -51,7 +77,17 @@ export async function GET(request: Request): Promise<Response> {
     ORDER BY sku, effective_from DESC
   `) as Row[]
 
+  const fxRows = (await sql`
+    SELECT month, rate, note, updated_at FROM fx_rates WHERE pair = 'USDINR' ORDER BY month DESC
+  `) as Row[]
+
   return json({
+    fxRates: fxRows.map((r) => ({
+      month: String(r.month),
+      rate: Number(r.rate),
+      note: r.note ? String(r.note) : undefined,
+      updatedAt: r.updated_at ? new Date(String(r.updated_at)).toISOString() : undefined,
+    })),
     versions: rows.map((r) => ({
       sku: String(r.sku),
       effectiveFrom: String(r.effective_from),
@@ -78,6 +114,29 @@ export async function POST(request: Request): Promise<Response> {
   if (auth.response) return auth.response
 
   const body = await readJson<SaveBody>(request)
+
+  if (body && body.fxRates !== undefined) {
+    if (!isFxRateArray(body.fxRates)) {
+      return json({ error: 'Expected { fxRates: [{ month: "yyyy-mm", rate: number > 0, note? }] }.' }, 400)
+    }
+    if (body.fxRates.length === 0) return json({ saved: 0 })
+    await sql.query(
+      `INSERT INTO fx_rates (month, pair, rate, note, updated_by, updated_at)
+       SELECT u.month, 'USDINR', u.rate, u.note, $4::text, now()
+       FROM UNNEST($1::text[], $2::float8[], $3::text[]) AS u(month, rate, note)
+       ON CONFLICT (month, pair) DO UPDATE SET
+         rate = EXCLUDED.rate, note = EXCLUDED.note,
+         updated_by = EXCLUDED.updated_by, updated_at = now()`,
+      [
+        body.fxRates.map((r) => r.month),
+        body.fxRates.map((r) => r.rate),
+        body.fxRates.map((r) => r.note ?? null),
+        auth.user.id,
+      ],
+    )
+    return json({ saved: body.fxRates.length })
+  }
+
   if (!body || !isVersionArray(body.versions)) {
     return json(
       { error: 'Expected { versions: [{ sku, effectiveFrom: "yyyy-mm", cogs: number >= 0, source }] }.' },
@@ -130,6 +189,13 @@ export async function DELETE(request: Request): Promise<Response> {
   if (auth.response) return auth.response
 
   const url = new URL(request.url)
+
+  const fxMonth = url.searchParams.get('fxMonth')
+  if (isNonEmptyString(fxMonth)) {
+    await sql`DELETE FROM fx_rates WHERE month = ${fxMonth} AND pair = 'USDINR'`
+    return json({ ok: true })
+  }
+
   const sku = url.searchParams.get('sku')
   const effectiveFrom = url.searchParams.get('effectiveFrom')
   if (!isNonEmptyString(sku) || !isNonEmptyString(effectiveFrom)) {

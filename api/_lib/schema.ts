@@ -273,6 +273,24 @@ BEGIN
   CREATE INDEX IF NOT EXISTS meesho_transactions_flagged_idx ON meesho_transactions (flagged) WHERE flagged;
 
   -- ---------------------------------------------------------------------------
+  -- The USD→INR rate that applied in each month.
+  --
+  -- Amazon USA is denominated in dollars, so this one number scales the whole
+  -- channel — revenue and cost alike — wherever it rolls into the rupee P&L.
+  -- Held per month rather than as a constant so a closed month keeps the rate
+  -- it was closed on, exactly like an effective-dated cost.
+  -- ---------------------------------------------------------------------------
+  CREATE TABLE IF NOT EXISTS fx_rates (
+    month      TEXT NOT NULL,
+    pair       TEXT NOT NULL DEFAULT 'USDINR',
+    rate       DOUBLE PRECISION NOT NULL,
+    note       TEXT,
+    updated_by TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (month, pair)
+  );
+
+  -- ---------------------------------------------------------------------------
   -- Operational data entered outside marketplace reports.
   -- ---------------------------------------------------------------------------
   CREATE TABLE IF NOT EXISTS inventory_snapshots (

@@ -193,6 +193,17 @@ export interface AmazonUsaPnlFacts {
   sponsoredProductsUsd: number
   cogsUsd: number
   freightUsd: number
+  /** The rupee amounts behind `cogsUsd` and `freightUsd`.
+   *
+   * Both are rupee costs — the Product Master's COGS and the India→USA freight
+   * — that used to be converted to dollars at import and frozen there. That
+   * froze half the statement at whatever rate was configured on upload day
+   * while revenue converted at read time, so editing the rate produced a P&L
+   * mixing two different exchange rates. Kept in rupees so they convert at the
+   * month's rate like everything else. Optional: facts imported before this
+   * existed fall back to the frozen dollar figures. */
+  cogsSourceInr?: number
+  freightSourceInr?: number
   /** Manual monthly entries — from the Assumptions-style form. */
   sponsoredBrandsUsd: number
   sponsoredDisplayDspUsd: number
