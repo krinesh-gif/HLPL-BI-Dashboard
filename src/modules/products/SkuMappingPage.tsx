@@ -4,7 +4,7 @@ import { PageShell } from '@/components/layout/PageShell'
 import { useDataStore } from '@/store/dataStore'
 import { useSkuMappingWork, type MappingRow } from './useSkuMappingWork'
 import { formatCurrencyFull, formatPercent } from '@/lib/format'
-import { CHANNEL_MAP } from '@/config/channels'
+import { CHANNEL_MAP, type SalesSourceId } from '@/config/channels'
 import type { ComboComponent, SkuMapping } from '@/data/skuMapping'
 import type { SkuMaster } from '@/data/models'
 
@@ -26,6 +26,11 @@ export function SkuMappingPage() {
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState<DraftComponent[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  // Which marketplace to look at, and what to rank by. Both default to the
+  // whole list newest-money-first, which is the order this page is worked in:
+  // the biggest unmapped seller is the one worth mapping next.
+  const [marketplace, setMarketplace] = useState<SalesSourceId | 'all'>('all')
+  const [sort, setSort] = useState<{ key: 'orders' | 'netSales'; dir: 'asc' | 'desc' }>({ key: 'netSales', dir: 'desc' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -36,9 +41,10 @@ export function SkuMappingPage() {
   // someone might remember about it.
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return allRows
-    const terms = q.split(/\s+/)
-    return allRows.filter((r) => {
+    const terms = q ? q.split(/\s+/) : []
+    const filtered = allRows.filter((r) => {
+      if (marketplace !== 'all' && !r.channels.includes(marketplace)) return false
+      if (terms.length === 0) return true
       const haystack = [
         r.channelSku,
         r.productName,
@@ -49,7 +55,21 @@ export function SkuMappingPage() {
         .toLowerCase()
       return terms.every((t) => haystack.includes(t))
     })
-  }, [allRows, search])
+    const sign = sort.dir === 'asc' ? 1 : -1
+    return [...filtered].sort((a, b) => (a[sort.key] - b[sort.key]) * sign)
+  }, [allRows, search, marketplace, sort])
+
+  /** Only the marketplaces this tab actually contains, so the filter never
+   * offers a choice that empties the table. */
+  const marketplaceOptions = useMemo(() => {
+    const seen = new Set<SalesSourceId>()
+    for (const r of allRows) for (const c of r.channels) seen.add(c)
+    return [...seen].sort((a, b) => (CHANNEL_MAP[a]?.label ?? a).localeCompare(CHANNEL_MAP[b]?.label ?? b))
+  }, [allRows])
+
+  function toggleSort(key: 'orders' | 'netSales') {
+    setSort((s) => (s.key === key ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' } : { key, dir: 'desc' }))
+  }
 
   const unmappedShare = work.totalNetSales > 0 ? (work.unmappedNetSales / work.totalNetSales) * 100 : 0
   const selectedInView = rows.filter((r) => selected.has(r.channelSku))
@@ -163,59 +183,78 @@ export function SkuMappingPage() {
     >
       {error && <p className="mb-4 rounded-md bg-[color-mix(in_oklab,var(--critical)_10%,transparent)] px-3 py-2 text-sm text-[var(--critical-ink)]">{error}</p>}
 
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {/* One strip rather than three cards: the numbers are a status line for
+          the work below, not the point of the page. */}
+      <div className="mb-3 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5">
         <Stat label="Still estimated" value={formatCurrencyFull(work.unmappedNetSales)} note={`${formatPercent(unmappedShare)} of net sales · ${work.unmapped.length} SKUs`} tone="amber" />
         <Stat label="Awaiting your check" value={String(work.needsVerification.length)} note="costed from a guess" tone="indigo" />
         <Stat label="Confirmed" value={String(work.done.length)} note="real component costs" tone="emerald" />
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
         <TabButton active={tab === 'unmapped'} onClick={() => { setTab('unmapped'); setSelected(new Set()) }}>Not mapped ({work.unmapped.length})</TabButton>
         <TabButton active={tab === 'review'} onClick={() => { setTab('review'); setSelected(new Set()) }}>To verify ({work.needsVerification.length})</TabButton>
         <TabButton active={tab === 'done'} onClick={() => { setTab('done'); setSelected(new Set()) }}>Confirmed ({work.done.length})</TabButton>
+
+        <select
+          value={marketplace}
+          onChange={(e) => setMarketplace(e.target.value as SalesSourceId | 'all')}
+          aria-label="Marketplace"
+          className="cursor-pointer rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-2.5 py-1.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
+        >
+          <option value="all">All marketplaces</option>
+          {marketplaceOptions.map((c) => (
+            <option key={c} value={c}>{CHANNEL_MAP[c]?.label ?? c}</option>
+          ))}
+        </select>
 
         <input
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search SKU, product, or marketplace…"
-          className="ml-auto w-72 rounded-md border border-[var(--line-2)] px-3 py-1.5 text-sm focus:border-[var(--accent)] focus:outline-none"
+          className="ml-auto w-64 rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
         />
-      </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        {rows.length > 0 && (
-          <label className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
-            <input type="checkbox" checked={allInViewSelected} onChange={() => setSelected(allInViewSelected ? new Set() : new Set(rows.map((r) => r.channelSku)))} />
-            Select all {search ? 'shown' : ''} ({rows.length})
-          </label>
-        )}
-        {selectedInView.length > 0 && (
-          <>
-            <button
-              type="button"
-              onClick={() => markVerified(selectedInView)}
-              disabled={busy}
-              className="rounded-md bg-[var(--good)] px-3 py-1.5 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
-            >
-              Mark {selectedInView.length} as verified
-            </button>
-            <button type="button" onClick={() => setSelected(new Set())} className="text-sm text-[var(--ink-3)] hover:text-[var(--ink-2)]">
-              Clear selection
-            </button>
-          </>
-        )}
         {tab === 'unmapped' && suggestionCount > 0 && (
           <button
             type="button"
             onClick={acceptAllSuggestions}
             disabled={busy}
-            className="ml-auto rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
+            className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
           >
             Accept all {suggestionCount} suggestion{suggestionCount === 1 ? '' : 's'}
           </button>
         )}
       </div>
+
+      {/* Bulk actions appear only once something is selected, so the row is not
+          three lines of controls waiting for a click that may never come. */}
+      {(selectedInView.length > 0 || rows.length > 0) && (
+        <div className="mb-2 flex flex-wrap items-center gap-3 text-sm">
+          {rows.length > 0 && (
+            <label className="flex items-center gap-2 text-[var(--ink-3)]">
+              <input type="checkbox" checked={allInViewSelected} onChange={() => setSelected(allInViewSelected ? new Set() : new Set(rows.map((r) => r.channelSku)))} />
+              Select all ({rows.length})
+            </label>
+          )}
+          {selectedInView.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => markVerified(selectedInView)}
+                disabled={busy}
+                className="rounded-md bg-[var(--good)] px-3 py-1 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
+              >
+                Mark {selectedInView.length} as verified
+              </button>
+              <button type="button" onClick={() => setSelected(new Set())} className="text-[var(--ink-3)] hover:text-[var(--ink-2)]">
+                Clear selection
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <p className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6 text-center text-sm text-[var(--ink-3)]">
@@ -230,32 +269,48 @@ export function SkuMappingPage() {
           <table className="w-full text-sm">
             <thead className="bg-[var(--surface-2)]">
               <tr>
-                <th className="w-8 px-3 py-2" />
-                <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Marketplace SKU</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Marketplace</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Orders</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Net Sales</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Cost basis</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Action</th>
+                <th className="w-8 px-3 py-1.5" />
+                <th className="px-3 py-1.5 text-left text-xs font-semibold text-[var(--ink-3)]">Marketplace SKU</th>
+                <th className="px-3 py-1.5 text-left text-xs font-semibold text-[var(--ink-3)]">Marketplace</th>
+                <SortHeader label="Orders" active={sort.key === 'orders'} dir={sort.dir} onClick={() => toggleSort('orders')} />
+                <SortHeader label="Net Sales" active={sort.key === 'netSales'} dir={sort.dir} onClick={() => toggleSort('netSales')} />
+                <th className="px-3 py-1.5 text-left text-xs font-semibold text-[var(--ink-3)]">Action</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.channelSku} className="border-t border-[var(--line)] align-top">
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-1.5">
                     <input type="checkbox" checked={selected.has(row.channelSku)} onChange={() => toggle(row.channelSku)} />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-1.5">
                     <div className="font-mono text-xs text-[var(--ink-2)]">{row.channelSku}</div>
                     <div className="mt-0.5 text-xs text-[var(--ink-3)]">{row.productName}</div>
+                    {/* What the "Cost basis" column used to hold. On the tab it
+                        was read from it said the same thing on every row, and
+                        the part that did vary — the recipe and the missing-cost
+                        warning — belongs beside the SKU it describes. */}
                     {row.mapping && (
                       <div className="mt-0.5 text-xs text-[var(--accent)]">
                         → {row.mapping.internalSku} <span className="text-[var(--ink-3)]">({row.mapping.kind.toLowerCase()})</span>
+                        {row.resolvedCogs !== null && (
+                          <span className="text-[var(--ink-3)]"> · {formatCurrencyFull(row.resolvedCogs)}/unit</span>
+                        )}
+                      </div>
+                    )}
+                    {row.components.length > 0 && (
+                      <div className="mt-0.5 text-xs text-[var(--ink-3)]">
+                        {row.components.map((c) => `${c.componentSku}${c.quantity > 1 ? ` ×${c.quantity}` : ''}`).join(' + ')}
+                      </div>
+                    )}
+                    {row.missingComponents.length > 0 && (
+                      <div className="mt-0.5 text-xs text-[var(--critical-ink)]">
+                        no cost on file for {row.missingComponents.join(', ')} — this is understated
                       </div>
                     )}
                     {row.mapping?.note && <div className="mt-0.5 text-xs text-[var(--ink-2)]">{row.mapping.note}</div>}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-1.5">
                     <div className="flex flex-wrap gap-1">
                       {row.channels.map((c) => (
                         <span key={c} className="whitespace-nowrap rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-xs text-[var(--ink-2)]">
@@ -264,28 +319,9 @@ export function SkuMappingPage() {
                       ))}
                     </div>
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">{row.orders.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right tabular-nums font-medium text-[var(--ink)]">{formatCurrencyFull(row.netSales)}</td>
-                  <td className="px-3 py-2">
-                    {row.resolvedCogs === null ? (
-                      <span className="text-[var(--ink-2)]">estimated at 25% of sales</span>
-                    ) : (
-                      <>
-                        <span className="text-[var(--ink-2)]">{formatCurrencyFull(row.resolvedCogs)} / unit</span>
-                        {row.components.length > 0 && (
-                          <div className="mt-0.5 text-xs text-[var(--ink-3)]">
-                            {row.components.map((c) => `${c.componentSku}${c.quantity > 1 ? ` ×${c.quantity}` : ''}`).join(' + ')}
-                          </div>
-                        )}
-                        {row.missingComponents.length > 0 && (
-                          <div className="mt-0.5 text-xs text-[var(--critical-ink)]">
-                            no cost on file for {row.missingComponents.join(', ')} — this is understated
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-1.5 text-right tabular-nums text-[var(--ink-2)]">{row.orders.toLocaleString()}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums font-medium text-[var(--ink)]">{formatCurrencyFull(row.netSales)}</td>
+                  <td className="px-3 py-1.5">
                     {editing === row.channelSku ? (
                       <ComboEditor
                         skuMaster={skuMaster}
@@ -333,9 +369,11 @@ export function SkuMappingPage() {
                           type="button"
                           onClick={() => startComboEdit(row)}
                           disabled={busy}
-                          className="rounded-md border border-[var(--line-2)] px-2.5 py-1 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--surface-hover)] disabled:opacity-40"
+                          title={row.components.length > 0 ? 'Edit combo' : 'Build combo'}
+                          aria-label={row.components.length > 0 ? 'Edit combo' : 'Build combo'}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[var(--accent)] text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
                         >
-                          {row.components.length > 0 ? 'Edit combo' : 'Build combo'}
+                          <ComboIcon />
                         </button>
 
                         {row.mapping && (
@@ -415,17 +453,58 @@ function ProductPicker({
   )
 }
 
+/**
+ * A sortable numeric column header.
+ *
+ * Both arrows are always drawn, with the active direction picked out — an
+ * arrow that only appears once a column is sorted gives no clue that the
+ * column can be sorted at all.
+ */
+function SortHeader({
+  label, active, dir, onClick,
+}: { label: string; active: boolean; dir: 'asc' | 'desc'; onClick: () => void }) {
+  return (
+    <th className="px-3 py-1.5 text-right text-xs font-semibold text-[var(--ink-3)]">
+      <button
+        type="button"
+        onClick={onClick}
+        aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+        className={`inline-flex items-center gap-1 hover:text-[var(--ink)] ${active ? 'text-[var(--ink)]' : ''}`}
+      >
+        {label}
+        <span aria-hidden className="flex flex-col leading-[0.55]">
+          <span className={active && dir === 'asc' ? 'text-[var(--accent)]' : 'text-[var(--ink-4,var(--ink-3))] opacity-40'}>▲</span>
+          <span className={active && dir === 'desc' ? 'text-[var(--accent)]' : 'text-[var(--ink-4,var(--ink-3))] opacity-40'}>▼</span>
+        </span>
+      </button>
+    </th>
+  )
+}
+
+/** Two items joining into a pack — the shape of what "build combo" does. */
+function ComboIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 2 3 7l9 5 9-5-9-5Z" />
+      <path d="m3 17 9 5 9-5" />
+      <path d="m3 12 9 5 9-5" />
+    </svg>
+  )
+}
+
 function Stat({ label, value, note, tone }: { label: string; value: string; note: string; tone: 'amber' | 'indigo' | 'emerald' }) {
   const tones = {
-    amber: 'border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] text-[var(--ink)]',
-    indigo: 'border-[color-mix(in_oklab,var(--accent)_45%,transparent)] bg-[var(--accent-soft)] text-[var(--accent)]',
-    emerald: 'border-[color-mix(in_oklab,var(--good)_45%,transparent)] bg-[color-mix(in_oklab,var(--good)_10%,transparent)] text-[var(--good-ink)]',
+    amber: 'bg-[var(--warning)]',
+    indigo: 'bg-[var(--accent)]',
+    emerald: 'bg-[var(--good)]',
   }
   return (
-    <div className={`rounded-lg border p-4 ${tones[tone]}`}>
-      <div className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</div>
-      <div className="mt-1 text-xl font-bold">{value}</div>
-      <div className="mt-0.5 text-xs opacity-80">{note}</div>
+    <div className="flex items-baseline gap-2">
+      <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${tones[tone]}`} />
+      <span className="text-xs text-[var(--ink-3)]">{label}</span>
+      <span className="text-base font-semibold text-[var(--ink)]">{value}</span>
+      <span className="text-xs text-[var(--ink-3)]">{note}</span>
     </div>
   )
 }
