@@ -232,6 +232,11 @@ export interface AmazonUsaPnlFacts {
    * existed fall back to the frozen dollar figures. */
   cogsSourceInr?: number
   freightSourceInr?: number
+  /** How the month's COGS was arrived at, split so the statement can show how
+   * much of it is a real cost and how much is filled in for SKUs with none. */
+  cogsPricedUsd?: number
+  cogsEstimatedUsd?: number
+  uncostedUnitsQty?: number
   /** Manual monthly entries — from the Assumptions-style form. */
   sponsoredBrandsUsd: number
   sponsoredDisplayDspUsd: number

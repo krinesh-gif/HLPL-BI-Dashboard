@@ -109,7 +109,7 @@ describe('a column that is already inside another one is shown, never added', ()
   })
 
   it('marks every such line on the statement rather than leaving it to be spotted', () => {
-    const memoLines = amazonUsaLineDefs(july()).filter((d) => d.memoOf)
+    const memoLines = amazonUsaLineDefs(july()).filter((d) => d.memoOf && d.key.startsWith('fee.'))
     expect(memoLines.map((d) => d.label)).toEqual([
       'Base fulfillment fee total',
       'Fuel and Logistics-related surcharge total',
@@ -258,7 +258,7 @@ describe('when the file does not show a column nested inside another', () => {
   })
 
   it('leaves nothing marked "included above"', () => {
-    expect(amazonUsaLineDefs(july({ nestedFeeIds: [] })).filter((d) => d.memoOf)).toHaveLength(0)
+    expect(amazonUsaLineDefs(july({ nestedFeeIds: [] })).filter((d) => d.memoOf && d.key.startsWith('fee.'))).toHaveLength(0)
   })
 })
 

@@ -13,7 +13,10 @@ import { channelOfSource } from '@/config/channels'
 import { MEESHO_ASSUMPTIONS, NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { toMonthKey } from '@/lib/format'
 import { allocateFixedExpensesForMonth } from './allocation'
-import { buildChannelPnl, cogsForRecords, computeSubtotals, type CogsInputs, type MarketingByChannel } from './pnl'
+import {
+  buildChannelPnl, cogsForRecords, computeSubtotals, estimateUncostedCogs,
+  type CogsInputs, type MarketingByChannel, type UncostedCogsEstimate,
+} from './pnl'
 import { amazonUsaFactsAtRate, amazonUsaLineDefs, amazonUsaToCanonicalBuckets, amazonUsaValuesInInr, computeAmazonUsaPnl, isLegacyAmazonUsaFacts } from './nativePnl/amazonUsa'
 import { applyFlipkartOtherCosts, computeFlipkartPnl, flipkartToCanonicalBuckets, FLIPKART_LINE_DEFS } from './nativePnl/flipkart'
 import { applyMeeshoOtherCosts, computeMeeshoPnl, meeshoToCanonicalBuckets, MEESHO_LINE_DEFS } from './nativePnl/meesho'
@@ -59,7 +62,20 @@ function computeAllocatedOtherCosts(
 
 /** Share of revenue charged as COGS for a SKU with no cost on file. Matches the
  * fallback the company's own model uses for its unpriced bucket. */
-const UNPRICED_COGS_FALLBACK_PCT = 0.25
+/** Records carrying a foreign currency have to be brought to rupees before a
+ * rupee cost is estimated from them. Amazon USA's rows are dollars; costs are
+ * always rupees. */
+function uncostedNetSalesInInr(
+  records: CanonicalSalesRecord[],
+  uncostedSkus: string[],
+  fxRate: number,
+): number {
+  const uncosted = new Set(uncostedSkus)
+  return records.reduce((sum, r) => {
+    if (r.status === 'cancelled' || !uncosted.has(r.sku)) return sum
+    return sum + (r.currency === 'USD' ? r.netSales * fxRate : r.netSales)
+  }, 0)
+}
 
 /** How far the order rows' unit count may drift from the statement's dispatched
  * units before they are treated as describing different things. They come from
@@ -84,7 +100,14 @@ function recomputedCogs(
   channel: BusinessChannelId,
   month: string,
   inputs: ChannelPnlViewInputs,
-): { priced: number; unpriced: number; total: number } | null {
+): {
+  priced: number
+  unpriced: number
+  total: number
+  uncostedSkus: string[]
+  uncostedUnits: number
+  method: UncostedCogsEstimate['method']
+} | null {
   if (!inputs.cogs?.costIndex) return null
 
   const records = inputs.salesRecords.filter(
@@ -92,9 +115,17 @@ function recomputedCogs(
   )
   if (records.length === 0) return null
 
+  const fxRate = inputs.fxRate ?? NATIVE_PNL_ASSUMPTIONS.usdToInrRate
   const result = cogsForRecords(records, inputs.skuMaster, month, inputs.cogs)
-  const unpriced = result.uncostedNetSales * UNPRICED_COGS_FALLBACK_PCT
-  return { priced: result.cogs, unpriced, total: result.cogs + unpriced }
+  const estimate = estimateUncostedCogs(result, uncostedNetSalesInInr(records, result.uncostedSkus, fxRate))
+  return {
+    priced: result.cogs,
+    unpriced: estimate.amount,
+    total: result.cogs + estimate.amount,
+    uncostedSkus: result.uncostedSkus,
+    uncostedUnits: result.uncostedUnits,
+    method: estimate.method,
+  }
 }
 
 /**
@@ -142,7 +173,8 @@ function recomputedMeeshoCogs(
   const bucket = (rows: CanonicalSalesRecord[]): number => {
     if (rows.length === 0) return 0
     const result = cogsForRecords(rows, inputs.skuMaster, month, inputs.cogs)
-    return result.cogs + result.uncostedNetSales * UNPRICED_COGS_FALLBACK_PCT
+    // Meesho rows are already rupees, so no conversion is needed here.
+    return result.cogs + estimateUncostedCogs(result, result.uncostedNetSales).amount
   }
 
   return {
@@ -206,7 +238,15 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       // that happened to be configured when the file was uploaded.
       const atRate = amazonUsaFactsAtRate(imported, fxRate)
       const recomputed = recomputedCogs(channel, month, inputs)
-      const facts = recomputed ? { ...atRate, cogsUsd: recomputed.total / fxRate } : atRate
+      const facts = recomputed
+        ? {
+            ...atRate,
+            cogsUsd: recomputed.total / fxRate,
+            cogsPricedUsd: recomputed.priced / fxRate,
+            cogsEstimatedUsd: recomputed.unpriced / fxRate,
+            uncostedUnitsQty: recomputed.uncostedUnits,
+          }
+        : atRate
 
       const usd = computeAmazonUsaPnl(facts)
       const showInr = inputs.amazonUsaCurrency === 'INR'
@@ -219,6 +259,20 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       const notes = isLegacyAmazonUsaFacts(imported)
         ? [`${month} was imported before the fee columns were read individually, so only Gross and Net Sales are reliable for it. Re-upload this month's Product Profitability export to fill in the charges.`]
         : []
+      // A month whose cost is largely guessed says so, and names the SKUs to
+      // fix. COGS that jumps about between months is almost always this: the
+      // set of SKUs with no cost on file changes, not the cost of the goods.
+      if (recomputed && recomputed.uncostedUnits > 0) {
+        const share = recomputed.total > 0 ? (recomputed.unpriced / recomputed.total) * 100 : 0
+        const shown = recomputed.uncostedSkus.slice(0, 8).join(', ')
+        const rest = recomputed.uncostedSkus.length - 8
+        notes.push(
+          `${recomputed.uncostedSkus.length} SKU(s) sold in ${month} have no cost on file, covering ` +
+          `${recomputed.uncostedUnits.toLocaleString('en-IN')} unit(s). Their cost is estimated ` +
+          `${recomputed.method === 'average-unit-cost' ? 'at what a costed unit averaged this month' : 'at 25% of what they sold for'}, ` +
+          `which is ${share.toFixed(0)}% of the COGS shown. Add costs for ${shown}${rest > 0 ? ` and ${rest} more` : ''} to price them properly.`,
+        )
+      }
       return {
         channel, month,
         canonical: { channel, month, lines: canonicalLines },

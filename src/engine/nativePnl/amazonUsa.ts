@@ -113,6 +113,8 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
   { key: 'netProceedsDiffUsd', label: 'Difference', section: 'NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
 
   { key: 'cogsUsd', label: 'Cost of Goods Sold', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input' },
+  { key: 'cogsPricedUsd', label: 'Priced from the cost sheet', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', memoOf: 'cogsUsd', hideWhenZero: true },
+  { key: 'cogsEstimatedUsd', label: 'Estimated — no cost on file for these SKUs', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', memoOf: 'cogsUsd', hideWhenZero: true },
   { key: 'freightUsd', label: 'India → USA Air Freight', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input' },
   { key: 'exportDocsUsd', label: 'Export Documentation & Handling', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', note: 'Manual entry' },
   { key: 'usImportDutyUsd', label: 'US Import Duty & Clearance', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', note: 'Manual entry' },
@@ -228,6 +230,8 @@ export function computeAmazonUsaPnl(facts: AmazonUsaPnlFacts): NativeLineValues 
     netProceedsDiffUsd: known(netProceedsUsd + adsNotBilledByAmazonUsd - (facts.sheetNetProceedsUsd ?? 0)),
 
     cogsUsd: -facts.cogsUsd,
+    cogsPricedUsd: -(facts.cogsPricedUsd ?? 0),
+    cogsEstimatedUsd: -(facts.cogsEstimatedUsd ?? 0),
     freightUsd: -facts.freightUsd,
     exportDocsUsd: -facts.exportDocsUsd,
     usImportDutyUsd: -facts.usImportDutyUsd,

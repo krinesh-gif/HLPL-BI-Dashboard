@@ -27,6 +27,9 @@ export interface CogsInputs {
 
 export interface CogsResult {
   cogs: number
+  /** Units that were priced from a real cost. Needed to state what a costed
+   * unit averaged this month, which is the basis for estimating the rest. */
+  costedUnits: number
   /** Units whose cost could not be established at all. Reported rather than
    * folded in as zero, which would show them at 100% margin. */
   uncostedUnits: number
@@ -82,6 +85,7 @@ export function cogsForRecords(
   }
 
   let cogs = 0
+  let costedUnits = 0
   let uncostedUnits = 0
   let uncostedNetSales = 0
   const uncostedSkus = new Set<string>()
@@ -96,9 +100,10 @@ export function cogsForRecords(
       continue
     }
     cogs += unit * r.quantity
+    costedUnits += r.quantity
   }
 
-  return { cogs, uncostedUnits, uncostedSkus: [...uncostedSkus], uncostedNetSales }
+  return { cogs, costedUnits, uncostedUnits, uncostedSkus: [...uncostedSkus], uncostedNetSales }
 }
 
 /**
@@ -221,4 +226,41 @@ export function buildAllChannelPnls(
   cogsInputs: CogsInputs = {},
 ): ChannelPnl[] {
   return BUSINESS_CHANNEL_IDS.map((c) => buildChannelPnl(allRecords, skuMaster, fixedExpenses, c, month, marketing, cogsInputs))
+}
+
+/**
+ * What to charge for units whose SKU has no cost on file.
+ *
+ * The old rule — 25% of what those units sold for — was wrong in two ways at
+ * once on Amazon USA. It was applied to `uncostedNetSales`, which for that
+ * channel is denominated in dollars, and added straight onto a rupee COGS
+ * total, so April's estimate landed as ₹993 where the same figure converted is
+ * ₹94,805. And 25% of the selling price bears no relation to what these goods
+ * actually cost: Amazon USA's priced SKUs run about ₹60 a unit against roughly
+ * ₹1,150 of net sales a unit, so the rule guessed four times too high on the
+ * months it did reach.
+ *
+ * A missing cost is now filled with what a costed unit of the same channel
+ * actually averaged that month. It is still an estimate, but an estimate drawn
+ * from the same goods in the same month rather than from the price tag. The
+ * share-of-sales rule survives only for a month where nothing at all is
+ * costed, which is the one case where there is no average to borrow.
+ *
+ * `uncostedNetSalesInr` must already be in rupees — the caller knows the
+ * currency of its own records; this function cannot.
+ */
+export const UNPRICED_COGS_SHARE_OF_SALES = 0.25
+
+export interface UncostedCogsEstimate {
+  amount: number
+  method: 'average-unit-cost' | 'share-of-sales' | 'none'
+}
+
+export function estimateUncostedCogs(result: CogsResult, uncostedNetSalesInr: number): UncostedCogsEstimate {
+  if (result.uncostedUnits === 0) return { amount: 0, method: 'none' }
+  const averageUnitCost = result.costedUnits > 0 ? result.cogs / result.costedUnits : 0
+  if (averageUnitCost > 0) {
+    return { amount: averageUnitCost * result.uncostedUnits, method: 'average-unit-cost' }
+  }
+  return { amount: uncostedNetSalesInr * UNPRICED_COGS_SHARE_OF_SALES, method: 'share-of-sales' }
 }
