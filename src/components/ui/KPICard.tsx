@@ -51,7 +51,7 @@ export function KPICard({ label, value, delta, tone = 'neutral', note, spark, ac
     <div
       className={clsx(
         'group relative overflow-hidden rounded-[var(--radius-card)] border border-[var(--line)]',
-        'bg-[var(--surface)] p-4 shadow-[var(--shadow-card)]',
+        'bg-[var(--surface)] p-3 shadow-[var(--shadow-card)]',
         'transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-pop)]',
       )}
     >
@@ -64,7 +64,7 @@ export function KPICard({ label, value, delta, tone = 'neutral', note, spark, ac
           <div className="truncate text-[11px] font-semibold tracking-wide text-[var(--ink-3)] uppercase">{label}</div>
           <div
             className={clsx(
-              'mt-2 text-[26px] leading-none font-semibold',
+              'mt-1.5 text-[22px] leading-none font-semibold',
               tone === 'good' && 'text-[var(--good-ink)]',
               tone === 'bad' && 'text-[var(--critical-ink)]',
               tone === 'neutral' && 'text-[var(--ink)]',
@@ -98,11 +98,11 @@ export function KPICard({ label, value, delta, tone = 'neutral', note, spark, ac
         </div>
       )}
 
-      {note && <div className="mt-2 text-[11px] leading-tight text-[var(--ink-3)]">{note}</div>}
+      {note && <div className="mt-1.5 text-[11px] leading-tight text-[var(--ink-3)]">{note}</div>}
     </div>
   )
 }
 
 export function KPIGrid({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">{children}</div>
+  return <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">{children}</div>
 }

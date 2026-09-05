@@ -2,7 +2,8 @@ import { useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { PageShell } from '@/components/layout/PageShell'
 import { KPICard, KPIGrid } from '@/components/ui/KPICard'
-import { TrendLineChart } from '@/components/charts/TrendLineChart'
+import { TrendLineChart, type SeriesDef } from '@/components/charts/TrendLineChart'
+import { SegmentedControl } from '@/components/ui/Surface'
 import { MixDonutChart } from '@/components/charts/MixDonutChart'
 import { EmptyState } from '@/components/ui/EmptyState'
 import {
@@ -32,6 +33,7 @@ export function ChannelDashboardPage() {
   // Amazon India is fed by two reports. Management sees the consolidated
   // channel by default and can narrow to either source when they want to know
   // which side of the business moved.
+  const [trendView, setTrendView] = useState<'both' | 'sales' | 'units'>('both')
   const [source, setSource] = useState<SalesSourceId | 'all'>('all')
   const d = useChannelData(channel, source === 'all' ? undefined : source)
 
@@ -121,7 +123,7 @@ export function ChannelDashboardPage() {
       </KPIGrid>
 
       {source === 'all' && d.sourceBreakdown.length > 0 && (
-        <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+        <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3">
           <h3 className="text-sm font-semibold text-[var(--ink-2)]">Sales sources</h3>
           <p className="mt-0.5 text-xs text-[var(--ink-3)]">
             {channelDef.label} is one business channel fed by {d.sourceBreakdown.length} reports. This is how the month splits between
@@ -171,20 +173,49 @@ export function ChannelDashboardPage() {
         </section>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <ChartCard title="Sales Trend (6 Months)">
-          <TrendLineChart data={d.trend} xKey="month" series={[{ key: 'netSales', label: 'Net Sales' }]} valueFormatter={(v) => formatCurrencyCompact(v)} />
-        </ChartCard>
-        <ChartCard title="Units Trend (6 Months)">
-          <TrendLineChart data={d.trend} xKey="month" series={[{ key: 'units', label: 'Units' }]} />
-        </ChartCard>
+      {/* Sales and units on one set of months, so the two can be read against
+          each other: units flat while sales climb is a price rise, and the two
+          diverging is the thing worth knowing. They keep separate axes because
+          ₹36 lakh and 3,000 units share no scale — on one axis the units would
+          be a flat line along the bottom. */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <ChartCard
+            title="Sales & Units (6 Months)"
+            action={
+              <SegmentedControl
+                value={trendView}
+                onChange={setTrendView}
+                options={[
+                  { value: 'both', label: 'Both' },
+                  { value: 'sales', label: 'Net Sales' },
+                  { value: 'units', label: 'Units' },
+                ]}
+              />
+            }
+          >
+            <TrendLineChart
+              data={d.trend}
+              xKey="month"
+              height={248}
+              // A lone series takes the left axis: a second scale is only
+              // worth its width when there are two magnitudes to separate.
+              series={
+                trendView === 'both'
+                  ? TREND_SERIES
+                  : TREND_SERIES.filter((s) => s.key === (trendView === 'sales' ? 'netSales' : 'units'))
+                      .map((s) => ({ ...s, axis: 'left' as const }))
+              }
+            />
+          </ChartCard>
+        </div>
         <ChartCard title="Category Performance">
-          <MixDonutChart data={d.categorySales} valueFormatter={(v) => formatCurrencyCompact(v)} />
+          <MixDonutChart data={d.categorySales} height={248} valueFormatter={(v) => formatCurrencyCompact(v)} />
         </ChartCard>
       </div>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--ink-3)]">Top Products</h2>
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[var(--ink-3)]">Top Products</h2>
         <TopProducts channel={channel} source={source === 'all' ? undefined : source} />
       </section>
 
@@ -196,10 +227,19 @@ export function ChannelDashboardPage() {
   )
 }
 
-function ChartCard({ title, children }: { title: string; children: ReactNode }) {
+/** The two trend lines, each on its own scale and its own colour. */
+const TREND_SERIES: SeriesDef[] = [
+  { key: 'netSales', label: 'Net Sales', axis: 'left', color: 'var(--series-1)', valueFormatter: (v: number) => formatCurrencyCompact(v) },
+  { key: 'units', label: 'Units', axis: 'right', color: 'var(--series-2)', valueFormatter: (v: number) => formatNumber(v) },
+]
+
+function ChartCard({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
-      <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">{title}</h3>
+    <div className="h-full rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3">
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-[var(--ink-2)]">{title}</h3>
+        {action}
+      </div>
       {children}
     </div>
   )
