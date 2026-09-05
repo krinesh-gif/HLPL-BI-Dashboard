@@ -89,21 +89,28 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
   ...feeLineDefs('marketplace', 'MARKETPLACE CHARGES', DEFAULT_NESTED),
   { key: 'unmappedFeesUsd', label: 'Fee columns not yet mapped', section: 'MARKETPLACE CHARGES', kind: 'input', group: 'MARKETPLACE CHARGES', hideWhenZero: true, note: 'New Amazon column — check the import warnings' },
 
+  // What the month earned after the marketplace has taken its cut, before a
+  // rupee of advertising. It is the line that says whether the product pays
+  // for itself; advertising is then a choice made against it.
+  { key: 'cm1', label: 'CM1 — After Marketplace Charges', section: 'CM1', kind: 'subtotal' },
+  { key: 'cm1Pct', label: 'CM1 %', section: 'CM1', kind: 'percent' },
+
   { key: 'totalAdvertisingUsd', label: 'Advertising Fees', section: 'ADVERTISING FEES', kind: 'subtotal', isGroupHead: true, group: 'ADVERTISING FEES' },
   ...feeLineDefs('advertising', 'ADVERTISING FEES', DEFAULT_NESTED),
+  // Amazon does not report these two in the Product Profitability export, so
+  // they are typed in monthly. Zero today; the lines are here so the spend
+  // lands in the right place the first month it happens.
+  { key: 'sponsoredBrandsUsd', label: 'Sponsored Brands', section: 'ADVERTISING FEES', kind: 'input', group: 'ADVERTISING FEES', note: 'Manual entry' },
+  { key: 'sponsoredDisplayDspUsd', label: 'Sponsored Display / DSP', section: 'ADVERTISING FEES', kind: 'input', group: 'ADVERTISING FEES', note: 'Manual entry' },
 
   { key: 'sheetSellerCostUsd', label: 'Seller-entered cost per unit × net units', section: 'NET PROCEEDS', kind: 'input', hideWhenZero: true, note: 'From the export’s own cost columns' },
   { key: 'netProceedsUsd', label: 'Net proceeds total', section: 'NET PROCEEDS', kind: 'subtotal' },
+  // Sponsored Brands and Display are billed outside this report, so Amazon's
+  // own Net proceeds cannot know about them. Adding them back is what keeps
+  // the two figures comparable once that spend starts.
+  { key: 'adsNotBilledByAmazonUsd', label: 'Add back: advertising Amazon does not bill in this report', section: 'NET PROCEEDS', kind: 'input', hideWhenZero: true, note: 'Reconciliation' },
   { key: 'sheetNetProceedsUsd', label: 'Net proceeds per Amazon export', section: 'NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
   { key: 'netProceedsDiffUsd', label: 'Difference', section: 'NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
-
-  // Placements Amazon does not report in this export, so they cannot sit
-  // inside a head whose total has to tie to the sheet. They are deducted after
-  // the tie-point instead.
-  { key: 'sponsoredBrandsUsd', label: 'Sponsored Brands', section: 'OTHER MARKETING — NOT IN THE AMAZON EXPORT', kind: 'input', note: 'Manual entry' },
-  { key: 'sponsoredDisplayDspUsd', label: 'Sponsored Display / DSP', section: 'OTHER MARKETING — NOT IN THE AMAZON EXPORT', kind: 'input', note: 'Manual entry' },
-  { key: 'offAmazonAdsUsd', label: 'Off-Amazon Advertising', section: 'OTHER MARKETING — NOT IN THE AMAZON EXPORT', kind: 'input', note: 'Manual entry' },
-  { key: 'totalOtherMarketingUsd', label: 'Total Other Marketing', section: 'OTHER MARKETING — NOT IN THE AMAZON EXPORT', kind: 'subtotal' },
 
   { key: 'cogsUsd', label: 'Cost of Goods Sold', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input' },
   { key: 'freightUsd', label: 'India → USA Air Freight', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input' },
@@ -178,12 +185,13 @@ export function computeAmazonUsaPnl(facts: AmazonUsaPnlFacts): NativeLineValues 
     AMAZON_USA_FEE_COLUMNS.filter((c) => c.group === group && counts(c)).reduce((sum, c) => sum + fee(c.id), 0)
 
   const totalMarketplaceChargesUsd = sumGroup('marketplace') + unmappedFeesUsd
-  // Advertising Fees is the export's own Sponsored Products column and nothing
-  // else, so the head ties to the sheet. The placements Amazon does not report
-  // are deducted below, after the tie-point.
-  const totalAdvertisingUsd = sumGroup('advertising')
-  const totalOtherMarketingUsd =
-    facts.sponsoredBrandsUsd + facts.sponsoredDisplayDspUsd + facts.offAmazonAdsUsd
+  const cm1 = facts.netSalesUsd - totalMarketplaceChargesUsd
+
+  // Sponsored Products comes across in the export; Sponsored Brands and
+  // Display are typed in because Amazon bills them outside this report. All
+  // three are real advertising and belong in one head.
+  const adsNotBilledByAmazonUsd = facts.sponsoredBrandsUsd + facts.sponsoredDisplayDspUsd
+  const totalAdvertisingUsd = sumGroup('advertising') + adsNotBilledByAmazonUsd
 
   // Amazon's Net proceeds also nets off the per-unit costs a seller typed into
   // Seller Central. Small here, but leaving it out is the difference between
@@ -192,7 +200,7 @@ export function computeAmazonUsaPnl(facts: AmazonUsaPnlFacts): NativeLineValues 
   const netProceedsUsd = facts.netSalesUsd - totalMarketplaceChargesUsd - totalAdvertisingUsd - sheetSellerCostUsd
 
   const totalLandedCostUsd = facts.cogsUsd + facts.freightUsd + facts.exportDocsUsd + facts.usImportDutyUsd
-  const cm2 = netProceedsUsd - totalOtherMarketingUsd - totalLandedCostUsd
+  const cm2 = netProceedsUsd - totalLandedCostUsd
 
   const fxConversionCostUsd = facts.netSalesUsd * (facts.fxConversionCostPct / 100)
   const totalOverheadsUsd =
@@ -207,17 +215,17 @@ export function computeAmazonUsaPnl(facts: AmazonUsaPnlFacts): NativeLineValues 
 
     totalMarketplaceChargesUsd: known(-totalMarketplaceChargesUsd),
     unmappedFeesUsd: -unmappedFeesUsd,
+    cm1: known(cm1),
+    cm1Pct: known(facts.netSalesUsd !== 0 ? (cm1 / facts.netSalesUsd) * 100 : 0),
     totalAdvertisingUsd: known(-totalAdvertisingUsd),
-
     sponsoredBrandsUsd: -facts.sponsoredBrandsUsd,
     sponsoredDisplayDspUsd: -facts.sponsoredDisplayDspUsd,
-    offAmazonAdsUsd: -facts.offAmazonAdsUsd,
-    totalOtherMarketingUsd: -totalOtherMarketingUsd,
 
     sheetSellerCostUsd: -sheetSellerCostUsd,
     netProceedsUsd: known(netProceedsUsd),
+    adsNotBilledByAmazonUsd: adsNotBilledByAmazonUsd,
     sheetNetProceedsUsd: known(facts.sheetNetProceedsUsd ?? 0),
-    netProceedsDiffUsd: known(netProceedsUsd - (facts.sheetNetProceedsUsd ?? 0)),
+    netProceedsDiffUsd: known(netProceedsUsd + adsNotBilledByAmazonUsd - (facts.sheetNetProceedsUsd ?? 0)),
 
     cogsUsd: -facts.cogsUsd,
     freightUsd: -facts.freightUsd,
@@ -284,7 +292,7 @@ export function amazonUsaToCanonicalBuckets(facts: AmazonUsaPnlFacts, fxRate = N
     returnCharges: inr(byBucket('returnCharges')),
     otherMarketplaceCharges: inr(byBucket('otherMarketplaceCharges') + unmapped + (facts.sheetMiscCostUsd ?? 0)),
     ads: inr(byBucket('ads') + facts.sponsoredBrandsUsd + facts.sponsoredDisplayDspUsd),
-    performanceMarketing: inr(facts.offAmazonAdsUsd),
+    performanceMarketing: 0,
     otherMarketing: 0,
     otherOpex: inr(
       facts.amazonSellingPlanUsd + facts.productLiabilityInsuranceUsd + facts.fdaLegalUsd +

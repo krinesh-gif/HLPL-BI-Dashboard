@@ -262,18 +262,53 @@ describe('when the file does not show a column nested inside another', () => {
   })
 })
 
-describe('Advertising Fees is the export’s own column and nothing else', () => {
-  it('excludes the placements Amazon does not report', () => {
-    const v = computeAmazonUsaPnl(july({ sponsoredBrandsUsd: 500, offAmazonAdsUsd: 250 }))
-    expect(v.totalAdvertisingUsd).toBeCloseTo(-3466.76, 4)
-    expect(v.totalOtherMarketingUsd).toBeCloseTo(-750, 4)
+describe('Advertising Fees is all three placements', () => {
+  it('is the export’s Sponsored Products column alone when nothing else is spent', () => {
+    expect(computeAmazonUsaPnl(july()).totalAdvertisingUsd).toBeCloseTo(-3466.76, 4)
   })
 
-  it('keeps Net proceeds tied to the sheet whatever is typed into them', () => {
-    const v = computeAmazonUsaPnl(july({ sponsoredBrandsUsd: 500, offAmazonAdsUsd: 250 }))
-    expect(v.netProceedsUsd).toBeCloseTo(11300.8814, 4)
+  it('adds Sponsored Brands and Display the month they start', () => {
+    const v = computeAmazonUsaPnl(july({ sponsoredBrandsUsd: 500, sponsoredDisplayDspUsd: 250 }))
+    expect(v.totalAdvertisingUsd).toBeCloseTo(-(3466.76 + 500 + 250), 4)
+    expect(v.sponsoredBrandsUsd).toBeCloseTo(-500, 4)
+    expect(v.sponsoredDisplayDspUsd).toBeCloseTo(-250, 4)
+  })
+
+  it('takes that spend out of Net proceeds, because it is real money', () => {
+    const v = computeAmazonUsaPnl(july({ sponsoredBrandsUsd: 500, sponsoredDisplayDspUsd: 250 }))
+    expect(v.netProceedsUsd).toBeCloseTo(11300.8814 - 750, 4)
+  })
+
+  it('still reconciles to the export, which cannot know about that spend', () => {
+    // Amazon bills Sponsored Brands and Display outside this report, so its own
+    // Net proceeds excludes them. Adding them back is what keeps the two
+    // figures comparable — otherwise the tie-out would read as a defect the
+    // first month the spend starts.
+    const v = computeAmazonUsaPnl(july({ sponsoredBrandsUsd: 500, sponsoredDisplayDspUsd: 250 }))
+    expect(v.adsNotBilledByAmazonUsd).toBeCloseTo(750, 4)
     expect(v.netProceedsDiffUsd).toBeCloseTo(0, 6)
-    // They are real spend, so they come off below the tie-point.
-    expect(v.cm2).toBeCloseTo(11300.8814 - 750, 4)
+  })
+
+  it('has no off-Amazon line at all', () => {
+    expect(AMAZON_USA_LINE_DEFS.map((d) => d.label)).not.toContain('Off-Amazon Advertising')
+  })
+})
+
+describe('CM1 sits between the marketplace and advertising', () => {
+  const v = computeAmazonUsaPnl(july())
+
+  it('is Net Sales less the marketplace’s cut, before a rupee of advertising', () => {
+    expect(v.cm1).toBeCloseTo(30738.235 - 15966.9936, 4)
+    expect(v.cm1Pct).toBeCloseTo((v.cm1 / 30738.235) * 100, 6)
+  })
+
+  it('is unmoved by advertising, which is the point of reading it there', () => {
+    expect(computeAmazonUsaPnl(july({ sponsoredBrandsUsd: 5000 })).cm1).toBeCloseTo(v.cm1, 4)
+  })
+
+  it('appears above the Advertising Fees head on the statement', () => {
+    const labels = AMAZON_USA_LINE_DEFS.map((d) => d.label)
+    expect(labels.indexOf('CM1 — After Marketplace Charges')).toBeLessThan(labels.indexOf('Advertising Fees'))
+    expect(labels.indexOf('Marketplace Charges')).toBeLessThan(labels.indexOf('CM1 — After Marketplace Charges'))
   })
 })
