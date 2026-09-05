@@ -198,6 +198,11 @@ export interface AmazonUsaPnlFacts {
    * header text as exported. Kept and shown rather than dropped or guessed at,
    * so a new Amazon fee is visible in the month it first appears. */
   unmappedFeeTotalsUsd?: Record<string, number>
+  /** The same fee columns, kept per SKU, so a fee can be traced to the products
+   * carrying it. Keyed sku → fee id → amount, and only for fees the SKU was
+   * actually charged, which keeps it to a few hundred numbers a month rather
+   * than one entry per SKU per fee. */
+  feeBySkuUsd?: Record<string, Record<string, number>>
   /** Fee ids this month's file proved to be contained inside another column —
    * checked row by row at import, not assumed. Empty means every column stands
    * on its own and every one is counted. */

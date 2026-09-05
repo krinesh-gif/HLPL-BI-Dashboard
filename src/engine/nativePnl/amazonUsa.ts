@@ -41,6 +41,7 @@ const feeLineDefs = (
     kind: 'input' as const,
     group: section,
     memoOf: nested.has(c.id) && c.componentOf ? `fee.${c.componentOf}` : undefined,
+    href: `#/channels/amazon-usa/fees?fee=${c.id}`,
   }))
 
 /**
@@ -69,7 +70,7 @@ export function amazonUsaLineDefs(facts: AmazonUsaPnlFacts): NativeLineDef[] {
     // A column that only repeats another one is dropped: there is no sum to
     // check, just the same number printed twice.
     if (isNested && col?.hideWhenNested) continue
-    out.push({ ...d, memoOf: isNested ? `fee.${col.componentOf}` : undefined })
+    out.push({ ...d, memoOf: isNested ? `fee.${col.componentOf}` : undefined, href: d.href })
   }
   return out
 }

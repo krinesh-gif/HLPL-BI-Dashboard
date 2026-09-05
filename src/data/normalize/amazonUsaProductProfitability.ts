@@ -83,11 +83,15 @@ export function normalizeAmazonUsaProductProfitability(
   for (const c of AMAZON_USA_FEE_COLUMNS) feeTotalsUsd[c.id] = 0
   const unmappedFeeTotalsUsd: Record<string, number> = {}
   for (const h of unmappedColumns) unmappedFeeTotalsUsd[h] = 0
+  // The same numbers kept per SKU. A month's total says a fee was charged; only
+  // the per-SKU split says which products are causing it, which is the
+  // difference between seeing a cost and being able to act on it.
+  const feeBySkuUsd: Record<string, Record<string, number>> = {}
 
   const facts: AmazonUsaPnlFacts = {
     month: '', schemaVersion: 2,
     unitsSoldQty: 0, unitsReturnedQty: 0, netUnitsSoldQty: 0,
-    feeTotalsUsd, unmappedFeeTotalsUsd,
+    feeTotalsUsd, unmappedFeeTotalsUsd, feeBySkuUsd,
     sheetCogsUsd: 0, sheetMiscCostUsd: 0, sheetNetProceedsUsd: 0,
     grossSalesUsd: 0, netSalesUsd: 0, referralFeeUsd: 0, fbaFulfilmentFeeUsd: 0,
     storageAgedDisposalUsd: 0, couponDealFeesUsd: 0, refundAdminFeeUsd: 0, fbaReimbursementsUsd: 0,
@@ -144,7 +148,14 @@ export function normalizeAmazonUsaProductProfitability(
     // Fees keep the export's own sign. Taking the magnitude, as this used to,
     // turned every credit into a charge — a reimbursement and a referral-fee
     // refund are money coming back, and were being counted as money going out.
-    for (const { header, id } of feeColumns) feeTotalsUsd[id] += num(row, header)
+    for (const { header, id } of feeColumns) {
+      const amount = num(row, header)
+      feeTotalsUsd[id] += amount
+      if (amount !== 0) {
+        const bySku = (feeBySkuUsd[msku] ??= {})
+        bySku[id] = (bySku[id] ?? 0) + amount
+      }
+    }
     for (const h of unmappedColumns) unmappedFeeTotalsUsd[h] += num(row, h)
     // Amazon nets the seller's own per-unit costs off Net proceeds, so they are
     // carried here to reconcile against the export's own figure.

@@ -29,6 +29,7 @@ export const NAVIGATION: NavSection[] = [
     children: [
       { label: 'Amazon India', path: '/channels/amazon_in' },
       { label: 'Amazon USA', path: '/channels/amazon_us' },
+      { label: 'Amazon USA — Fees', path: '/channels/amazon-usa/fees' },
       { label: 'Flipkart', path: '/channels/flipkart' },
       { label: 'Meesho', path: '/channels/meesho' },
       { label: 'Myntra', path: '/channels/myntra' },

@@ -27,10 +27,23 @@ export function NativePnlTable({
 }) {
   const { isOpen, toggle } = useCollapsedGroups()
 
+  // A breakdown only earns its space when it breaks something down. A
+  // component worth nothing says nothing, and a component that alone accounts
+  // for its whole parent just prints the same figure twice — which is what
+  // March did, where the base fulfilment fee was the only fulfilment fee there
+  // was and the two lines read as a double entry.
+  const degenerateMemo = (def: NativeLineDef): boolean => {
+    if (!def.memoOf) return false
+    const value = values[def.key] ?? 0
+    if (value === 0) return true
+    return Math.abs(value - (values[def.memoOf] ?? 0)) < 0.005
+  }
+
   const visible = lineDefs.filter(
     (def) =>
       (!def.group || def.isGroupHead || isOpen(def.group)) &&
-      !(def.hideWhenZero && (values[def.key] ?? 0) === 0),
+      !(def.hideWhenZero && (values[def.key] ?? 0) === 0) &&
+      !degenerateMemo(def),
   )
   // A line that other lines add up to. It is set in the body colour and
   // semibold while its parts sit under it in grey, so the sum reads as the
@@ -99,7 +112,16 @@ export function NativePnlTable({
                     ) : (
                       <>
                         {def.memoOf && <span aria-hidden className="mr-1.5 text-[var(--ink-3)]">↳</span>}
-                        {def.label}
+                        {/* A fee on the statement leads to its own history and
+                            the SKUs behind it. A number you cannot open is a
+                            number you cannot act on. */}
+                        {def.href ? (
+                          <a href={def.href} className="underline decoration-[var(--line-2)] underline-offset-2 hover:text-[var(--accent)] hover:decoration-[var(--accent)]">
+                            {def.label}
+                          </a>
+                        ) : (
+                          def.label
+                        )}
                         {def.memoOf && (
                           <span className="ml-2 text-xs font-normal italic text-[var(--ink-3)]">
                             part of {labelByKey.get(def.memoOf) ?? 'the line above'} — not added again

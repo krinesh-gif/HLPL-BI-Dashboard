@@ -312,3 +312,30 @@ describe('CM1 sits between the marketplace and advertising', () => {
     expect(labels.indexOf('Marketplace Charges')).toBeLessThan(labels.indexOf('CM1 — After Marketplace Charges'))
   })
 })
+
+describe('a breakdown that breaks nothing down is not shown', () => {
+  // March was the launch month: the base fulfilment fee was the only
+  // fulfilment fee there was, so the parent and its one component carried the
+  // same figure and read as a double entry.
+  const march = july({
+    feeTotalsUsd: { ...JULY_FEES, fbaFulfillmentFees: 400, baseFulfillmentFee: 400, fuelLogisticsSurcharge: 0, lowInventoryLevelFee: 0 },
+  })
+
+  it('still reports the parent', () => {
+    expect(computeAmazonUsaPnl(march)['fee.fbaFulfillmentFees']).toBeCloseTo(-400, 4)
+  })
+
+  it('leaves the component equal to its parent, and the empty ones, to the table to drop', () => {
+    // The engine keeps every column — what is worth showing is the table's
+    // call, and it needs the values to make it.
+    const v = computeAmazonUsaPnl(march)
+    expect(v['fee.baseFulfillmentFee']).toBeCloseTo(-400, 4)
+    expect(v['fee.fuelLogisticsSurcharge']).toBe(-0)
+    expect(v['fee.lowInventoryLevelFee']).toBe(-0)
+  })
+
+  it('keeps a real breakdown, where the parts differ from the whole', () => {
+    const v = computeAmazonUsaPnl(july())
+    expect(Math.abs(v['fee.baseFulfillmentFee'])).not.toBeCloseTo(Math.abs(v['fee.fbaFulfillmentFees']), 2)
+  })
+})

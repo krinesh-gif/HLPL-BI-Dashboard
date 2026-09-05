@@ -10,6 +10,10 @@ export interface NativeLineDef {
   group?: string
   /** The row carrying the group's +/− control and its total. Always visible. */
   isGroupHead?: boolean
+  /** Where this line can be explored in more detail. Rendered as a link on the
+   * label, so a fee on the P&L leads to its own history and the SKUs behind
+   * it rather than being a dead number. */
+  href?: string
   /** Dropped from the statement when its value is zero — for a line that only
    * exists to report something unusual, and is noise when there is nothing to
    * report. */
