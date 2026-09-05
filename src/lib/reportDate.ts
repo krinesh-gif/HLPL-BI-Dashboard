@@ -31,6 +31,24 @@ export function parseUsSlashDate(raw: string): Date | null {
   return localDate(Number(m[3]), Number(m[1]), Number(m[2]))
 }
 
+/**
+ * DD/MM/YY or DD/MM/YYYY, which is how Amazon's Indian reports write a date —
+ * the Vendor Central export heads its file with `Viewing Range=[01/07/26 -
+ * 31/07/26]`, meaning 1 to 31 July 2026. Read the American way that range
+ * would be 7 January to an impossible 7 March, so the convention has to be
+ * stated rather than guessed.
+ *
+ * A two-digit year is read as 20YY. These reports do not go back to the
+ * nineties, and a windowed guess would be a second thing to get wrong.
+ */
+export function parseInSlashDate(raw: string): Date | null {
+  const m = /^\s*(\d{1,2})[/-](\d{1,2})[/-](\d{2}|\d{4})\s*$/.exec(raw)
+  if (!m) return null
+  const yearRaw = Number(m[3])
+  const year = m[3].length === 2 ? 2000 + yearRaw : yearRaw
+  return localDate(year, Number(m[2]), Number(m[1]))
+}
+
 /** yyyy-mm-dd, optionally followed by a time, which is what the Indian
  * marketplaces export. Built as a local date rather than through
  * `new Date('2026-03-12')`, which the spec defines as UTC midnight. */
@@ -49,12 +67,15 @@ export function parseIsoLocalDate(raw: string): Date | null {
  * string nothing can read comes back null rather than as an invalid Date that
  * spreads NaN through the import.
  */
-export function parseReportDate(raw: string | undefined | null, convention: 'us' | 'iso'): Date | null {
+export function parseReportDate(raw: string | undefined | null, convention: 'us' | 'iso' | 'in'): Date | null {
   if (!raw) return null
   const text = String(raw)
-  const first = convention === 'us' ? parseUsSlashDate(text) : parseIsoLocalDate(text)
+  const preferred = { us: parseUsSlashDate, iso: parseIsoLocalDate, in: parseInSlashDate }[convention]
+  const first = preferred(text)
   if (first) return first
-  const second = convention === 'us' ? parseIsoLocalDate(text) : parseUsSlashDate(text)
+  // ISO is unambiguous, so it is always worth a try before the slash forms,
+  // which disagree with each other about which number is the day.
+  const second = parseIsoLocalDate(text) ?? (convention === 'us' ? parseInSlashDate(text) : parseUsSlashDate(text))
   if (second) return second
   const fallback = new Date(text)
   return Number.isNaN(fallback.getTime()) ? null : fallback

@@ -241,11 +241,15 @@ export const useDataStore = create<DataState>((set, get) => {
           await api.post('/api/sales/import', { records: [], importRecord })
         }
 
-        // The Amazon USA export is one aggregated row per SKU per month, so
-        // re-importing it restates those rows rather than adding to them.
-        // Without this, a re-upload after the order-date fix would land beside
-        // the old, wrongly dated copies and double the month's sales.
-        const replaceExisting = Boolean(amazonUsaFacts)
+        // A report that is one aggregated row per SKU per month restates those
+        // rows on re-import rather than adding to them — the Amazon USA
+        // profitability export and the Amazon India Vendor Central sales
+        // export are both this shape. Without it, a re-upload after a
+        // correction lands beside the old copies and doubles the month.
+        // Order-level reports are the opposite: each row is its own event, so
+        // they accumulate and are de-duplicated by row identity.
+        const replaceExisting =
+          Boolean(amazonUsaFacts) || (salesRecords.length > 0 && salesRecords.every((r) => r.isAggregate === true))
 
         for (const batch of batched(salesRecords, UPLOAD_BATCH_SIZE)) {
           // `raw` (a verbatim copy of the source spreadsheet row) is dropped

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { PageShell } from '@/components/layout/PageShell'
-import { parseSpreadsheetFile, readWorkbookSheetsRaw, type ParsedFile } from '@/lib/csvParse'
+import { parseSpreadsheetFile, readCsvRaw, readWorkbookSheetsRaw, type ParsedFile } from '@/lib/csvParse'
 import { detectAmazonSellerCentralReport, normalizeAmazonSellerCentralRows } from '@/data/normalize/amazonSellerCentral'
 import { detectFlipkartSkuPnlReport, normalizeFlipkartSkuPnl } from '@/data/normalize/flipkartSkuPnl'
 import { detectFlipkartWorkbook, normalizeFlipkartWorkbook } from '@/data/normalize/flipkartWorkbook'
@@ -9,6 +9,7 @@ import { detectMeeshoOrderSummaryReport, normalizeMeeshoOrderSummary } from '@/d
 import { detectMeeshoOrderPaymentsSheet, normalizeMeeshoOrderPayments } from '@/data/normalize/meeshoOrderPayments'
 import { detectSkuMapWorkbook, normalizeSkuMapWorkbook } from '@/data/normalize/skuMapWorkbook'
 import { detectAmazonAdsSponsoredProductsReport, normalizeAmazonAdsSponsoredProductsReport } from '@/data/normalize/amazonAdsSponsoredProducts'
+import { detectAmazonVendorCentralSalesReport, normalizeAmazonVendorCentralSales } from '@/data/normalize/amazonVendorCentralSales'
 import { checkForDuplicates } from '@/data/normalize/duplicates'
 import { useDataStore, type ImportOutcome } from '@/store/dataStore'
 import { monthLabel } from '@/lib/format'
@@ -20,6 +21,7 @@ import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrd
 
 type ReportKind =
   | 'amazon_seller_central'
+  | 'amazon_vendor_central_sales'
   | 'flipkart_sku_pnl'
   | 'flipkart_workbook'
   | 'amazon_usa_product_profitability'
@@ -30,6 +32,7 @@ type ReportKind =
 
 const REPORT_LABELS: Record<ReportKind, string> = {
   amazon_seller_central: 'Amazon India — Seller Central Order Report',
+  amazon_vendor_central_sales: 'Amazon India — Vendor Central Sales by ASIN (Monthly)',
   flipkart_sku_pnl: 'Flipkart — SKU-Level P&L Report',
   flipkart_workbook: 'Flipkart — Full P&L Workbook (Overall Summary + Orders P&L)',
   amazon_usa_product_profitability: 'Amazon USA — Product Profitability Report',
@@ -40,6 +43,7 @@ const REPORT_LABELS: Record<ReportKind, string> = {
 }
 const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   amazon_seller_central: 'amazon_in_seller',
+  amazon_vendor_central_sales: 'amazon_in_vendor',
   flipkart_sku_pnl: 'flipkart',
   flipkart_workbook: 'flipkart',
   amazon_usa_product_profitability: 'amazon_us',
@@ -106,7 +110,7 @@ function uniqueId(prefix: string): string {
 }
 
 export function UploadReportsPage() {
-  const { skuMaster, importReport, importProgress, importSkuMapWorkbook, clearMeeshoData, meeshoFacts } = useDataStore()
+  const { skuMaster, mappings, importReport, importProgress, importSkuMapWorkbook, clearMeeshoData, meeshoFacts } = useDataStore()
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null)
   const { month: filterMonth } = useFilterStore()
   const [stage, setStage] = useState<Stage>('idle')
@@ -223,6 +227,20 @@ export function UploadReportsPage() {
           }) }
         }
         // Not a recognized multi-sheet workbook — fall through to the single-sheet path.
+      }
+
+      if (lowerName.endsWith('.csv')) {
+        // Read flat first: Amazon's Vendor Central export puts a line of
+        // report settings above the column names, so parsed with the first
+        // line as the header it is neither recognisable nor readable.
+        const sheet = await readCsvRaw(file)
+        if (detectAmazonVendorCentralSalesReport(sheet)) {
+          const r = normalizeAmazonVendorCentralSales(sheet, skuMaster, mappings, importId)
+          return { id, fileName: file.name, status: 'ready', preview: await buildPreview({
+            fileName: file.name, reportKind: 'amazon_vendor_central_sales', totalRows: r.totalRows,
+            validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings,
+          }) }
+        }
       }
 
       const parsed = await parseSpreadsheetFile(file)

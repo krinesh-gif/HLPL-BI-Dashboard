@@ -82,3 +82,24 @@ export function rowsToRecords(headers: string[], rawRows: RawSheet, dataStartInd
     return record
   })
 }
+
+/**
+ * Reads a .csv as raw rows-of-cells, with no assumption that the first line is
+ * the header.
+ *
+ * Amazon's Vendor Central exports put a line of report settings above the
+ * column names — programme, distributor view, currency, the reporting range.
+ * Parsed with `header: true` that settings line becomes the header and the
+ * real column names become the first data row, so the file has to be read
+ * flat and its header row found by looking at it.
+ */
+export function readCsvRaw(file: File): Promise<RawSheet> {
+  return new Promise((resolve, reject) => {
+    Papa.parse<(string | number)[]>(file, {
+      header: false,
+      skipEmptyLines: true,
+      complete: (result) => resolve(result.data),
+      error: (err: Error) => reject(err),
+    })
+  })
+}
