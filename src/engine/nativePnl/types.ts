@@ -6,6 +6,17 @@ export interface NativeLineDef {
   section: string
   kind: 'input' | 'subtotal' | 'percent'
   note?: string
+  /** Rows sharing a group collapse together behind the group's head row. */
+  group?: string
+  /** The row carrying the group's +/− control and its total. Always visible. */
+  isGroupHead?: boolean
+  /** Dropped from the statement when its value is zero — for a line that only
+   * exists to report something unusual, and is noise when there is nothing to
+   * report. */
+  hideWhenZero?: boolean
+  /** Shown for reference only — already counted inside another line, so it is
+   * never part of a total. Rendered muted and indented under its parent. */
+  memoOf?: string
 }
 
 export type NativeLineValues = Record<string, number>

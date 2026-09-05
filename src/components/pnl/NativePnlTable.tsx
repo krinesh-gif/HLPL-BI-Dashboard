@@ -1,7 +1,17 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import clsx from 'clsx'
 import type { NativeLineDef, NativeLineValues } from '@/engine/nativePnl/types'
 import { formatCurrencyFull, formatPercent } from '@/lib/format'
+
+/** Rows of a collapsible group start hidden: the statement reads at a glance,
+ * and the detail is one click away rather than twenty lines of scrolling. */
+function useCollapsedGroups() {
+  const [open, setOpen] = useState<Record<string, boolean>>({})
+  return {
+    isOpen: (group: string) => open[group] ?? false,
+    toggle: (group: string) => setOpen((o) => ({ ...o, [group]: !(o[group] ?? false) })),
+  }
+}
 
 export function NativePnlTable({
   lineDefs,
@@ -15,7 +25,17 @@ export function NativePnlTable({
   /** Called with the new positive magnitude when a "Manual entry" row is edited. */
   onEditManualEntry?: (key: string, value: number) => void
 }) {
-  const rows = lineDefs.map((def, i) => ({ def, showSectionHeader: i === 0 || def.section !== lineDefs[i - 1].section }))
+  const { isOpen, toggle } = useCollapsedGroups()
+
+  const visible = lineDefs.filter(
+    (def) =>
+      (!def.group || def.isGroupHead || isOpen(def.group)) &&
+      !(def.hideWhenZero && (values[def.key] ?? 0) === 0),
+  )
+  const rows = visible.map((def, i) => ({
+    def,
+    showSectionHeader: i === 0 || def.section !== visible[i - 1].section,
+  }))
 
   return (
     <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
@@ -24,19 +44,64 @@ export function NativePnlTable({
           {rows.map(({ def, showSectionHeader }) => {
             const value = values[def.key] ?? 0
             const isEditable = onEditManualEntry && def.kind === 'input' && def.note?.startsWith('Manual entry')
+            const collapsible = def.isGroupHead && def.group
+            const expanded = collapsible ? isOpen(def.group as string) : false
             return (
               <Fragment key={def.key}>
-                {showSectionHeader && (
+                {showSectionHeader && !collapsible && (
                   <tr className="bg-[var(--surface-2)]">
                     <td colSpan={2} className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">
                       {def.section}
                     </td>
                   </tr>
                 )}
-                <tr className={clsx('border-t border-[var(--line)]', def.kind === 'subtotal' && 'bg-[var(--accent-soft)]/50 font-semibold text-[var(--ink)]')}>
-                  <td className={clsx('px-4 py-2', def.kind === 'input' && 'pl-8 text-[var(--ink-2)]', def.kind === 'percent' && 'pl-8 text-[var(--ink-3)] italic')}>
-                    {def.label}
-                    {def.note && <span className="ml-2 text-xs font-normal text-[var(--ink-3)]">{def.note}</span>}
+                <tr
+                  className={clsx(
+                    'border-t border-[var(--line)]',
+                    def.kind === 'subtotal' && 'bg-[var(--accent-soft)]/50 font-semibold text-[var(--ink)]',
+                    def.memoOf && 'text-[var(--ink-3)]',
+                  )}
+                >
+                  <td
+                    className={clsx(
+                      'px-4 py-2',
+                      def.kind === 'input' && 'pl-8 text-[var(--ink-2)]',
+                      def.kind === 'percent' && 'pl-8 text-[var(--ink-3)] italic',
+                      // A memo line sits one level deeper than the line that
+                      // already contains it, so the nesting shows the reason it
+                      // is not added in.
+                      def.memoOf && 'pl-14 text-[var(--ink-3)]',
+                      collapsible && 'pl-2',
+                    )}
+                  >
+                    {collapsible ? (
+                      <button
+                        type="button"
+                        onClick={() => toggle(def.group as string)}
+                        aria-expanded={expanded}
+                        className="inline-flex items-center gap-2 font-semibold text-[var(--ink)] hover:text-[var(--accent)]"
+                      >
+                        <span
+                          aria-hidden
+                          className="inline-flex h-5 w-5 items-center justify-center rounded border border-[var(--line-2)] bg-[var(--surface)] text-sm leading-none text-[var(--ink-2)]"
+                        >
+                          {expanded ? '−' : '+'}
+                        </span>
+                        {def.label}
+                      </button>
+                    ) : (
+                      <>
+                        {def.label}
+                        {def.memoOf && (
+                          <span className="ml-2 text-xs font-normal italic text-[var(--ink-3)]">
+                            included above — not added again
+                          </span>
+                        )}
+                        {def.note && !def.memoOf && (
+                          <span className="ml-2 text-xs font-normal text-[var(--ink-3)]">{def.note}</span>
+                        )}
+                      </>
+                    )}
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums">
                     {isEditable ? (

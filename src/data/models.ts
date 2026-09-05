@@ -181,8 +181,32 @@ export interface FlipkartPnlFacts {
 
 export interface AmazonUsaPnlFacts {
   month: string
+  /** 2 = the fee columns are kept one-for-one with Amazon's export in
+   * `feeTotalsUsd`. Version 1 collapsed them into eight buckets, which is why
+   * only Gross and Net Sales ever tied to the sheet. */
+  schemaVersion?: 2
   grossSalesUsd: number
   netSalesUsd: number
+  unitsSoldQty?: number
+  unitsReturnedQty?: number
+  netUnitsSoldQty?: number
+  /** Every "... total" fee column of the Product Profitability export, summed
+   * over the month and keyed by `AMAZON_USA_FEE_COLUMNS[].id`. Amounts carry
+   * the export's own sign: a charge is positive, a credit negative. */
+  feeTotalsUsd?: Record<string, number>
+  /** Fee columns Amazon added that this build does not recognise, keyed by the
+   * header text as exported. Kept and shown rather than dropped or guessed at,
+   * so a new Amazon fee is visible in the month it first appears. */
+  unmappedFeeTotalsUsd?: Record<string, number>
+  /** The export's own per-unit seller costs × net units sold. Amazon subtracts
+   * both when it computes Net proceeds, so the statement must too. */
+  sheetCogsUsd?: number
+  sheetMiscCostUsd?: number
+  /** Σ of the export's own "Net proceeds total" column — the figure the
+   * statement is reconciled against rather than assumed to match. */
+  sheetNetProceedsUsd?: number
+  /** Version 1 fee buckets. Retained so months imported before the rebuild
+   * still render; new imports leave them at zero and use `feeTotalsUsd`. */
   referralFeeUsd: number
   fbaFulfilmentFeeUsd: number
   storageAgedDisposalUsd: number

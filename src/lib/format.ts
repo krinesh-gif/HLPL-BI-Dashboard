@@ -19,13 +19,22 @@ export function formatCurrencyCompact(value: number, currency: 'INR' | 'USD' = '
   return `${sign}${symbol}${abs.toFixed(0)}`
 }
 
-/** Full Indian-grouped currency for tables, e.g. ₹12,45,000 */
+/**
+ * Full currency for tables, e.g. ₹12,45,000 or $11,300.88.
+ *
+ * Rupees are grouped the Indian way and shown whole — a paisa in a monthly
+ * P&L is noise. Dollars keep their cents, because the Amazon statement is
+ * reconciled against the export line by line and "$11,301" against
+ * "$11,300.88" reads as a mismatch when it is only a rounding.
+ */
 export function formatCurrencyFull(value: number, currency: 'INR' | 'USD' = 'INR'): string {
   if (!Number.isFinite(value)) return '—'
-  const locale = currency === 'INR' ? 'en-IN' : 'en-US'
-  const symbol = currency === 'INR' ? '₹' : '$'
-  const rounded = Math.round(value) || 0 // normalize -0 to 0
-  return `${symbol}${rounded.toLocaleString(locale)}`
+  if (currency === 'USD') {
+    const cents = Math.round(value * 100) / 100 || 0 // normalize -0 to 0
+    return `$${cents.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
+  const rounded = Math.round(value) || 0
+  return `₹${rounded.toLocaleString('en-IN')}`
 }
 
 export function formatPercent(value: number, decimals = 1): string {

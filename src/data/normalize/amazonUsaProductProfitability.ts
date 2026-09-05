@@ -1,14 +1,14 @@
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import type { AmazonUsaPnlFacts, CanonicalSalesRecord, SkuMaster } from '@/data/models'
+import { AMAZON_USA_FEE_COLUMNS, feeColumnForHeader, sumCountedFees } from '@/data/amazonUsa/feeColumns'
 import { getField, headersPresent, type NormalizeResult } from './types'
 import { normalizeCategory } from '@/data/categories'
 
 // Column names as they appear in Seller Central ▸ Reports ▸ Business Reports ▸
-// Product Profitability (the real export inspected in
-// Aravi_Amazon_USA_PnL_FY2627_v7.xlsx's "PASTE HERE" sheet). Amazon adds,
-// removes and renames fee columns between months, so every "...total" column
-// is matched by keyword rather than by fixed position — new/renamed fee
-// columns fall into "Other Amazon fees" rather than being silently dropped.
+// Product Profitability. Amazon changes both the number and the order of the
+// fee columns between months — the four months in
+// Aravi_Amazon_USA_PnL_FY2627_v7.xlsx carry 66, 66, 72 and 78 columns — so
+// every column is found by its header text and never by position.
 const COLUMNS = {
   msku: ['msku'],
   startDate: ['start date'],
@@ -20,24 +20,8 @@ const COLUMNS = {
   netSales: ['net sales'],
   cogsPerUnit: ['cost of goods sold per unit'],
   miscCostPerUnit: ['miscellaneous cost per unit'],
+  netProceeds: ['net proceeds total'],
 }
-
-interface FeeBucket {
-  key: 'referralFeeUsd' | 'fbaFulfilmentFeeUsd' | 'storageAgedDisposalUsd' | 'couponDealFeesUsd' | 'refundAdminFeeUsd' | 'fbaReimbursementsUsd' | 'sponsoredProductsUsd' | 'otherAmazonFeesUsd'
-  match: (headerLower: string) => boolean
-}
-
-// Order matters: more specific matchers (referral fee refunds, reimbursements)
-// must be checked before their broader counterparts.
-const FEE_BUCKETS: FeeBucket[] = [
-  { key: 'fbaReimbursementsUsd', match: (h) => h.includes('reimbursement') },
-  { key: 'sponsoredProductsUsd', match: (h) => h.includes('sponsored products') },
-  { key: 'referralFeeUsd', match: (h) => h.includes('referral fee') },
-  { key: 'fbaFulfilmentFeeUsd', match: (h) => h.includes('fulfillment fee') || h.includes('fulfilment fee') },
-  { key: 'storageAgedDisposalUsd', match: (h) => h.includes('storage') || h.includes('aged inventory') || h.includes('disposal') },
-  { key: 'couponDealFeesUsd', match: (h) => h.includes('coupon') },
-  { key: 'refundAdminFeeUsd', match: (h) => h.includes('refund administration') },
-]
 
 export function detectAmazonUsaProductProfitabilityReport(headers: string[]): boolean {
   return headersPresent(headers, COLUMNS.msku) && headersPresent(headers, COLUMNS.netSales) && headersPresent(headers, COLUMNS.unitsSold)
@@ -65,13 +49,19 @@ export function normalizeAmazonUsaProductProfitability(
   let unknownSkuCount = 0
   let detectedMonth = ''
 
-  // Classify every "...total" column once, up front, from the header list.
-  const totalColumns = headers.filter((h) => h.trim().toLowerCase().endsWith('total'))
-  const columnBucket = new Map<string, FeeBucket['key']>()
-  for (const col of totalColumns) {
-    const lower = col.trim().toLowerCase()
-    const bucket = FEE_BUCKETS.find((b) => b.match(lower))
-    columnBucket.set(col, bucket?.key ?? 'otherAmazonFeesUsd')
+  // Match every "... total" column to the fee it names, once, from the header
+  // list. A column this build has never seen is kept under its own header
+  // rather than swept into a catch-all — a fee Amazon introduces is visible in
+  // the month it appears instead of being quietly absorbed into another line.
+  const feeColumns: { header: string; id: string }[] = []
+  const unmappedColumns: string[] = []
+  for (const h of headers) {
+    const lower = h.trim().toLowerCase()
+    if (!lower.endsWith('total')) continue
+    if (lower === 'net proceeds total') continue // Amazon's own result, not a fee
+    const col = feeColumnForHeader(h)
+    if (col) feeColumns.push({ header: h, id: col.id })
+    else unmappedColumns.push(h)
   }
 
   // Resolve each simple column name once, rather than re-scanning `headers` per row.
@@ -82,10 +72,22 @@ export function normalizeAmazonUsaProductProfitability(
   const unitsReturnedCol = resolve(COLUMNS.unitsReturned, 'Units returned')
   const salesCol = resolve(COLUMNS.sales, 'Sales')
   const netSalesCol = resolve(COLUMNS.netSales, 'Net sales')
+  const cogsPerUnitCol = resolve(COLUMNS.cogsPerUnit, 'Cost of goods sold per unit')
+  const miscCostPerUnitCol = resolve(COLUMNS.miscCostPerUnit, 'Miscellaneous cost per unit')
+  const netProceedsCol = resolve(COLUMNS.netProceeds, 'Net proceeds total')
   const startDateCol = headers.find((h) => COLUMNS.startDate.includes(h.trim().toLowerCase()))
 
+  const feeTotalsUsd: Record<string, number> = {}
+  for (const c of AMAZON_USA_FEE_COLUMNS) feeTotalsUsd[c.id] = 0
+  const unmappedFeeTotalsUsd: Record<string, number> = {}
+  for (const h of unmappedColumns) unmappedFeeTotalsUsd[h] = 0
+
   const facts: AmazonUsaPnlFacts = {
-    month: '', grossSalesUsd: 0, netSalesUsd: 0, referralFeeUsd: 0, fbaFulfilmentFeeUsd: 0,
+    month: '', schemaVersion: 2,
+    unitsSoldQty: 0, unitsReturnedQty: 0, netUnitsSoldQty: 0,
+    feeTotalsUsd, unmappedFeeTotalsUsd,
+    sheetCogsUsd: 0, sheetMiscCostUsd: 0, sheetNetProceedsUsd: 0,
+    grossSalesUsd: 0, netSalesUsd: 0, referralFeeUsd: 0, fbaFulfilmentFeeUsd: 0,
     storageAgedDisposalUsd: 0, couponDealFeesUsd: 0, refundAdminFeeUsd: 0, fbaReimbursementsUsd: 0,
     otherAmazonFeesUsd: 0, sponsoredProductsUsd: 0, cogsUsd: 0, freightUsd: 0,
     sponsoredBrandsUsd: 0, sponsoredDisplayDspUsd: 0, offAmazonAdsUsd: 0, exportDocsUsd: 0, usImportDutyUsd: 0,
@@ -101,10 +103,14 @@ export function normalizeAmazonUsaProductProfitability(
 
     const netUnitsSold = num(row, netUnitsSoldCol)
     const unitsSold = num(row, unitsSoldCol)
-    if (unitsSold === 0 && netUnitsSold === 0) {
-      nonSellingRowCount++
-      return // non-selling SKU row this month — not an error, just excluded from sales facts
-    }
+    // A SKU that sold nothing this month can still be charged: storage, aged
+    // inventory and disposal all accrue on stock sitting in the warehouse, and
+    // Amazon counts them in Net proceeds. Such a row is excluded from the sales
+    // records — a zero-quantity order line would be a fiction — but its fees
+    // belong to the month. Skipping the row wholesale, as this used to, quietly
+    // understated July's charges by $84.22.
+    const nonSelling = unitsSold === 0 && netUnitsSold === 0
+    if (nonSelling) nonSellingRowCount++
 
     const sales = num(row, salesCol)
     const netSales = num(row, netSalesCol)
@@ -125,11 +131,23 @@ export function normalizeAmazonUsaProductProfitability(
 
     facts.grossSalesUsd += sales
     facts.netSalesUsd += netSales
+    facts.unitsSoldQty = (facts.unitsSoldQty ?? 0) + unitsSold
+    facts.unitsReturnedQty = (facts.unitsReturnedQty ?? 0) + num(row, unitsReturnedCol)
+    facts.netUnitsSoldQty = (facts.netUnitsSoldQty ?? 0) + netUnitsSold
     facts.cogsSourceInr = (facts.cogsSourceInr ?? 0) + cogsPerUnitInr * netUnitsSold
     facts.freightSourceInr = (facts.freightSourceInr ?? 0) + NATIVE_PNL_ASSUMPTIONS.indiaUsaFreightPerUnitInr * netUnitsSold
-    for (const [col, bucket] of columnBucket) {
-      facts[bucket] += Math.abs(num(row, col))
-    }
+    // Fees keep the export's own sign. Taking the magnitude, as this used to,
+    // turned every credit into a charge — a reimbursement and a referral-fee
+    // refund are money coming back, and were being counted as money going out.
+    for (const { header, id } of feeColumns) feeTotalsUsd[id] += num(row, header)
+    for (const h of unmappedColumns) unmappedFeeTotalsUsd[h] += num(row, h)
+    // Amazon nets the seller's own per-unit costs off Net proceeds, so they are
+    // carried here to reconcile against the export's own figure.
+    facts.sheetCogsUsd = (facts.sheetCogsUsd ?? 0) + num(row, cogsPerUnitCol) * netUnitsSold
+    facts.sheetMiscCostUsd = (facts.sheetMiscCostUsd ?? 0) + num(row, miscCostPerUnitCol) * netUnitsSold
+    facts.sheetNetProceedsUsd = (facts.sheetNetProceedsUsd ?? 0) + num(row, netProceedsCol)
+
+    if (nonSelling) return
 
     validRecords.push({
       orderId: `amazon_us-${msku}-${startDateRaw ?? detectedMonth}`,
@@ -161,7 +179,21 @@ export function normalizeAmazonUsaProductProfitability(
   const warnings: string[] = []
   if (unknownSkuCount > 0) warnings.push(`${unknownSkuCount} row(s) reference an MSKU not found in the Product Master — COGS could not be attributed for these.`)
   if (!detectedMonth) warnings.push('Could not detect the report month from a "Start date" column — facts were aggregated but the month key is empty.')
-  if (nonSellingRowCount > 0) warnings.push(`${nonSellingRowCount} row(s) had zero units sold this month (non-selling SKUs) and were excluded from sales facts.`)
+  if (nonSellingRowCount > 0) warnings.push(`${nonSellingRowCount} row(s) had zero units sold this month (non-selling SKUs). Their storage, aged-inventory and disposal fees are counted; no sales record was created for them.`)
+  if (unmappedColumns.length > 0) {
+    warnings.push(`Amazon exported ${unmappedColumns.length} fee column(s) this build does not recognise — they are counted and shown on their own line, not merged into another fee: ${unmappedColumns.join(', ')}.`)
+  }
+  // The export computes its own Net proceeds. Checking against it here is what
+  // turns "the statement should tie" into "the statement is known to tie".
+  const computedNetProceeds =
+    facts.netSalesUsd
+    - sumCountedFees(feeTotalsUsd)
+    - Object.values(unmappedFeeTotalsUsd).reduce((a, b) => a + b, 0)
+    - (facts.sheetCogsUsd ?? 0) - (facts.sheetMiscCostUsd ?? 0)
+  const proceedsGap = computedNetProceeds - (facts.sheetNetProceedsUsd ?? 0)
+  if (Math.abs(proceedsGap) > 0.01) {
+    warnings.push(`Net proceeds computed from the fee columns differs from the export's own "Net proceeds total" by ${proceedsGap.toFixed(2)} USD.`)
+  }
 
   return { validRecords, totalRows: rows.length, invalidRows, warnings, facts, month: detectedMonth }
 }
