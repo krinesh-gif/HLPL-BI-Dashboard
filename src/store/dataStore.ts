@@ -152,6 +152,10 @@ interface DataState extends SharedDataset, MappingTablesState {
   saveFreightRate: (rate: FreightRate) => Promise<void>
   removeFxRate: (month: string) => Promise<void>
   removeFreightRate: (month: string) => Promise<void>
+  /** Saves a month's fixed operating costs. Keyed on (month, category), so
+   * saving the same month again corrects it rather than adding to it. */
+  saveFixedExpenses: (entries: FixedExpenseEntry[]) => Promise<void>
+  removeFixedExpense: (month: string, category: FixedExpenseEntry['category']) => Promise<void>
   /** Records a month's ad spend for a channel that has no report to upload. */
   saveManualAdSpend: (entry: Omit<ManualAdSpend, 'enteredAt'>) => Promise<void>
   removeManualAdSpend: (channel: string, month: string) => Promise<void>
@@ -331,6 +335,12 @@ export const useDataStore = create<DataState>((set, get) => {
 
     removeFxRate: (month) => writeThen(() => api.delete(`/api/cost-versions?fxMonth=${encodeURIComponent(month)}`)),
     removeFreightRate: (month) => writeThen(() => api.delete(`/api/cost-versions?freightMonth=${encodeURIComponent(month)}`)),
+
+    saveFixedExpenses: (entries) => writeThen(() => api.post('/api/cost-versions', { fixedExpenses: entries })),
+    removeFixedExpense: (month, category) =>
+      writeThen(() => api.delete(
+        `/api/cost-versions?expenseMonth=${encodeURIComponent(month)}&expenseCategory=${encodeURIComponent(category)}`,
+      )),
 
     removeMapping: (channelSku) =>
       writeThen(() => api.delete(`/api/sku-map?channelSku=${encodeURIComponent(channelSku)}`)),

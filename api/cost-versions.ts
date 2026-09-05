@@ -12,6 +12,36 @@ interface SaveBody {
    * with the month it applies to. */
   fxRates?: unknown
   freightRates?: unknown
+  /** A month's fixed operating costs. Here for the same two reasons as the
+   * rates above: the function budget is full, and a fixed expense is the same
+   * kind of thing — a financial figure stamped with the month it belongs to. */
+  fixedExpenses?: unknown
+}
+
+/** The nine OPEX lines the P&L has. A category outside this list would be
+ * stored and then never shown, because the statement has nowhere to put it. */
+const EXPENSE_CATEGORIES = new Set([
+  'salaries', 'rent', 'software', 'warehouse', 'logistics',
+  'professionalFees', 'officeExpenses', 'generalExpenses', 'otherOpex',
+])
+
+interface FixedExpenseInput { month: string; category: string; amount: number; note?: string }
+
+function isFixedExpenseArray(v: unknown): v is FixedExpenseInput[] {
+  return (
+    Array.isArray(v) &&
+    v.every((x) => {
+      if (!x || typeof x !== 'object') return false
+      const c = x as FixedExpenseInput
+      // Zero is allowed — it is how a category is cleared for a month without
+      // losing the row. Negative is not: a fixed cost is not income.
+      return (
+        isNonEmptyString(c.month) && MONTH_PATTERN.test(c.month) &&
+        isNonEmptyString(c.category) && EXPENSE_CATEGORIES.has(c.category) &&
+        typeof c.amount === 'number' && Number.isFinite(c.amount) && c.amount >= 0
+      )
+    })
+  )
 }
 
 interface FxRateInput {
@@ -144,6 +174,31 @@ export async function POST(request: Request): Promise<Response> {
 
   const body = await readJson<SaveBody>(request)
 
+  if (body && body.fixedExpenses !== undefined) {
+    if (!isFixedExpenseArray(body.fixedExpenses)) {
+      return json(
+        { error: 'Expected { fixedExpenses: [{ month: "yyyy-mm", category: one of the nine OPEX lines, amount: number >= 0, note? }] }.' },
+        400,
+      )
+    }
+    if (body.fixedExpenses.length === 0) return json({ saved: 0 })
+    // Keyed on (month, category), so saving a month twice corrects it rather
+    // than adding a second copy of the same cost.
+    await sql.query(
+      `INSERT INTO fixed_expenses (month, category, amount, note)
+       SELECT * FROM UNNEST($1::text[], $2::text[], $3::float8[], $4::text[])
+       ON CONFLICT (month, category) DO UPDATE SET
+         amount = EXCLUDED.amount, note = EXCLUDED.note`,
+      [
+        body.fixedExpenses.map((e) => e.month),
+        body.fixedExpenses.map((e) => e.category),
+        body.fixedExpenses.map((e) => e.amount),
+        body.fixedExpenses.map((e) => e.note ?? null),
+      ],
+    )
+    return json({ saved: body.fixedExpenses.length })
+  }
+
   if (body && body.freightRates !== undefined) {
     if (!isFreightRateArray(body.freightRates)) {
       return json({ error: 'Expected { freightRates: [{ month: "yyyy-mm", perUnitInr: number >= 0, note? }] }.' }, 400)
@@ -241,6 +296,13 @@ export async function DELETE(request: Request): Promise<Response> {
   if (auth.response) return auth.response
 
   const url = new URL(request.url)
+
+  const expenseMonth = url.searchParams.get('expenseMonth')
+  const expenseCategory = url.searchParams.get('expenseCategory')
+  if (isNonEmptyString(expenseMonth) && isNonEmptyString(expenseCategory)) {
+    await sql`DELETE FROM fixed_expenses WHERE month = ${expenseMonth} AND category = ${expenseCategory}`
+    return json({ ok: true })
+  }
 
   const freightMonth = url.searchParams.get('freightMonth')
   if (isNonEmptyString(freightMonth)) {
