@@ -14,7 +14,7 @@ import { MEESHO_ASSUMPTIONS, NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAs
 import { toMonthKey } from '@/lib/format'
 import { allocateFixedExpensesForMonth } from './allocation'
 import { buildChannelPnl, cogsForRecords, computeSubtotals, type CogsInputs, type MarketingByChannel } from './pnl'
-import { amazonUsaFactsAtRate, amazonUsaToCanonicalBuckets, amazonUsaValuesInInr, AMAZON_USA_LINE_DEFS, computeAmazonUsaPnl } from './nativePnl/amazonUsa'
+import { amazonUsaFactsAtRate, amazonUsaLineDefs, amazonUsaToCanonicalBuckets, amazonUsaValuesInInr, computeAmazonUsaPnl, isLegacyAmazonUsaFacts } from './nativePnl/amazonUsa'
 import { applyFlipkartOtherCosts, computeFlipkartPnl, flipkartToCanonicalBuckets, FLIPKART_LINE_DEFS } from './nativePnl/flipkart'
 import { applyMeeshoOtherCosts, computeMeeshoPnl, meeshoToCanonicalBuckets, MEESHO_LINE_DEFS } from './nativePnl/meesho'
 import type { NativeLineDef, NativeLineValues } from './nativePnl/types'
@@ -211,15 +211,23 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       const usd = computeAmazonUsaPnl(facts)
       const showInr = inputs.amazonUsaCurrency === 'INR'
       const canonicalLines = computeSubtotals(amazonUsaToCanonicalBuckets(facts, fxRate))
+      // A month imported before the fee columns were kept one-for-one has no
+      // column-level figures to show. Saying so is the only honest option:
+      // spreading its eight old buckets across Amazon's real column names put
+      // the old catch-all on the "Storage utilization surcharge" line and
+      // showed a five-figure charge against a sheet that said zero.
+      const notes = isLegacyAmazonUsaFacts(imported)
+        ? [`${month} was imported before the fee columns were read individually, so only Gross and Net Sales are reliable for it. Re-upload this month's Product Profitability export to fill in the charges.`]
+        : []
       return {
         channel, month,
         canonical: { channel, month, lines: canonicalLines },
         native: {
-          lineDefs: AMAZON_USA_LINE_DEFS,
+          lineDefs: amazonUsaLineDefs(imported),
           values: showInr ? amazonUsaValuesInInr(usd, fxRate) : usd,
           currency: showInr ? 'INR' : 'USD',
         },
-        notes: [],
+        notes,
       }
     }
   }

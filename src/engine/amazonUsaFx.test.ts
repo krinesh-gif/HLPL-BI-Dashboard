@@ -20,7 +20,11 @@ const skuMaster: SkuMaster[] = [
 
 function facts(over: Partial<AmazonUsaPnlFacts> = {}): AmazonUsaPnlFacts {
   return {
-    month: '2026-07',
+    month: '2026-07', schemaVersion: 2,
+    // Column-level facts, as the importer now produces them.
+    feeTotalsUsd: { referralFee: 1350, fbaFulfillmentFees: 900, sponsoredProductsCharge: 500 },
+    unmappedFeeTotalsUsd: {}, nestedFeeIds: [],
+    sheetCogsUsd: 0, sheetMiscCostUsd: 0, sheetNetProceedsUsd: 0,
     grossSalesUsd: 10000, netSalesUsd: 9000,
     referralFeeUsd: 1350, fbaFulfilmentFeeUsd: 900, storageAgedDisposalUsd: 0,
     couponDealFeesUsd: 0, refundAdminFeeUsd: 0, fbaReimbursementsUsd: 0, otherAmazonFeesUsd: 0,

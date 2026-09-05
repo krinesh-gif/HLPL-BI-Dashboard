@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { AMAZON_USA_FEE_COLUMNS, AMAZON_USA_COUNTED_FEE_COLUMNS } from '@/data/amazonUsa/feeColumns'
-import { AMAZON_USA_LINE_DEFS, amazonUsaToCanonicalBuckets, computeAmazonUsaPnl } from './amazonUsa'
+import { AMAZON_USA_FEE_COLUMNS } from '@/data/amazonUsa/feeColumns'
+import {
+  AMAZON_USA_LINE_DEFS,
+  amazonUsaLineDefs,
+  amazonUsaToCanonicalBuckets,
+  computeAmazonUsaPnl,
+  isLegacyAmazonUsaFacts,
+} from './amazonUsa'
 import type { AmazonUsaPnlFacts } from '@/data/models'
 
 /**
@@ -32,12 +38,19 @@ const JULY_FEES: Record<string, number> = {
   sponsoredProductsCharge: 3466.76,
 }
 
+/** The four columns the July file proved to be contained in another one. */
+const JULY_NESTED = [
+  'baseFulfillmentFee', 'fuelLogisticsSurcharge', 'lowInventoryLevelFee', 'monthlyInventoryStorageFee',
+]
+
 function july(over: Partial<AmazonUsaPnlFacts> = {}): AmazonUsaPnlFacts {
   return {
     month: '2026-07', schemaVersion: 2,
     grossSalesUsd: 32099.005, netSalesUsd: 30738.235,
     unitsSoldQty: 2416, unitsReturnedQty: 105, netUnitsSoldQty: 2311,
     feeTotalsUsd: { ...JULY_FEES }, unmappedFeeTotalsUsd: {},
+    // What the importer proved from the July band, row by row.
+    nestedFeeIds: JULY_NESTED,
     sheetCogsUsd: 3.6, sheetMiscCostUsd: 0, sheetNetProceedsUsd: 11300.8814,
     referralFeeUsd: 0, fbaFulfilmentFeeUsd: 0, storageAgedDisposalUsd: 0, couponDealFeesUsd: 0,
     refundAdminFeeUsd: 0, fbaReimbursementsUsd: 0, otherAmazonFeesUsd: 0, sponsoredProductsUsd: 0,
@@ -96,7 +109,7 @@ describe('a column that is already inside another one is shown, never added', ()
   })
 
   it('marks every such line on the statement rather than leaving it to be spotted', () => {
-    const memoLines = AMAZON_USA_LINE_DEFS.filter((d) => d.memoOf)
+    const memoLines = amazonUsaLineDefs(july()).filter((d) => d.memoOf)
     expect(memoLines.map((d) => d.label).sort()).toEqual([
       'Base fulfillment fee total',
       'Fuel and Logistics-related surcharge total',
@@ -171,8 +184,72 @@ describe('amazonUsaToCanonicalBuckets', () => {
   it('never counts a component column, so the roll-up matches the statement', () => {
     const everyBucket = (b.marketplaceCommission ?? 0) + (b.fulfilment ?? 0) + (b.returnCharges ?? 0)
       + (b.otherMarketplaceCharges ?? 0) + (b.ads ?? 0)
-    const countedTotal = AMAZON_USA_COUNTED_FEE_COLUMNS.reduce((s, c) => s + JULY_FEES[c.id], 0)
+    const countedTotal = AMAZON_USA_FEE_COLUMNS
+      .filter((c) => !JULY_NESTED.includes(c.id))
+      .reduce((s, c) => s + JULY_FEES[c.id], 0)
     // Misc cost rides in otherMarketplaceCharges; it is zero in July.
     expect(everyBucket).toBeCloseTo(countedTotal * 90, 2)
+  })
+})
+
+describe('a month imported before the columns were read individually', () => {
+  const legacy: AmazonUsaPnlFacts = { ...july(), feeTotalsUsd: undefined, nestedFeeIds: undefined }
+
+  it('is recognised rather than rendered as if it were complete', () => {
+    expect(isLegacyAmazonUsaFacts(legacy)).toBe(true)
+    expect(isLegacyAmazonUsaFacts(july())).toBe(false)
+  })
+
+  it('reports every charge as unknown rather than as the old buckets under Amazon’s column names', () => {
+    // Spreading the eight old buckets across the real column titles put the
+    // old catch-all on "Storage utilization surcharge" and showed $14,061.75
+    // against a sheet that said zero. A zero would be almost as bad: it reads
+    // as "Amazon charged nothing". These render as "—".
+    const v = computeAmazonUsaPnl(legacy)
+    expect(v['fee.storageUtilizationSurcharge']).toBeNaN()
+    expect(v['fee.referralFee']).toBeNaN()
+    expect(v.totalMarketplaceChargesUsd).toBeNaN()
+    expect(v.netProceedsUsd).toBeNaN()
+    expect(v.cm3).toBeNaN()
+  })
+
+  it('still gives the Master P&L this channel’s cost, rather than reading the month as free', () => {
+    // The old split between buckets was wrong; the aggregate was about right.
+    const b = amazonUsaToCanonicalBuckets({ ...legacy, referralFeeUsd: 4417.46, fbaFulfilmentFeeUsd: 19165.36 }, 90)
+    expect(b.marketplaceCommission).toBeCloseTo(4417.46 * 90, 2)
+    expect(b.fulfilment).toBeCloseTo(19165.36 * 90, 2)
+  })
+
+  it('still reports the revenue it does have', () => {
+    expect(computeAmazonUsaPnl(legacy).netSalesUsd).toBeCloseTo(30738.235, 4)
+  })
+})
+
+describe('when the file does not show a column nested inside another', () => {
+  it('counts every column on its own, as the sheet’s own total does', () => {
+    const flat = computeAmazonUsaPnl(july({ nestedFeeIds: [] }))
+    const everyColumn = Object.values(JULY_FEES).reduce((a, b) => a + b, 0)
+    expect(Math.abs(flat.totalMarketplaceChargesUsd) + Math.abs(flat.totalAdvertisingUsd))
+      .toBeCloseTo(everyColumn, 4)
+  })
+
+  it('leaves nothing marked "included above"', () => {
+    expect(amazonUsaLineDefs(july({ nestedFeeIds: [] })).filter((d) => d.memoOf)).toHaveLength(0)
+  })
+})
+
+describe('Advertising Fees is the export’s own column and nothing else', () => {
+  it('excludes the placements Amazon does not report', () => {
+    const v = computeAmazonUsaPnl(july({ sponsoredBrandsUsd: 500, offAmazonAdsUsd: 250 }))
+    expect(v.totalAdvertisingUsd).toBeCloseTo(-3466.76, 4)
+    expect(v.totalOtherMarketingUsd).toBeCloseTo(-750, 4)
+  })
+
+  it('keeps Net proceeds tied to the sheet whatever is typed into them', () => {
+    const v = computeAmazonUsaPnl(july({ sponsoredBrandsUsd: 500, offAmazonAdsUsd: 250 }))
+    expect(v.netProceedsUsd).toBeCloseTo(11300.8814, 4)
+    expect(v.netProceedsDiffUsd).toBeCloseTo(0, 6)
+    // They are real spend, so they come off below the tie-point.
+    expect(v.cm2).toBeCloseTo(11300.8814 - 750, 4)
   })
 })

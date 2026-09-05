@@ -1,6 +1,6 @@
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import type { AmazonUsaPnlFacts, CanonicalSalesRecord, SkuMaster } from '@/data/models'
-import { AMAZON_USA_FEE_COLUMNS, feeColumnForHeader, sumCountedFees } from '@/data/amazonUsa/feeColumns'
+import { AMAZON_USA_FEE_COLUMNS, feeColumnForHeader } from '@/data/amazonUsa/feeColumns'
 import { getField, headersPresent, type NormalizeResult } from './types'
 import { normalizeCategory } from '@/data/categories'
 
@@ -176,6 +176,28 @@ export function normalizeAmazonUsaProductProfitability(
 
   facts.month = detectedMonth
 
+  // Whether a fee column is already contained in another one is a property of
+  // the file, not a rule this code gets to assume. Each candidate is tested
+  // row by row against the file just uploaded: a column that does not prove
+  // itself contained stands on its own and is counted, so the dashboard's
+  // total is the sheet's total whatever shape Amazon ships next month.
+  const nested: string[] = []
+  for (const c of AMAZON_USA_FEE_COLUMNS) {
+    if (!c.componentOf) continue
+    const parts = AMAZON_USA_FEE_COLUMNS.filter((x) => x.componentOf === c.componentOf)
+    const parentCol = feeColumns.find((f) => f.id === c.componentOf)
+    if (!parentCol) continue
+    const partCols = parts.map((pt) => feeColumns.find((f) => f.id === pt.id)).filter((f) => f !== undefined)
+    if (partCols.length !== parts.length) continue
+    const holds = rows.every((row) => {
+      const parent = num(row, parentCol.header)
+      const sum = partCols.reduce((t, f) => t + num(row, f.header), 0)
+      return Math.abs(parent - sum) < 0.01
+    })
+    if (holds) nested.push(c.id)
+  }
+  facts.nestedFeeIds = nested
+
   const warnings: string[] = []
   if (unknownSkuCount > 0) warnings.push(`${unknownSkuCount} row(s) reference an MSKU not found in the Product Master — COGS could not be attributed for these.`)
   if (!detectedMonth) warnings.push('Could not detect the report month from a "Start date" column — facts were aggregated but the month key is empty.')
@@ -185,9 +207,10 @@ export function normalizeAmazonUsaProductProfitability(
   }
   // The export computes its own Net proceeds. Checking against it here is what
   // turns "the statement should tie" into "the statement is known to tie".
+  const nestedSet = new Set(nested)
   const computedNetProceeds =
     facts.netSalesUsd
-    - sumCountedFees(feeTotalsUsd)
+    - AMAZON_USA_FEE_COLUMNS.filter((c) => !nestedSet.has(c.id)).reduce((sum, c) => sum + (feeTotalsUsd[c.id] ?? 0), 0)
     - Object.values(unmappedFeeTotalsUsd).reduce((a, b) => a + b, 0)
     - (facts.sheetCogsUsd ?? 0) - (facts.sheetMiscCostUsd ?? 0)
   const proceedsGap = computedNetProceeds - (facts.sheetNetProceedsUsd ?? 0)

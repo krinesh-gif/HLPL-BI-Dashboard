@@ -350,3 +350,25 @@ describe('rows', () => {
     expect(run([{ ...julyRows[0], MSKU: '' }]).invalidRows).toHaveLength(1)
   })
 })
+
+describe('whether a column is inside another is decided by the file, not assumed', () => {
+  it('proves the nesting when the July file shows it, row by row', () => {
+    // FBA fulfilment fees = base + fuel + low-inventory, and monthly inventory
+    // storage repeats base monthly storage, on every row of this export.
+    expect(run().facts.nestedFeeIds?.sort()).toEqual([
+      'baseFulfillmentFee', 'fuelLogisticsSurcharge', 'lowInventoryLevelFee', 'monthlyInventoryStorageFee',
+    ])
+  })
+
+  it('counts every column on its own when the file does not show the nesting', () => {
+    // One row where the parent no longer equals its parts is enough: the
+    // relationship is a property of Amazon's export, not a rule this code owns.
+    const rows = julyRows.map((r, i) =>
+      i === 0 ? { ...r, 'FBA fulfillment fees total': '999' } : r)
+    expect(run(rows).facts.nestedFeeIds).not.toContain('baseFulfillmentFee')
+  })
+
+  it('still ties to the export’s own Net proceeds either way', () => {
+    expect(run().warnings.some((w) => w.includes('Net proceeds'))).toBe(false)
+  })
+})
