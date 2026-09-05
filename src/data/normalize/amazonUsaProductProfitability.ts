@@ -3,6 +3,7 @@ import type { AmazonUsaPnlFacts, CanonicalSalesRecord, SkuMaster } from '@/data/
 import { AMAZON_USA_FEE_COLUMNS, feeColumnForHeader } from '@/data/amazonUsa/feeColumns'
 import { getField, headersPresent, type NormalizeResult } from './types'
 import { normalizeCategory } from '@/data/categories'
+import { toIsoDate } from '@/lib/format'
 
 // Column names as they appear in Seller Central ▸ Reports ▸ Business Reports ▸
 // Product Profitability. Amazon changes both the number and the order of the
@@ -151,7 +152,7 @@ export function normalizeAmazonUsaProductProfitability(
 
     validRecords.push({
       orderId: `amazon_us-${msku}-${startDateRaw ?? detectedMonth}`,
-      orderDate: startDateRaw ? new Date(startDateRaw).toISOString().slice(0, 10) : `${detectedMonth}-01`,
+      orderDate: startDateRaw ? toIsoDate(new Date(startDateRaw)) : `${detectedMonth}-01`,
       channel: 'amazon_us',
       marketplace: 'amazon_us',
       sellerType: 'seller_central',

@@ -1,4 +1,5 @@
 import { FORECAST_ASSUMPTIONS, INVENTORY_THRESHOLDS } from '@/config/thresholds'
+import { toIsoDate } from '@/lib/format'
 
 export type RiskStatus = 'BUY_NOW' | 'PLAN_PURCHASE' | 'HEALTHY' | 'EXCESS_INVENTORY' | 'STOCK_OUT_RISK'
 
@@ -108,5 +109,5 @@ export function computeInventoryRecommendation(input: InventoryRecommendationInp
 function addDays(iso: string, days: number): string {
   const d = new Date(iso)
   d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
+  return toIsoDate(d)
 }

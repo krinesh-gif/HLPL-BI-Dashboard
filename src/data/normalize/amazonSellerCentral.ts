@@ -1,6 +1,7 @@
 import type { CanonicalSalesRecord, SkuMaster } from '@/data/models'
 import { getField, headersPresent, type NormalizeResult } from './types'
 import { normalizeCategory } from '@/data/categories'
+import { toIsoDate } from '@/lib/format'
 
 // Column names as they appear in Amazon Seller Central's "All Orders" / order
 // report export. Multiple aliases are accepted per field since Amazon's report
@@ -78,7 +79,7 @@ export function normalizeAmazonSellerCentralRows(
 
     validRecords.push({
       orderId,
-      orderDate: purchaseDate.toISOString().slice(0, 10),
+      orderDate: toIsoDate(purchaseDate),
       channel: 'amazon_in_seller',
       marketplace: 'amazon_in_seller',
       sellerType: 'seller_central',

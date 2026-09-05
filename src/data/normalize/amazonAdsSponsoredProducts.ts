@@ -2,6 +2,7 @@ import type { AdsRecord } from '@/data/models'
 import type { ChannelId } from '@/config/channels'
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { getField, headersPresent, type RowIssue } from './types'
+import { toIsoDate } from '@/lib/format'
 
 // Column names as they appear in the Amazon Ads console's Sponsored Products
 // "Campaign report" export. "Portfolio name" is frequently used as the SKU
@@ -78,7 +79,7 @@ export function normalizeAmazonAdsSponsoredProductsReport(rows: Record<string, s
     const fxRate = channel === 'amazon_us' ? NATIVE_PNL_ASSUMPTIONS.usdToInrRate : 1
 
     adsRecords.push({
-      date: startDate.toISOString().slice(0, 10),
+      date: toIsoDate(startDate),
       channel,
       campaign,
       sku,

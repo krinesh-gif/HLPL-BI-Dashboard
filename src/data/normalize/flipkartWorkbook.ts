@@ -2,6 +2,7 @@ import { mergeHeaderRows, rowsToRecords, type RawSheet } from '@/lib/csvParse'
 import type { CanonicalSalesRecord, FlipkartPnlFacts, SkuMaster } from '@/data/models'
 import { getField, type NormalizeResult } from './types'
 import { normalizeCategory } from '@/data/categories'
+import { toIsoDate } from '@/lib/format'
 
 /**
  * Normalizes the REAL Flipkart P&L workbook (Seller Hub ▸ Reports ▸ Profit &
@@ -146,7 +147,7 @@ export function normalizeFlipkartWorkbook(
 
     validRecords.push({
       orderId: orderItemId,
-      orderDate: orderDate.toISOString().slice(0, 10),
+      orderDate: toIsoDate(orderDate),
       channel: 'flipkart',
       marketplace: 'flipkart',
       sellerType: 'marketplace',

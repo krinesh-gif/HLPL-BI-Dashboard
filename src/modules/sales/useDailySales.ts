@@ -5,6 +5,7 @@ import { normalizeCategory, distinctCategories } from '@/data/categories'
 import { asp, orderBasisNetSales, rtoPct, type NetSalesFigure } from '@/engine/netSales'
 import { movingAverage } from '@/engine/sales'
 import type { CanonicalSalesRecord } from '@/data/models'
+import { toIsoDate } from '@/lib/format'
 
 export type DailyLevel = 'company' | 'channel' | 'sku'
 
@@ -36,7 +37,7 @@ const DEFAULT_WINDOW_DAYS = 45
 function isoDaysAgo(from: string, days: number): string {
   const d = new Date(from)
   d.setDate(d.getDate() - days)
-  return d.toISOString().slice(0, 10)
+  return toIsoDate(d)
 }
 
 /**

@@ -60,6 +60,25 @@ export function monthLabel(yyyyMm: string): string {
 }
 
 /** yyyy-mm for a given ISO date. */
+/**
+ * A Date as the yyyy-mm-dd it reads as on the wall clock, not in UTC.
+ *
+ * `toISOString().slice(0, 10)` was used to store every imported order date,
+ * and it converts to UTC first. In India that moves midnight backwards by five
+ * and a half hours, so a row dated 01/07/2026 was stored as 2026-06-30 and
+ * counted into June. Amazon USA's Product Profitability export dates every row
+ * to the first of the month, so its entire month landed in the previous one —
+ * which is why the P&L could not find any July order rows to price July's COGS
+ * from, and fell back to the figure frozen at import.
+ *
+ * A report date is a calendar date, not an instant. It carries no time and no
+ * zone, so it must never be put through one.
+ */
+export function toIsoDate(d: Date): string {
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function toMonthKey(iso: string): string {
   return iso.slice(0, 7)
 }

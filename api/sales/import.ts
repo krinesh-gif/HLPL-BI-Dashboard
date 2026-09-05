@@ -8,6 +8,8 @@ import type { CanonicalSalesRecord, ImportRecord } from '../../src/data/models.j
 interface Body {
   records?: unknown
   importRecord?: unknown
+  /** Restate rows that already exist rather than skipping them as duplicates. */
+  replaceExisting?: unknown
 }
 
 /** Real uploads run to 11k+ rows. Inserting them in chunks keeps each
@@ -33,6 +35,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const { records, importRecord } = body
+  const replaceExisting = body.replaceExisting === true
 
   await sql`
     INSERT INTO imports (
@@ -46,9 +49,29 @@ export async function POST(request: Request): Promise<Response> {
     ON CONFLICT (id) DO NOTHING
   `
 
+  // A report that carries one aggregated row per SKU per month restates those
+  // rows rather than adding to them. Matching is on the row's business
+  // identity — channel, order id, SKU — and deliberately not on the dedup key,
+  // because the dedup key covers the order date: a row whose date was
+  // corrected reads as a brand new row, so it would land beside its own older
+  // copy and double the month. Matching on identity also finds the old copy
+  // wherever it was previously filed, which matters here because the date bug
+  // had put these rows in the *previous* month.
+  let replaced = 0
   let inserted = 0
   for (let i = 0; i < records.length; i += CHUNK_SIZE) {
     const chunk = records.slice(i, i + CHUNK_SIZE)
+    if (replaceExisting) {
+      const gone = (await sql.query(
+        `DELETE FROM sales_records
+          WHERE (channel, order_id, sku) IN (
+            SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[])
+          )
+          RETURNING dedup_key`,
+        [chunk.map((r) => r.channel), chunk.map((r) => r.orderId), chunk.map((r) => r.sku)],
+      )) as unknown[]
+      replaced += gone.length
+    }
     // ON CONFLICT DO NOTHING makes de-duplication the database's job, so it
     // stays correct even if two people import overlapping files at once —
     // something a client-side check can't guarantee.
@@ -94,7 +117,7 @@ export async function POST(request: Request): Promise<Response> {
     inserted += result.length
   }
 
-  return json({ inserted, skippedAsDuplicate: records.length - inserted })
+  return json({ inserted, replaced, skippedAsDuplicate: records.length - inserted })
 }
 
 export default createHandler({ POST })

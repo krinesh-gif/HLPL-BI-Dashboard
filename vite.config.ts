@@ -46,5 +46,11 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
+    // The suite runs on India time because the business does, and because a
+    // UTC test machine cannot see a whole class of date bug. Storing an
+    // imported order date via `toISOString()` is correct at UTC+0 and a day
+    // early at UTC+5:30 — it moved every Amazon USA month into the previous
+    // one in production while every test here passed for months.
+    env: { TZ: 'Asia/Kolkata' },
   },
 })

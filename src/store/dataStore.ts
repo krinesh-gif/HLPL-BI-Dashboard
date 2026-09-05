@@ -95,6 +95,8 @@ export interface ImportOutcome {
 interface BatchResult {
   inserted: number
   skippedAsDuplicate: number
+  /** Rows the import superseded, for a report that restates a whole month. */
+  replaced?: number
 }
 
 interface MappingTablesState {
@@ -235,6 +237,12 @@ export const useDataStore = create<DataState>((set, get) => {
           await api.post('/api/sales/import', { records: [], importRecord })
         }
 
+        // The Amazon USA export is one aggregated row per SKU per month, so
+        // re-importing it restates those rows rather than adding to them.
+        // Without this, a re-upload after the order-date fix would land beside
+        // the old, wrongly dated copies and double the month's sales.
+        const replaceExisting = Boolean(amazonUsaFacts)
+
         for (const batch of batched(salesRecords, UPLOAD_BATCH_SIZE)) {
           // `raw` (a verbatim copy of the source spreadsheet row) is dropped
           // before upload: nothing in the app ever reads it back, yet it is
@@ -244,6 +252,7 @@ export const useDataStore = create<DataState>((set, get) => {
           const result = await api.post<BatchResult>('/api/sales/import', {
             records: batch.map(({ raw: _raw, ...rest }) => rest),
             importRecord,
+            replaceExisting,
           })
           added += result.inserted
           skippedAsDuplicate += result.skippedAsDuplicate

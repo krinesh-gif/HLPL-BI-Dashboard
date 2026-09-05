@@ -1,6 +1,7 @@
 import type { CanonicalSalesRecord, SkuMaster } from '@/data/models'
 import { getField, headersPresent, type NormalizeResult } from './types'
 import { normalizeCategory } from '@/data/categories'
+import { toIsoDate } from '@/lib/format'
 
 // Column names as they appear in Meesho's raw "Order Summary" export
 // (Sub orderId, Catalog ID, Quantity, Price, Order Date, Order Status,
@@ -64,7 +65,7 @@ export function normalizeMeeshoOrderSummary(
 
     validRecords.push({
       orderId,
-      orderDate: orderDate.toISOString().slice(0, 10),
+      orderDate: toIsoDate(orderDate),
       channel: 'meesho',
       marketplace: 'meesho',
       sellerType: 'marketplace',
