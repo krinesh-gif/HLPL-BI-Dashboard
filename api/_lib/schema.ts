@@ -170,6 +170,11 @@ BEGIN
     data  JSONB NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS myntra_facts (
+    month TEXT PRIMARY KEY,
+    data  JSONB NOT NULL
+  );
+
   -- Meesho alone carries two statements per month: the same orders bucketed by
   -- order date and by payment date. Keying on month alone made the second one
   -- written overwrite the first, so only one basis ever survived and the

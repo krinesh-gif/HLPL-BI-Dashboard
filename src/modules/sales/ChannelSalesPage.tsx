@@ -29,13 +29,13 @@ const METRICS: { key: Metric; label: string; format: (v: number) => string }[] =
  * them.
  */
 export function ChannelSalesPage() {
-  const { salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts } = useDataStore()
+  const { salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts } = useDataStore()
   const { month } = useFilterStore()
   const [metric, setMetric] = useState<Metric>('netSales')
   const [monthsShown, setMonthsShown] = useState(MONTH_WINDOW)
 
   const { months, activeChannels, matrix, monthTotals, channelTotals, grandTotal } = useMemo(() => {
-    const facts = { flipkartFacts, amazonUsaFacts, meeshoFacts }
+    const facts = { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts }
     const months = Array.from({ length: monthsShown }, (_, i) => addMonths(month, i - (monthsShown - 1)))
 
     const matrix = new Map<string, Map<BusinessChannelId, { netSales: number; units: number; orders: number }>>()
@@ -72,7 +72,7 @@ export function ChannelSalesPage() {
     const grandTotal = [...monthTotals.values()].reduce((a, b) => a + b, 0)
 
     return { months, activeChannels, matrix, monthTotals, channelTotals, grandTotal }
-  }, [salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, month, monthsShown, metric])
+  }, [salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, month, monthsShown, metric])
 
   const format = METRICS.find((m) => m.key === metric)!.format
 

@@ -20,6 +20,7 @@ function dataset(over: Partial<Parameters<typeof latestMonthWithData>[0]> = {}) 
     flipkartFacts: [],
     amazonUsaFacts: [],
     meeshoFacts: [],
+    myntraFacts: [],
     manualAdSpend: [],
     ...over,
   }

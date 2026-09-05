@@ -12,11 +12,11 @@ import { asp, netSalesForMonth, rtoPct } from '@/engine/netSales'
 const MONTHS_SHOWN = 12
 
 export function MonthlySalesPage() {
-  const { salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts } = useDataStore()
+  const { salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts } = useDataStore()
   const { month } = useFilterStore()
 
   const rows = useMemo(() => {
-    const facts = { flipkartFacts, amazonUsaFacts, meeshoFacts }
+    const facts = { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts }
     const channelIds = BUSINESS_CHANNEL_IDS
     const months = Array.from({ length: MONTHS_SHOWN }, (_, i) => addMonths(month, i - (MONTHS_SHOWN - 1)))
 
@@ -39,7 +39,7 @@ export function MonthlySalesPage() {
         growthPct: previous ? growthPct(figure.netSales, previous.netSales) : null,
       }
     })
-  }, [salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, month])
+  }, [salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, month])
 
   return (
     <PageShell title="Monthly Sales" subtitle="Trailing 12-month revenue, units, orders and ASP" showFilters={false}>

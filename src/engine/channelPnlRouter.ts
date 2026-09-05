@@ -7,6 +7,7 @@ import type {
   FixedExpenseEntry,
   FlipkartPnlFacts,
   MeeshoPnlFacts,
+  MyntraPnlFacts,
   SkuMaster,
 } from '@/data/models'
 import { channelOfSource } from '@/config/channels'
@@ -20,6 +21,7 @@ import {
 import { amazonUsaFactsAtRate, amazonUsaLineDefs, amazonUsaToCanonicalBuckets, amazonUsaValuesInInr, computeAmazonUsaPnl, isLegacyAmazonUsaFacts } from './nativePnl/amazonUsa'
 import { applyFlipkartOtherCosts, computeFlipkartPnl, flipkartToCanonicalBuckets, FLIPKART_LINE_DEFS } from './nativePnl/flipkart'
 import { applyMeeshoOtherCosts, computeMeeshoPnl, meeshoToCanonicalBuckets, MEESHO_LINE_DEFS } from './nativePnl/meesho'
+import { applyMyntraOtherCosts, computeMyntraPnl, myntraToCanonicalBuckets, MYNTRA_LINE_DEFS } from './nativePnl/myntra'
 import type { NativeLineDef, NativeLineValues } from './nativePnl/types'
 
 export interface NativePnlView {
@@ -45,6 +47,9 @@ export interface ChannelFactsStore {
   flipkartFacts: FlipkartPnlFacts[]
   amazonUsaFacts: AmazonUsaPnlFacts[]
   meeshoFacts: MeeshoPnlFacts[]
+  /** Optional so a caller written before Myntra had a statement still
+   * compiles; every screen in the app passes it. */
+  myntraFacts?: MyntraPnlFacts[]
 }
 
 /** Sums this channel's allocated share (sales-contribution method) of the
@@ -302,6 +307,46 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
           values: showInr ? amazonUsaValuesInInr(usd, fxRate) : usd,
           currency: showInr ? 'INR' : 'USD',
         },
+        notes,
+      }
+    }
+  }
+
+  if (channel === 'myntra') {
+    const imported = inputs.facts.myntraFacts?.find((f) => f.month === month)
+    if (imported) {
+      // Myntra states what it charged, never what the goods cost. COGS is
+      // priced here, from the order rows at the month's effective cost, so a
+      // corrected cost sheet restates the month instead of leaving whatever
+      // was frozen at upload time.
+      const recomputed = recomputedCogs(channel, month, inputs)
+      const facts = recomputed
+        ? { ...imported, cogsPriced: recomputed.priced, cogsUnpriced: recomputed.unpriced }
+        : imported
+      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+      const values = applyMyntraOtherCosts(computeMyntraPnl(facts), otherCosts)
+      const notes: string[] = []
+      if (!recomputed) {
+        notes.push(
+          `No Myntra order rows are on file for ${month}, so the statement shows no cost of goods. Re-upload this ` +
+          `month's P&L report — its SKU_Detail sheet is what the cost is priced from.`,
+        )
+      }
+      if (recomputed && recomputed.uncostedUnits > 0) {
+        const share = recomputed.total > 0 ? (recomputed.unpriced / recomputed.total) * 100 : 0
+        const shown = recomputed.uncostedSkus.slice(0, 8).join(', ')
+        const rest = recomputed.uncostedSkus.length - 8
+        notes.push(
+          `${recomputed.uncostedSkus.length} SKU(s) sold on Myntra in ${month} have no cost on file, covering ` +
+          `${recomputed.uncostedUnits.toLocaleString('en-IN')} unit(s). Their cost is estimated ` +
+          `${recomputed.method === 'average-unit-cost' ? 'at what a costed unit averaged this month' : 'at 25% of what they sold for'}, ` +
+          `which is ${share.toFixed(0)}% of the COGS shown. Add costs for ${shown}${rest > 0 ? ` and ${rest} more` : ''} to price them properly.`,
+        )
+      }
+      return {
+        channel, month,
+        canonical: { channel, month, lines: computeSubtotals(myntraToCanonicalBuckets(facts)) },
+        native: { lineDefs: MYNTRA_LINE_DEFS, values, currency: 'INR' },
         notes,
       }
     }

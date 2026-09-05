@@ -34,7 +34,7 @@ export function useMomMetrics(trendMonths = DEFAULT_TREND_MONTHS): {
   trend: TrendPoint[]
   monthOptions: string[]
 } {
-  const { salesRecords, skuMaster, mappings, flipkartFacts, amazonUsaFacts, meeshoFacts } = useDataStore()
+  const { salesRecords, skuMaster, mappings, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts } = useDataStore()
   const { month } = useFilterStore()
   const [level, setLevel] = useState<MetricLevel>('channel')
   // Defaults to the previous month, but any earlier month can be compared
@@ -44,7 +44,7 @@ export function useMomMetrics(trendMonths = DEFAULT_TREND_MONTHS): {
 
   return useMemo(() => {
     const channels = BUSINESS_CHANNEL_IDS
-    const facts = { flipkartFacts, amazonUsaFacts, meeshoFacts }
+    const facts = { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts }
     const inputs: MomInputs = { records: salesRecords, month, previousMonth: compareMonth, facts, channels }
 
     // One name per SKU across the whole dashboard: the Product Master title,
@@ -74,5 +74,5 @@ export function useMomMetrics(trendMonths = DEFAULT_TREND_MONTHS): {
       // reachable without typing a date.
       monthOptions: Array.from({ length: 25 }, (_, i) => addMonths(month, -i)),
     }
-  }, [salesRecords, skuMaster, mappings, flipkartFacts, amazonUsaFacts, meeshoFacts, month, compareMonth, level, trendMonths])
+  }, [salesRecords, skuMaster, mappings, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, month, compareMonth, level, trendMonths])
 }

@@ -10,12 +10,13 @@ import { detectMeeshoOrderPaymentsSheet, normalizeMeeshoOrderPayments } from '@/
 import { detectSkuMapWorkbook, normalizeSkuMapWorkbook } from '@/data/normalize/skuMapWorkbook'
 import { detectAmazonAdsSponsoredProductsReport, normalizeAmazonAdsSponsoredProductsReport } from '@/data/normalize/amazonAdsSponsoredProducts'
 import { detectAmazonVendorCentralSalesReport, normalizeAmazonVendorCentralSales } from '@/data/normalize/amazonVendorCentralSales'
+import { detectMyntraPnlWorkbook, normalizeMyntraPnlWorkbook } from '@/data/normalize/myntraPnlWorkbook'
 import { checkForDuplicates } from '@/data/normalize/duplicates'
 import { useDataStore, type ImportOutcome } from '@/store/dataStore'
 import { monthLabel } from '@/lib/format'
 import { useFilterStore } from '@/store/filterStore'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
-import type { AdsRecord, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, MeeshoPnlFacts } from '@/data/models'
+import type { AdsRecord, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, MeeshoPnlFacts, MyntraPnlFacts } from '@/data/models'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
 
@@ -25,6 +26,7 @@ type ReportKind =
   | 'flipkart_sku_pnl'
   | 'flipkart_workbook'
   | 'amazon_usa_product_profitability'
+  | 'myntra_pnl_workbook'
   | 'meesho_order_summary'
   | 'meesho_order_payments'
   | 'meesho_settlement_json'
@@ -36,6 +38,7 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   flipkart_sku_pnl: 'Flipkart — SKU-Level P&L Report',
   flipkart_workbook: 'Flipkart — Full P&L Workbook (Overall Summary + Orders P&L)',
   amazon_usa_product_profitability: 'Amazon USA — Product Profitability Report',
+  myntra_pnl_workbook: 'Myntra — P&L Report (PnL_Summary + SKU_Detail)',
   meesho_order_summary: 'Meesho — Order Summary Report',
   meesho_order_payments: 'Meesho — Aggregated Payment File (Order Payments + Ads Cost)',
   meesho_settlement_json: 'Meesho — Settlement Data (JSON)',
@@ -47,6 +50,7 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   flipkart_sku_pnl: 'flipkart',
   flipkart_workbook: 'flipkart',
   amazon_usa_product_profitability: 'amazon_us',
+  myntra_pnl_workbook: 'myntra',
   meesho_order_summary: 'meesho',
   meesho_order_payments: 'meesho',
   meesho_settlement_json: 'meesho',
@@ -67,6 +71,7 @@ interface PreviewState {
   isLikelyReupload: boolean
   flipkartFacts?: FlipkartPnlFacts
   amazonUsaFacts?: AmazonUsaPnlFacts
+  myntraFacts?: MyntraPnlFacts
   meeshoFactsByMonth?: MeeshoPnlFacts[]
   meeshoTransactions?: MeeshoTransaction[]
   meeshoAdsRows?: MeeshoAdsRow[]
@@ -211,6 +216,18 @@ export function UploadReportsPage() {
             validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings, flipkartFacts: r.facts,
           }) }
         }
+        if (detectMyntraPnlWorkbook(sheetNames)) {
+          const r = normalizeMyntraPnlWorkbook(sheets, skuMaster, mappings, importId)
+          // The statement and the per-SKU sheet describe one month. A gap
+          // between them goes in front of the person uploading, before the
+          // figures are relied on.
+          const failed = r.checks.filter((c) => !c.passed).map((c) => `${c.name}: ${c.detail}`)
+          return { id, fileName: file.name, status: 'ready', preview: await buildPreview({
+            fileName: file.name, reportKind: 'myntra_pnl_workbook', totalRows: r.totalRows,
+            validRecords: r.validRecords, invalidCount: r.invalidRows.length,
+            warnings: [...failed, ...r.warnings], myntraFacts: r.facts ?? undefined,
+          }) }
+        }
         if (detectMeeshoOrderPaymentsSheet(sheets['Order Payments'])) {
           const r = normalizeMeeshoOrderPayments(
             sheets['Order Payments'], sheets['Ads Cost'], skuMaster, importId, file.name,
@@ -328,6 +345,7 @@ export function UploadReportsPage() {
         adsRecords: preview.adsRecords,
         flipkartFacts: preview.flipkartFacts,
         amazonUsaFacts: preview.amazonUsaFacts,
+        myntraFacts: preview.myntraFacts,
         meeshoFactsByMonth: preview.meeshoFactsByMonth,
       })
       updateItem(item.id, { status: 'done', outcome: result })

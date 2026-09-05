@@ -189,6 +189,90 @@ export interface FlipkartPnlFacts {
   googleAds: number
 }
 
+/**
+ * Myntra's own Profit & Loss report, sheet `PnL_Summary`, one month.
+ *
+ * Every field is the value that sheet prints, kept as a positive magnitude
+ * except where Myntra itself reports a signed net (`reverseExpense`, which is
+ * negative whenever reverse logistics outweighs the recoveries). The statement
+ * does the subtracting; nothing here is pre-netted, so each line can be shown
+ * against the sheet it came from.
+ *
+ * Two of these lines are memos rather than deductions, and treating them as
+ * deductions is the easiest way to get this report wrong:
+ *
+ *  - `commissionDiscount` is already inside `fwdCommissionFee`. Myntra prints
+ *    it under "Rewards & Other Benefits" beside the SJIT incentive, but only
+ *    the incentive is added to the settlement — Bank Settlement (Projected) is
+ *    exactly Estimated Net Sales After Expenses plus SJIT.
+ *  - `productGst` is collected on the sale and owed to the government. Myntra
+ *    prints it below the expenses and does not deduct it from the settlement,
+ *    because the cash does arrive; it is removed here only to state revenue
+ *    ex-GST, the same way Flipkart's output GST is.
+ */
+export interface MyntraPnlFacts {
+  month: string
+  /** Myntra's seller id, from the report header. */
+  sellerId?: string
+  grossSales: number
+  grossSalesUnits: number
+  returnsAndCancellations: number
+  returnsAndCancellationsUnits: number
+  estimatedNetSales: number
+  estimatedNetSalesUnits: number
+
+  /** Forward expenses — charges on dispatched orders. */
+  fwdCommissionFee: number
+  fwdTaxesTcs: number
+  fwdTaxesTds: number
+  fwdLogisticCharge: number
+  fwdAdditionalCharges: number
+  /** Σ of the forward lines, as the sheet reports it. */
+  forwardExpense: number
+
+  /** Reverse expenses. The three recoveries are credits and the reverse
+   * logistic charge is a cost, so `reverseExpense` is a signed net and is
+   * usually negative. */
+  revCommissionRecovery: number
+  revTcsRecovery: number
+  revTdsRecovery: number
+  revLogisticCharge: number
+  revAdditionalRecovery: number
+  reverseExpense: number
+
+  /** Forward minus reverse, as the sheet reports it. */
+  totalExpenses: number
+  estimatedNetSalesAfterExpenses: number
+
+  /** Memo — see the note above. */
+  productGst: number
+
+  nodPaid: number
+  nodDeducted: number
+  sjitIncentive: number
+  /** Memo — already inside `fwdCommissionFee`. */
+  commissionDiscount: number
+  rewardsAndBenefits: number
+  orderSpf: number
+
+  bankSettlementProjected: number
+  bankSettlementSettled: number
+  bankSettlementUnsettled: number
+  inputTaxCredits: number
+  inputTaxCreditsGstTcs: number
+  inputTaxCreditsTds: number
+  earningsOnPlatform: number
+  /** Myntra's own net margin, a fraction of Estimated Net Sales. */
+  netMarginPct: number
+
+  /** Computed here, not by Myntra: the cost of the goods sold, priced from the
+   * company's own cost sheet at the month's effective cost. */
+  cogsPriced: number
+  cogsUnpriced: number
+  /** Manual monthly entry — Myntra's P&L report carries no advertising. */
+  myntraAds: number
+}
+
 export interface AmazonUsaPnlFacts {
   month: string
   /** 2 = the fee columns are kept one-for-one with Amazon's export in

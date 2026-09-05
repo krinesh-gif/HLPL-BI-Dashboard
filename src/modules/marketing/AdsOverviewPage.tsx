@@ -16,7 +16,7 @@ import { exportRowsToCsv } from '@/lib/exportCsv'
  * is being spent in one place rather than a channel at a time.
  */
 export function AdsOverviewPage() {
-  const { adsRecords, manualAdSpend, salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts } = useDataStore()
+  const { adsRecords, manualAdSpend, salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts } = useDataStore()
   const { month } = useFilterStore()
 
   const { figures, totals, netSales } = useMemo(() => {
@@ -24,9 +24,9 @@ export function AdsOverviewPage() {
     return {
       figures,
       totals: totalAdsSpend(figures),
-      netSales: netSalesForMonth(salesRecords, month, { flipkartFacts, amazonUsaFacts, meeshoFacts }).netSales,
+      netSales: netSalesForMonth(salesRecords, month, { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts }).netSales,
     }
-  }, [adsRecords, manualAdSpend, salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, month])
+  }, [adsRecords, manualAdSpend, salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, month])
 
   const label = (id: string) => ADS_CHANNELS.find((c) => c.id === id)?.label ?? id
 

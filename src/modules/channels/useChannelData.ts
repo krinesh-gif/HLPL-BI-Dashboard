@@ -31,12 +31,12 @@ const TREND_MONTHS = 6
  * the P&L lives in one place so a channel's numbers cannot be defined twice.
  */
 export function useChannelData(channel: BusinessChannelId, source?: SalesSourceId) {
-  const { salesRecords, skuMaster, mappings, flipkartFacts, amazonUsaFacts, meeshoFacts } = useDataStore()
+  const { salesRecords, skuMaster, mappings, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts } = useDataStore()
   const { month } = useFilterStore()
 
   return useMemo(() => {
     const previousMonth = addMonths(month, -1)
-    const channelFacts = { flipkartFacts, amazonUsaFacts, meeshoFacts }
+    const channelFacts = { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts }
 
     const inScope = (r: { channel: SalesSourceId }) =>
       source ? r.channel === source : channelOfSource(r.channel) === channel
@@ -99,5 +99,5 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
       topSkus: [...skuRows].sort((a, b) => b.netSales - a.netSales).slice(0, 5),
       bottomSkus: [...skuRows].sort((a, b) => a.netSales - b.netSales).slice(0, 5),
     }
-  }, [salesRecords, skuMaster, mappings, flipkartFacts, amazonUsaFacts, meeshoFacts, channel, source, month])
+  }, [salesRecords, skuMaster, mappings, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, channel, source, month])
 }

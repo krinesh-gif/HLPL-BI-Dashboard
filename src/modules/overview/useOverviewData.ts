@@ -20,14 +20,14 @@ import {
 } from '@/engine/insight'
 
 export function useOverviewData() {
-  const { salesRecords, adsRecords, skuMaster, inventorySnapshots, flipkartFacts, amazonUsaFacts, meeshoFacts } = useDataStore()
+  const { salesRecords, adsRecords, skuMaster, inventorySnapshots, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts } = useDataStore()
   const { forMonth } = usePnlInputs()
   const { month } = useFilterStore()
 
   return useMemo(() => {
     const previousMonth = addMonths(month, -1)
     const channelIds = BUSINESS_CHANNEL_IDS
-    const facts = { flipkartFacts, amazonUsaFacts, meeshoFacts }
+    const facts = { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts }
 
     const currentChannelPnls = buildAllChannelPnlViews(channelIds, month, forMonth(month)).map((v) => v.canonical)
     const previousChannelPnls = buildAllChannelPnlViews(channelIds, previousMonth, forMonth(previousMonth)).map((v) => v.canonical)
@@ -184,5 +184,5 @@ export function useOverviewData() {
       avgCoverageDays,
       insights,
     }
-  }, [salesRecords, adsRecords, skuMaster, inventorySnapshots, flipkartFacts, amazonUsaFacts, meeshoFacts, forMonth, month])
+  }, [salesRecords, adsRecords, skuMaster, inventorySnapshots, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, forMonth, month])
 }

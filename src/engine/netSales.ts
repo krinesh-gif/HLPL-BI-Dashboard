@@ -7,6 +7,7 @@ import type {
   CanonicalSalesRecord,
   FlipkartPnlFacts,
   MeeshoPnlFacts,
+  MyntraPnlFacts,
   PnlBasis,
 } from '@/data/models'
 
@@ -161,6 +162,9 @@ export interface ChannelFacts {
   flipkartFacts: FlipkartPnlFacts[]
   amazonUsaFacts: AmazonUsaPnlFacts[]
   meeshoFacts: MeeshoPnlFacts[]
+  /** Optional so a caller written before Myntra had a statement still
+   * compiles; every screen in the app passes it. */
+  myntraFacts?: MyntraPnlFacts[]
 }
 
 /**
@@ -217,6 +221,26 @@ export function settlementBasisNetSales(
       netSales: f.estimatedNetSales,
       basis: 'settlement',
       sourceLabel: 'Flipkart SKU-level P&L',
+    }
+  }
+
+  if (channel === 'myntra') {
+    const f = facts.myntraFacts?.find((x) => x.month === month)
+    if (!f) return null
+    return {
+      ...EMPTY_FIGURE,
+      grossSales: f.grossSales,
+      // Product GST was collected on the sale and is owed onward, so it was
+      // never revenue. Grouping it with returns keeps the identity
+      // net = gross - discounts - returns intact while removing it.
+      returnsValue: f.returnsAndCancellations + f.productGst,
+      netSales: f.estimatedNetSales - f.productGst,
+      units: f.estimatedNetSalesUnits,
+      returnUnits: f.returnsAndCancellationsUnits,
+      shippedUnits: f.estimatedNetSalesUnits,
+      marketplaceFee: f.totalExpenses,
+      basis: 'settlement',
+      sourceLabel: 'Myntra P&L report',
     }
   }
 

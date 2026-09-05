@@ -19,7 +19,7 @@ const TREND_MONTHS = 6
 export function AdsChannelPage() {
   const { adsChannelId } = useParams<{ adsChannelId: string }>()
   const navigate = useNavigate()
-  const { adsRecords, manualAdSpend, salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts } = useDataStore()
+  const { adsRecords, manualAdSpend, salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts } = useDataStore()
   const { month } = useFilterStore()
 
   const channel = adsChannelId as AdsChannelId
@@ -30,7 +30,7 @@ export function AdsChannelPage() {
     const figure = adsSpendFor(channel, month, adsRecords, manualAdSpend)
     const netSales = netSalesForChannelMonth({
       records: salesRecords, channel, month,
-      facts: { flipkartFacts, amazonUsaFacts, meeshoFacts },
+      facts: { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts },
     }).netSales
 
     const trend = Array.from({ length: TREND_MONTHS }, (_, i) => {
@@ -45,7 +45,7 @@ export function AdsChannelPage() {
     })
 
     return { figure, netSales, trend }
-  }, [def, channel, month, adsRecords, manualAdSpend, salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts])
+  }, [def, channel, month, adsRecords, manualAdSpend, salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts])
 
   if (!def || !data) {
     return (

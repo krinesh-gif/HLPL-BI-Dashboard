@@ -17,6 +17,7 @@ interface FactTable {
 const FACT_TABLES: Record<string, FactTable> = {
   flipkart: { table: 'flipkart_facts', byBasis: false },
   'amazon-usa': { table: 'amazon_usa_facts', byBasis: false },
+  myntra: { table: 'myntra_facts', byBasis: false },
   meesho: { table: 'meesho_facts', byBasis: true },
 }
 
