@@ -32,7 +32,6 @@ function facts(over: Partial<AmazonUsaPnlFacts> = {}): AmazonUsaPnlFacts {
     sponsoredBrandsUsd: 0, sponsoredDisplayDspUsd: 0, offAmazonAdsUsd: 0,
     exportDocsUsd: 0, usImportDutyUsd: 0, amazonSellingPlanUsd: 0,
     productLiabilityInsuranceUsd: 0, fdaLegalUsd: 0, agencySoftwareUsd: 0, otherOverheadUsd: 0,
-    fxConversionCostPct: 0.5,
     // The rupee costs, carried in rupees so they convert with everything else.
     cogsSourceInr: 264_000,
     freightSourceInr: 22_024,

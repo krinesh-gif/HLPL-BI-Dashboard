@@ -58,7 +58,7 @@ function july(over: Partial<AmazonUsaPnlFacts> = {}): AmazonUsaPnlFacts {
     sponsoredBrandsUsd: 0, sponsoredDisplayDspUsd: 0, offAmazonAdsUsd: 0,
     exportDocsUsd: 0, usImportDutyUsd: 0,
     amazonSellingPlanUsd: 0, productLiabilityInsuranceUsd: 0, fdaLegalUsd: 0,
-    agencySoftwareUsd: 0, otherOverheadUsd: 0, fxConversionCostPct: 0,
+    agencySoftwareUsd: 0, otherOverheadUsd: 0,
     ...over,
   }
 }
@@ -184,9 +184,20 @@ describe('the CM ladder continues below the tie-point', () => {
     expect(v.cm2).toBeCloseTo(v.netProceedsUsd - 3250, 4)
   })
 
-  it('applies the FX conversion cost as a percentage of net sales at CM3', () => {
-    const v = computeAmazonUsaPnl(july({ fxConversionCostPct: 0.5 }))
-    expect(v.cm3).toBeCloseTo(v.cm2 - 30738.235 * 0.005, 4)
+  it('takes only the overheads that were actually entered at CM3', () => {
+    const v = computeAmazonUsaPnl(july({ cogsUsd: 3000, freightUsd: 250, amazonSellingPlanUsd: 39.99 }))
+    expect(v.cm3).toBeCloseTo(v.cm2 - 39.99, 4)
+  })
+
+  it('charges nothing for converting the money home', () => {
+    // A modelled 0.5% of net sales used to be deducted here. It was an
+    // assumption, not a payment anyone made, and it moved CM3 on every month
+    // by a figure no bank statement supported.
+    expect(AMAZON_USA_LINE_DEFS.map((d) => d.label)).not.toContain('FX Conversion & Remittance Cost')
+    const v = computeAmazonUsaPnl(july())
+    expect(v.fxConversionCostUsd).toBeUndefined()
+    expect(v.totalOverheadsUsd).toBe(-0)
+    expect(v.cm3).toBeCloseTo(v.cm2, 6)
   })
 })
 

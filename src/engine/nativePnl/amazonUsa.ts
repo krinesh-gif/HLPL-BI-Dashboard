@@ -127,7 +127,6 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
   { key: 'fdaLegalUsd', label: 'FDA / MoCRA, Trademark, Legal', section: 'FIXED OVERHEADS & FINANCE', kind: 'input', note: 'Manual entry' },
   { key: 'agencySoftwareUsd', label: 'Agency, Software & Tools', section: 'FIXED OVERHEADS & FINANCE', kind: 'input', note: 'Manual entry' },
   { key: 'otherOverheadUsd', label: 'Other US Overhead', section: 'FIXED OVERHEADS & FINANCE', kind: 'input', note: 'Manual entry' },
-  { key: 'fxConversionCostUsd', label: 'FX Conversion & Remittance Cost', section: 'FIXED OVERHEADS & FINANCE', kind: 'input' },
   { key: 'totalOverheadsUsd', label: 'Total Overheads & Finance', section: 'FIXED OVERHEADS & FINANCE', kind: 'subtotal' },
   { key: 'cm3', label: 'CM3 — Channel Profit Before Tax', section: 'FIXED OVERHEADS & FINANCE', kind: 'subtotal' },
   { key: 'cm3Pct', label: 'CM3 %', section: 'FIXED OVERHEADS & FINANCE', kind: 'percent' },
@@ -207,10 +206,9 @@ export function computeAmazonUsaPnl(facts: AmazonUsaPnlFacts): NativeLineValues 
   const totalLandedCostUsd = facts.cogsUsd + facts.freightUsd + facts.exportDocsUsd + facts.usImportDutyUsd
   const cm2 = netProceedsUsd - totalLandedCostUsd
 
-  const fxConversionCostUsd = facts.netSalesUsd * (facts.fxConversionCostPct / 100)
   const totalOverheadsUsd =
     facts.amazonSellingPlanUsd + facts.productLiabilityInsuranceUsd + facts.fdaLegalUsd +
-    facts.agencySoftwareUsd + facts.otherOverheadUsd + fxConversionCostUsd
+    facts.agencySoftwareUsd + facts.otherOverheadUsd
   const cm3 = cm2 - totalOverheadsUsd
 
   const values: NativeLineValues = {
@@ -246,7 +244,6 @@ export function computeAmazonUsaPnl(facts: AmazonUsaPnlFacts): NativeLineValues 
     fdaLegalUsd: -facts.fdaLegalUsd,
     agencySoftwareUsd: -facts.agencySoftwareUsd,
     otherOverheadUsd: -facts.otherOverheadUsd,
-    fxConversionCostUsd: -fxConversionCostUsd,
     totalOverheadsUsd: -totalOverheadsUsd,
     cm3: known(cm3),
     cm3Pct: known(facts.netSalesUsd !== 0 ? (cm3 / facts.netSalesUsd) * 100 : 0),
@@ -303,7 +300,7 @@ export function amazonUsaToCanonicalBuckets(facts: AmazonUsaPnlFacts, fxRate = N
     otherMarketing: 0,
     otherOpex: inr(
       facts.amazonSellingPlanUsd + facts.productLiabilityInsuranceUsd + facts.fdaLegalUsd +
-      facts.agencySoftwareUsd + facts.otherOverheadUsd + facts.netSalesUsd * (facts.fxConversionCostPct / 100),
+      facts.agencySoftwareUsd + facts.otherOverheadUsd,
     ),
   }
 }

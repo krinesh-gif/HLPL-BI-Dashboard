@@ -63,7 +63,7 @@ function amazonInputs(records: CanonicalSalesRecord[], fxRate: number): ChannelP
     refundAdminFeeUsd: 0, fbaReimbursementsUsd: 0, otherAmazonFeesUsd: 0, sponsoredProductsUsd: 0,
     cogsUsd: 0, freightUsd: 0, sponsoredBrandsUsd: 0, sponsoredDisplayDspUsd: 0, offAmazonAdsUsd: 0,
     exportDocsUsd: 0, usImportDutyUsd: 0, amazonSellingPlanUsd: 0, productLiabilityInsuranceUsd: 0,
-    fdaLegalUsd: 0, agencySoftwareUsd: 0, otherOverheadUsd: 0, fxConversionCostPct: 0,
+    fdaLegalUsd: 0, agencySoftwareUsd: 0, otherOverheadUsd: 0,
   }
   return {
     salesRecords: records, skuMaster, fixedExpenses: [], marketing: {},

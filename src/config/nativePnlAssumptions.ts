@@ -8,7 +8,6 @@ export const NATIVE_PNL_ASSUMPTIONS = {
   unpricedSkuCogsPct: 25,
   usdToInrRate: 95.2,
   indiaUsaFreightPerUnitInr: 110.12,
-  fxConversionCostPct: 0.5,
 }
 
 /**

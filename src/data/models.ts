@@ -253,7 +253,6 @@ export interface AmazonUsaPnlFacts {
   fdaLegalUsd: number
   agencySoftwareUsd: number
   otherOverheadUsd: number
-  fxConversionCostPct: number
 }
 
 /**
