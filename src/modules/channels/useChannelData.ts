@@ -16,6 +16,7 @@ import {
   rtoPct,
 } from '@/engine/netSales'
 import { reconcileChannelMonth } from '@/engine/reconciliation'
+import { productLabelResolver } from '@/data/productLabel'
 
 const TREND_MONTHS = 6
 
@@ -30,7 +31,7 @@ const TREND_MONTHS = 6
  * the P&L lives in one place so a channel's numbers cannot be defined twice.
  */
 export function useChannelData(channel: BusinessChannelId, source?: SalesSourceId) {
-  const { salesRecords, skuMaster, flipkartFacts, amazonUsaFacts, meeshoFacts } = useDataStore()
+  const { salesRecords, skuMaster, mappings, flipkartFacts, amazonUsaFacts, meeshoFacts } = useDataStore()
   const { month } = useFilterStore()
 
   return useMemo(() => {
@@ -59,10 +60,10 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
     const categorySales = Array.from(categoryTotals.entries()).map(([name, value]) => ({ name, value }))
 
     const bySku = groupBySku(currentRecords)
+    const label = productLabelResolver({ skuMaster, mappings })
     const skuRows = Array.from(bySku.entries()).map(([sku, records]) => {
       const facts = orderBasisNetSales(records)
-      const master = skuMaster.find((s) => s.sku === sku)
-      return { sku, productName: master?.productName ?? sku, netSales: facts.netSales, units: facts.units }
+      return { sku, productName: label(sku, records[0]?.productName).title, netSales: facts.netSales, units: facts.units }
     })
 
     // The breakdown that lets ₹1 Cr of Amazon India be read as ₹80 L Seller
@@ -98,5 +99,5 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
       topSkus: [...skuRows].sort((a, b) => b.netSales - a.netSales).slice(0, 5),
       bottomSkus: [...skuRows].sort((a, b) => a.netSales - b.netSales).slice(0, 5),
     }
-  }, [salesRecords, skuMaster, flipkartFacts, amazonUsaFacts, meeshoFacts, channel, source, month])
+  }, [salesRecords, skuMaster, mappings, flipkartFacts, amazonUsaFacts, meeshoFacts, channel, source, month])
 }

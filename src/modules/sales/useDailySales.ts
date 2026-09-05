@@ -6,6 +6,7 @@ import { asp, orderBasisNetSales, rtoPct, type NetSalesFigure } from '@/engine/n
 import { movingAverage } from '@/engine/sales'
 import type { CanonicalSalesRecord } from '@/data/models'
 import { toIsoDate } from '@/lib/format'
+import { productLabelResolver } from '@/data/productLabel'
 
 export type DailyLevel = 'company' | 'channel' | 'sku'
 
@@ -52,7 +53,7 @@ function isoDaysAgo(from: string, days: number): string {
  * over here.
  */
 export function useDailySales() {
-  const { salesRecords, skuMaster } = useDataStore()
+  const { salesRecords, skuMaster, mappings } = useDataStore()
 
   const latestDate = useMemo(() => {
     let latest = ''
@@ -136,18 +137,21 @@ export function useDailySales() {
     }
   }, [salesRecords, from, to, filters.channel, filters.category, filters.sku])
 
-  const options = useMemo(
-    () => ({
+  const options = useMemo(() => {
+    // The Product Master name, reached through the channel-code mapping, so a
+    // SKU reads the same here as everywhere else rather than carrying whatever
+    // title the marketplace happened to list it under.
+    const label = productLabelResolver({ skuMaster, mappings })
+    return {
       categories: distinctCategories(salesRecords.map((r) => r.category)),
       // Only SKUs that actually sold — the full Product Master is hundreds of
       // entries, most irrelevant to any given range.
       skus: [...new Set(salesRecords.map((r) => r.sku))].sort().map((sku) => ({
         sku,
-        label: skuMaster.find((s) => s.sku === sku)?.productName ?? sku,
+        label: label(sku).title,
       })),
-    }),
-    [salesRecords, skuMaster],
-  )
+    }
+  }, [salesRecords, skuMaster, mappings])
 
   return { ...result, filters: { ...filters, from, to }, setFilters, options, latestDate }
 }

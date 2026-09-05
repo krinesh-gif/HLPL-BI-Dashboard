@@ -8,6 +8,7 @@ import { filterByMonth, growthPct } from '@/engine/sales'
 import { orderBasisNetSales } from '@/engine/netSales'
 import { buildCostIndex, cogsForMonth } from '@/data/costVersions'
 import { resolveCogs } from '@/data/skuMapping'
+import { productLabelResolver } from '@/data/productLabel'
 import { exportRowsToCsv } from '@/lib/exportCsv'
 
 export type RankBy = 'netSales' | 'units' | 'orders' | 'contribution' | 'growth'
@@ -25,6 +26,8 @@ const TOP_N_OPTIONS = [5, 10, 15, 20]
 interface ProductRow {
   sku: string
   productName: string
+  /** False when the Product Master has no entry for this SKU. */
+  resolvedName: boolean
   netSales: number
   units: number
   orders: number
@@ -76,7 +79,10 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
 
     const currentBySku = group(current)
     const previousBySku = group(previous)
-    const nameBySku = new Map(skuMaster.map((s) => [s.sku, s.productName]))
+    // One name per product, from the Product Master, reached through the SKU
+    // mapping. Marketplace listing titles differ per channel, run to four
+    // wrapped lines, and are sometimes just the SKU code repeated.
+    const label = productLabelResolver({ skuMaster, mappings })
 
     const result: ProductRow[] = [...currentBySku.entries()].map(([sku, records]) => {
       const figure = orderBasisNetSales(records)
@@ -90,7 +96,8 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
 
       return {
         sku,
-        productName: nameBySku.get(sku) ?? records[0]?.productName ?? sku,
+        productName: label(sku, records[0]?.productName).title,
+        resolvedName: label(sku, records[0]?.productName).resolved,
         netSales: figure.netSales,
         units: figure.units,
         orders: figure.orders,
@@ -220,8 +227,18 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
             {rows.top.map((r, i) => (
               <tr key={r.sku} className="border-t border-[var(--line)]">
                 <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-3)]">{i + 1}</td>
-                <td className="px-3 py-2">
-                  <div className="text-[var(--ink)]">{r.productName}</div>
+                <td className="max-w-[26rem] px-3 py-2">
+                  <div className="truncate text-[var(--ink)]" title={r.productName}>
+                    {r.productName}
+                    {!r.resolvedName && (
+                      <span
+                        className="ml-1.5 rounded bg-[color-mix(in_oklab,var(--warning)_18%,transparent)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--ink-2)]"
+                        title="Not in the Product Master — showing the marketplace's own name. Map it on SKU Mapping."
+                      >
+                        unmapped
+                      </span>
+                    )}
+                  </div>
                   <div className="font-mono text-xs text-[var(--ink-3)]">{r.sku}</div>
                 </td>
                 <td className="px-3 py-2 text-right font-medium tabular-nums text-[var(--ink)]">{formatCurrencyFull(r.netSales)}</td>

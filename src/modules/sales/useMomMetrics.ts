@@ -14,6 +14,7 @@ import {
   type MomRow,
   type TrendPoint,
 } from '@/engine/momMetrics'
+import { productLabelResolver } from '@/data/productLabel'
 
 const DEFAULT_TREND_MONTHS = 12
 
@@ -33,7 +34,7 @@ export function useMomMetrics(trendMonths = DEFAULT_TREND_MONTHS): {
   trend: TrendPoint[]
   monthOptions: string[]
 } {
-  const { salesRecords, skuMaster, flipkartFacts, amazonUsaFacts, meeshoFacts } = useDataStore()
+  const { salesRecords, skuMaster, mappings, flipkartFacts, amazonUsaFacts, meeshoFacts } = useDataStore()
   const { month } = useFilterStore()
   const [level, setLevel] = useState<MetricLevel>('channel')
   // Defaults to the previous month, but any earlier month can be compared
@@ -46,7 +47,9 @@ export function useMomMetrics(trendMonths = DEFAULT_TREND_MONTHS): {
     const facts = { flipkartFacts, amazonUsaFacts, meeshoFacts }
     const inputs: MomInputs = { records: salesRecords, month, previousMonth: compareMonth, facts, channels }
 
-    const nameBySku = new Map(skuMaster.map((s) => [s.sku, s.productName]))
+    // One name per SKU across the whole dashboard: the Product Master title,
+    // reached through the channel-code mapping.
+    const label = productLabelResolver({ skuMaster, mappings })
     const rows =
       level === 'master'
         ? [masterMomRow(inputs)]
@@ -54,7 +57,7 @@ export function useMomMetrics(trendMonths = DEFAULT_TREND_MONTHS): {
           ? channelMomRows(inputs)
           : level === 'category'
             ? categoryMomRows(inputs)
-            : skuMomRows(inputs, (sku) => nameBySku.get(sku) ?? sku)
+            : skuMomRows(inputs, (sku) => label(sku).title)
 
     const months = Array.from({ length: trendMonths }, (_, i) => addMonths(month, i - (trendMonths - 1)))
 
@@ -71,5 +74,5 @@ export function useMomMetrics(trendMonths = DEFAULT_TREND_MONTHS): {
       // reachable without typing a date.
       monthOptions: Array.from({ length: 25 }, (_, i) => addMonths(month, -i)),
     }
-  }, [salesRecords, skuMaster, flipkartFacts, amazonUsaFacts, meeshoFacts, month, compareMonth, level, trendMonths])
+  }, [salesRecords, skuMaster, mappings, flipkartFacts, amazonUsaFacts, meeshoFacts, month, compareMonth, level, trendMonths])
 }
