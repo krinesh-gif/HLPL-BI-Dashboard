@@ -3,6 +3,7 @@ import { PageShell } from '@/components/layout/PageShell'
 import { useDataStore } from '@/store/dataStore'
 import { useSkuCostValidation } from './useSkuCostValidation'
 import { UncategorizedPanel } from './UncategorizedPanel'
+import { AddProductForm } from './AddProductForm'
 import { formatCurrencyFull, formatPercent } from '@/lib/format'
 import type { SkuMaster } from '@/data/models'
 
@@ -22,6 +23,7 @@ export function ProductMasterPage() {
 
   return (
     <PageShell title="Product Master" subtitle="Centralized SKU data — COGS here is the single source of truth for every channel's P&L" showFilters={false}>
+      <AddProductForm />
       <UncategorizedPanel />
 
       {unmappedSkus.length > 0 && (
