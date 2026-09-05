@@ -10,6 +10,7 @@ import { resolveRecoveryReason } from '@/data/meesho/feeCategories'
 import type { MeeshoException, MeeshoTransaction } from '@/data/meesho/transaction'
 import { factsFromContributions, type DatedContribution, type MeeshoContribution } from '@/data/meesho/contribution'
 import { toIsoDate } from '@/lib/format'
+import { parseReportDate } from '@/lib/reportDate'
 
 /**
  * Normalises Meesho's "Order Payments" sheet from the aggregated payment file.
@@ -105,8 +106,8 @@ function text(row: (string | number)[], at: number): string {
 function isoDate(raw: string): string | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw.trim())
   if (m) return `${m[1]}-${m[2]}-${m[3]}`
-  const parsed = new Date(raw)
-  return Number.isNaN(parsed.getTime()) ? null : toIsoDate(parsed)
+  const parsed = parseReportDate(raw, 'iso')
+  return parsed ? toIsoDate(parsed) : null
 }
 
 /** One advertising deduction, with the identity that makes it unique across

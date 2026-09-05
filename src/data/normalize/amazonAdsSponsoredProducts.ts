@@ -3,6 +3,7 @@ import type { ChannelId } from '@/config/channels'
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { getField, headersPresent, type RowIssue } from './types'
 import { toIsoDate } from '@/lib/format'
+import { parseReportDate } from '@/lib/reportDate'
 
 // Column names as they appear in the Amazon Ads console's Sponsored Products
 // "Campaign report" export. "Portfolio name" is frequently used as the SKU
@@ -63,8 +64,9 @@ export function normalizeAmazonAdsSponsoredProductsReport(rows: Record<string, s
     if (!campaign) return invalidRows.push({ rowIndex, reason: 'Missing Campaign Name' })
     if (!startDateRaw) return invalidRows.push({ rowIndex, reason: 'Missing Start Date' })
 
-    const startDate = new Date(startDateRaw)
-    if (Number.isNaN(startDate.getTime())) return invalidRows.push({ rowIndex, reason: `Invalid date: "${startDateRaw}"` })
+    // Campaign Manager exports American dates, same as the seller reports.
+    const startDate = parseReportDate(startDateRaw, 'us')
+    if (!startDate) return invalidRows.push({ rowIndex, reason: `Invalid date: "${startDateRaw}"` })
 
     const channel = resolveChannel(getField(row, COLUMNS.retailer), getField(row, COLUMNS.country))
     if (!channel) return invalidRows.push({ rowIndex, reason: 'Could not determine an Amazon channel from Retailer/Country' })

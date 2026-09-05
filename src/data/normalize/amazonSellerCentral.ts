@@ -2,6 +2,7 @@ import type { CanonicalSalesRecord, SkuMaster } from '@/data/models'
 import { getField, headersPresent, type NormalizeResult } from './types'
 import { normalizeCategory } from '@/data/categories'
 import { toIsoDate } from '@/lib/format'
+import { parseReportDate } from '@/lib/reportDate'
 
 // Column names as they appear in Amazon Seller Central's "All Orders" / order
 // report export. Multiple aliases are accepted per field since Amazon's report
@@ -58,7 +59,8 @@ export function normalizeAmazonSellerCentralRows(
     if (!sku) return invalidRows.push({ rowIndex, reason: 'Missing SKU' })
     if (!purchaseDateRaw) return invalidRows.push({ rowIndex, reason: 'Missing purchase date' })
 
-    const purchaseDate = new Date(purchaseDateRaw)
+    // An Indian report; its dates come through ISO, not American.
+    const purchaseDate = parseReportDate(purchaseDateRaw, 'iso') ?? new Date(NaN)
     if (Number.isNaN(purchaseDate.getTime())) return invalidRows.push({ rowIndex, reason: `Invalid date: "${purchaseDateRaw}"` })
 
     const quantity = Number(quantityRaw)

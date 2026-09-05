@@ -2,6 +2,7 @@ import type { CanonicalSalesRecord, SkuMaster } from '@/data/models'
 import { getField, headersPresent, type NormalizeResult } from './types'
 import { normalizeCategory } from '@/data/categories'
 import { toIsoDate } from '@/lib/format'
+import { parseReportDate } from '@/lib/reportDate'
 
 // Column names as they appear in Meesho's raw "Order Summary" export
 // (Sub orderId, Catalog ID, Quantity, Price, Order Date, Order Status,
@@ -51,7 +52,7 @@ export function normalizeMeeshoOrderSummary(
     if (!sku) return invalidRows.push({ rowIndex, reason: 'Missing SKU ID' })
     if (!orderDateRaw) return invalidRows.push({ rowIndex, reason: 'Missing Order Date' })
 
-    const orderDate = new Date(orderDateRaw)
+    const orderDate = parseReportDate(orderDateRaw, 'iso') ?? new Date(NaN)
     if (Number.isNaN(orderDate.getTime())) return invalidRows.push({ rowIndex, reason: `Invalid date: "${orderDateRaw}"` })
 
     const quantity = Number(quantityRaw)

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { toIsoDate, toMonthKey } from '@/lib/format'
+import { parseReportDate, parseUsSlashDate } from '@/lib/reportDate'
 import { normalizeAmazonUsaProductProfitability } from './amazonUsaProductProfitability'
 import type { SkuMaster } from '@/data/models'
 
@@ -57,5 +58,50 @@ describe('an imported order date keeps the day the report says', () => {
 
   it('reports an unparseable date as empty rather than as 1970', () => {
     expect(toIsoDate(new Date('not a date'))).toBe('')
+  })
+})
+
+describe('a report is read in the convention its marketplace writes', () => {
+  it('reads Amazon USA the American way: 6/1/2026 is 1 June', () => {
+    // The band this row belongs to is June 2026. Read the Indian way it would
+    // be 6 January and the whole month would land five months early.
+    expect(parseReportDate('6/1/2026', 'us')?.getMonth()).toBe(5)
+    expect(parseReportDate('6/1/2026', 'us')?.getDate()).toBe(1)
+    expect(toIsoDate(parseReportDate('6/1/2026', 'us')!)).toBe('2026-06-01')
+    expect(toIsoDate(parseReportDate('6/30/2026', 'us')!)).toBe('2026-06-30')
+  })
+
+  it('does not depend on the browser to guess that', () => {
+    // `new Date('6/1/2026')` is implementation-defined for a non-ISO string.
+    // V8 reads it American; the spec does not require any engine to.
+    expect(parseUsSlashDate('6/1/2026')?.getMonth()).toBe(5)
+    expect(parseUsSlashDate('12/31/2026')?.getDate()).toBe(31)
+    expect(parseUsSlashDate('2026-06-01')).toBeNull()
+  })
+
+  it('reads the Indian files as the ISO they are, without a UTC hop', () => {
+    // `new Date('2026-03-12')` is UTC midnight by specification, which moves
+    // the day in any zone behind UTC.
+    expect(toIsoDate(parseReportDate('2026-03-12', 'iso')!)).toBe('2026-03-12')
+    expect(toIsoDate(parseReportDate('2026-03-11 21:17:41', 'iso')!)).toBe('2026-03-11')
+  })
+
+  it('still reads a file that arrives in the other convention', () => {
+    expect(toIsoDate(parseReportDate('2026-06-01', 'us')!)).toBe('2026-06-01')
+    expect(toIsoDate(parseReportDate('6/1/2026', 'iso')!)).toBe('2026-06-01')
+  })
+
+  it('rejects an impossible date instead of rolling it forward', () => {
+    // JS turns 31 February into 3 March without complaint.
+    expect(parseUsSlashDate('2/31/2026')).toBeNull()
+    expect(parseReportDate('', 'us')).toBeNull()
+    expect(parseReportDate('not a date', 'us')).toBeNull()
+  })
+
+  it('carries the American reading through a real Amazon USA import', () => {
+    const juneRow = { ...row, 'Start date': '6/1/2026', 'End date': '6/30/2026' }
+    const result = normalizeAmazonUsaProductProfitability(headers, [juneRow], skuMaster, 'us-format')
+    expect(result.month).toBe('2026-06')
+    expect(result.validRecords[0].orderDate).toBe('2026-06-01')
   })
 })

@@ -4,6 +4,7 @@ import { AMAZON_USA_FEE_COLUMNS, feeColumnForHeader } from '@/data/amazonUsa/fee
 import { getField, headersPresent, type NormalizeResult } from './types'
 import { normalizeCategory } from '@/data/categories'
 import { toIsoDate } from '@/lib/format'
+import { parseReportDate } from '@/lib/reportDate'
 
 // Column names as they appear in Seller Central ▸ Reports ▸ Business Reports ▸
 // Product Profitability. Amazon changes both the number and the order of the
@@ -116,10 +117,13 @@ export function normalizeAmazonUsaProductProfitability(
     const sales = num(row, salesCol)
     const netSales = num(row, netSalesCol)
 
+    // Amazon writes this report the American way: "6/1/2026" is 1 June, and
+    // the band it belongs to is June 2026. Read as an Indian date it would be
+    // 6 January and the whole month would land in the wrong place.
     const startDateRaw = startDateCol ? row[startDateCol] : undefined
-    if (startDateRaw && !detectedMonth) {
-      const d = new Date(startDateRaw)
-      if (!Number.isNaN(d.getTime())) detectedMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const startDate = parseReportDate(startDateRaw, 'us')
+    if (startDate && !detectedMonth) {
+      detectedMonth = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`
     }
 
     const skuRecord = skuByCode.get(msku)
@@ -152,7 +156,7 @@ export function normalizeAmazonUsaProductProfitability(
 
     validRecords.push({
       orderId: `amazon_us-${msku}-${startDateRaw ?? detectedMonth}`,
-      orderDate: startDateRaw ? toIsoDate(new Date(startDateRaw)) : `${detectedMonth}-01`,
+      orderDate: startDate ? toIsoDate(startDate) : `${detectedMonth}-01`,
       channel: 'amazon_us',
       marketplace: 'amazon_us',
       sellerType: 'seller_central',

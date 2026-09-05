@@ -3,6 +3,7 @@ import type { CanonicalSalesRecord, FlipkartPnlFacts, SkuMaster } from '@/data/m
 import { getField, type NormalizeResult } from './types'
 import { normalizeCategory } from '@/data/categories'
 import { toIsoDate } from '@/lib/format'
+import { parseReportDate } from '@/lib/reportDate'
 
 /**
  * Normalizes the REAL Flipkart P&L workbook (Seller Hub ▸ Reports ▸ Profit &
@@ -50,7 +51,7 @@ function extractMonthFromSummary(map: Map<string, number | string>): string {
   const range = map.get('orders recieved during') ?? map.get('orders received during')
   if (typeof range !== 'string') return ''
   const startPart = range.split(' to ')[0]?.trim()
-  const d = new Date(startPart)
+  const d = parseReportDate(startPart, 'iso') ?? new Date(NaN)
   if (Number.isNaN(d.getTime())) return ''
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
@@ -126,7 +127,7 @@ export function normalizeFlipkartWorkbook(
     if (!sku) return invalidRows.push({ rowIndex, reason: 'Missing SKU' })
     if (!orderDateRaw) return invalidRows.push({ rowIndex, reason: 'Missing order date' })
 
-    const orderDate = new Date(orderDateRaw)
+    const orderDate = parseReportDate(orderDateRaw, 'iso') ?? new Date(NaN)
     if (Number.isNaN(orderDate.getTime())) return invalidRows.push({ rowIndex, reason: `Invalid date: "${orderDateRaw}"` })
 
     const grossUnits = Number(getField(row, ['gross units'])) || 0
