@@ -11,12 +11,31 @@ interface SaveBody {
    * because they are the same kind of thing: a financial parameter stamped
    * with the month it applies to. */
   fxRates?: unknown
+  freightRates?: unknown
 }
 
 interface FxRateInput {
   month: string
   rate: number
   note?: string
+}
+
+interface FreightRateInput { month: string; perUnitInr: number; note?: string }
+
+function isFreightRateArray(v: unknown): v is FreightRateInput[] {
+  return (
+    Array.isArray(v) &&
+    v.every((x) => {
+      if (!x || typeof x !== 'object') return false
+      const c = x as FreightRateInput
+      // Zero is allowed — a month with no inbound shipment really did cost
+      // nothing to freight. Negative is not.
+      return (
+        isNonEmptyString(c.month) && MONTH_PATTERN.test(c.month) &&
+        typeof c.perUnitInr === 'number' && Number.isFinite(c.perUnitInr) && c.perUnitInr >= 0
+      )
+    })
+  )
 }
 
 function isFxRateArray(v: unknown): v is FxRateInput[] {
@@ -81,7 +100,17 @@ export async function GET(request: Request): Promise<Response> {
     SELECT month, rate, note, updated_at FROM fx_rates WHERE pair = 'USDINR' ORDER BY month DESC
   `) as Row[]
 
+  const freightRows = (await sql`
+    SELECT month, per_unit_inr, note, updated_at FROM freight_rates ORDER BY month DESC
+  `) as Row[]
+
   return json({
+    freightRates: freightRows.map((r) => ({
+      month: String(r.month),
+      perUnitInr: Number(r.per_unit_inr),
+      note: r.note ? String(r.note) : undefined,
+      updatedAt: r.updated_at ? new Date(String(r.updated_at)).toISOString() : undefined,
+    })),
     fxRates: fxRows.map((r) => ({
       month: String(r.month),
       rate: Number(r.rate),
@@ -114,6 +143,29 @@ export async function POST(request: Request): Promise<Response> {
   if (auth.response) return auth.response
 
   const body = await readJson<SaveBody>(request)
+
+  if (body && body.freightRates !== undefined) {
+    if (!isFreightRateArray(body.freightRates)) {
+      return json({ error: 'Expected { freightRates: [{ month: "yyyy-mm", perUnitInr: number >= 0, note? }] }.' }, 400)
+    }
+    if (body.freightRates.length === 0) return json({ saved: 0 })
+    await sql.query(
+      `INSERT INTO freight_rates (month, per_unit_inr, note, updated_by)
+       SELECT * FROM UNNEST($1::text[], $2::float8[], $3::text[], $4::text[])
+       ON CONFLICT (month) DO UPDATE SET
+         per_unit_inr = EXCLUDED.per_unit_inr,
+         note = EXCLUDED.note,
+         updated_by = EXCLUDED.updated_by,
+         updated_at = now()`,
+      [
+        body.freightRates.map((r) => r.month),
+        body.freightRates.map((r) => r.perUnitInr),
+        body.freightRates.map((r) => r.note ?? null),
+        body.freightRates.map(() => auth.user.id),
+      ],
+    )
+    return json({ saved: body.freightRates.length })
+  }
 
   if (body && body.fxRates !== undefined) {
     if (!isFxRateArray(body.fxRates)) {
@@ -189,6 +241,12 @@ export async function DELETE(request: Request): Promise<Response> {
   if (auth.response) return auth.response
 
   const url = new URL(request.url)
+
+  const freightMonth = url.searchParams.get('freightMonth')
+  if (isNonEmptyString(freightMonth)) {
+    await sql`DELETE FROM freight_rates WHERE month = ${freightMonth}`
+    return json({ deleted: 1 })
+  }
 
   const fxMonth = url.searchParams.get('fxMonth')
   if (isNonEmptyString(fxMonth)) {

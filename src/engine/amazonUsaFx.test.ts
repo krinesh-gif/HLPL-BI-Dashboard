@@ -4,7 +4,7 @@ import { lineValuesToUsd } from '@/data/fxRates'
 import { buildChannelPnlView, type ChannelPnlViewInputs } from './channelPnlRouter'
 import { buildMultiMonthPnl } from './multiMonthPnl'
 import { computeSubtotals } from './pnl'
-import { amazonUsaFactsAtRate, amazonUsaValuesInInr, computeAmazonUsaPnl } from './nativePnl/amazonUsa'
+import { AMAZON_USA_LINE_DEFS, amazonUsaFactsAtRate, amazonUsaValuesInInr, computeAmazonUsaPnl } from './nativePnl/amazonUsa'
 
 /**
  * Amazon USA is denominated in dollars, so one exchange rate scales the entire
@@ -150,5 +150,39 @@ describe('the multi-month table follows the currency toggle', () => {
     expect(total(usd, 'grossSales') * rate).toBeCloseTo(total(inr, 'grossSales'), 2)
     expect(total(usd, 'grossMarginPct')).toBeCloseTo(total(inr, 'grossMarginPct'), 6)
     expect(total(usd, 'ebitdaMarginPct')).toBeCloseTo(total(inr, 'ebitdaMarginPct'), 6)
+  })
+})
+
+describe('freight is priced when the statement is read, at the month’s rate', () => {
+  // 2,311 net units in July. It used to be a constant multiplied in at import
+  // and frozen into the month, so correcting the rate reached nothing already
+  // loaded and changing it at all needed a deploy.
+  const withUnits = { ...facts(), netUnitsSoldQty: 2311, freightSourceInr: 110.12 * 2311 }
+  const base = (freightPerUnitInr?: number): ChannelPnlViewInputs => ({
+    ...inputs(90, 'USD'),
+    facts: { flipkartFacts: [], amazonUsaFacts: [withUnits], meeshoFacts: [] },
+    freightPerUnitInr,
+  })
+
+  it('multiplies the month’s rate by the units it shipped', () => {
+    const v = buildChannelPnlView('amazon_us', '2026-07', base(120)).native?.values
+    expect(v?.freightUsd).toBeCloseTo(-(120 * 2311) / 90, 4)
+  })
+
+  it('restates the month when the rate is corrected', () => {
+    const cheap = buildChannelPnlView('amazon_us', '2026-07', base(90)).native?.values.freightUsd ?? 0
+    const dear = buildChannelPnlView('amazon_us', '2026-07', base(150)).native?.values.freightUsd ?? 0
+    expect(Math.abs(dear)).toBeGreaterThan(Math.abs(cheap))
+  })
+
+  it('keeps the figure imported with the month when no rate is supplied', () => {
+    const v = buildChannelPnlView('amazon_us', '2026-07', base(undefined)).native?.values
+    expect(v?.freightUsd).toBeCloseTo(-(110.12 * 2311) / 90, 4)
+  })
+})
+
+describe('the seller-entered cost is out of the statement but still in the tie', () => {
+  it('has no line of its own', () => {
+    expect(AMAZON_USA_LINE_DEFS.map((d) => d.label)).not.toContain('Seller-entered cost per unit × net units')
   })
 })

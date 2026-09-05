@@ -104,26 +104,25 @@ export function PnlPage() {
           </div>
         )}
 
-        <div className="flex flex-col gap-1">
+        <label className="flex flex-col gap-1">
           <span className="text-xs font-medium text-[var(--ink-3)]">Quick select</span>
-          <div className="flex flex-wrap gap-0.5 rounded-full border border-[var(--line)] bg-[var(--surface-2)] p-0.5">
+          <select
+            value={r.period.mode === 'quick' ? r.period.quick : 'custom'}
+            onChange={(e) => {
+              const v = e.target.value
+              if (v === 'custom') r.setPeriod({ ...r.period, mode: 'custom' })
+              else r.setPeriod({ ...r.period, mode: 'quick', quick: v as QuickPeriod })
+            }}
+            className="cursor-pointer rounded-full border border-[var(--line-2)] bg-[var(--surface)] px-3.5 py-1.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
+          >
             {QUICK_PERIODS.map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => r.setPeriod({ ...r.period, mode: 'quick', quick: p.key as QuickPeriod })}
-                aria-pressed={r.period.mode === 'quick' && r.period.quick === p.key}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                  r.period.mode === 'quick' && r.period.quick === p.key
-                    ? 'bg-[var(--accent)] text-[var(--accent-ink)] shadow-[0_1px_4px_color-mix(in_oklab,var(--accent)_40%,transparent)]'
-                    : 'text-[var(--ink-3)] hover:text-[var(--ink)]'
-                }`}
-              >
-                {p.label}
-              </button>
+              <option key={p.key} value={p.key}>{p.label}</option>
             ))}
-          </div>
-        </div>
+            {/* Picking From/To directly puts the period into custom mode; the
+                option is here so the control still shows what is selected. */}
+            <option value="custom">Custom range</option>
+          </select>
+        </label>
 
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium text-[var(--ink-3)]">From</span>

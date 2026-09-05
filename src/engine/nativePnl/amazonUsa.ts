@@ -103,7 +103,6 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
   { key: 'sponsoredBrandsUsd', label: 'Sponsored Brands', section: 'ADVERTISING FEES', kind: 'input', group: 'ADVERTISING FEES', note: 'Manual entry' },
   { key: 'sponsoredDisplayDspUsd', label: 'Sponsored Display / DSP', section: 'ADVERTISING FEES', kind: 'input', group: 'ADVERTISING FEES', note: 'Manual entry' },
 
-  { key: 'sheetSellerCostUsd', label: 'Seller-entered cost per unit × net units', section: 'NET PROCEEDS', kind: 'input', hideWhenZero: true, note: 'From the export’s own cost columns' },
   { key: 'netProceedsUsd', label: 'Net proceeds total', section: 'NET PROCEEDS', kind: 'subtotal' },
   // Sponsored Brands and Display are billed outside this report, so Amazon's
   // own Net proceeds cannot know about them. Adding them back is what keeps
@@ -195,9 +194,12 @@ export function computeAmazonUsaPnl(facts: AmazonUsaPnlFacts): NativeLineValues 
   const adsNotBilledByAmazonUsd = facts.sponsoredBrandsUsd + facts.sponsoredDisplayDspUsd
   const totalAdvertisingUsd = sumGroup('advertising') + adsNotBilledByAmazonUsd
 
-  // Amazon's Net proceeds also nets off the per-unit costs a seller typed into
-  // Seller Central. Small here, but leaving it out is the difference between
-  // tying to the sheet and nearly tying to it.
+  // Amazon's Net proceeds nets off the per-unit costs a seller typed into
+  // Seller Central. It is not shown: this statement carries its own Cost of
+  // Goods Sold, priced from the cost sheet, and a second partly-filled cost
+  // beside it invites the two to be read as separate charges. It stays in the
+  // arithmetic because Amazon's own figure includes it, and dropping it would
+  // put the statement out against the export by exactly this much.
   const sheetSellerCostUsd = (facts.sheetCogsUsd ?? 0) + (facts.sheetMiscCostUsd ?? 0)
   const netProceedsUsd = facts.netSalesUsd - totalMarketplaceChargesUsd - totalAdvertisingUsd - sheetSellerCostUsd
 

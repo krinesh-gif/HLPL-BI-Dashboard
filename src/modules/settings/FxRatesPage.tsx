@@ -4,6 +4,7 @@ import { Card, CardHeader, Badge } from '@/components/ui/Surface'
 import { useDataStore } from '@/store/dataStore'
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { fxRateForMonth } from '@/data/fxRates'
+import { freightRateForMonth } from '@/data/freightRates'
 import { monthLabel, toMonthKey } from '@/lib/format'
 
 /**
@@ -61,8 +62,8 @@ export function FxRatesPage() {
 
   return (
     <PageShell
-      title="Exchange Rates"
-      subtitle="USD → INR, per month. Amazon USA is priced in dollars, so this scales the whole channel."
+      title="Rates"
+      subtitle="The two figures Amazon USA is costed on that no report supplies: the exchange rate, and what it costs to fly a unit there."
       showFilters={false}
     >
       <Card>
@@ -180,6 +181,159 @@ export function FxRatesPage() {
           mistaken entry.
         </p>
       </Card>
+
+      <FreightSection />
     </PageShell>
+  )
+}
+
+/**
+ * India → USA inbound freight, entered per month as rupees per unit shipped.
+ *
+ * There is no formula behind this and no report supplies it: Amazon's exports
+ * say what sold and what Amazon charged, and know nothing about the airway
+ * bill. The figure is the month's total inbound freight divided by the units
+ * it carried, which is a business input, so it is entered rather than derived.
+ *
+ * It was a constant compiled into the build, multiplied by units at import and
+ * frozen into the month. Nobody could change it without a deploy, and because
+ * it was frozen, correcting it would not have restated the months already
+ * loaded. Dated by month and applied when the statement is read, it behaves
+ * like the exchange rate and the cost sheet: a closed month keeps what it was
+ * closed on, and a correction reaches every month that should see it.
+ */
+function FreightSection() {
+  const { freightRates, amazonUsaFacts, saveFreightRate, removeFreightRate } = useDataStore()
+  const [month, setMonth] = useState(() => toMonthKey(new Date().toISOString().slice(0, 10)))
+  const [perUnit, setPerUnit] = useState('')
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const usaMonths = useMemo(
+    () => [...new Set(amazonUsaFacts.map((f) => f.month))].sort().reverse(),
+    [amazonUsaFacts],
+  )
+  const missing = usaMonths.filter((m) => !freightRateForMonth(m, freightRates).entered)
+  const sorted = [...freightRates].sort((a, b) => b.month.localeCompare(a.month))
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    const value = Number(perUnit)
+    if (!Number.isFinite(value) || value < 0) {
+      setError('Enter rupees per unit — zero is allowed for a month with no inbound shipment, negative is not.')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      await saveFreightRate({ month, perUnitInr: value, note: note.trim() || undefined })
+      setPerUnit('')
+      setNote('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader
+          title="India → USA freight"
+          subtitle="Rupees per unit shipped. Take the month's total inbound freight and divide by the units it carried."
+        />
+        <form onSubmit={submit} className="mt-4 flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-[var(--ink-3)]">Month</span>
+            <input
+              type="month"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              className="rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-[var(--ink-3)]">₹ per unit</span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={perUnit}
+              onChange={(e) => setPerUnit(e.target.value)}
+              placeholder={NATIVE_PNL_ASSUMPTIONS.indiaUsaFreightPerUnitInr.toFixed(2)}
+              className="w-32 rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-3 py-1.5 text-sm tabular-nums text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
+            />
+          </label>
+          <label className="flex flex-1 flex-col gap-1">
+            <span className="text-xs font-medium text-[var(--ink-3)]">Source</span>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Forwarder invoice, airway bill, quarter average…"
+              className="w-full rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={busy}
+            className="rounded-md bg-[var(--accent)] px-4 py-1.5 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
+          >
+            {busy ? 'Saving…' : 'Save'}
+          </button>
+        </form>
+        {error && <p className="mt-2 text-sm text-[var(--critical-ink)]">{error}</p>}
+        {missing.length > 0 && (
+          <p className="mt-3 text-xs text-[var(--ink-3)]">
+            No freight rate entered for {missing.map(monthLabel).join(', ')} — those months are using the default{' '}
+            <Badge tone="neutral">₹{NATIVE_PNL_ASSUMPTIONS.indiaUsaFreightPerUnitInr.toFixed(2)}</Badge> per unit.
+          </p>
+        )}
+      </Card>
+
+      <Card padded={false}>
+        <div className="px-5 pt-5">
+          <CardHeader title="Freight on file" subtitle={`${sorted.length} month${sorted.length === 1 ? '' : 's'}`} />
+        </div>
+        {sorted.length === 0 ? (
+          <p className="px-5 pb-5 text-sm text-[var(--ink-3)]">
+            Nothing entered yet — every Amazon USA month is freighted at the default.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-[var(--surface-2)] text-[11px] tracking-wide text-[var(--ink-3)] uppercase">
+                <tr>
+                  <th className="px-5 py-2.5 text-left">Month</th>
+                  <th className="px-5 py-2.5 text-right">₹ per unit</th>
+                  <th className="px-5 py-2.5 text-left">Source</th>
+                  <th className="px-5 py-2.5" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--line)]">
+                {sorted.map((r) => (
+                  <tr key={r.month} className="hover:bg-[var(--surface-hover)]">
+                    <td className="px-5 py-2.5 font-medium text-[var(--ink)]">{monthLabel(r.month)}</td>
+                    <td className="px-5 py-2.5 text-right tabular-nums text-[var(--ink)]">{r.perUnitInr.toFixed(2)}</td>
+                    <td className="px-5 py-2.5 text-[var(--ink-3)]">{r.note ?? '—'}</td>
+                    <td className="px-5 py-2.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => void removeFreightRate(r.month)}
+                        className="text-xs font-medium text-[var(--ink-3)] hover:text-[var(--critical-ink)]"
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </>
   )
 }

@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useDataStore } from '@/store/dataStore'
 import { buildCostIndex } from '@/data/costVersions'
 import { fxRateValue } from '@/data/fxRates'
+import { freightRateValue } from '@/data/freightRates'
 import { marketingFromAds } from '@/engine/marketing'
 import type { ChannelPnlViewInputs } from '@/engine/channelPnlRouter'
 
@@ -24,7 +25,7 @@ export function usePnlInputs(): {
   const {
     salesRecords, adsRecords, skuMaster, fixedExpenses,
     flipkartFacts, amazonUsaFacts, meeshoFacts,
-    costVersions, mappings, comboComponents, manualAdSpend, fxRates,
+    costVersions, mappings, comboComponents, manualAdSpend, fxRates, freightRates,
   } = useDataStore()
 
   return useMemo(() => {
@@ -51,11 +52,12 @@ export function usePnlInputs(): {
         ...inputs,
         marketing: marketingFromAds(adsRecords, month, manualAdSpend),
         fxRate: fxRateValue(month, fxRates),
+        freightPerUnitInr: freightRateValue(month, freightRates),
       }),
     }
   }, [
     salesRecords, adsRecords, skuMaster, fixedExpenses,
     flipkartFacts, amazonUsaFacts, meeshoFacts,
-    costVersions, mappings, comboComponents, manualAdSpend, fxRates,
+    costVersions, mappings, comboComponents, manualAdSpend, fxRates, freightRates,
   ])
 }

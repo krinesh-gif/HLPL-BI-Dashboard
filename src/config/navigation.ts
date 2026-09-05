@@ -83,7 +83,7 @@ export const NAVIGATION: NavSection[] = [
     label: 'Settings',
     children: [
       { label: 'General', path: '/settings' },
-      { label: 'Exchange Rates', path: '/settings/fx-rates' },
+      { label: 'Rates (FX & Freight)', path: '/settings/fx-rates' },
       { label: 'Team', path: '/settings/team' },
     ],
   },

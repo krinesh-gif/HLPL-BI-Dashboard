@@ -199,6 +199,8 @@ export interface ChannelPnlViewInputs {
   /** INR per USD for this month. Amazon USA is denominated in dollars, so this
    * scales the whole channel wherever it rolls into the rupee P&L. */
   fxRate?: number
+  /** Rupees of India→USA freight per unit shipped, for this month. */
+  freightPerUnitInr?: number
   /** Which currency to render Amazon USA's own statement in. The canonical
    * roll-up is always rupees regardless — the Master P&L has one currency. */
   amazonUsaCurrency?: 'USD' | 'INR'
@@ -236,7 +238,14 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       const fxRate = inputs.fxRate ?? NATIVE_PNL_ASSUMPTIONS.usdToInrRate
       // Rupee costs are converted at this month's rate rather than the one
       // that happened to be configured when the file was uploaded.
-      const atRate = amazonUsaFactsAtRate(imported, fxRate)
+      // Freight is priced when the statement is read, at the month's rate, so
+      // correcting the rate restates the months it should and leaves closed
+      // months on the rate they were closed at. It used to be a constant
+      // multiplied in at import and frozen, which meant neither.
+      const withFreight = inputs.freightPerUnitInr !== undefined && imported.netUnitsSoldQty !== undefined
+        ? { ...imported, freightSourceInr: inputs.freightPerUnitInr * imported.netUnitsSoldQty }
+        : imported
+      const atRate = amazonUsaFactsAtRate(withFreight, fxRate)
       const recomputed = recomputedCogs(channel, month, inputs)
       const facts = recomputed
         ? {

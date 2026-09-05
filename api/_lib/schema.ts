@@ -280,6 +280,14 @@ BEGIN
   -- Held per month rather than as a constant so a closed month keeps the rate
   -- it was closed on, exactly like an effective-dated cost.
   -- ---------------------------------------------------------------------------
+  CREATE TABLE IF NOT EXISTS freight_rates (
+    month        TEXT PRIMARY KEY,
+    per_unit_inr DOUBLE PRECISION NOT NULL,
+    note         TEXT,
+    updated_by   TEXT,
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
   CREATE TABLE IF NOT EXISTS fx_rates (
     month      TEXT NOT NULL,
     pair       TEXT NOT NULL DEFAULT 'USDINR',
