@@ -31,8 +31,13 @@ export interface AmazonUsaFeeColumn {
   /** Where the line sits on the statement. */
   group: 'marketplace' | 'advertising'
   /** Set when another column already includes this one. Such a line is shown
-   * for reference and excluded from every total. */
+   * for reference, indented under its parent, and excluded from every total. */
   componentOf?: string
+  /** Drop the line entirely once the file has proved it a duplicate rather
+   * than a component. A column that merely repeats another one adds nothing to
+   * read: there is no sum to check, only the same number printed twice. It
+   * comes back the moment a file shows it carrying its own charge. */
+  hideWhenNested?: boolean
   /** Which canonical P&L bucket this rolls into for the Master P&L. */
   bucket: PnlLineKey
 }
@@ -52,7 +57,7 @@ export const AMAZON_USA_FEE_COLUMNS: AmazonUsaFeeColumn[] = [
   { id: 'fbaInboundPlacementFee', header: 'FBA inbound placement service fee total', group: 'marketplace', bucket: 'fulfilment' },
   { id: 'fuelLogisticsSurcharge', header: 'Fuel and Logistics-related surcharge total', group: 'marketplace', componentOf: 'fbaFulfillmentFees', bucket: 'fulfilment' },
   { id: 'lowInventoryLevelFee', header: 'Low-inventory-level fee total', group: 'marketplace', componentOf: 'fbaFulfillmentFees', bucket: 'fulfilment' },
-  { id: 'monthlyInventoryStorageFee', header: 'Monthly inventory storage fee total', group: 'marketplace', componentOf: 'baseMonthlyStorageFee', bucket: 'otherMarketplaceCharges' },
+  { id: 'monthlyInventoryStorageFee', header: 'Monthly inventory storage fee total', group: 'marketplace', componentOf: 'baseMonthlyStorageFee', hideWhenNested: true, bucket: 'otherMarketplaceCharges' },
   { id: 'referralFeeRefunds', header: 'Referral Fee Refunds total', group: 'marketplace', bucket: 'marketplaceCommission' },
   { id: 'referralFee', header: 'Referral fee total', group: 'marketplace', bucket: 'marketplaceCommission' },
   { id: 'refundAdministrationFee', header: 'Refund administration fee total', group: 'marketplace', bucket: 'returnCharges' },
@@ -60,6 +65,19 @@ export const AMAZON_USA_FEE_COLUMNS: AmazonUsaFeeColumn[] = [
   { id: 'storageUtilizationSurcharge', header: 'Storage utilization surcharge total', group: 'marketplace', bucket: 'otherMarketplaceCharges' },
   { id: 'sponsoredProductsCharge', header: 'Sponsored Products charge total', group: 'advertising', bucket: 'ads' },
 ]
+
+/**
+ * The order the statement reads in: each counted column, immediately followed
+ * by the columns it contains.
+ *
+ * Amazon exports them alphabetically, which scatters a parent away from its
+ * parts — "Base fulfillment fee" sits eight rows above the "FBA fulfillment
+ * fees" that contains it, so the arithmetic is invisible. Grouping them puts
+ * the sum on top of its own addends, where it can be checked at a glance.
+ */
+export const AMAZON_USA_FEE_COLUMNS_IN_ORDER: AmazonUsaFeeColumn[] = AMAZON_USA_FEE_COLUMNS
+  .filter((c) => !c.componentOf)
+  .flatMap((parent) => [parent, ...AMAZON_USA_FEE_COLUMNS.filter((c) => c.componentOf === parent.id)])
 
 /** The columns that actually add up. A `componentOf` line is already inside
  * another one, so counting it too would double-charge the month. */

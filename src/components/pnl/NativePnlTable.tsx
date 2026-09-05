@@ -32,6 +32,11 @@ export function NativePnlTable({
       (!def.group || def.isGroupHead || isOpen(def.group)) &&
       !(def.hideWhenZero && (values[def.key] ?? 0) === 0),
   )
+  // A line that other lines add up to. It is set in the body colour and
+  // semibold while its parts sit under it in grey, so the sum reads as the
+  // figure and the parts read as the working behind it.
+  const labelByKey = new Map(lineDefs.map((d) => [d.key, d.label]))
+  const parentKeys = new Set(visible.map((d) => d.memoOf).filter((k): k is string => Boolean(k)))
   const rows = visible.map((def, i) => ({
     def,
     showSectionHeader: i === 0 || def.section !== visible[i - 1].section,
@@ -59,6 +64,7 @@ export function NativePnlTable({
                   className={clsx(
                     'border-t border-[var(--line)]',
                     def.kind === 'subtotal' && 'bg-[var(--accent-soft)]/50 font-semibold text-[var(--ink)]',
+                    parentKeys.has(def.key) && 'font-semibold text-[var(--ink)]',
                     def.memoOf && 'text-[var(--ink-3)]',
                   )}
                 >
@@ -67,9 +73,10 @@ export function NativePnlTable({
                       'px-4 py-2',
                       def.kind === 'input' && 'pl-8 text-[var(--ink-2)]',
                       def.kind === 'percent' && 'pl-8 text-[var(--ink-3)] italic',
+                      parentKeys.has(def.key) && 'font-semibold text-[var(--ink)]',
                       // A memo line sits one level deeper than the line that
-                      // already contains it, so the nesting shows the reason it
-                      // is not added in.
+                      // already contains it, directly beneath it, so the sum
+                      // sits on top of its own addends.
                       def.memoOf && 'pl-14 text-[var(--ink-3)]',
                       collapsible && 'pl-2',
                     )}
@@ -91,10 +98,11 @@ export function NativePnlTable({
                       </button>
                     ) : (
                       <>
+                        {def.memoOf && <span aria-hidden className="mr-1.5 text-[var(--ink-3)]">↳</span>}
                         {def.label}
                         {def.memoOf && (
                           <span className="ml-2 text-xs font-normal italic text-[var(--ink-3)]">
-                            included above — not added again
+                            part of {labelByKey.get(def.memoOf) ?? 'the line above'} — not added again
                           </span>
                         )}
                         {def.note && !def.memoOf && (

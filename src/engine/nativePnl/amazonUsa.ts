@@ -1,6 +1,10 @@
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import type { AmazonUsaPnlFacts, PnlLineValues } from '@/data/models'
-import { AMAZON_USA_FEE_COLUMNS, type AmazonUsaFeeColumn } from '@/data/amazonUsa/feeColumns'
+import {
+  AMAZON_USA_FEE_COLUMNS,
+  AMAZON_USA_FEE_COLUMNS_IN_ORDER,
+  type AmazonUsaFeeColumn,
+} from '@/data/amazonUsa/feeColumns'
 import type { NativeLineDef, NativeLineValues } from './types'
 
 /**
@@ -30,7 +34,7 @@ const feeLineDefs = (
   section: string,
   nested: Set<string>,
 ): NativeLineDef[] =>
-  AMAZON_USA_FEE_COLUMNS.filter((c) => c.group === group).map((c) => ({
+  AMAZON_USA_FEE_COLUMNS_IN_ORDER.filter((c) => c.group === group).map((c) => ({
     key: `fee.${c.id}`,
     label: c.header,
     section,
@@ -56,12 +60,18 @@ export function nestedFeeIds(facts: AmazonUsaPnlFacts): Set<string> {
  * actually showed. */
 export function amazonUsaLineDefs(facts: AmazonUsaPnlFacts): NativeLineDef[] {
   const nested = nestedFeeIds(facts)
-  return AMAZON_USA_LINE_DEFS.map((d) => {
-    if (!d.key.startsWith('fee.')) return d
+  const out: NativeLineDef[] = []
+  for (const d of AMAZON_USA_LINE_DEFS) {
+    if (!d.key.startsWith('fee.')) { out.push(d); continue }
     const id = d.key.slice(4)
     const col = AMAZON_USA_FEE_COLUMNS.find((c) => c.id === id)
-    return { ...d, memoOf: nested.has(id) && col?.componentOf ? `fee.${col.componentOf}` : undefined }
-  })
+    const isNested = nested.has(id) && col?.componentOf !== undefined
+    // A column that only repeats another one is dropped: there is no sum to
+    // check, just the same number printed twice.
+    if (isNested && col?.hideWhenNested) continue
+    out.push({ ...d, memoOf: isNested ? `fee.${col.componentOf}` : undefined })
+  }
+  return out
 }
 
 /** The nesting Amazon's export has shown to date. Only a starting point — the

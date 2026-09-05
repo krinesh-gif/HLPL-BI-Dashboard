@@ -110,12 +110,36 @@ describe('a column that is already inside another one is shown, never added', ()
 
   it('marks every such line on the statement rather than leaving it to be spotted', () => {
     const memoLines = amazonUsaLineDefs(july()).filter((d) => d.memoOf)
-    expect(memoLines.map((d) => d.label).sort()).toEqual([
+    expect(memoLines.map((d) => d.label)).toEqual([
       'Base fulfillment fee total',
       'Fuel and Logistics-related surcharge total',
       'Low-inventory-level fee total',
-      'Monthly inventory storage fee total',
     ])
+  })
+
+  it('puts each sum directly on top of the parts that make it', () => {
+    // Amazon exports these alphabetically, which leaves "Base fulfillment fee"
+    // eight rows above the line that contains it and the arithmetic invisible.
+    const labels = amazonUsaLineDefs(july()).filter((d) => d.key.startsWith('fee.')).map((d) => d.label)
+    const parent = labels.indexOf('FBA fulfillment fees total')
+    expect(labels.slice(parent, parent + 4)).toEqual([
+      'FBA fulfillment fees total',
+      'Base fulfillment fee total',
+      'Fuel and Logistics-related surcharge total',
+      'Low-inventory-level fee total',
+    ])
+    expect(labels[parent] && amazonUsaLineDefs(july())[0].label).toBe('Gross Sales')
+  })
+
+  it('drops a column that only repeats another one, since there is no sum to check', () => {
+    const labels = amazonUsaLineDefs(july()).map((d) => d.label)
+    expect(labels).toContain('Base monthly storage fee total')
+    expect(labels).not.toContain('Monthly inventory storage fee total')
+  })
+
+  it('brings it back the moment a file shows it carrying its own charge', () => {
+    const standalone = amazonUsaLineDefs(july({ nestedFeeIds: ['baseFulfillmentFee'] }))
+    expect(standalone.map((d) => d.label)).toContain('Monthly inventory storage fee total')
   })
 })
 
@@ -142,9 +166,9 @@ describe('a fee column Amazon has just invented', () => {
 })
 
 describe('every line on the statement is a real column', () => {
-  it('names each fee exactly as Amazon exports it', () => {
+  it('names each fee exactly as Amazon exports it, and covers every column', () => {
     const feeLabels = AMAZON_USA_LINE_DEFS.filter((d) => d.key.startsWith('fee.')).map((d) => d.label)
-    expect(feeLabels).toEqual(AMAZON_USA_FEE_COLUMNS.map((c) => c.header))
+    expect(feeLabels.slice().sort()).toEqual(AMAZON_USA_FEE_COLUMNS.map((c) => c.header).sort())
   })
 
   it('groups the charges under the two collapsible heads', () => {
