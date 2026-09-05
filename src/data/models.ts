@@ -36,6 +36,16 @@ export interface CanonicalSalesRecord {
   /** Original uploaded row, untouched, keyed by original header names. */
   raw?: Record<string, string | number>
   /** Which import batch this row came from — used for de-dup and audit trail. */
+  /**
+   * True when this row is a month's total for one SKU rather than a single
+   * order.
+   *
+   * Amazon's Product Profitability export and Flipkart's SKU-level P&L are
+   * both one aggregated row per SKU per month; neither carries an order count
+   * at all. Counting such a row as one order made Amazon USA read 35 orders in
+   * a month — its SKU count — and an average order value of ₹70.6K.
+   */
+  isAggregate?: boolean
   importId: string
 }
 

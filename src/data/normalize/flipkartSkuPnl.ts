@@ -110,6 +110,7 @@ export function normalizeFlipkartSkuPnl(
       shippingCost: num(row, COLUMNS.forwardShipping) + num(row, COLUMNS.reverseShipping),
       marketplaceFee: num(row, COLUMNS.commissionFee) + num(row, COLUMNS.fixedFee) + num(row, COLUMNS.pickAndPack),
       tax: 0,
+      isAggregate: true,
       status: 'completed',
       currency: 'INR',
       raw: row,

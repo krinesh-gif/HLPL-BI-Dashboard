@@ -53,7 +53,15 @@ export interface NetSalesFigure {
   discounts: number
   returnsValue: number
   units: number
+  /**
+   * Real orders. Zero when the source is a per-SKU monthly aggregate, because
+   * such a report carries no order count and inventing one is worse than
+   * having none — counting an aggregate row as an order gave Amazon USA 35
+   * orders in a month (its SKU count) and an average order value of ₹70.6K.
+   */
   orders: number
+  /** True when some rows were aggregates, so `orders` cannot be complete. */
+  hasAggregateRows: boolean
   returnUnits: number
   rtoUnits: number
   /** Units that actually shipped — the denominator for RTO %. */
@@ -76,6 +84,7 @@ export const EMPTY_FIGURE: NetSalesFigure = {
   returnsValue: 0,
   units: 0,
   orders: 0,
+  hasAggregateRows: false,
   returnUnits: 0,
   rtoUnits: 0,
   shippedUnits: 0,
@@ -126,7 +135,9 @@ export function orderBasisNetSales(
     figure.netSales += r.netSales * rate
 
     figure.units += r.quantity
-    figure.orders += 1
+    // An aggregate row is a month's total for one SKU, not an order.
+    if (r.isAggregate) figure.hasAggregateRows = true
+    else figure.orders += 1
     figure.returnUnits += r.returnUnits
     figure.rtoUnits += r.rtoUnits
     // An RTO unit was shipped and came back; a cancelled unit never shipped and
@@ -282,6 +293,9 @@ export function netSalesForChannelMonth(scope: NetSalesScope): NetSalesFigure {
     ...settlement,
     units: order.units,
     orders: order.orders,
+    // A settlement figure borrows its unit and order counts from the order
+    // rows, so it has to borrow whether those rows could be counted at all.
+    hasAggregateRows: order.hasAggregateRows,
     returnUnits: order.returnUnits,
     rtoUnits: order.rtoUnits,
     shippedUnits: order.shippedUnits,
@@ -303,6 +317,7 @@ export function addFigures(a: NetSalesFigure, b: NetSalesFigure): NetSalesFigure
     returnsValue: a.returnsValue + b.returnsValue,
     units: a.units + b.units,
     orders: a.orders + b.orders,
+    hasAggregateRows: a.hasAggregateRows || b.hasAggregateRows,
     returnUnits: a.returnUnits + b.returnUnits,
     rtoUnits: a.rtoUnits + b.rtoUnits,
     shippedUnits: a.shippedUnits + b.shippedUnits,
@@ -340,8 +355,16 @@ export function asp(figure: NetSalesFigure): number | null {
 }
 
 /** Average Order Value. Net Sales per order. */
+/** Average order value. Null when the source cannot say how many orders there
+ * were, which is not the same as zero and must not be shown as a figure. */
 export function aov(figure: NetSalesFigure): number | null {
+  if (figure.hasAggregateRows) return null
   return figure.orders > 0 ? figure.netSales / figure.orders : null
+}
+
+/** The order count, or null when the source does not carry one. */
+export function orderCount(figure: NetSalesFigure): number | null {
+  return figure.hasAggregateRows ? null : figure.orders
 }
 
 /** RTO as a share of shipped units. Null when nothing shipped, because 0% and

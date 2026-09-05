@@ -247,6 +247,12 @@ BEGIN
   -- NOT EXISTS skips an existing one, so anything added later has to be added
   -- explicitly. These run before the indexes below, because an index over a
   -- column that has not been added yet fails outright.
+  -- A row that is a month's total for one SKU, not a single order. Backfilled
+  -- for Amazon USA, whose export has only ever been that shape, so the order
+  -- count corrects itself without waiting for a re-upload.
+  ALTER TABLE sales_records ADD COLUMN IF NOT EXISTS is_aggregate BOOLEAN NOT NULL DEFAULT false;
+  UPDATE sales_records SET is_aggregate = true WHERE channel = 'amazon_us' AND is_aggregate = false;
+
   ALTER TABLE meesho_transactions ADD COLUMN IF NOT EXISTS flagged BOOLEAN NOT NULL DEFAULT false;
   ALTER TABLE meesho_transactions ADD COLUMN IF NOT EXISTS transaction_ref TEXT NOT NULL DEFAULT '';
   ALTER TABLE meesho_transactions ADD COLUMN IF NOT EXISTS contribution JSONB NOT NULL DEFAULT '{}'::jsonb;

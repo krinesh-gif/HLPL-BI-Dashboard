@@ -8,6 +8,7 @@ import { groupBySku, growthPct } from '@/engine/sales'
 import {
   asp,
   aov,
+  orderCount,
   netSalesBySource,
   netSalesForChannelMonth,
   orderBasisNetSales,
@@ -78,7 +79,8 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
       currentFacts,
       previousFacts,
       growth: growthPct(currentFacts.netSales, previousFacts.netSales),
-      aov: aov(currentFacts) ?? 0,
+      aov: aov(currentFacts),
+      orders: orderCount(currentFacts),
       asp: asp(currentFacts) ?? 0,
       previousAsp: asp(previousFacts),
       rtoRate: rtoPct(currentFacts) ?? 0,

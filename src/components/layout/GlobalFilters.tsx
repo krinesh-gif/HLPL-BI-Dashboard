@@ -5,7 +5,13 @@ import { useDataStore } from '@/store/dataStore'
 import { monthLabel } from '@/lib/format'
 import { distinctCategories } from '@/data/categories'
 
-export function GlobalFilters() {
+/**
+ * `showChannel` is off on a page that is already about one channel. The
+ * sidebar has picked the channel, the heading names it, and a second control
+ * offering to change it is either dead — it cannot navigate — or contradicts
+ * the page it sits on.
+ */
+export function GlobalFilters({ showChannel = true }: { showChannel?: boolean }) {
   const { month, channel, category, setMonth, setChannel, setCategory, reset } = useFilterStore()
   const salesRecords = useDataStore((s) => s.salesRecords)
 
@@ -32,12 +38,12 @@ export function GlobalFilters() {
         onChange={setMonth}
         options={months.map((m) => ({ value: m, label: monthLabel(m) }))}
       />
-      <FilterSelect
+      {showChannel && <FilterSelect
         label="Channel"
         value={channel}
         onChange={(v) => setChannel(v as typeof channel)}
         options={[{ value: 'all', label: 'All Channels' }, ...CHANNELS.map((c) => ({ value: c.id, label: c.label }))]}
-      />
+      />}
       <FilterSelect
         label="Category"
         value={category}

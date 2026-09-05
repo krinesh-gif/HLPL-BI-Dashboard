@@ -39,6 +39,7 @@ export function toSkuMaster(r: Row): SkuMaster {
 export function toSalesRecord(r: Row): CanonicalSalesRecord {
   return {
     orderId: str(r.order_id),
+    isAggregate: r.is_aggregate === true,
     orderDate: str(r.order_date),
     channel: str(r.channel) as ChannelId,
     marketplace: str(r.marketplace),

@@ -37,7 +37,7 @@ export function ChannelDashboardPage() {
 
   if (!channelDef) {
     return (
-      <PageShell title="Channel not found">
+      <PageShell showChannelFilter={false} title="Channel not found">
         <EmptyState title="Unknown channel" description="This channel is not configured." />
       </PageShell>
     )
@@ -59,9 +59,9 @@ export function ChannelDashboardPage() {
     </label>
   )
 
-  if (d.currentFacts.orders === 0 && d.currentFacts.netSales === 0) {
+  if (d.currentFacts.units === 0 && d.currentFacts.netSales === 0) {
     return (
-      <PageShell title={channelDef.label} subtitle="Channel dashboard">
+      <PageShell showChannelFilter={false} title={channelDef.label} subtitle="Channel dashboard">
         {sourcePicker && <div className="mb-4">{sourcePicker}</div>}
         <EmptyState
           title={`No ${channelDef.label} data available for this month.`}
@@ -73,6 +73,7 @@ export function ChannelDashboardPage() {
 
   return (
     <PageShell
+      showChannelFilter={false}
       title={channelDef.label}
       subtitle={source === 'all' ? 'Sales, products, growth and returns' : `Sales source: ${sourcesOfChannel(channel).find((s) => s.id === source)?.label}`}
     >
@@ -96,8 +97,19 @@ export function ChannelDashboardPage() {
           note={d.sourceLabel}
         />
         <KPICard label="Units" value={formatNumber(d.currentFacts.units)} />
-        <KPICard label="Orders" value={formatNumber(d.currentFacts.orders)} />
-        <KPICard label="AOV" value={formatCurrencyCompact(d.aov)} />
+        {/* Amazon USA's report is one row per SKU per month and carries no
+            order count. "—" is the honest answer; 35 was its SKU count, and the
+            average order value derived from it was nonsense. */}
+        <KPICard
+          label="Orders"
+          value={d.orders === null ? '—' : formatNumber(d.orders)}
+          note={d.orders === null ? 'not reported by this channel’s file' : undefined}
+        />
+        <KPICard
+          label="AOV"
+          value={d.aov === null ? '—' : formatCurrencyCompact(d.aov)}
+          note={d.aov === null ? 'needs an order count' : undefined}
+        />
         <KPICard label="ASP" value={formatCurrencyCompact(d.asp)} />
         <KPICard label="RTO %" value={formatPercent(d.rtoRate)} tone={d.rtoRate > 5 ? 'bad' : 'neutral'} />
         <KPICard label="Returns %" value={formatPercent(d.returnRate)} />
@@ -134,7 +146,7 @@ export function ChannelDashboardPage() {
                     <td className="py-1.5 text-[var(--ink)]">{row.label}</td>
                     <td className="py-1.5 text-right tabular-nums text-[var(--ink)]">{formatCurrencyFull(row.figure.netSales)}</td>
                     <td className="py-1.5 text-right tabular-nums text-[var(--ink-2)]">{formatNumber(row.figure.units)}</td>
-                    <td className="py-1.5 text-right tabular-nums text-[var(--ink-2)]">{formatNumber(row.figure.orders)}</td>
+                    <td className="py-1.5 text-right tabular-nums text-[var(--ink-2)]">{row.figure.hasAggregateRows ? '—' : formatNumber(row.figure.orders)}</td>
                     <td className="py-1.5 text-right tabular-nums text-[var(--ink-3)]">
                       {total > 0 ? formatPercent((row.figure.netSales / total) * 100) : '—'}
                     </td>

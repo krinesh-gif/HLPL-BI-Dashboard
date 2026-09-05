@@ -183,6 +183,7 @@ export function normalizeAmazonUsaProductProfitability(
       shippingCost: 0,
       marketplaceFee: sales - netSales,
       tax: 0,
+      isAggregate: true,
       status: 'completed',
       currency: 'USD',
       raw: row,

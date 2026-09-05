@@ -79,12 +79,12 @@ export async function POST(request: Request): Promise<Response> {
       `INSERT INTO sales_records (
          dedup_key, order_id, order_date, channel, marketplace, seller_type, sku, product_name,
          category, sub_category, quantity, gross_sales, discount, net_sales, return_units,
-         rto_units, shipping_cost, marketplace_fee, tax, status, currency, raw, import_id
+         rto_units, shipping_cost, marketplace_fee, tax, status, currency, raw, import_id, is_aggregate
        )
        SELECT * FROM UNNEST(
          $1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $8::text[],
          $9::text[], $10::text[], $11::float8[], $12::float8[], $13::float8[], $14::float8[], $15::float8[],
-         $16::float8[], $17::float8[], $18::float8[], $19::float8[], $20::text[], $21::text[], $22::jsonb[], $23::text[]
+         $16::float8[], $17::float8[], $18::float8[], $19::float8[], $20::text[], $21::text[], $22::jsonb[], $23::text[], $24::bool[]
        )
        ON CONFLICT (dedup_key) DO NOTHING
        RETURNING dedup_key`,
@@ -112,6 +112,7 @@ export async function POST(request: Request): Promise<Response> {
         chunk.map((r) => r.currency),
         chunk.map((r) => JSON.stringify(r.raw ?? null)),
         chunk.map((r) => r.importId),
+        chunk.map((r) => r.isAggregate === true),
       ],
     )) as unknown[]
     inserted += result.length
