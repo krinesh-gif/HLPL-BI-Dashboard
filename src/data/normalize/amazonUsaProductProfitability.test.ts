@@ -372,3 +372,55 @@ describe('whether a column is inside another is decided by the file, not assumed
     expect(run().warnings.some((w) => w.includes('Net proceeds'))).toBe(false)
   })
 })
+
+describe('an early export, before Amazon invented some of its fees', () => {
+  /** July's rows with a fee column removed and its value taken back out of the
+   * parent — which is what a month predating that fee actually looks like. */
+  function without(pattern: RegExp, parentAdjust: string[]) {
+    const drop = headers.filter((h) => pattern.test(h))
+    const hdrs = headers.filter((h) => !drop.includes(h))
+    const rows = julyRows.map((r) => {
+      const c: Record<string, string> = { ...r }
+      const removed = parentAdjust.reduce((sum, col) => sum + (Number(r[col]) || 0), 0)
+      c['FBA fulfillment fees total'] = String((Number(r['FBA fulfillment fees total']) || 0) - removed)
+      c['Net proceeds total'] = String((Number(r['Net proceeds total']) || 0) + removed)
+      for (const d of drop) delete c[d]
+      return c
+    })
+    return { hdrs, rows }
+  }
+
+  it('still works out that the base fee is inside the fulfilment fee', () => {
+    // The check used to demand every sibling this build knows about. Amazon
+    // adds fee columns over time — these exports carry 63, 66, 72 and 78 — so
+    // any month predating the newest fee failed the test outright.
+    const { hdrs, rows } = without(/^Low-inventory-level fee/, ['Low-inventory-level fee total'])
+    const facts = normalizeAmazonUsaProductProfitability(hdrs, rows, skuMaster, 'early').facts
+    expect(facts.nestedFeeIds).toContain('baseFulfillmentFee')
+    expect(facts.nestedFeeIds).toContain('fuelLogisticsSurcharge')
+  })
+
+  it('does not charge the base fee twice, on its own line and inside the parent', () => {
+    // Failing the test meant nothing was marked contained, so the base fee was
+    // counted on its own line as well as inside FBA fulfilment fees — March's
+    // marketplace charges read $9,295.33 against a true $5,493.04, and the
+    // statement printed the same figure on two lines.
+    const { hdrs, rows } = without(/^Low-inventory-level fee/, ['Low-inventory-level fee total'])
+    const { facts, warnings } = normalizeAmazonUsaProductProfitability(hdrs, rows, skuMaster, 'early')
+    expect(warnings.some((w) => w.includes('Net proceeds'))).toBe(false)
+    expect(facts.feeTotalsUsd?.baseFulfillmentFee).toBeGreaterThan(0)
+  })
+
+  it('handles a launch month where the base fee is the only fulfilment fee there is', () => {
+    const { hdrs, rows } = without(
+      /^(Low-inventory-level fee|Fuel and Logistics)/,
+      ['Low-inventory-level fee total', 'Fuel and Logistics-related surcharge total'],
+    )
+    const { facts, warnings } = normalizeAmazonUsaProductProfitability(hdrs, rows, skuMaster, 'launch')
+    expect(facts.nestedFeeIds).toContain('baseFulfillmentFee')
+    expect(warnings.some((w) => w.includes('Net proceeds'))).toBe(false)
+    // Parent and its one component carry the same figure; the table drops the
+    // component rather than printing it twice.
+    expect(facts.feeTotalsUsd?.fbaFulfillmentFees).toBeCloseTo(facts.feeTotalsUsd?.baseFulfillmentFee ?? 0, 4)
+  })
+})

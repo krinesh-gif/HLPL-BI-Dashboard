@@ -200,11 +200,21 @@ export function normalizeAmazonUsaProductProfitability(
   const nested: string[] = []
   for (const c of AMAZON_USA_FEE_COLUMNS) {
     if (!c.componentOf) continue
-    const parts = AMAZON_USA_FEE_COLUMNS.filter((x) => x.componentOf === c.componentOf)
     const parentCol = feeColumns.find((f) => f.id === c.componentOf)
     if (!parentCol) continue
-    const partCols = parts.map((pt) => feeColumns.find((f) => f.id === pt.id)).filter((f) => f !== undefined)
-    if (partCols.length !== parts.length) continue
+    // Only the sibling columns this file actually has. Amazon adds fee columns
+    // over time — the exports here carry 63, 66, 72 and 78 of them — so
+    // requiring every sibling this build knows about made the test bail on any
+    // month predating the newest fee. Bailing meant nothing was marked
+    // contained, so the base fulfilment fee was charged on its own line *and*
+    // inside FBA fulfilment fees: March's marketplace charges came out at
+    // $9,295.33 against a true $5,493.04, and the same figure appeared twice
+    // on the statement.
+    const partCols = AMAZON_USA_FEE_COLUMNS
+      .filter((x) => x.componentOf === c.componentOf)
+      .map((pt) => feeColumns.find((f) => f.id === pt.id))
+      .filter((f) => f !== undefined)
+    if (partCols.length === 0) continue
     const holds = rows.every((row) => {
       const parent = num(row, parentCol.header)
       const sum = partCols.reduce((t, f) => t + num(row, f.header), 0)
