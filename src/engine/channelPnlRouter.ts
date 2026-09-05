@@ -259,6 +259,18 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       const notes = isLegacyAmazonUsaFacts(imported)
         ? [`${month} was imported before the fee columns were read individually, so only Gross and Net Sales are reliable for it. Re-upload this month's Product Profitability export to fill in the charges.`]
         : []
+      // No order rows for the month means COGS cannot be recomputed at all and
+      // the statement is showing whatever was frozen into the file at import.
+      // That fallback used to be silent, which is how an order-date bug that
+      // filed every Amazon USA month under the previous one went unnoticed:
+      // the figure looked plausible and nothing said it was stale.
+      if (!recomputed) {
+        notes.push(
+          `No Amazon USA order rows are on file for ${month}, so COGS is the figure frozen when the file was ` +
+          `imported rather than priced from this month's cost sheet. Re-upload this month's Product Profitability ` +
+          `export to price it properly.`,
+        )
+      }
       // A month whose cost is largely guessed says so, and names the SKUs to
       // fix. COGS that jumps about between months is almost always this: the
       // set of SKUs with no cost on file changes, not the cost of the goods.

@@ -96,6 +96,18 @@ describe('Amazon USA sells in dollars and buys in rupees', () => {
     expect(view.native?.values.cogsEstimatedUsd).toBeCloseTo(-400 * 0.25, 4)
   })
 
+  it('says so when the month has no order rows to price from', () => {
+    // The statement then shows the COGS frozen at import. Saying nothing is how
+    // an order-date bug that filed every month under the previous one stayed
+    // invisible: the figure looked plausible and never moved.
+    const none = buildChannelPnlView('amazon_us', '2026-07', amazonInputs([], fxRate))
+    expect(none.notes.some((n) => n.includes('No Amazon USA order rows are on file'))).toBe(true)
+  })
+
+  it('says nothing about missing rows when they are there', () => {
+    expect(view.notes.some((n) => n.includes('No Amazon USA order rows'))).toBe(false)
+  })
+
   it('says nothing when every SKU has a cost', () => {
     const allCosted = buildChannelPnlView('amazon_us', '2026-07', amazonInputs([record('COSTED', 20, 400, 'USD')], fxRate))
     expect(allCosted.notes.some((n) => n.includes('no cost on file'))).toBe(false)
