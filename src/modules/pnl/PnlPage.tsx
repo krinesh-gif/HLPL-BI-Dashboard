@@ -7,6 +7,7 @@ import { formatCurrencyCompact, formatCurrencyFull, formatPercent, monthLabel } 
 import { exportRowsToCsv } from '@/lib/exportCsv'
 import { QUICK_PERIODS, type QuickPeriod } from '@/engine/multiMonthPnl'
 import { NativePnlTable } from '@/components/pnl/NativePnlTable'
+import { amountTone } from '@/components/pnl/amountTone'
 import { usePnlReport, type PnlView } from './usePnlReport'
 
 /**
@@ -28,8 +29,11 @@ export function PnlPage() {
       `HLPL_PnL_${r.view}_${r.displayCurrency}_${r.months[0]}_to_${r.months[r.months.length - 1]}`,
       r.table.rows.map((row) => {
         const out: Record<string, string | number> = { Particular: row.def.label }
+        // Signed the same way the table shows it, so a deduction reads as a
+        // deduction in the spreadsheet too.
+        const sign = row.def.sign ?? 1
         const cell = (v: number | null) =>
-          v === null ? '' : row.def.kind === 'percent' ? Number(v.toFixed(2)) : Math.round(v)
+          v === null ? '' : row.def.kind === 'percent' ? Number(v.toFixed(2)) : Math.round(v * sign)
         r.months.forEach((m, i) => { out[monthLabel(m)] = cell(row.values[i]) })
         out.Total = cell(row.total)
         return out
@@ -190,6 +194,10 @@ export function PnlPage() {
             {r.table.rows.map((row) => {
               const isSubtotal = row.def.kind === 'subtotal'
               const isPercent = row.def.kind === 'percent'
+              // Deductions are stored as positive magnitudes and shown
+              // negative, so red always means money leaving and the minus sign
+              // says so without relying on the colour.
+              const signed = (v: number | null) => (v === null ? null : v * (row.def.sign ?? 1))
               // An undefined figure and a zero are different answers; a margin
               // in a month with no revenue is unmeasurable, not 0%.
               const format = (v: number | null) =>
@@ -207,22 +215,21 @@ export function PnlPage() {
                   >
                     {row.def.label}
                   </th>
-                  {row.values.map((v, i) => (
-                    <td
-                      key={r.months[i]}
-                      className={`px-4 py-2 text-right tabular-nums ${
-                        v !== null && v < 0 ? 'text-[var(--critical-ink)]' : ''
-                      }`}
-                    >
-                      {v === 0 && !isPercent ? '—' : format(v)}
-                    </td>
-                  ))}
+                  {row.values.map((v, i) => {
+                    const shown = signed(v)
+                    return (
+                      <td
+                        key={r.months[i]}
+                        className={`px-4 py-2 text-right tabular-nums ${amountTone(shown)}`}
+                      >
+                        {shown === 0 && !isPercent ? '—' : format(shown)}
+                      </td>
+                    )
+                  })}
                   <td
-                    className={`border-l-2 border-[var(--line-2)] bg-[var(--surface-2)] px-4 py-2 text-right font-semibold tabular-nums ${
-                      row.total !== null && row.total < 0 ? 'text-[var(--critical-ink)]' : 'text-[var(--ink)]'
-                    }`}
+                    className={`border-l-2 border-[var(--line-2)] bg-[var(--surface-2)] px-4 py-2 text-right font-semibold tabular-nums ${amountTone(signed(row.total))}`}
                   >
-                    {row.total === 0 && !isPercent ? '—' : format(row.total)}
+                    {signed(row.total) === 0 && !isPercent ? '—' : format(signed(row.total))}
                   </td>
                 </tr>
               )

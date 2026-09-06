@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react'
 import clsx from 'clsx'
 import type { NativeLineDef, NativeLineValues } from '@/engine/nativePnl/types'
 import { formatCurrencyFull, formatPercent } from '@/lib/format'
+import { amountTone } from './amountTone'
 
 /** Rows of a collapsible group start hidden: the statement reads at a glance,
  * and the detail is one click away rather than twenty lines of scrolling. */
@@ -133,7 +134,15 @@ export function NativePnlTable({
                       </>
                     )}
                   </td>
-                  <td className="px-4 py-2 text-right tabular-nums">
+                  <td
+                    className={clsx(
+                      'px-4 py-2 text-right tabular-nums',
+                      // Green for money in, red for money out. A memo line
+                      // keeps its grey: it is already inside the line above,
+                      // and colouring it would make it look like it counts.
+                      !isEditable && !def.memoOf && amountTone(value),
+                    )}
+                  >
                     {isEditable ? (
                       <input
                         type="number"

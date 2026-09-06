@@ -33,6 +33,15 @@ export interface PnlRowDef {
   total: (totals: PnlLineValues) => number | null
   /** Shown indented under the subtotal it feeds. */
   indent?: boolean
+  /**
+   * How the figure is shown, not how it is stored.
+   *
+   * Deduction lines hold a positive magnitude — `cogs` is what the goods cost,
+   * not minus what they cost — because that is what the engine sums. On screen
+   * they are money leaving, so they are printed negative. Without this, a P&L
+   * that colours negatives red would print "Less: COGS" in green.
+   */
+  sign?: 1 | -1
 }
 
 const sum = (lines: PnlLineValues, keys: (keyof PnlLineValues)[]): number =>
@@ -61,20 +70,20 @@ const ebitda = (l: PnlLineValues) => l.ebitda ?? 0
  * uses this same set, so the reports are directly comparable. */
 export const PNL_ROWS: PnlRowDef[] = [
   { key: 'grossSales', label: 'Gross Sales', kind: 'input', value: (l) => l.grossSales ?? 0, total: (t) => t.grossSales ?? 0 },
-  { key: 'discounts', label: 'Less: Discounts', kind: 'input', indent: true, value: (l) => l.discounts ?? 0, total: (t) => t.discounts ?? 0 },
-  { key: 'returns', label: 'Less: Returns', kind: 'input', indent: true, value: (l) => l.returns ?? 0, total: (t) => t.returns ?? 0 },
+  { key: 'discounts', label: 'Less: Discounts', kind: 'input', indent: true, value: (l) => l.discounts ?? 0, total: (t) => t.discounts ?? 0, sign: -1 },
+  { key: 'returns', label: 'Less: Returns', kind: 'input', indent: true, value: (l) => l.returns ?? 0, total: (t) => t.returns ?? 0, sign: -1 },
   { key: 'netSales', label: 'Net Sales', kind: 'subtotal', value: (l) => l.netSales ?? 0, total: (t) => t.netSales ?? 0 },
 
-  { key: 'cogs', label: 'Less: COGS', kind: 'input', indent: true, value: (l) => l.cogs ?? 0, total: (t) => t.cogs ?? 0 },
+  { key: 'cogs', label: 'Less: COGS', kind: 'input', indent: true, value: (l) => l.cogs ?? 0, total: (t) => t.cogs ?? 0, sign: -1 },
   { key: 'grossProfit', label: 'Gross Profit', kind: 'subtotal', value: grossProfit, total: grossProfit },
   { key: 'grossMarginPct', label: 'Gross Margin %', kind: 'percent', value: marginOf(grossProfit), total: marginOf(grossProfit) },
 
-  { key: 'marketplaceCosts', label: 'Less: Marketplace Costs', kind: 'input', indent: true, value: (l) => sum(l, MARKETPLACE_COST_KEYS), total: (t) => sum(t, MARKETPLACE_COST_KEYS) },
-  { key: 'marketing', label: 'Less: Marketing', kind: 'input', indent: true, value: (l) => sum(l, MARKETING_KEYS), total: (t) => sum(t, MARKETING_KEYS) },
+  { key: 'marketplaceCosts', label: 'Less: Marketplace Costs', kind: 'input', indent: true, value: (l) => sum(l, MARKETPLACE_COST_KEYS), total: (t) => sum(t, MARKETPLACE_COST_KEYS), sign: -1 },
+  { key: 'marketing', label: 'Less: Marketing', kind: 'input', indent: true, value: (l) => sum(l, MARKETING_KEYS), total: (t) => sum(t, MARKETING_KEYS), sign: -1 },
   { key: 'contribution', label: 'Contribution', kind: 'subtotal', value: contribution, total: contribution },
   { key: 'contributionMarginPct', label: 'Contribution Margin %', kind: 'percent', value: marginOf(contribution), total: marginOf(contribution) },
 
-  { key: 'fixedExpenses', label: 'Less: Fixed Expenses', kind: 'input', indent: true, value: (l) => sum(l, FIXED_EXPENSE_KEYS), total: (t) => sum(t, FIXED_EXPENSE_KEYS) },
+  { key: 'fixedExpenses', label: 'Less: Fixed Expenses', kind: 'input', indent: true, value: (l) => sum(l, FIXED_EXPENSE_KEYS), total: (t) => sum(t, FIXED_EXPENSE_KEYS), sign: -1 },
   { key: 'ebitda', label: 'EBITDA', kind: 'subtotal', value: ebitda, total: ebitda },
   { key: 'ebitdaMarginPct', label: 'EBITDA Margin %', kind: 'percent', value: marginOf(ebitda), total: marginOf(ebitda) },
 ]

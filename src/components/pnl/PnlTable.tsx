@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { PNL_STRUCTURE, SECTION_LABELS, type PnlSection } from '@/config/pnlStructure'
 import type { PnlLineValues } from '@/data/models'
 import { formatCurrencyFull, formatPercent } from '@/lib/format'
+import { amountTone } from './amountTone'
 
 export function PnlTable({ lines, currency = 'INR' }: { lines: PnlLineValues; currency?: 'INR' | 'USD' }) {
   const rowsWithHeaderFlag = PNL_STRUCTURE.map((def, i) => ({
@@ -15,7 +16,9 @@ export function PnlTable({ lines, currency = 'INR' }: { lines: PnlLineValues; cu
       <table className="w-full text-sm">
         <tbody>
           {rowsWithHeaderFlag.map(({ def, showSectionHeader }) => {
-            const value = lines[def.key] ?? 0
+            // Deductions are stored as positive magnitudes; `sign` is how they
+            // are shown, so money leaving reads negative and prints red.
+            const value = (lines[def.key] ?? 0) * def.sign
 
             return (
               <Fragment key={def.key}>
@@ -35,7 +38,7 @@ export function PnlTable({ lines, currency = 'INR' }: { lines: PnlLineValues; cu
                   <td className={clsx('px-4 py-2', def.kind === 'input' && 'pl-8 text-[var(--ink-2)]', def.kind === 'percent' && 'pl-8 text-[var(--ink-3)] italic')}>
                     {def.label}
                   </td>
-                  <td className="px-4 py-2 text-right tabular-nums">
+                  <td className={clsx('px-4 py-2 text-right tabular-nums', amountTone(value))}>
                     {def.kind === 'percent' ? formatPercent(value) : formatCurrencyFull(value, currency)}
                   </td>
                 </tr>
