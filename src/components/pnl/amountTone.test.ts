@@ -50,3 +50,24 @@ describe('P&L row signs', () => {
     expect(amountTone(448587 * (netSales.sign ?? 1))).toContain('--good-ink')
   })
 })
+
+describe('the revenue block adds up on screen', () => {
+  /**
+   * Net Sales is Gross less discounts, returns AND output GST. The GST step
+   * had no row, so a reader adding up the visible lines got a different Net
+   * Sales from the one printed — Myntra's July was out by its 91,753 of
+   * Product GST with nothing on the page to explain it.
+   */
+  it('shows every line that Net Sales is computed from', () => {
+    const revenueKeys = ['grossSales', 'discounts', 'returns', 'otherRevenueAdj']
+    const shown = PNL_ROWS.map((r) => r.key)
+    for (const key of revenueKeys) {
+      expect(shown, `${key} is subtracted but has no row`).toContain(key)
+    }
+    expect(shown.indexOf('netSales')).toBeGreaterThan(shown.indexOf('otherRevenueAdj'))
+  })
+
+  it('signs the GST line as a deduction like the others', () => {
+    expect(PNL_ROWS.find((r) => r.key === 'otherRevenueAdj')?.sign).toBe(-1)
+  })
+})

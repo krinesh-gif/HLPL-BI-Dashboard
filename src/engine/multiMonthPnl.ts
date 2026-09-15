@@ -72,6 +72,13 @@ export const PNL_ROWS: PnlRowDef[] = [
   { key: 'grossSales', label: 'Gross Sales', kind: 'input', value: (l) => l.grossSales ?? 0, total: (t) => t.grossSales ?? 0 },
   { key: 'discounts', label: 'Less: Discounts', kind: 'input', indent: true, value: (l) => l.discounts ?? 0, total: (t) => t.discounts ?? 0, sign: -1 },
   { key: 'returns', label: 'Less: Returns', kind: 'input', indent: true, value: (l) => l.returns ?? 0, total: (t) => t.returns ?? 0, sign: -1 },
+  // Output GST is collected on the sale and paid onward, so it was never
+  // revenue and Net Sales is stated after it. It had no row of its own, which
+  // meant the revenue block did not add up on screen: Myntra's July read
+  // 6,77,353 less 1,37,012 of returns and then a Net Sales of 4,48,588, with
+  // the 91,753 of Product GST deducted invisibly. A reader checking the
+  // arithmetic could only conclude the report was wrong.
+  { key: 'otherRevenueAdj', label: 'Less: Output GST & revenue adjustments', kind: 'input', indent: true, value: (l) => l.otherRevenueAdj ?? 0, total: (t) => t.otherRevenueAdj ?? 0, sign: -1 },
   { key: 'netSales', label: 'Net Sales', kind: 'subtotal', value: (l) => l.netSales ?? 0, total: (t) => t.netSales ?? 0 },
 
   { key: 'cogs', label: 'Less: COGS', kind: 'input', indent: true, value: (l) => l.cogs ?? 0, total: (t) => t.cogs ?? 0, sign: -1 },
