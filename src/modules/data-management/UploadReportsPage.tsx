@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { PageShell } from '@/components/layout/PageShell'
-import { parseSpreadsheetFile, readCsvRaw, readWorkbookSheetsRaw, type ParsedFile } from '@/lib/csvParse'
+import { parseSpreadsheetFile, readCsvRaw, readWorkbookSheetsRaw, type ParsedFile, type RawSheet } from '@/lib/csvParse'
 import { detectAmazonSellerCentralReport, normalizeAmazonSellerCentralRows } from '@/data/normalize/amazonSellerCentral'
 import { detectFlipkartSkuPnlReport, normalizeFlipkartSkuPnl } from '@/data/normalize/flipkartSkuPnl'
 import { detectFlipkartWorkbook, normalizeFlipkartWorkbook } from '@/data/normalize/flipkartWorkbook'
@@ -11,12 +11,15 @@ import { detectSkuMapWorkbook, normalizeSkuMapWorkbook } from '@/data/normalize/
 import { detectAmazonAdsSponsoredProductsReport, normalizeAmazonAdsSponsoredProductsReport } from '@/data/normalize/amazonAdsSponsoredProducts'
 import { detectAmazonVendorCentralSalesReport, normalizeAmazonVendorCentralSales } from '@/data/normalize/amazonVendorCentralSales'
 import { detectMyntraPnlWorkbook, normalizeMyntraPnlWorkbook } from '@/data/normalize/myntraPnlWorkbook'
+import {
+  detectNykaaCartRuleSheet, detectNykaaComboSheet, detectNykaaSalesSheet, normalizeNykaaWorkbook,
+} from '@/data/normalize/nykaaSalesWorkbook'
 import { checkForDuplicates } from '@/data/normalize/duplicates'
 import { useDataStore, type ImportOutcome } from '@/store/dataStore'
 import { monthLabel } from '@/lib/format'
 import { useFilterStore } from '@/store/filterStore'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
-import type { AdsRecord, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, MeeshoPnlFacts, MyntraPnlFacts } from '@/data/models'
+import type { AdsRecord, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, MeeshoPnlFacts, MyntraPnlFacts, NykaaPnlFacts } from '@/data/models'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
 
@@ -27,6 +30,8 @@ type ReportKind =
   | 'flipkart_workbook'
   | 'amazon_usa_product_profitability'
   | 'myntra_pnl_workbook'
+  | 'nykaa_sales'
+  | 'nykaa_companion'
   | 'meesho_order_summary'
   | 'meesho_order_payments'
   | 'meesho_settlement_json'
@@ -39,6 +44,8 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   flipkart_workbook: 'Flipkart — Full P&L Workbook (Overall Summary + Orders P&L)',
   amazon_usa_product_profitability: 'Amazon USA — Product Profitability Report',
   myntra_pnl_workbook: 'Myntra — P&L Report (PnL_Summary + SKU_Detail)',
+  nykaa_sales: 'Nykaa — Monthly Sales Data (B2B, margin on MRP)',
+  nykaa_companion: 'Nykaa — Cart Rule / Combo file',
   meesho_order_summary: 'Meesho — Order Summary Report',
   meesho_order_payments: 'Meesho — Aggregated Payment File (Order Payments + Ads Cost)',
   meesho_settlement_json: 'Meesho — Settlement Data (JSON)',
@@ -51,6 +58,8 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   flipkart_workbook: 'flipkart',
   amazon_usa_product_profitability: 'amazon_us',
   myntra_pnl_workbook: 'myntra',
+  nykaa_sales: 'nykaa',
+  nykaa_companion: 'nykaa',
   meesho_order_summary: 'meesho',
   meesho_order_payments: 'meesho',
   meesho_settlement_json: 'meesho',
@@ -72,6 +81,7 @@ interface PreviewState {
   flipkartFacts?: FlipkartPnlFacts
   amazonUsaFacts?: AmazonUsaPnlFacts
   myntraFacts?: MyntraPnlFacts
+  nykaaFacts?: NykaaPnlFacts
   meeshoFactsByMonth?: MeeshoPnlFacts[]
   meeshoTransactions?: MeeshoTransaction[]
   meeshoAdsRows?: MeeshoAdsRow[]
@@ -112,6 +122,31 @@ let idCounter = 0
 function uniqueId(prefix: string): string {
   idCounter += 1
   return `${prefix}-${Date.now()}-${idCounter}`
+}
+
+interface NykaaCompanions { cartRule?: RawSheet; combo?: RawSheet }
+
+/**
+ * The Cart Rule and Combo sheets from the same batch of files, if they are
+ * there. Read before anything is analysed so the Sales file can be normalized
+ * with them in one pass, whichever order the three were picked in.
+ */
+async function findNykaaCompanions(files: File[]): Promise<NykaaCompanions> {
+  const found: NykaaCompanions = {}
+  for (const file of files) {
+    const name = file.name.toLowerCase()
+    if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) continue
+    try {
+      const sheets = await readWorkbookSheetsRaw(file)
+      const first = sheets[Object.keys(sheets)[0]] ?? []
+      if (!found.cartRule && detectNykaaCartRuleSheet(first)) found.cartRule = first
+      else if (!found.combo && detectNykaaComboSheet(first)) found.combo = first
+    } catch {
+      // A file that cannot be read here is reported properly when it is
+      // analysed; this pass only looks for companions.
+    }
+  }
+  return found
 }
 
 export function UploadReportsPage() {
@@ -188,7 +223,7 @@ export function UploadReportsPage() {
 
   /** Reads one file and works out what it is. Returns the result rather than
    * setting state, so a failure on one file leaves the others alone. */
-  async function analyzeFile(file: File): Promise<QueueItem> {
+  async function analyzeFile(file: File, nykaa?: NykaaCompanions): Promise<QueueItem> {
     const id = uniqueId(file.name)
     const fail = (reason: string): QueueItem => ({ id, fileName: file.name, status: 'error', error: reason })
     try {
@@ -214,6 +249,31 @@ export function UploadReportsPage() {
           return { id, fileName: file.name, status: 'ready', preview: await buildPreview({
             fileName: file.name, reportKind: 'flipkart_workbook', totalRows: r.totalRows,
             validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings, flipkartFacts: r.facts,
+          }) }
+        }
+        // Nykaa sends three single-sheet workbooks: Sales, Cart Rule and
+        // Combo. Only Sales drives the P&L; the other two are read for their
+        // memo figures and are recognised here so they are not reported as
+        // unknown files.
+        const firstSheet = sheets[sheetNames[0]] ?? []
+        if (detectNykaaSalesSheet(firstSheet)) {
+          const r = normalizeNykaaWorkbook(firstSheet, nykaa?.cartRule, nykaa?.combo, skuMaster, mappings, importId)
+          const failed = r.checks.filter((c) => !c.passed).map((c) => `${c.name}: ${c.detail}`)
+          return { id, fileName: file.name, status: 'ready', preview: await buildPreview({
+            fileName: file.name, reportKind: 'nykaa_sales', totalRows: r.totalRows,
+            validRecords: r.validRecords, invalidCount: r.invalidRows.length,
+            warnings: [...failed, ...r.warnings], nykaaFacts: r.facts ?? undefined,
+          }) }
+        }
+        if (detectNykaaCartRuleSheet(firstSheet) || detectNykaaComboSheet(firstSheet)) {
+          const what = detectNykaaCartRuleSheet(firstSheet) ? 'Cart Rule' : 'Combo'
+          return { id, fileName: file.name, status: 'ready', preview: await buildPreview({
+            fileName: file.name, reportKind: 'nykaa_companion', totalRows: Math.max(firstSheet.length - 1, 0),
+            validRecords: [], invalidCount: 0,
+            warnings: [
+              `Read as Nykaa's ${what} file. It carries no revenue of its own — its figures are folded into the ` +
+              'Nykaa Sales file uploaded alongside it, as memo lines. Importing it on its own does nothing.',
+            ],
           }) }
         }
         if (detectMyntraPnlWorkbook(sheetNames)) {
@@ -287,10 +347,15 @@ export function UploadReportsPage() {
     setStage('idle')
     setReading({ done: 0, total: files.length })
     const added: QueueItem[] = []
+    // Nykaa's month arrives as three separate workbooks. The Sales file is the
+    // only one that carries revenue, but the other two carry figures that
+    // belong on its statement, so the batch is scanned for them first and they
+    // are handed to whichever file turns out to be the Sales one.
+    const nykaa = await findNykaaCompanions(files)
     // One at a time: each file runs a duplicate check against the shared
     // database, and firing a dozen of those at once helps nobody.
     for (const file of files) {
-      added.push(await analyzeFile(file))
+      added.push(await analyzeFile(file, nykaa))
       setReading({ done: added.length, total: files.length })
     }
     setReading(null)
@@ -346,6 +411,7 @@ export function UploadReportsPage() {
         flipkartFacts: preview.flipkartFacts,
         amazonUsaFacts: preview.amazonUsaFacts,
         myntraFacts: preview.myntraFacts,
+        nykaaFacts: preview.nykaaFacts,
         meeshoFactsByMonth: preview.meeshoFactsByMonth,
       })
       updateItem(item.id, { status: 'done', outcome: result })

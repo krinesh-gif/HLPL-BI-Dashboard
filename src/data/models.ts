@@ -273,6 +273,55 @@ export interface MyntraPnlFacts {
   myntraAds: number
 }
 
+/**
+ * Nykaa — one month of the three files Nykaa sends.
+ *
+ * Nykaa is a B2B channel, which changes where revenue comes from. Nykaa buys
+ * the goods and resells them, taking a flat margin on MRP; what a shopper
+ * actually paid is Nykaa\'s pricing decision, not our revenue. So every figure
+ * that feeds the P&L is measured at MRP, and the customer-facing sale value is
+ * carried alongside as a memo — visible, and in no total.
+ *
+ * Amounts are positive magnitudes. The statement does the subtracting.
+ */
+export interface NykaaPnlFacts {
+  month: string
+  /** Σ row_mrp — everything that shipped, valued at MRP. */
+  grossSalesMrp: number
+  /** Σ return_mrp2 — what came back, valued at the same MRP. */
+  returnsMrp: number
+  /** Σ final_mrp — shipped less returned. The base every rupee below is
+   * computed from. */
+  netSalesMrp: number
+
+  unitsShipped: number
+  unitsReturned: number
+  netUnits: number
+  orders: number
+
+  /** Nykaa\'s margin and the output tax, as a percentage. Absent means the
+   * standing assumption applies, so correcting that restates every month. */
+  commissionPctOfMrp?: number
+  outputGstPct?: number
+
+  /** Memo only — never in a total.
+   *
+   * What the shopper paid (Σ final_sp), the platform discount inside that
+   * price (Σ row_discount), and the coupon value from the Cart Rule file,
+   * which is funded by Nykaa and is therefore Nykaa\'s cost and not ours.
+   */
+  customerPaidValue: number
+  platformDiscount: number
+  nykaaFundedCoupon: number
+
+  /** Computed here, not by Nykaa: what the goods cost, priced from the
+   * company\'s own cost sheet at the month\'s effective cost. */
+  cogsPriced: number
+  cogsUnpriced: number
+  /** Manual monthly entry — Nykaa\'s MI/ad invoice carries no report. */
+  nykaaAds: number
+}
+
 export interface AmazonUsaPnlFacts {
   month: string
   /** 2 = the fee columns are kept one-for-one with Amazon's export in

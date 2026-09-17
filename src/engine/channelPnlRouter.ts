@@ -8,6 +8,7 @@ import type {
   FlipkartPnlFacts,
   MeeshoPnlFacts,
   MyntraPnlFacts,
+  NykaaPnlFacts,
   SkuMaster,
 } from '@/data/models'
 import { channelOfSource } from '@/config/channels'
@@ -22,6 +23,7 @@ import { amazonUsaFactsAtRate, amazonUsaLineDefs, amazonUsaToCanonicalBuckets, a
 import { applyFlipkartOtherCosts, computeFlipkartPnl, flipkartToCanonicalBuckets, FLIPKART_LINE_DEFS } from './nativePnl/flipkart'
 import { applyMeeshoOtherCosts, computeMeeshoPnl, meeshoToCanonicalBuckets, MEESHO_LINE_DEFS } from './nativePnl/meesho'
 import { applyMyntraOtherCosts, computeMyntraPnl, myntraToCanonicalBuckets, MYNTRA_LINE_DEFS } from './nativePnl/myntra'
+import { applyNykaaOtherCosts, computeNykaaPnl, nykaaToCanonicalBuckets, NYKAA_LINE_DEFS } from './nativePnl/nykaa'
 import type { NativeLineDef, NativeLineValues } from './nativePnl/types'
 
 export interface NativePnlView {
@@ -50,6 +52,7 @@ export interface ChannelFactsStore {
   /** Optional so a caller written before Myntra had a statement still
    * compiles; every screen in the app passes it. */
   myntraFacts?: MyntraPnlFacts[]
+  nykaaFacts?: NykaaPnlFacts[]
 }
 
 /** Sums this channel's allocated share (sales-contribution method) of the
@@ -307,6 +310,46 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
           values: showInr ? amazonUsaValuesInInr(usd, fxRate) : usd,
           currency: showInr ? 'INR' : 'USD',
         },
+        notes,
+      }
+    }
+  }
+
+  if (channel === 'nykaa') {
+    const imported = inputs.facts.nykaaFacts?.find((f) => f.month === month)
+    if (imported) {
+      // Nykaa states what it bought, never what the goods cost us. COGS is
+      // priced here, from the order rows at the month's effective cost, so a
+      // corrected cost sheet restates the month rather than leaving whatever
+      // was frozen at upload time.
+      const recomputed = recomputedCogs(channel, month, inputs)
+      const facts = recomputed
+        ? { ...imported, cogsPriced: recomputed.priced, cogsUnpriced: recomputed.unpriced }
+        : imported
+      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+      const values = applyNykaaOtherCosts(computeNykaaPnl(facts), otherCosts)
+      const notes: string[] = []
+      if (!recomputed) {
+        notes.push(
+          `No Nykaa order rows are on file for ${month}, so the statement shows no cost of goods. Re-upload this ` +
+          `month's Nykaa Sales file — it is what the cost is priced from.`,
+        )
+      }
+      if (recomputed && recomputed.uncostedUnits > 0) {
+        const share = recomputed.total > 0 ? (recomputed.unpriced / recomputed.total) * 100 : 0
+        const shown = recomputed.uncostedSkus.slice(0, 8).join(', ')
+        const rest = recomputed.uncostedSkus.length - 8
+        notes.push(
+          `${recomputed.uncostedSkus.length} Nykaa SKU(s) sold in ${month} have no cost on file, covering ` +
+          `${recomputed.uncostedUnits.toLocaleString('en-IN')} unit(s). Their cost is estimated ` +
+          `${recomputed.method === 'average-unit-cost' ? 'at what a costed unit averaged this month' : 'at 25% of what they sold for'}, ` +
+          `which is ${share.toFixed(0)}% of the COGS shown. Link ${shown}${rest > 0 ? ` and ${rest} more` : ''} on SKU Mapping to price them properly.`,
+        )
+      }
+      return {
+        channel, month,
+        canonical: { channel, month, lines: computeSubtotals(nykaaToCanonicalBuckets(facts)) },
+        native: { lineDefs: NYKAA_LINE_DEFS, values, currency: 'INR' },
         notes,
       }
     }

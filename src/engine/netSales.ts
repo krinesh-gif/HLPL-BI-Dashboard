@@ -2,12 +2,14 @@ import type { BusinessChannelId, SalesSourceId } from '@/config/channels'
 import { BUSINESS_CHANNEL_IDS, channelOfSource, channelLabel, sourcesOfChannel } from '@/config/channels'
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { toMonthKey } from '@/lib/format'
+import { nykaaRevenue } from './nativePnl/nykaa'
 import type {
   AmazonUsaPnlFacts,
   CanonicalSalesRecord,
   FlipkartPnlFacts,
   MeeshoPnlFacts,
   MyntraPnlFacts,
+  NykaaPnlFacts,
   PnlBasis,
 } from '@/data/models'
 
@@ -165,6 +167,7 @@ export interface ChannelFacts {
   /** Optional so a caller written before Myntra had a statement still
    * compiles; every screen in the app passes it. */
   myntraFacts?: MyntraPnlFacts[]
+  nykaaFacts?: NykaaPnlFacts[]
 }
 
 /**
@@ -221,6 +224,28 @@ export function settlementBasisNetSales(
       netSales: f.estimatedNetSales,
       basis: 'settlement',
       sourceLabel: 'Flipkart SKU-level P&L',
+    }
+  }
+
+  if (channel === 'nykaa') {
+    const f = facts.nykaaFacts?.find((x) => x.month === month)
+    if (!f) return null
+    const { outputGst, netRevenueExGst } = nykaaRevenue(f)
+    return {
+      ...EMPTY_FIGURE,
+      // Nykaa is B2B: it buys the goods and takes a margin on MRP, so the
+      // channel's sales are measured at MRP and its margin is a cost, not a
+      // smaller top line. What shoppers paid is Nykaa's pricing, not our sale.
+      grossSales: f.grossSalesMrp,
+      returnsValue: f.grossSalesMrp - netRevenueExGst,
+      netSales: netRevenueExGst,
+      units: f.netUnits,
+      orders: f.orders,
+      returnUnits: f.unitsReturned,
+      shippedUnits: f.unitsShipped,
+      tax: outputGst,
+      basis: 'settlement',
+      sourceLabel: 'Nykaa monthly sales file',
     }
   }
 

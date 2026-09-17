@@ -35,3 +35,25 @@ export const MEESHO_ASSUMPTIONS = {
   gstOnMarketplaceFeesPct: 0.18,
   gstOnAdvertisingPct: 0.18,
 }
+
+/**
+ * Nykaa operating assumptions.
+ *
+ * Nykaa is a B2B channel: Nykaa buys the goods and resells them, and its
+ * margin is a flat percentage of MRP rather than a commission on whatever the
+ * shopper ended up paying. So the revenue line is built from MRP, not from the
+ * sale price — the discount Nykaa chooses to give a shopper is Nykaa's
+ * decision and Nykaa's cost, and does not change what Nykaa owes us.
+ *
+ * Both figures are applied when the statement is read, so correcting one
+ * restates every month rather than only the months uploaded afterwards. A
+ * month that was genuinely traded on different terms overrides them in its own
+ * facts.
+ */
+export const NYKAA_ASSUMPTIONS = {
+  /** Nykaa's margin, as a percentage of MRP. */
+  commissionPctOfMrp: 38,
+  /** MRP is a tax-inclusive price by law, so what we realise out of it is
+   * tax-inclusive too. This strips the tax back out to state revenue. */
+  outputGstPct: 18,
+}

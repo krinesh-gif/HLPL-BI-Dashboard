@@ -35,7 +35,7 @@ export interface PnlPeriod {
  * calculated two different ways.
  */
 export function usePnlReport() {
-  const { salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, fxRates } = useDataStore()
+  const { salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, fxRates } = useDataStore()
   const { month } = useFilterStore()
   const { forMonth } = usePnlInputs()
 
@@ -56,8 +56,9 @@ export function usePnlReport() {
     for (const f of amazonUsaFacts) set.add(f.month)
     for (const f of meeshoFacts) set.add(f.month)
     for (const f of myntraFacts) set.add(f.month)
+    for (const f of nykaaFacts) set.add(f.month)
     return [...set].sort()
-  }, [salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts])
+  }, [salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts])
 
   return useMemo(() => {
     const months =

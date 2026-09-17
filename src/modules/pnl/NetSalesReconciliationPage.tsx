@@ -15,7 +15,7 @@ import { reconcileAllChannels, type ChannelReconciliation, type ReconciliationCa
  * engine; this page shows what that engine had to choose between.
  */
 export function NetSalesReconciliationPage() {
-  const { salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts } = useDataStore()
+  const { salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts } = useDataStore()
   const { month } = useFilterStore()
   const [expanded, setExpanded] = useState<string | null>(null)
 
@@ -25,9 +25,9 @@ export function NetSalesReconciliationPage() {
         salesRecords,
         BUSINESS_CHANNELS.map((c) => c.id),
         month,
-        { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts },
+        { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts },
       ),
-    [salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, month],
+    [salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, month],
   )
 
   const comparable = rows.filter((r) => r.settlementBasis !== null)

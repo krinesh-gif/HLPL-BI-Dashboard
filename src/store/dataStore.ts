@@ -20,6 +20,7 @@ import type {
   ManualAdSpend,
   MeeshoPnlFacts,
   MyntraPnlFacts,
+  NykaaPnlFacts,
   SkuMaster,
 } from '@/data/models'
 
@@ -37,6 +38,7 @@ interface SharedDataset {
   amazonUsaFacts: AmazonUsaPnlFacts[]
   meeshoFacts: MeeshoPnlFacts[]
   myntraFacts: MyntraPnlFacts[]
+  nykaaFacts: NykaaPnlFacts[]
   /** Advertising spend typed in by hand, for platforms that bill by invoice. */
   manualAdSpend: ManualAdSpend[]
 }
@@ -53,6 +55,7 @@ const EMPTY_DATASET: SharedDataset = {
   amazonUsaFacts: [],
   meeshoFacts: [],
   myntraFacts: [],
+  nykaaFacts: [],
   manualAdSpend: [],
 }
 
@@ -66,6 +69,7 @@ export interface ReportImport {
   flipkartFacts?: FlipkartPnlFacts
   amazonUsaFacts?: AmazonUsaPnlFacts
   myntraFacts?: MyntraPnlFacts
+  nykaaFacts?: NykaaPnlFacts
   meeshoFactsByMonth?: MeeshoPnlFacts[]
   /** The individual events behind those facts. These are what is stored: a
    * month is summed from them, so an event repeated across uploads cannot be
@@ -189,6 +193,7 @@ export function latestMonthWithData(dataset: SharedDataset): string | null {
     ...dataset.amazonUsaFacts.map((f) => f.month),
     ...dataset.meeshoFacts.map((f) => f.month),
     ...(dataset.myntraFacts ?? []).map((f) => f.month),
+    ...(dataset.nykaaFacts ?? []).map((f) => f.month),
   ].filter(Boolean)
 
   return months.length === 0 ? null : months.reduce((a, b) => (a > b ? a : b))
@@ -236,7 +241,7 @@ export const useDataStore = create<DataState>((set, get) => {
      * file (rows, then one facts call per month) downloaded everything three
      * or more times over, and a large file could not get through at all.
      */
-    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, myntraFacts, meeshoFactsByMonth, meeshoTransactions, meeshoAdsRows, meeshoRecoveryRows }) => {
+    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, myntraFacts, nykaaFacts, meeshoFactsByMonth, meeshoTransactions, meeshoAdsRows, meeshoRecoveryRows }) => {
       const total = salesRecords.length + adsRecords.length
       set({ importProgress: { sent: 0, total } })
       try {
@@ -296,6 +301,10 @@ export const useDataStore = create<DataState>((set, get) => {
         if (myntraFacts) {
           await api.post('/api/facts/myntra', { facts: myntraFacts })
           monthsUpdated.push(myntraFacts.month)
+        }
+        if (nykaaFacts) {
+          await api.post('/api/facts/nykaa', { facts: nykaaFacts })
+          monthsUpdated.push(nykaaFacts.month)
         }
         if (meeshoTransactions && meeshoTransactions.length > 0) {
           // Events are sent, never months. Meesho's downloads carry earlier
