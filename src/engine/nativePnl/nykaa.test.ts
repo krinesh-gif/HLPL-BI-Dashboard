@@ -115,3 +115,29 @@ describe('nykaaToCanonicalBuckets', () => {
     expect(loud).toEqual(b)
   })
 })
+
+describe('the MI reaches the statement', () => {
+  /**
+   * Nykaa's Marketing Invest bill arrives as a PDF, not inside the sales
+   * files, so the P&L reads ad spend from where the Ads screens store it.
+   * Without that the MI would be entered, shown on the Ads page, and silently
+   * missing from CM2.
+   */
+  it('takes CM2 below CM1 once a month has marketing', () => {
+    const withMi = computeNykaaPnl({ ...AUG, nykaaAds: 135542 })
+    expect(withMi.cm2).toBeCloseTo(withMi.cm1 - 135542, 6)
+    expect(withMi.cm2).toBeLessThan(withMi.cm1)
+    expect(withMi.nykaaAds).toBe(-135542)
+  })
+
+  it('charges the taxable value only — the GST on it is not a cost', () => {
+    const taxable = computeNykaaPnl({ ...AUG, nykaaAds: 135542 })
+    const wrongly = computeNykaaPnl({ ...AUG, nykaaAds: 159939.56 })
+    expect(taxable.cm2 - wrongly.cm2).toBeCloseTo(24397.56, 2)
+  })
+
+  it('leaves CM2 equal to CM1 when no invoice has arrived', () => {
+    const v = computeNykaaPnl({ ...AUG, nykaaAds: 0 })
+    expect(v.cm2).toBeCloseTo(v.cm1, 6)
+  })
+})

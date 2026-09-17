@@ -323,12 +323,26 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       // corrected cost sheet restates the month rather than leaving whatever
       // was frozen at upload time.
       const recomputed = recomputedCogs(channel, month, inputs)
-      const facts = recomputed
-        ? { ...imported, cogsPriced: recomputed.priced, cogsUnpriced: recomputed.unpriced }
-        : imported
+      // Nykaa's Marketing Invest bill arrives as a PDF, not inside the sales
+      // files, so the month's ad spend comes from the same place the Ads
+      // screens read it. One figure, one source: entering or re-reading the MI
+      // moves the P&L and the Ads page together, and re-uploading the sales
+      // file cannot wipe it.
+      const adSpend = inputs.marketing[channel]?.ads ?? 0
+      const facts = {
+        ...imported,
+        ...(recomputed ? { cogsPriced: recomputed.priced, cogsUnpriced: recomputed.unpriced } : {}),
+        nykaaAds: imported.nykaaAds || adSpend,
+      }
       const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
       const values = applyNykaaOtherCosts(computeNykaaPnl(facts), otherCosts)
       const notes: string[] = []
+      if (facts.nykaaAds === 0) {
+        notes.push(
+          `No Nykaa Marketing Invest is on file for ${month}, so CM2 is the same figure as CM1. Upload the MI ` +
+          'invoice PDF Nykaa emails for the month — it is booked to the activity month it bills, not its own date.',
+        )
+      }
       if (!recomputed) {
         notes.push(
           `No Nykaa order rows are on file for ${month}, so the statement shows no cost of goods. Re-upload this ` +

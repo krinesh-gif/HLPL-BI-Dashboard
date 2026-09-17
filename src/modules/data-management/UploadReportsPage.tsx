@@ -14,12 +14,14 @@ import { detectMyntraPnlWorkbook, normalizeMyntraPnlWorkbook } from '@/data/norm
 import {
   detectNykaaCartRuleSheet, detectNykaaComboSheet, detectNykaaSalesSheet, normalizeNykaaWorkbook,
 } from '@/data/normalize/nykaaSalesWorkbook'
+import { detectNykaaMarketingInvoice, parseNykaaMarketingInvoice } from '@/data/normalize/nykaaMarketingInvoice'
+import { readPdfText } from '@/lib/pdfText'
 import { checkForDuplicates } from '@/data/normalize/duplicates'
 import { useDataStore, type ImportOutcome } from '@/store/dataStore'
 import { monthLabel } from '@/lib/format'
 import { useFilterStore } from '@/store/filterStore'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
-import type { AdsRecord, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, MeeshoPnlFacts, MyntraPnlFacts, NykaaPnlFacts } from '@/data/models'
+import type { AdsRecord, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraPnlFacts, NykaaPnlFacts } from '@/data/models'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
 
@@ -32,6 +34,7 @@ type ReportKind =
   | 'myntra_pnl_workbook'
   | 'nykaa_sales'
   | 'nykaa_companion'
+  | 'nykaa_marketing_invoice'
   | 'meesho_order_summary'
   | 'meesho_order_payments'
   | 'meesho_settlement_json'
@@ -46,6 +49,7 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   myntra_pnl_workbook: 'Myntra — P&L Report (PnL_Summary + SKU_Detail)',
   nykaa_sales: 'Nykaa — Monthly Sales Data (B2B, margin on MRP)',
   nykaa_companion: 'Nykaa — Cart Rule / Combo file',
+  nykaa_marketing_invoice: 'Nykaa — Marketing Invest (MI) tax invoice',
   meesho_order_summary: 'Meesho — Order Summary Report',
   meesho_order_payments: 'Meesho — Aggregated Payment File (Order Payments + Ads Cost)',
   meesho_settlement_json: 'Meesho — Settlement Data (JSON)',
@@ -60,6 +64,7 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   myntra_pnl_workbook: 'myntra',
   nykaa_sales: 'nykaa',
   nykaa_companion: 'nykaa',
+  nykaa_marketing_invoice: 'nykaa',
   meesho_order_summary: 'meesho',
   meesho_order_payments: 'meesho',
   meesho_settlement_json: 'meesho',
@@ -82,6 +87,8 @@ interface PreviewState {
   amazonUsaFacts?: AmazonUsaPnlFacts
   myntraFacts?: MyntraPnlFacts
   nykaaFacts?: NykaaPnlFacts
+  /** A month's ad spend that arrived as an invoice rather than a report. */
+  manualAdSpend?: Omit<ManualAdSpend, 'enteredAt'>
   meeshoFactsByMonth?: MeeshoPnlFacts[]
   meeshoTransactions?: MeeshoTransaction[]
   meeshoAdsRows?: MeeshoAdsRow[]
@@ -150,7 +157,7 @@ async function findNykaaCompanions(files: File[]): Promise<NykaaCompanions> {
 }
 
 export function UploadReportsPage() {
-  const { skuMaster, mappings, importReport, importProgress, importSkuMapWorkbook, clearMeeshoData, meeshoFacts } = useDataStore()
+  const { skuMaster, mappings, importReport, importProgress, importSkuMapWorkbook, saveManualAdSpend, clearMeeshoData, meeshoFacts } = useDataStore()
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null)
   const { month: filterMonth } = useFilterStore()
   const [stage, setStage] = useState<Stage>('idle')
@@ -228,6 +235,35 @@ export function UploadReportsPage() {
     const fail = (reason: string): QueueItem => ({ id, fileName: file.name, status: 'error', error: reason })
     try {
       const lowerName = file.name.toLowerCase()
+      if (lowerName.endsWith('.pdf')) {
+        // Nykaa's Marketing Invest bill is emailed as a PDF and is the only
+        // way that cost reaches the business, so it is read here rather than
+        // retyped from the attachment.
+        const text = await readPdfText(file)
+        if (!detectNykaaMarketingInvoice(text)) {
+          return fail('This PDF is not a Nykaa Marketing Invest invoice. No other PDF is read yet.')
+        }
+        const r = parseNykaaMarketingInvoice(text)
+        if (!r.invoice) return fail(r.warnings[0] ?? 'This Nykaa MI invoice could not be read.')
+        const failed = r.checks.filter((c) => !c.passed).map((c) => `${c.name}: ${c.detail}`)
+        return { id, fileName: file.name, status: 'ready', preview: await buildPreview({
+          fileName: file.name, reportKind: 'nykaa_marketing_invoice', totalRows: 1,
+          validRecords: [], invalidCount: 0, warnings: [...failed, ...r.warnings],
+          manualAdSpend: {
+            channel: 'nykaa',
+            month: r.invoice.activityMonth,
+            // The taxable value, never the total: the GST on top is input tax
+            // credit and charging it to the P&L would overstate the month's
+            // advertising by 18%.
+            amount: r.invoice.taxableValue,
+            fileName: file.name,
+            note:
+              `Invoice ${r.invoice.invoiceNumber} dated ${r.invoice.invoiceDate} · ` +
+              `taxable ₹${r.invoice.taxableValue.toFixed(2)} + GST ₹${(r.invoice.cgst + r.invoice.sgst + r.invoice.igst).toFixed(2)} ` +
+              `= ₹${r.invoice.totalAmount.toFixed(2)} paid`,
+          },
+        }) }
+      }
       if (lowerName.endsWith('.json')) {
         return fail(
           'Meesho is now read from the aggregated payment workbook (Payments ▸ Download aggregated payment file), ' +
@@ -392,6 +428,19 @@ export function UploadReportsPage() {
       const preview = item.preview
       if (!preview) throw new Error('Nothing to import for this file.')
 
+      // An invoice is not a report: it carries one figure for one channel-month
+      // and is stored where the Ads screens and the channel P&L both read it.
+      if (preview.manualAdSpend) {
+        await saveManualAdSpend(preview.manualAdSpend)
+        const outcome: ImportOutcome = {
+          fileName: preview.fileName, added: 1, skippedAsDuplicate: 0,
+          monthsUpdated: [preview.manualAdSpend.month],
+        }
+        setOutcome(outcome)
+        updateItem(item.id, { status: 'done', outcome })
+        return
+      }
+
       const channel = preview.adsRecords[0]?.channel ?? REPORT_CHANNEL[preview.reportKind]
       const importRecord: ImportRecord = {
         id: uniqueId('import'),
@@ -451,7 +500,7 @@ export function UploadReportsPage() {
         <input
           type="file"
           multiple
-          accept=".csv,.xlsx,.xls,.json"
+          accept=".csv,.xlsx,.xls,.json,.pdf"
           disabled={busy}
           onChange={(e) => {
             const files = Array.from(e.target.files ?? [])
@@ -465,9 +514,11 @@ export function UploadReportsPage() {
           is written.
         </p>
         <p className="mt-2 text-xs text-[var(--ink-3)]">
-          Supported: Amazon India Seller Central order reports, Flipkart SKU-level P&L exports (or the full P&L
-          workbook), Amazon USA Product Profitability exports, Amazon Ads Sponsored Products campaign reports, Meesho
-          Order Summary reports, and the Meesho aggregated payment file.
+          Supported: Amazon India Seller Central order reports and the Vendor Central monthly sales export, Flipkart
+          SKU-level P&L exports (or the full P&L workbook), Amazon USA Product Profitability exports, Amazon Ads
+          Sponsored Products campaign reports, Meesho Order Summary reports and the Meesho aggregated payment file,
+          Myntra&apos;s P&L report, Nykaa&apos;s three monthly files (Sales, Cart Rule, Combo — drop all three in
+          together), and Nykaa&apos;s Marketing Invest invoice as the PDF it is emailed as.
         </p>
         {reading && (
           <p className="mt-3 text-sm text-[var(--ink-2)]">
