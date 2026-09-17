@@ -38,6 +38,10 @@ export const NYKAA_LINE_DEFS: NativeLineDef[] = [
 
   { key: 'outputGst', label: 'Less: Output GST', section: 'REVENUE', kind: 'input', note: 'MRP is tax-inclusive, so the realisation is too' },
   { key: 'netRevenueExGst', label: 'NET REVENUE (ex-GST)', section: 'REVENUE', kind: 'subtotal', note: '⭐ denominator for every %' },
+  {
+    key: 'realisationPctOfMrp', label: 'Realisation, % of MRP (ex-GST)', section: 'REVENUE', kind: 'percent',
+    note: "52.54% at 38% margin and 18% GST — the 'Cost to Nykaa' line of the agreement's margin table",
+  },
 
   { key: 'cogsPriced', label: 'Less: COGS — priced SKUs', section: 'COST OF GOODS SOLD', kind: 'input' },
   { key: 'cogsUnpriced', label: 'Less: COGS — unpriced SKUs (est.)', section: 'COST OF GOODS SOLD', kind: 'input', note: '⚠ estimate — goes to zero once every SKU is mapped and priced' },
@@ -101,6 +105,9 @@ export function computeNykaaPnl(facts: NykaaPnlFacts): NativeLineValues {
   const cm1 = netRevenueExGst - totalCogs
   const cm2 = cm1 - facts.nykaaAds
   const pct = (v: number): number => (netRevenueExGst !== 0 ? (v / netRevenueExGst) * 100 : 0)
+  // Every month's own check against the contract: at 38% margin and 18% GST
+  // this must read 52.54%, which is the agreement's "Cost to Nykaa" line.
+  const realisationPctOfMrp = facts.netSalesMrp !== 0 ? (netRevenueExGst / facts.netSalesMrp) * 100 : 0
 
   return {
     grossSalesMrp: facts.grossSalesMrp,
@@ -113,6 +120,7 @@ export function computeNykaaPnl(facts: NykaaPnlFacts): NativeLineValues {
 
     outputGst: -outputGst,
     netRevenueExGst,
+    realisationPctOfMrp,
 
     cogsPriced: -facts.cogsPriced,
     cogsUnpriced: -facts.cogsUnpriced,

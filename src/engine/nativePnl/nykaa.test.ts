@@ -141,3 +141,57 @@ describe('the MI reaches the statement', () => {
     expect(v.cm2).toBeCloseTo(v.cm1, 6)
   })
 })
+
+/**
+ * Nykaa's own margin table, from the agreement, at MRP = 100.
+ *
+ * It is the contract, so it is pinned here: any change to how the margin or
+ * the tax is applied has to keep reproducing these figures or fail.
+ *
+ *   MRP            100.00      Gross Margin 38%     38.00
+ *   Invoice Value   62.00      input GST 18/118      9.46
+ *   Cost to Nykaa   52.54   ← our revenue, ex-GST
+ */
+describe("Nykaa's agreement margin table", () => {
+  const perHundred = (over: Partial<NykaaPnlFacts> = {}) =>
+    nykaaRevenue({ ...AUG, grossSalesMrp: 100, returnsMrp: 0, netSalesMrp: 100, ...over })
+
+  it('reproduces the inflow block to the paisa', () => {
+    const { commission, realisationInclGst, outputGst, netRevenueExGst } = perHundred()
+    expect(commission).toBeCloseTo(38.0, 2)       // Gross Margin 38%
+    expect(realisationInclGst).toBeCloseTo(62.0, 2) // Invoice Value
+    expect(outputGst).toBeCloseTo(9.46, 2)        // input IGST 18%, interstate
+    expect(outputGst / 2).toBeCloseTo(4.73, 2)    // input CGST + SGST 9% each, local
+    expect(netRevenueExGst).toBeCloseTo(52.54, 2) // Cost to Nykaa
+  })
+
+  it('realises 52.54 paise ex-GST for every rupee of MRP', () => {
+    const v = computeNykaaPnl({ ...AUG, grossSalesMrp: 100, returnsMrp: 0, netSalesMrp: 100 })
+    expect(v.realisationPctOfMrp).toBeCloseTo(52.5424, 3)
+  })
+
+  it('keeps that rate at the real August scale', () => {
+    // 26,89,538 of net MRP at the agreement's rate is the 14,13,147.08 the
+    // statement shows. The rate is 0.62/1.18 exactly — 52.5424% is that
+    // rounded for reading, and rounding it before multiplying moves August by
+    // 73 paise.
+    const { netRevenueExGst } = nykaaRevenue(AUG)
+    expect(netRevenueExGst).toBeCloseTo(2689538 * (0.62 / 1.18), 2)
+    expect(netRevenueExGst).toBeCloseTo(1413147.08, 2)
+    expect(computeNykaaPnl(AUG).realisationPctOfMrp).toBeCloseTo(52.5424, 3)
+  })
+
+  it('leaves the agreement\'s GST LOSS row out of our books, because it is Nykaa\'s', () => {
+    // The table's outflow block is Nykaa reselling at MRP: output GST 15.25
+    // less the 9.46 it paid us is a 5.80 GST differential, which turns its
+    // headline 38 into a real 32.20. None of that is ours — our revenue stops
+    // at Cost to Nykaa — so none of it appears in this statement.
+    const { outputGst: ourGst, netRevenueExGst } = perHundred()
+    const nykaaOutputGst = 100 * (18 / 118)
+    const gstLoss = nykaaOutputGst - ourGst
+    expect(gstLoss).toBeCloseTo(5.8, 2)
+    expect(100 - nykaaOutputGst - netRevenueExGst).toBeCloseTo(32.2, 1) // Nykaa's net margin
+    // Our own figures are untouched by any of it.
+    expect(netRevenueExGst).toBeCloseTo(52.54, 2)
+  })
+})
