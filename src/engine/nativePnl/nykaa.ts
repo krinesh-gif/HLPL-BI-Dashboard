@@ -55,11 +55,11 @@ export const NYKAA_LINE_DEFS: NativeLineDef[] = [
 
   {
     key: 'listDiscount', label: 'Less: Discount off MRP (listed price)', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
-    kind: 'input', note: 'Σ (final_mrp − final_subtotal) — what the goods are listed at, below their printed price',
+    kind: 'input', hideWhenZero: true, note: 'Σ (final_mrp − final_subtotal) — what the goods are listed at, below their printed price',
   },
   {
     key: 'promoDiscount', label: 'Less: Promotions, coupons and cart rules', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
-    kind: 'input', note: 'Σ (final_subtotal − final_sp) — run on top of the listed price',
+    kind: 'input', hideWhenZero: true, note: 'Σ (final_subtotal − final_sp) — run on top of the listed price',
   },
   {
     key: 'nykaaFundedCoupon', label: 'Add back: coupons Nykaa funds itself', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',

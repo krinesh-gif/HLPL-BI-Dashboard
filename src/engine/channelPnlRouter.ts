@@ -137,6 +137,39 @@ function recomputedCogs(
 }
 
 /**
+ * Nykaa's customer discount, recovered from the month's own order rows.
+ *
+ * The discount is normally computed at import, but months uploaded before it
+ * was modelled have no such figure — and reading zero there is not a small
+ * error. August's discount is 7.83 lakh against 14.13 lakh of invoice revenue,
+ * so a month missing it reports more than twice the revenue it earned, with
+ * nothing on screen to say so.
+ *
+ * Every Nykaa row keeps its MRP as `netSales` and the shopper's price in
+ * `raw.final_sp`, so the total is recoverable from rows already stored. Only
+ * the total: splitting it into the listed price and the promotions on top
+ * needs `final_subtotal`, which older rows do not carry. The statement shows
+ * the subtotal alone in that case rather than inventing a split.
+ *
+ * Returns null when no row carries a sale price, which is what distinguishes
+ * a month that cannot be recomputed from a month that genuinely sold at MRP.
+ */
+function recomputedNykaaDiscount(month: string, inputs: ChannelPnlViewInputs): number | null {
+  let discount = 0
+  let priced = 0
+  for (const r of inputs.salesRecords) {
+    if (channelOfSource(r.channel) !== 'nykaa' || toMonthKey(r.orderDate) !== month) continue
+    const paid = r.raw?.final_sp
+    if (typeof paid !== 'number') continue
+    priced++
+    discount += r.netSales - paid
+  }
+  // A negative total would mean shoppers paid above MRP, which is not a thing
+  // Nykaa does and is not something to charge ourselves for.
+  return priced === 0 ? null : Math.max(discount, 0)
+}
+
+/**
  * Meesho's three COGS lines, recomputed at the month's effective cost.
  *
  * Meesho's statement splits cost of goods three ways — units actually sold,
@@ -329,9 +362,19 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       // moves the P&L and the Ads page together, and re-uploading the sales
       // file cannot wipe it.
       const adSpend = inputs.marketing[channel]?.ads ?? 0
-      const facts = {
+      // A month imported before the discount was modelled carries no figure
+      // for it. Rather than read that as "no discount", it is recovered from
+      // the month's own rows, so the correction reaches every month already
+      // uploaded instead of only the ones uploaded again afterwards.
+      const derivedDiscount = imported.customerDiscount === undefined
+        ? recomputedNykaaDiscount(month, inputs)
+        : null
+      const facts: NykaaPnlFacts = {
         ...imported,
         ...(recomputed ? { cogsPriced: recomputed.priced, cogsUnpriced: recomputed.unpriced } : {}),
+        ...(derivedDiscount === null
+          ? {}
+          : { customerDiscount: Math.max(derivedDiscount - (imported.nykaaFundedCoupon ?? 0), 0) }),
         nykaaAds: imported.nykaaAds || adSpend,
       }
       const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
@@ -354,8 +397,21 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       // from rather than leaving the number to speak for itself.
       const expectedDiscount = facts.customerDiscount ?? 0
       const charged = facts.discountDebitNote?.amount
+      if (imported.customerDiscount === undefined && derivedDiscount === null && expectedDiscount === 0) {
+        notes.push(
+          `${month} was imported before Nykaa's customer discount was modelled, and its order rows do not carry the ` +
+          'sale price either, so the statement cannot tell how far below MRP the month traded. Revenue here is what ' +
+          `Nykaa invoiced, not what we kept. Re-upload ${month}'s Nykaa Sales file to correct it.`,
+        )
+      } else if (imported.customerDiscount === undefined) {
+        notes.push(
+          `The ${formatCurrencyFull(expectedDiscount)} of customer discount deducted here was recovered from ` +
+          `${month}'s order rows, because the month was imported before this cost was modelled. The total is right; ` +
+          'the split between the listed price and the promotions on top needs the Sales file uploading again.',
+        )
+      }
       if (charged === undefined) {
-        if (expectedDiscount > 0) {
+        if (expectedDiscount > 0 && imported.customerDiscount !== undefined) {
           notes.push(
             `The ${formatCurrencyFull(expectedDiscount)} of customer discount deducted here is what ${month}'s sales file ` +
             'implies: Nykaa sold below MRP and recovers the difference by debit note, raised without GST. The note ' +
