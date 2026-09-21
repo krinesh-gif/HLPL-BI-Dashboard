@@ -19,8 +19,13 @@ Vercel is the service that hosts the dashboard. It's free for this.
 4. Leave all the build settings alone — they're already configured.
 5. Find the **Production Branch** (or "Git Branch") box and set it to:
    ```
-   claude/bold-ramanujan-m7g3dp
+   Main
    ```
+   Capital M — it is case-sensitive. This is the one setting worth getting
+   right: it decides which branch the live site is built from, and every other
+   branch only ever produces a private preview. Point it anywhere else and the
+   site quietly stops updating, while Vercel still reports each push as
+   deployed.
 6. Click **Deploy** and wait about a minute.
 
 You'll get a success screen with a web address. The app won't work yet — it has
@@ -122,3 +127,27 @@ The schema itself lives in [`api/_lib/schema.ts`](api/_lib/schema.ts) as a
 single `DO` block — one statement, so it can be pasted into a database console
 without tripping the "cannot insert multiple commands into a prepared statement"
 error.
+
+---
+
+## The site is not showing my latest change
+
+The sidebar prints the build it is running: `Build <commit> (<branch>) · <time>`.
+Compare it with the newest commit on `Main` at
+<https://github.com/krinesh-gif/HLPL-BI-Dashboard/commits/Main>.
+
+**The branch in the brackets is not `Main`.** Vercel is building a different
+branch. Fix it at **Settings → Git → Production Branch**, set it to `Main`, then
+deploy a commit as below.
+
+**The branch is `Main` but the commit is older.** Vercel has not built the newer
+commit. Open **Deployments** and look at the newest one: a failed build leaves
+the previous deployment live, which looks exactly like nothing having happened.
+
+**Do not use the Redeploy button to pick up a new commit.** It rebuilds the
+commit that deployment was originally made from, so it returns the same build
+however many times it is pressed. To deploy a newer commit, either open its
+deployment and choose **Promote to Production**, or push a new commit to `Main`.
+
+**The build and branch are both right but a figure looks stale.** The browser
+caches the app. Reload with Ctrl+Shift+R (Cmd+Shift+R on a Mac).
