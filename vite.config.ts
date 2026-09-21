@@ -27,6 +27,25 @@ function buildCommit(): string {
   }
 }
 
+/**
+ * The branch this bundle was built from.
+ *
+ * The commit alone does not separate the two reasons a deployment can be
+ * stale, and they need opposite fixes. Either the host never built the newer
+ * commit — where re-running the deployment cannot help, because it rebuilds
+ * the commit it was made from — or it is building the right commit off the
+ * wrong branch. The branch name tells those apart at a glance.
+ */
+function buildBranch(): string {
+  const fromCi = process.env.VERCEL_GIT_COMMIT_REF
+  if (fromCi) return fromCi
+  try {
+    return execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' }).trim()
+  } catch {
+    return 'unknown'
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   // Relative base so the built assets resolve correctly under any subpath
@@ -35,6 +54,7 @@ export default defineConfig({
   base: './',
   define: {
     __BUILD_COMMIT__: JSON.stringify(buildCommit()),
+    __BUILD_BRANCH__: JSON.stringify(buildBranch()),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
   },
   plugins: [react(), tailwindcss()],
