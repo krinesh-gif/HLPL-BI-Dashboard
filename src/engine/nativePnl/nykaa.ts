@@ -122,17 +122,39 @@ export function nykaaOutputGstPct(facts: NykaaPnlFacts): number {
 /**
  * How much of the shortfall against MRP Nykaa charges back.
  *
- * `customerDiscount` is what the sales file implies under the standing
- * assumption; `promo-only` reads the narrower basis off the same facts. Old
- * months, imported before these fields existed, fall back to zero rather than
- * to a guess — a missing discount is visible on the statement, an invented one
- * is not.
+ * A month imported before this cost was modelled carries no `customerDiscount`,
+ * and reading that as zero is not a small error: it reports the invoice as
+ * though we kept all of it, which on June and July showed a gross margin of
+ * around 74% on a channel actually running at about 40%.
+ *
+ * It does not need re-importing, because the figure was always derivable from
+ * what was stored. Every Nykaa month records what Nykaa invoiced against
+ * (`netSalesMrp`) and what shoppers paid (`customerPaidValue`), and the gap
+ * between them is the discount Nykaa charges back. An earlier attempt to
+ * rebuild it from the order rows instead could never have worked: the client
+ * strips each row's verbatim copy of its spreadsheet line before upload, so
+ * the sale price is not in the database at row level at all.
+ *
+ * Two guards. A month with no `customerPaidValue` derives nothing rather than
+ * treating a missing figure as a sale at zero, which would charge the whole of
+ * MRP as discount. And a coupon file larger than the shortfall cannot turn the
+ * deduction negative and pay us to discount.
  */
 export function nykaaDiscountRecovered(facts: NykaaPnlFacts): number {
+  const nykaaFunded = facts.nykaaFundedCoupon ?? 0
   if (NYKAA_ASSUMPTIONS.discountRecovered === 'promo-only') {
-    return Math.max((facts.promoDiscount ?? 0) - (facts.nykaaFundedCoupon ?? 0), 0)
+    return Math.max((facts.promoDiscount ?? 0) - nykaaFunded, 0)
   }
-  return facts.customerDiscount ?? 0
+  if (facts.customerDiscount !== undefined) return facts.customerDiscount
+  if (!facts.customerPaidValue || facts.customerPaidValue <= 0) return 0
+  return Math.max(facts.netSalesMrp - facts.customerPaidValue - nykaaFunded, 0)
+}
+
+/** True when this month's discount was derived from its totals rather than
+ * imported. The figure is right either way; only the split into the listed
+ * price and the promotions on top needs the file uploading again. */
+export function nykaaDiscountWasDerived(facts: NykaaPnlFacts): boolean {
+  return facts.customerDiscount === undefined && nykaaDiscountRecovered(facts) > 0
 }
 
 /** What Nykaa pays us, and what is left of it after tax and after the discount

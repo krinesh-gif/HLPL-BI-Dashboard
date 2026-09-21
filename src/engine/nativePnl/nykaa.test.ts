@@ -96,12 +96,26 @@ describe('the customer discount Nykaa charges back', () => {
     expect(netRevenueExGst).not.toBeCloseTo(invoiceRevenueExGst - customerDiscount / 1.18, 0)
   })
 
-  it('reads zero for a month imported before the discount was modelled', () => {
+  it('derives the same figure for a month imported before it was modelled', () => {
+    // Such a month stores no discount, but it does store what Nykaa invoiced
+    // against and what shoppers paid, and the gap between those is the
+    // discount. Reading it as zero instead reported the invoice as though we
+    // kept all of it — about 74% gross margin on a channel running at 40%.
     const old = { ...AUG } as Partial<NykaaPnlFacts>
     delete old.listDiscount
     delete old.promoDiscount
     delete old.customerDiscount
-    const { customerDiscount, invoiceRevenueExGst, netRevenueExGst } = nykaaRevenue(old as NykaaPnlFacts)
+    expect(nykaaRevenue(old as NykaaPnlFacts).customerDiscount).toBeCloseTo(783214.13, 2)
+    expect(nykaaRevenue(old as NykaaPnlFacts).netRevenueExGst)
+      .toBeCloseTo(nykaaRevenue(AUG).netRevenueExGst, 6)
+  })
+
+  it('derives nothing at all when the month has no sale total to derive from', () => {
+    // Treating a missing figure as a sale at zero would charge the whole of
+    // MRP as discount and wipe the month's revenue out entirely.
+    const blind = { ...AUG, customerPaidValue: 0 } as Partial<NykaaPnlFacts>
+    delete blind.customerDiscount
+    const { customerDiscount, invoiceRevenueExGst, netRevenueExGst } = nykaaRevenue(blind as NykaaPnlFacts)
     expect(customerDiscount).toBe(0)
     expect(netRevenueExGst).toBeCloseTo(invoiceRevenueExGst, 6)
   })

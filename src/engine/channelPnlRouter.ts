@@ -23,7 +23,10 @@ import { amazonUsaFactsAtRate, amazonUsaLineDefs, amazonUsaToCanonicalBuckets, a
 import { applyFlipkartOtherCosts, computeFlipkartPnl, flipkartToCanonicalBuckets, FLIPKART_LINE_DEFS } from './nativePnl/flipkart'
 import { applyMeeshoOtherCosts, computeMeeshoPnl, meeshoToCanonicalBuckets, MEESHO_LINE_DEFS } from './nativePnl/meesho'
 import { applyMyntraOtherCosts, computeMyntraPnl, myntraToCanonicalBuckets, MYNTRA_LINE_DEFS } from './nativePnl/myntra'
-import { applyNykaaOtherCosts, computeNykaaPnl, nykaaToCanonicalBuckets, NYKAA_LINE_DEFS } from './nativePnl/nykaa'
+import {
+  applyNykaaOtherCosts, computeNykaaPnl, nykaaDiscountRecovered, nykaaDiscountWasDerived,
+  nykaaToCanonicalBuckets, NYKAA_LINE_DEFS,
+} from './nativePnl/nykaa'
 import type { NativeLineDef, NativeLineValues } from './nativePnl/types'
 
 export interface NativePnlView {
@@ -146,45 +149,14 @@ function recomputedCogs(
  * put in a note above the table, which is the one part of a long statement a
  * reader scrolls straight past. It belongs on the line it explains.
  */
-function nykaaLineDefsFor(imported: NykaaPnlFacts, derived: number | null): NativeLineDef[] {
-  if (imported.customerDiscount !== undefined) return NYKAA_LINE_DEFS
-  const note = derived === null
-    ? '⚠ Not established — this month\'s order rows carry no sale price. Re-upload the Nykaa Sales file.'
-    : 'Rebuilt from this month\'s order rows, because the month predates this line. Re-upload the Sales file to split it.'
+function nykaaLineDefsFor(facts: NykaaPnlFacts): NativeLineDef[] {
+  if (facts.customerDiscount !== undefined) return NYKAA_LINE_DEFS
+  const note = nykaaDiscountWasDerived(facts)
+    ? 'Derived from this month\'s own MRP and sale totals, because the month predates this line. Upload the Sales '
+      + 'and Cart Rule files again to split it and credit any coupons Nykaa funded.'
+    : '⚠ Not established — this month has no record of what shoppers paid, so every margin below is overstated. '
+      + 'Re-upload the Nykaa Sales file.'
   return NYKAA_LINE_DEFS.map((d) => (d.key === 'customerDiscount' ? { ...d, note } : d))
-}
-
-/**
- * Nykaa's customer discount, recovered from the month's own order rows.
- *
- * The discount is normally computed at import, but months uploaded before it
- * was modelled have no such figure — and reading zero there is not a small
- * error. August's discount is 7.83 lakh against 14.13 lakh of invoice revenue,
- * so a month missing it reports more than twice the revenue it earned, with
- * nothing on screen to say so.
- *
- * Every Nykaa row keeps its MRP as `netSales` and the shopper's price in
- * `raw.final_sp`, so the total is recoverable from rows already stored. Only
- * the total: splitting it into the listed price and the promotions on top
- * needs `final_subtotal`, which older rows do not carry. The statement shows
- * the subtotal alone in that case rather than inventing a split.
- *
- * Returns null when no row carries a sale price, which is what distinguishes
- * a month that cannot be recomputed from a month that genuinely sold at MRP.
- */
-function recomputedNykaaDiscount(month: string, inputs: ChannelPnlViewInputs): number | null {
-  let discount = 0
-  let priced = 0
-  for (const r of inputs.salesRecords) {
-    if (channelOfSource(r.channel) !== 'nykaa' || toMonthKey(r.orderDate) !== month) continue
-    const paid = r.raw?.final_sp
-    if (typeof paid !== 'number') continue
-    priced++
-    discount += r.netSales - paid
-  }
-  // A negative total would mean shoppers paid above MRP, which is not a thing
-  // Nykaa does and is not something to charge ourselves for.
-  return priced === 0 ? null : Math.max(discount, 0)
 }
 
 /**
@@ -380,19 +352,9 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       // moves the P&L and the Ads page together, and re-uploading the sales
       // file cannot wipe it.
       const adSpend = inputs.marketing[channel]?.ads ?? 0
-      // A month imported before the discount was modelled carries no figure
-      // for it. Rather than read that as "no discount", it is recovered from
-      // the month's own rows, so the correction reaches every month already
-      // uploaded instead of only the ones uploaded again afterwards.
-      const derivedDiscount = imported.customerDiscount === undefined
-        ? recomputedNykaaDiscount(month, inputs)
-        : null
       const facts: NykaaPnlFacts = {
         ...imported,
         ...(recomputed ? { cogsPriced: recomputed.priced, cogsUnpriced: recomputed.unpriced } : {}),
-        ...(derivedDiscount === null
-          ? {}
-          : { customerDiscount: Math.max(derivedDiscount - (imported.nykaaFundedCoupon ?? 0), 0) }),
         nykaaAds: imported.nykaaAds || adSpend,
       }
       const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
@@ -413,30 +375,22 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       // The discount is the channel's second largest cost and the one most
       // likely to be disputed, so the statement says where its figure came
       // from rather than leaving the number to speak for itself.
-      const expectedDiscount = facts.customerDiscount ?? 0
+      const expectedDiscount = nykaaDiscountRecovered(facts)
       const charged = facts.discountDebitNote?.amount
-      if (imported.customerDiscount === undefined && derivedDiscount === null && expectedDiscount === 0) {
+      if (expectedDiscount === 0 && facts.netSalesMrp > 0) {
         notes.push(
-          `${month} was imported before Nykaa's customer discount was modelled, and its order rows do not carry the ` +
-          'sale price either, so the statement cannot tell how far below MRP the month traded. Revenue here is what ' +
-          `Nykaa invoiced, not what we kept. Re-upload ${month}'s Nykaa Sales file to correct it.`,
+          `${month} shows no customer discount, which on this channel means the figure is missing rather than nil: ` +
+          'Nykaa sells below MRP and charges the difference back on every month. Revenue here is what Nykaa ' +
+          `invoiced, not what we kept, so every margin below it is overstated. Re-upload ${month}'s Nykaa Sales file.`,
         )
-      } else if (imported.customerDiscount === undefined) {
+      } else if (nykaaDiscountWasDerived(facts)) {
         notes.push(
-          `The ${formatCurrencyFull(expectedDiscount)} of customer discount deducted here was recovered from ` +
-          `${month}'s order rows, because the month was imported before this cost was modelled. The total is right; ` +
-          'the split between the listed price and the promotions on top needs the Sales file uploading again.',
+          `The ${formatCurrencyFull(expectedDiscount)} of customer discount deducted here was derived from ${month}'s ` +
+          'own MRP and sale totals, because the month was imported before this cost was modelled. The total is right; ' +
+          'uploading the Sales and Cart Rule files again splits it and credits any coupons Nykaa funded.',
         )
       }
-      if (charged === undefined) {
-        if (expectedDiscount > 0 && imported.customerDiscount !== undefined) {
-          notes.push(
-            `The ${formatCurrencyFull(expectedDiscount)} of customer discount deducted here is what ${month}'s sales file ` +
-            'implies: Nykaa sold below MRP and recovers the difference by debit note, raised without GST. The note ' +
-            'itself has not been uploaded for this month — Nykaa raises it late, so the month does not wait for it.',
-          )
-        }
-      } else if (Math.abs(charged - expectedDiscount) > Math.max(expectedDiscount * 0.01, 1)) {
+      if (charged !== undefined && Math.abs(charged - expectedDiscount) > Math.max(expectedDiscount * 0.01, 1)) {
         notes.push(
           `Nykaa's debit note ${facts.discountDebitNote?.documentNumber ?? ''} charges ${formatCurrencyFull(charged)} of ` +
           `discount for ${month}, against the ${formatCurrencyFull(expectedDiscount)} this month's sales file accounts for. ` +
@@ -457,7 +411,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       return {
         channel, month,
         canonical: { channel, month, lines: computeSubtotals(nykaaToCanonicalBuckets(facts)) },
-        native: { lineDefs: nykaaLineDefsFor(imported, derivedDiscount), values, currency: 'INR' },
+        native: { lineDefs: nykaaLineDefsFor(facts), values, currency: 'INR' },
         notes,
       }
     }

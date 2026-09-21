@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildChannelPnlView } from './channelPnlRouter'
-import type { CanonicalSalesRecord, FlipkartPnlFacts, NykaaPnlFacts, SkuMaster } from '@/data/models'
+import type { FlipkartPnlFacts, NykaaPnlFacts, SkuMaster } from '@/data/models'
 
 const skuMaster: SkuMaster[] = [
   { sku: 'S1', productName: 'Test', category: 'Test', brand: 'HLPL', cogs: 50, mrp: 200, launchDate: '2025-01-01', status: 'active', leadTimeDays: 20, safetyStock: 50 },
@@ -71,26 +71,18 @@ const legacyNykaaAugust: NykaaPnlFacts = {
   cogsPriced: 0, cogsUnpriced: 0, nykaaAds: 0,
 } as NykaaPnlFacts
 
-/** One Nykaa row as the old importer wrote it: MRP in `netSales`, the sale
- * price in `raw.final_sp`, and no `final_subtotal` to split them with. */
-const legacyNykaaRow = (sku: string, mrp: number, paid: number): CanonicalSalesRecord => ({
-  orderId: `nykaa-${sku}-2026-08`, orderDate: '2026-08-01', channel: 'nykaa', marketplace: 'nykaa',
-  sellerType: 'marketplace', sku, productName: sku, category: 'Test', quantity: 1,
-  grossSales: mrp, discount: 0, netSales: mrp, returnUnits: 0, rtoUnits: 0, shippingCost: 0,
-  marketplaceFee: 0, tax: 0, status: 'completed', currency: 'INR', isAggregate: true,
-  raw: { final_sp: paid }, importId: 'old',
-})
-
 describe('Nykaa months imported before the customer discount was modelled', () => {
-  const rows = [legacyNykaaRow('A', 2000000, 1400000), legacyNykaaRow('B', 689538, 500158.84)]
   const view = buildChannelPnlView('nykaa', '2026-08', {
-    salesRecords: rows, skuMaster, fixedExpenses: [], marketing: {},
+    salesRecords: [], skuMaster, fixedExpenses: [], marketing: {},
     facts: { flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [], nykaaFacts: [legacyNykaaAugust] },
   })
 
-  it('recovers the discount from the rows rather than reporting none', () => {
-    // 26,89,538 of MRP against 19,00,158.84 paid, less the 6,165.03 Nykaa
-    // funded: the same 7,83,214.13 a fresh import computes.
+  it('derives the discount from the totals the old importer did store', () => {
+    // 26,89,538 of net MRP against 19,00,158.84 paid, less the 6,165.03 Nykaa
+    // funded: the same 7,83,214.13 a fresh import computes. No order rows are
+    // passed at all, because the sale price never reaches the database at row
+    // level — the client strips each row's raw copy before upload, which is
+    // what made an earlier attempt to rebuild it from rows a silent no-op.
     expect(view.native?.values.customerDiscount).toBeCloseTo(-783214.13, 2)
     expect(view.native?.values.netRevenueExGst).toBeCloseTo(629932.95, 2)
   })
@@ -99,53 +91,35 @@ describe('Nykaa months imported before the customer discount was modelled', () =
     expect(view.canonical.lines.netSales).toBeCloseTo(view.native!.values.netRevenueExGst, 6)
   })
 
-  it('marks the line itself as rebuilt, where a reader is already looking', () => {
+  it('marks the line itself as derived, where a reader is already looking', () => {
     const line = view.native?.lineDefs.find((d) => d.key === 'customerDiscount')
-    expect(line?.note).toContain('Rebuilt from this month')
+    expect(line?.note).toContain('Derived from this month')
+    expect(view.notes.some((n) => n.includes('was derived from'))).toBe(true)
   })
 
-  it('marks the line as not established when the rows cannot supply it', () => {
+  it('never treats a missing sale total as a sale at zero', () => {
+    // Without this guard the whole of MRP becomes discount and the month
+    // reports no revenue at all — a louder wrong answer than the one it fixes.
+    const noSaleTotal = { ...legacyNykaaAugust, customerPaidValue: 0 }
     const blind = buildChannelPnlView('nykaa', '2026-08', {
       salesRecords: [], skuMaster, fixedExpenses: [], marketing: {},
-      facts: { flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [], nykaaFacts: [legacyNykaaAugust] },
-    })
-    const line = blind.native?.lineDefs.find((d) => d.key === 'customerDiscount')
-    expect(line?.note).toContain('Not established')
-    // A zero that means "we could not tell" must never read like a zero that
-    // means "this month was sold at MRP".
-    expect(line?.note).not.toEqual(
-      buildChannelPnlView('nykaa', '2026-08', {
-        salesRecords: rows, skuMaster, fixedExpenses: [], marketing: {},
-        facts: {
-          flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [],
-          nykaaFacts: [{ ...legacyNykaaAugust, customerDiscount: 783214.13 }],
-        },
-      }).native?.lineDefs.find((d) => d.key === 'customerDiscount')?.note,
-    )
-  })
-
-  it('says the figure was recovered, and what re-uploading would add', () => {
-    expect(view.notes.some((n) => n.includes('recovered from') && n.includes('Sales file uploading again'))).toBe(true)
-  })
-
-  it('says so plainly when the rows cannot supply it either', () => {
-    const blind = buildChannelPnlView('nykaa', '2026-08', {
-      salesRecords: [], skuMaster, fixedExpenses: [], marketing: {},
-      facts: { flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [], nykaaFacts: [legacyNykaaAugust] },
+      facts: { flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [], nykaaFacts: [noSaleTotal] },
     })
     expect(blind.native?.values.customerDiscount).toBe(-0)
-    expect(blind.notes.some((n) => n.includes('cannot tell how far below MRP'))).toBe(true)
+    expect(blind.native?.lineDefs.find((d) => d.key === 'customerDiscount')?.note).toContain('Not established')
+    expect(blind.notes.some((n) => n.includes('every margin below it is overstated'))).toBe(true)
   })
 
   it('leaves a freshly imported month alone', () => {
     const fresh = buildChannelPnlView('nykaa', '2026-08', {
-      salesRecords: rows, skuMaster, fixedExpenses: [], marketing: {},
+      salesRecords: [], skuMaster, fixedExpenses: [], marketing: {},
       facts: {
         flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [],
         nykaaFacts: [{ ...legacyNykaaAugust, listDiscount: 690129.23, promoDiscount: 99249.93, customerDiscount: 783214.13 }],
       },
     })
     expect(fresh.native?.values.listDiscount).toBeCloseTo(-690129.23, 2)
-    expect(fresh.notes.some((n) => n.includes('recovered from'))).toBe(false)
+    expect(fresh.notes.some((n) => n.includes('was derived from'))).toBe(false)
+    expect(fresh.native?.lineDefs.find((d) => d.key === 'customerDiscount')?.note).not.toContain('Derived')
   })
 })
