@@ -99,6 +99,31 @@ describe('Nykaa months imported before the customer discount was modelled', () =
     expect(view.canonical.lines.netSales).toBeCloseTo(view.native!.values.netRevenueExGst, 6)
   })
 
+  it('marks the line itself as rebuilt, where a reader is already looking', () => {
+    const line = view.native?.lineDefs.find((d) => d.key === 'customerDiscount')
+    expect(line?.note).toContain('Rebuilt from this month')
+  })
+
+  it('marks the line as not established when the rows cannot supply it', () => {
+    const blind = buildChannelPnlView('nykaa', '2026-08', {
+      salesRecords: [], skuMaster, fixedExpenses: [], marketing: {},
+      facts: { flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [], nykaaFacts: [legacyNykaaAugust] },
+    })
+    const line = blind.native?.lineDefs.find((d) => d.key === 'customerDiscount')
+    expect(line?.note).toContain('Not established')
+    // A zero that means "we could not tell" must never read like a zero that
+    // means "this month was sold at MRP".
+    expect(line?.note).not.toEqual(
+      buildChannelPnlView('nykaa', '2026-08', {
+        salesRecords: rows, skuMaster, fixedExpenses: [], marketing: {},
+        facts: {
+          flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [],
+          nykaaFacts: [{ ...legacyNykaaAugust, customerDiscount: 783214.13 }],
+        },
+      }).native?.lineDefs.find((d) => d.key === 'customerDiscount')?.note,
+    )
+  })
+
   it('says the figure was recovered, and what re-uploading would add', () => {
     expect(view.notes.some((n) => n.includes('recovered from') && n.includes('Sales file uploading again'))).toBe(true)
   })

@@ -137,6 +137,24 @@ function recomputedCogs(
 }
 
 /**
+ * The Nykaa statement's line definitions, with the discount line told to
+ * explain where its own figure came from.
+ *
+ * A zero on this line has three quite different meanings — the month really
+ * was sold at MRP, the figure was rebuilt from order rows, or it could not be
+ * established at all — and they need different responses. That explanation was
+ * put in a note above the table, which is the one part of a long statement a
+ * reader scrolls straight past. It belongs on the line it explains.
+ */
+function nykaaLineDefsFor(imported: NykaaPnlFacts, derived: number | null): NativeLineDef[] {
+  if (imported.customerDiscount !== undefined) return NYKAA_LINE_DEFS
+  const note = derived === null
+    ? '⚠ Not established — this month\'s order rows carry no sale price. Re-upload the Nykaa Sales file.'
+    : 'Rebuilt from this month\'s order rows, because the month predates this line. Re-upload the Sales file to split it.'
+  return NYKAA_LINE_DEFS.map((d) => (d.key === 'customerDiscount' ? { ...d, note } : d))
+}
+
+/**
  * Nykaa's customer discount, recovered from the month's own order rows.
  *
  * The discount is normally computed at import, but months uploaded before it
@@ -439,7 +457,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       return {
         channel, month,
         canonical: { channel, month, lines: computeSubtotals(nykaaToCanonicalBuckets(facts)) },
-        native: { lineDefs: NYKAA_LINE_DEFS, values, currency: 'INR' },
+        native: { lineDefs: nykaaLineDefsFor(imported, derivedDiscount), values, currency: 'INR' },
         notes,
       }
     }
