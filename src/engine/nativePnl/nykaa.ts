@@ -10,22 +10,29 @@ import type { NativeLineDef, NativeLineValues } from './types'
  * the other shape. Nykaa buys the goods and resells them, and its margin is a
  * flat percentage of MRP. Two consequences run through this whole statement:
  *
- *  1. REVENUE IS BUILT FROM MRP, NOT FROM THE SALE PRICE. What Nykaa owes us
- *     is MRP less its margin. Whether Nykaa then sells at full price or
- *     discounts hard is Nykaa's decision, funded by Nykaa, and does not change
- *     the invoice. Building revenue off the sale price would have made our
- *     turnover swing with somebody else's promotion calendar — August's
- *     shoppers paid 19.0 lakh against an MRP of 26.9 lakh, so the error would
- *     have been nearly a third of the month.
+ *  1. REVENUE IS BUILT FROM MRP, NOT FROM THE SALE PRICE. What Nykaa invoices
+ *     against is MRP less its margin, whatever a shopper ends up paying.
+ *     Building revenue off the sale price would double-count the discount,
+ *     which is charged separately and is the next point.
  *
- *  2. THE DISCOUNTS IN THE FILES ARE MEMOS. The platform discount inside the
- *     sale price and the coupon value in the Cart Rule file are both Nykaa's
- *     spend. They are shown, because knowing how hard the channel is being
- *     discounted matters, and they are in no total.
+ *  2. THE MARGIN AND THE DISCOUNT ARE TWO CHARGES, NOT ONE. Nykaa takes 38% of
+ *     MRP as its margin. Then, having sold below MRP, it recovers that
+ *     shortfall from us too, on a Financial Debit Note raised without GST. At
+ *     an MRP of ₹100 and a 10% shopper discount we are charged ₹38 and ₹10,
+ *     not ₹38 in total. This statement carried the discount as a memo until
+ *     the note was seen, which left out the channel's second largest cost:
+ *     ₹7.83 lakh in August, against ₹14.13 lakh of revenue.
+ *
+ * The debit note is not what the statement deducts. It arrives months after
+ * its activity month — the sample bills 06-2025 on a document dated 20.03.2026
+ * — and a month cannot wait that long to close. The discount comes from the
+ * sales file, which states it exactly and arrives on time; the note, when it
+ * turns up, is checked against it.
  *
  * MRP is a tax-inclusive price by law, so the realisation is tax-inclusive
  * too; output GST comes off once to state revenue, the same way it does for
- * Meesho and Myntra.
+ * Meesho and Myntra. The debit note carries no GST at all, so it comes off
+ * after that line and none of it returns as input credit.
  */
 export const NYKAA_LINE_DEFS: NativeLineDef[] = [
   { key: 'grossSalesMrp', label: 'Gross Sales (at MRP)', section: 'SALES — AT MRP', kind: 'input' },
@@ -37,10 +44,40 @@ export const NYKAA_LINE_DEFS: NativeLineDef[] = [
   { key: 'netRealisationInclGst', label: 'NET REALISATION (incl. GST)', section: "NYKAA'S MARGIN", kind: 'subtotal', note: 'what Nykaa pays us' },
 
   { key: 'outputGst', label: 'Less: Output GST', section: 'REVENUE', kind: 'input', note: 'MRP is tax-inclusive, so the realisation is too' },
-  { key: 'netRevenueExGst', label: 'NET REVENUE (ex-GST)', section: 'REVENUE', kind: 'subtotal', note: '⭐ denominator for every %' },
   {
-    key: 'realisationPctOfMrp', label: 'Realisation, % of MRP (ex-GST)', section: 'REVENUE', kind: 'percent',
+    key: 'invoiceRevenueExGst', label: 'INVOICE REVENUE (ex-GST)', section: 'REVENUE', kind: 'subtotal',
+    note: 'what the invoice is worth before the discount is charged back',
+  },
+  {
+    key: 'invoiceRealisationPctOfMrp', label: 'Invoice realisation, % of MRP', section: 'REVENUE', kind: 'percent',
     note: "52.54% at 38% margin and 18% GST — the 'Cost to Nykaa' line of the agreement's margin table",
+  },
+
+  {
+    key: 'listDiscount', label: 'Less: Discount off MRP (listed price)', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
+    kind: 'input', note: 'Σ (final_mrp − final_subtotal) — what the goods are listed at, below their printed price',
+  },
+  {
+    key: 'promoDiscount', label: 'Less: Promotions, coupons and cart rules', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
+    kind: 'input', note: 'Σ (final_subtotal − final_sp) — run on top of the listed price',
+  },
+  {
+    key: 'nykaaFundedCoupon', label: 'Add back: coupons Nykaa funds itself', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
+    kind: 'input', hideWhenZero: true, note: 'COUPON_NYKAA_FUNDED in the Cart Rule file — the one slice Nykaa absorbs',
+  },
+  {
+    key: 'customerDiscount', label: 'Customer discount recovered by Nykaa', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
+    kind: 'subtotal', note: 'charged by debit note, raised without GST — so no input credit comes back on it',
+  },
+  {
+    key: 'discountPctOfMrp', label: 'Discount, % of net MRP', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
+    kind: 'percent', note: 'how far below MRP the channel actually trades',
+  },
+
+  { key: 'netRevenueExGst', label: 'NET REVENUE (ex-GST)', section: 'NET REVENUE', kind: 'subtotal', note: '⭐ denominator for every %' },
+  {
+    key: 'realisationPctOfMrp', label: 'Realisation, % of MRP (ex-GST)', section: 'NET REVENUE', kind: 'percent',
+    note: 'what a rupee of MRP is finally worth to us, after both the margin and the discount',
   },
 
   { key: 'cogsPriced', label: 'Less: COGS — priced SKUs', section: 'COST OF GOODS SOLD', kind: 'input' },
@@ -58,16 +95,17 @@ export const NYKAA_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm3Pct', label: 'Net Profit %', section: 'YOUR OTHER COSTS', kind: 'percent' },
 
   {
-    key: 'customerPaidValue', label: 'Value shoppers actually paid', section: 'MEMO — NYKAA\'S PRICING, NOT OUR REVENUE',
-    kind: 'input', note: 'Σ final_sp — below MRP because Nykaa discounts; does not change what Nykaa owes us',
+    key: 'customerPaidValue', label: 'Value shoppers actually paid', section: 'MEMO',
+    kind: 'input', note: 'Σ final_sp — the invoice is still raised on MRP; the gap is the discount line above',
   },
   {
-    key: 'platformDiscount', label: 'Platform discount inside that price', section: 'MEMO — NYKAA\'S PRICING, NOT OUR REVENUE',
-    kind: 'input', hideWhenZero: true, note: 'Σ row_discount — funded by Nykaa',
+    key: 'debitNoteAmount', label: "Nykaa's debit note for this month", section: 'MEMO',
+    kind: 'input', hideWhenZero: true,
+    note: 'the document that charges the discount back, once it arrives — read as a check, not deducted again',
   },
   {
-    key: 'nykaaFundedCoupon', label: 'Coupon discount (Cart Rule file)', section: 'MEMO — NYKAA\'S PRICING, NOT OUR REVENUE',
-    kind: 'input', hideWhenZero: true, note: 'COUPON_NYKAA_FUNDED — Nykaa\'s cost, never charged to us',
+    key: 'debitNoteVariance', label: 'Note vs the discount in the sales file', section: 'MEMO',
+    kind: 'input', hideWhenZero: true, note: 'positive means Nykaa charged more than the files account for',
   },
 ]
 
@@ -81,12 +119,30 @@ export function nykaaOutputGstPct(facts: NykaaPnlFacts): number {
   return facts.outputGstPct ?? NYKAA_ASSUMPTIONS.outputGstPct
 }
 
-/** What Nykaa pays us, and what is left of it after tax. Both are needed in
- * two places, so they are derived once here. */
+/**
+ * How much of the shortfall against MRP Nykaa charges back.
+ *
+ * `customerDiscount` is what the sales file implies under the standing
+ * assumption; `promo-only` reads the narrower basis off the same facts. Old
+ * months, imported before these fields existed, fall back to zero rather than
+ * to a guess — a missing discount is visible on the statement, an invented one
+ * is not.
+ */
+export function nykaaDiscountRecovered(facts: NykaaPnlFacts): number {
+  if (NYKAA_ASSUMPTIONS.discountRecovered === 'promo-only') {
+    return Math.max((facts.promoDiscount ?? 0) - (facts.nykaaFundedCoupon ?? 0), 0)
+  }
+  return facts.customerDiscount ?? 0
+}
+
+/** What Nykaa pays us, and what is left of it after tax and after the discount
+ * is charged back. Needed in two places, so it is derived once here. */
 export function nykaaRevenue(facts: NykaaPnlFacts): {
   commission: number
   realisationInclGst: number
   outputGst: number
+  invoiceRevenueExGst: number
+  customerDiscount: number
   netRevenueExGst: number
 } {
   const commission = facts.netSalesMrp * (nykaaCommissionPct(facts) / 100)
@@ -96,18 +152,32 @@ export function nykaaRevenue(facts: NykaaPnlFacts): {
   // fraction — 18/118, not 18/100. Taking 18% of a tax-inclusive figure would
   // over-deduct by about 2.7% of revenue every month.
   const outputGst = gstPct > 0 ? realisationInclGst * (gstPct / (100 + gstPct)) : 0
-  return { commission, realisationInclGst, outputGst, netRevenueExGst: realisationInclGst - outputGst }
+  const invoiceRevenueExGst = realisationInclGst - outputGst
+  // The debit note carries no GST, so unlike every fee on every other channel
+  // there is no input credit to strip out of it: the whole charge comes off
+  // revenue as it stands.
+  const customerDiscount = nykaaDiscountRecovered(facts)
+  return {
+    commission, realisationInclGst, outputGst, invoiceRevenueExGst, customerDiscount,
+    netRevenueExGst: invoiceRevenueExGst - customerDiscount,
+  }
 }
 
 export function computeNykaaPnl(facts: NykaaPnlFacts): NativeLineValues {
-  const { commission, realisationInclGst, outputGst, netRevenueExGst } = nykaaRevenue(facts)
+  const {
+    commission, realisationInclGst, outputGst, invoiceRevenueExGst, customerDiscount, netRevenueExGst,
+  } = nykaaRevenue(facts)
   const totalCogs = facts.cogsPriced + facts.cogsUnpriced
   const cm1 = netRevenueExGst - totalCogs
   const cm2 = cm1 - facts.nykaaAds
   const pct = (v: number): number => (netRevenueExGst !== 0 ? (v / netRevenueExGst) * 100 : 0)
-  // Every month's own check against the contract: at 38% margin and 18% GST
-  // this must read 52.54%, which is the agreement's "Cost to Nykaa" line.
-  const realisationPctOfMrp = facts.netSalesMrp !== 0 ? (netRevenueExGst / facts.netSalesMrp) * 100 : 0
+  const ofMrp = (v: number): number => (facts.netSalesMrp !== 0 ? (v / facts.netSalesMrp) * 100 : 0)
+
+  // The three discount lines are shown as the sales file states them, so they
+  // add up on screen, and the subtotal is what the statement actually deducts.
+  // On the narrower basis those two disagree, and the statement says which one
+  // it took rather than quietly restating the parts to match.
+  const debitNote = facts.discountDebitNote?.amount ?? 0
 
   return {
     grossSalesMrp: facts.grossSalesMrp,
@@ -119,8 +189,19 @@ export function computeNykaaPnl(facts: NykaaPnlFacts): NativeLineValues {
     netRealisationInclGst: realisationInclGst,
 
     outputGst: -outputGst,
+    invoiceRevenueExGst,
+    // Every month's own check against the contract: at 38% margin and 18% GST
+    // this must read 52.54%, which is the agreement's "Cost to Nykaa" line.
+    invoiceRealisationPctOfMrp: ofMrp(invoiceRevenueExGst),
+
+    listDiscount: -(facts.listDiscount ?? 0),
+    promoDiscount: -(facts.promoDiscount ?? 0),
+    nykaaFundedCoupon: facts.nykaaFundedCoupon ?? 0,
+    customerDiscount: -customerDiscount,
+    discountPctOfMrp: ofMrp(customerDiscount),
+
     netRevenueExGst,
-    realisationPctOfMrp,
+    realisationPctOfMrp: ofMrp(netRevenueExGst),
 
     cogsPriced: -facts.cogsPriced,
     cogsUnpriced: -facts.cogsUnpriced,
@@ -137,8 +218,8 @@ export function computeNykaaPnl(facts: NykaaPnlFacts): NativeLineValues {
     cm3Pct: pct(cm2),
 
     customerPaidValue: facts.customerPaidValue,
-    platformDiscount: facts.platformDiscount,
-    nykaaFundedCoupon: facts.nykaaFundedCoupon,
+    debitNoteAmount: debitNote,
+    debitNoteVariance: debitNote === 0 ? 0 : debitNote - customerDiscount,
   }
 }
 
@@ -164,15 +245,17 @@ export function applyNykaaOtherCosts(computed: NativeLineValues, otherCosts: num
  * selling that could be negotiated per order; it is the price. It belongs
  * above the line, and once it is there both reports read 52.4%.
  *
- * The memo figures appear nowhere: the shopper's price and the discounts
- * funding it are Nykaa's, and putting either in a bucket would put somebody
- * else's promotion into our accounts.
+ * The customer discount joins it in `discounts` for the same reason. It is
+ * another rupee off the same MRP, charged on a note that carries no GST, and
+ * the Master P&L's fee buckets all assume a fee with tax on it. Putting it
+ * there would have made Nykaa's Net Sales the one figure on the report that
+ * did not match the channel's own statement.
  */
 export function nykaaToCanonicalBuckets(facts: NykaaPnlFacts): PnlLineValues {
-  const { commission, outputGst } = nykaaRevenue(facts)
+  const { commission, outputGst, customerDiscount } = nykaaRevenue(facts)
   return {
     grossSales: facts.grossSalesMrp,
-    discounts: commission,
+    discounts: commission + customerDiscount,
     returns: facts.returnsMrp,
     // GST was collected inside the realisation and is paid onward, so it was
     // never revenue — removed here to put Nykaa on the same ex-GST footing as

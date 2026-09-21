@@ -13,7 +13,7 @@ import type {
 } from '@/data/models'
 import { channelOfSource } from '@/config/channels'
 import { MEESHO_ASSUMPTIONS, NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
-import { toMonthKey } from '@/lib/format'
+import { formatCurrencyFull, toMonthKey } from '@/lib/format'
 import { allocateFixedExpensesForMonth } from './allocation'
 import {
   buildChannelPnl, cogsForRecords, computeSubtotals, estimateUncostedCogs,
@@ -347,6 +347,26 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
         notes.push(
           `No Nykaa order rows are on file for ${month}, so the statement shows no cost of goods. Re-upload this ` +
           `month's Nykaa Sales file — it is what the cost is priced from.`,
+        )
+      }
+      // The discount is the channel's second largest cost and the one most
+      // likely to be disputed, so the statement says where its figure came
+      // from rather than leaving the number to speak for itself.
+      const expectedDiscount = facts.customerDiscount ?? 0
+      const charged = facts.discountDebitNote?.amount
+      if (charged === undefined) {
+        if (expectedDiscount > 0) {
+          notes.push(
+            `The ${formatCurrencyFull(expectedDiscount)} of customer discount deducted here is what ${month}'s sales file ` +
+            'implies: Nykaa sold below MRP and recovers the difference by debit note, raised without GST. The note ' +
+            'itself has not been uploaded for this month — Nykaa raises it late, so the month does not wait for it.',
+          )
+        }
+      } else if (Math.abs(charged - expectedDiscount) > Math.max(expectedDiscount * 0.01, 1)) {
+        notes.push(
+          `Nykaa's debit note ${facts.discountDebitNote?.documentNumber ?? ''} charges ${formatCurrencyFull(charged)} of ` +
+          `discount for ${month}, against the ${formatCurrencyFull(expectedDiscount)} this month's sales file accounts for. ` +
+          'The statement deducts the sales file figure; the difference is worth taking up with Nykaa.',
         )
       }
       if (recomputed && recomputed.uncostedUnits > 0) {

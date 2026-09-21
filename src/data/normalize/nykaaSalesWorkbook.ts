@@ -11,19 +11,26 @@ import type { NormalizeResult } from './types'
  *
  *  - **Sales** (`externorderno`, `skucode`, `row_mrp` …): every invoice line of
  *    the month. This is the only file the P&L is built from.
- *  - **Cart Rule** (`nykaa_orderno`, `cart_rule_discount` …): coupon discounts.
- *    Every row of August's file was `COUPON_NYKAA_FUNDED`, so the value is
- *    Nykaa's cost and is carried as a memo, not a deduction.
+ *  - **Cart Rule** (`nykaa_orderno`, `cart_rule_discount` …): not a separate
+ *    discount but a breakdown of part of `row_discount`, naming which coupons
+ *    Nykaa funded itself. August's 154 cart-rule orders carry ₹6,165.03 there
+ *    against ₹6,271.29 of `row_discount` on the same orders, which is what
+ *    says it is a subset rather than an addition.
  *  - **Combo** (`increment_id`, `combo_sku` …): which component SKU sits inside
  *    which bundle. It restates rows the Sales file already counts, so it is
  *    never added to revenue.
  *
- * The one thing to get right here is which column revenue comes from. Nykaa is
- * a B2B channel: it buys the goods and takes a flat margin on MRP, so what it
- * owes us is set by MRP and not by what a shopper paid. The file carries both.
- * In August they differ by nearly a third — 26.9 lakh of MRP against 19.0 lakh
- * actually paid — so reading the wrong column would not have looked like a
- * rounding problem, it would have looked like a bad month.
+ * The Sales file prices every line four times, and the whole statement turns on
+ * telling them apart. On one August row: `row_mrp` 322 is the printed price,
+ * `row_subtotal` 259 is what the product is listed at, `row_discount` 0 is any
+ * promotion on top, and `row_sp` 259 is what the shopper paid.
+ * `row_subtotal − row_discount = row_sp` holds on all 6,513 rows.
+ *
+ * Revenue comes from MRP, because MRP is what Nykaa raises its PO on. But the
+ * shortfall against MRP is not somebody else's problem: Nykaa sells below MRP
+ * and charges the difference back to us on a Financial Debit Note. So the gap
+ * is split out here as a cost — ₹6.90 lakh of list discount plus ₹0.99 lakh of
+ * promotions in August, against a net MRP of ₹26.90 lakh.
  *
  * The file's own `ret_yes_no` flag is not the return signal. It reads "No" on
  * all 6,513 August rows including the 294 that carry a return quantity, so
@@ -41,12 +48,12 @@ const SALES_HEADERS = {
   day: 'day_of_date',
   unitMrp: 'unit_mrp',
   rowMrp: 'row_mrp',
-  rowDiscount: 'row_discount',
   qtyShipped: 'qty_at_mrp',
   returnQty: 'return_qty',
   returnMrp: 'return_mrp2',
   finalQty: 'final_qty',
   finalMrp: 'final_mrp',
+  finalSubtotal: 'final_subtotal',
   finalSp: 'final_sp',
   productName: 'product_name',
   l1: 'canonical_l1',
@@ -178,7 +185,7 @@ export function normalizeNykaaWorkbook(
   interface Bucket {
     grossMrp: number; returnsMrp: number; netMrp: number
     shipped: number; returned: number; netQty: number
-    customerPaid: number; discount: number
+    customerPaid: number; netSubtotal: number
     productName: string; category: string
   }
   const bySku = new Map<string, Bucket>()
@@ -191,7 +198,7 @@ export function normalizeNykaaWorkbook(
 
     const bucket = bySku.get(sku) ?? {
       grossMrp: 0, returnsMrp: 0, netMrp: 0, shipped: 0, returned: 0, netQty: 0,
-      customerPaid: 0, discount: 0,
+      customerPaid: 0, netSubtotal: 0,
       productName: text(row, SALES_HEADERS.productName),
       // Nykaa's own taxonomy is three levels deep; the middle one is the
       // closest thing to the categories the rest of the dashboard uses.
@@ -204,7 +211,9 @@ export function normalizeNykaaWorkbook(
     bucket.returned += at(row, SALES_HEADERS.returnQty)
     bucket.netQty += at(row, SALES_HEADERS.finalQty)
     bucket.customerPaid += at(row, SALES_HEADERS.finalSp)
-    bucket.discount += at(row, SALES_HEADERS.rowDiscount)
+    // Both discount figures are taken net of returns, like every other line
+    // here: a returned unit's discount is not recovered from us either.
+    bucket.netSubtotal += at(row, SALES_HEADERS.finalSubtotal)
     bySku.set(sku, bucket)
   }
 
@@ -254,8 +263,8 @@ export function normalizeNykaaWorkbook(
         qty_at_mrp: b.shipped,
         return_qty: b.returned,
         final_qty: b.netQty,
+        final_subtotal: b.netSubtotal,
         final_sp: b.customerPaid,
-        row_discount: b.discount,
       },
       importId,
     })
@@ -264,9 +273,14 @@ export function normalizeNykaaWorkbook(
   const total = (pick: (b: Bucket) => number): number =>
     [...bySku.values()].reduce((sum, b) => sum + pick(b), 0)
 
-  // --- Cart Rule: coupon value, and whether any of it is ours -------------
+  // --- Cart Rule: the one slice of the discount Nykaa pays for itself -----
+  //
+  // Everything Nykaa sells below MRP comes back to us on the debit note,
+  // except what Nykaa funded. This file is the only place that split is
+  // stated, so a month without it is read as nothing being Nykaa-funded —
+  // which errs towards charging ourselves too much rather than too little.
   let nykaaFundedCoupon = 0
-  let brandFundedCoupon = 0
+  let otherCartRuleDiscount = 0
   if (cartRule && cartRule.length > 1) {
     const cIndex = headerIndex(cartRule)
     const dCol = cIndex.get(CARTRULE_HEADERS.discount)
@@ -275,31 +289,39 @@ export function normalizeNykaaWorkbook(
       if (dCol === undefined) break
       const value = num(row[dCol])
       const category = catCol === undefined ? '' : String(row[catCol] ?? '').toUpperCase()
-      // Only a Nykaa-funded coupon is Nykaa's cost. Anything brand-funded is
-      // ours, and is called out rather than folded into the same memo.
-      if (category.includes('NYKAA_FUNDED') || category === '') nykaaFundedCoupon += value
-      else brandFundedCoupon += value
+      if (category.includes('NYKAA_FUNDED')) nykaaFundedCoupon += value
+      else otherCartRuleDiscount += value
     }
   }
-  if (brandFundedCoupon > 0) {
-    warnings.push(
-      `₹${brandFundedCoupon.toFixed(2)} of the Cart Rule file is not marked Nykaa-funded. Brand-funded discount is ` +
-      'our cost and is not yet deducted anywhere — send this month\'s file over so the split can be handled properly.',
-    )
-  }
+
+  const netSalesMrp = total((b) => b.netMrp)
+  const netSubtotal = total((b) => b.netSubtotal)
+  const customerPaidValue = total((b) => b.customerPaid)
+  // MRP → listed price → what was paid. Splitting the shortfall in two is what
+  // lets the statement show whether the month was discounted by how the goods
+  // are priced or by what was run on top of that price.
+  const listDiscount = netSalesMrp - netSubtotal
+  const promoDiscount = netSubtotal - customerPaidValue
+  // A Nykaa-funded coupon is the one part of the shortfall Nykaa absorbs, so
+  // it is credited back out of what the debit note can charge us. It is never
+  // allowed to turn the deduction negative — a cart-rule file covering orders
+  // the sales file does not carry would otherwise pay us to discount.
+  const customerDiscount = Math.max(listDiscount + promoDiscount - nykaaFundedCoupon, 0)
 
   const facts: NykaaPnlFacts = {
     month,
     grossSalesMrp: total((b) => b.grossMrp),
     returnsMrp: total((b) => b.returnsMrp),
-    netSalesMrp: total((b) => b.netMrp),
+    netSalesMrp,
     unitsShipped: total((b) => b.shipped),
     unitsReturned: total((b) => b.returned),
     netUnits: total((b) => b.netQty),
     orders: orders.size,
-    customerPaidValue: total((b) => b.customerPaid),
-    platformDiscount: total((b) => b.discount),
+    customerPaidValue,
+    listDiscount,
+    promoDiscount,
     nykaaFundedCoupon,
+    customerDiscount,
     cogsPriced: 0,
     cogsUnpriced: 0,
     nykaaAds: 0,
@@ -316,6 +338,13 @@ export function normalizeNykaaWorkbook(
   }
   check('Net MRP = Gross MRP − Returns MRP', facts.grossSalesMrp - facts.returnsMrp, facts.netSalesMrp, 1)
   check('Net units = Shipped − Returned', facts.unitsShipped - facts.unitsReturned, facts.netUnits, 0.5)
+  // The two halves of the discount must account for the whole shortfall. If
+  // they ever do not, the file has a fifth price column and the deduction is
+  // reading the wrong one.
+  check(
+    'List + promo discount = Net MRP − what shoppers paid',
+    facts.netSalesMrp - facts.customerPaidValue, facts.listDiscount + facts.promoDiscount, 1,
+  )
 
   if (combo && combo.length > 1) {
     const kIndex = headerIndex(combo)
@@ -337,9 +366,21 @@ export function normalizeNykaaWorkbook(
       'Link them on the SKU Mapping screen to get COGS and contribution for Nykaa.',
     )
   }
+  if (otherCartRuleDiscount > 0) {
+    warnings.push(
+      `₹${otherCartRuleDiscount.toFixed(2)} of the Cart Rule file is not marked COUPON_NYKAA_FUNDED, so it has been ` +
+      'treated as ours and left inside the discount Nykaa recovers. Check the rule names if that is wrong.',
+    )
+  }
+
+  const inr = (v: number): string => `₹${v.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+  const pctOfMrp = facts.netSalesMrp > 0 ? (facts.customerDiscount / facts.netSalesMrp) * 100 : 0
   warnings.push(
-    'Revenue is built from MRP, because Nykaa buys the goods and takes a flat margin on MRP. What shoppers paid ' +
-    `(₹${facts.customerPaidValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}) is Nykaa's pricing decision and is shown as a memo only.`,
+    `Revenue is built from MRP (${inr(facts.netSalesMrp)} net), because that is what Nykaa raises its PO on. ` +
+    `Shoppers paid ${inr(facts.customerPaidValue)}, and the ${inr(facts.customerDiscount)} of that shortfall ` +
+    `(${pctOfMrp.toFixed(1)}% of MRP — ${inr(facts.listDiscount)} off the printed price, ${inr(facts.promoDiscount)} of ` +
+    `promotions${nykaaFundedCoupon > 0 ? `, less ${inr(nykaaFundedCoupon)} Nykaa funds itself` : ''}) is deducted: ` +
+    'Nykaa recovers it by debit note, raised without GST, so none of it comes back as input credit.',
   )
 
   return { validRecords, totalRows: rows.length, invalidRows, warnings, facts, month, checks }

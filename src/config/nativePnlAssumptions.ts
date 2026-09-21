@@ -41,11 +41,17 @@ export const MEESHO_ASSUMPTIONS = {
  *
  * Nykaa is a B2B channel: Nykaa buys the goods and resells them, and its
  * margin is a flat percentage of MRP rather than a commission on whatever the
- * shopper ended up paying. So the revenue line is built from MRP, not from the
- * sale price — the discount Nykaa chooses to give a shopper is Nykaa's
- * decision and Nykaa's cost, and does not change what Nykaa owes us.
+ * shopper ended up paying. So the revenue line is built from MRP, which is
+ * what Nykaa raises its purchase order on.
  *
- * Both figures are applied when the statement is read, so correcting one
+ * The margin and the customer discount are two separate charges, and reading
+ * them as one is the mistake this block exists to prevent. Nykaa takes its
+ * margin off MRP, and then, having sold below MRP, recovers that discount from
+ * us as well, by a Financial Debit Note raised without GST. At an MRP of ₹100
+ * and a 10% shopper discount we are charged ₹38 of margin *and* ₹10 of
+ * discount, not ₹38 in total.
+ *
+ * Every figure here is applied when the statement is read, so correcting one
  * restates every month rather than only the months uploaded afterwards. A
  * month that was genuinely traded on different terms overrides them in its own
  * facts.
@@ -56,4 +62,19 @@ export const NYKAA_ASSUMPTIONS = {
   /** MRP is a tax-inclusive price by law, so what we realise out of it is
    * tax-inclusive too. This strips the tax back out to state revenue. */
   outputGstPct: 18,
+  /**
+   * Which part of the shortfall against MRP the debit note recovers.
+   *
+   * `full` — everything between MRP and what the shopper paid: the standing
+   * discount off the printed price *and* the promotions on top of it. This is
+   * the rule as it was described to us — Nykaa raises the PO on MRP, and any
+   * rupee it then sells below MRP comes back on the note.
+   *
+   * `promo-only` — the promotions alone, on the reading that the listed price
+   * is already priced into the margin. Nykaa's August file puts ₹6.90 lakh in
+   * the first bucket and ₹0.99 lakh in the second, so the choice moves the
+   * month by more than the whole of its advertising. Both are computed either
+   * way and both are on the statement; this only picks which one is deducted.
+   */
+  discountRecovered: 'full' as 'full' | 'promo-only',
 }

@@ -168,6 +168,10 @@ interface DataState extends SharedDataset, MappingTablesState {
   importSkuMapWorkbook: (fileName: string, parsed: SkuMapWorkbookResult) => Promise<ImportOutcome>
   patchFlipkartFacts: (month: string, patch: Partial<FlipkartPnlFacts>) => Promise<void>
   patchAmazonUsaFacts: (month: string, patch: Partial<AmazonUsaPnlFacts>) => Promise<void>
+  /** Records Nykaa's discount debit note against the month it bills. It is
+   * a patch, not an import: the month's figures come from the sales file and
+   * the note only adds what Nykaa says it charged. */
+  patchNykaaFacts: (month: string, patch: Partial<NykaaPnlFacts>) => Promise<void>
 }
 
 /** Vercel rejects a request body over ~4.5 MB, and a real Flipkart workbook
@@ -415,5 +419,6 @@ export const useDataStore = create<DataState>((set, get) => {
 
     patchFlipkartFacts: (month, patch) => writeThen(() => api.patch('/api/facts/flipkart', { month, patch })),
     patchAmazonUsaFacts: (month, patch) => writeThen(() => api.patch('/api/facts/amazon-usa', { month, patch })),
+    patchNykaaFacts: (month, patch) => writeThen(() => api.patch('/api/facts/nykaa', { month, patch })),
   }
 })

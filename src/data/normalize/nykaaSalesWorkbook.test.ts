@@ -10,13 +10,19 @@ const SALES_HEADER = [
   'externorderno', 'skucode', 'sku_type', 'brand_name', 'invoiceno', 'orderdate', 'orderqty',
   'unit_mrp', 'row_mrp', 'row_discount', 'qty_at_mrp', 'return_qty', 'return_mrp2',
   'final_qty', 'final_mrp', 'final_sp', 'product_name', 'canonical_l1', 'canonical_l2', 'day_of_date',
+  'final_subtotal',
 ]
 // orderno, sku, type, brand, invoice, orderdate, orderqty, unit_mrp, row_mrp,
 // row_discount, qty_at_mrp, return_qty, return_mrp2, final_qty, final_mrp,
-// final_sp, name, l1, l2, day
-const TEATREE = ['NYK-1', 'ARAVI00000002', 'SIMPLE', 'aravi organic', 'INV1', '2026-08-01 00:39:56', 3, 322, 966, 0, 3, 1, 322, 2, 644, 518, 'Tea Tree Oil', 'Bath & Body', 'Body Care', '2026-08-01']
-const ROSEMARY = ['NYK-2', 'ARAVI00000033', 'CONFIG', 'aravi organic', 'INV2', '2026-08-10 13:29:00', 2, 649, 1298, 175.6, 2, 0, 0, 2, 1298, 878, 'Rosemary Oil', 'Hair', 'Hair Care', '2026-08-10']
-const NOTHING = ['NYK-3', 'ARAVI00000099', 'SIMPLE', 'aravi organic', 'INV3', '2026-08-11 10:00:00', 0, 299, 0, 0, 0, 0, 0, 0, 0, 0, 'Dormant SKU', 'Skin', 'Lip Care', '2026-08-11']
+// final_sp, name, l1, l2, day, final_subtotal
+//
+// The four prices are the point of the file: MRP → listed price
+// (final_subtotal) → what was paid (final_sp). Tea Tree is listed 126 below
+// MRP with no promotion on top; Rosemary is listed 244.40 below MRP and then
+// carries the 175.60 coupon the Cart Rule file names.
+const TEATREE = ['NYK-1', 'ARAVI00000002', 'SIMPLE', 'aravi organic', 'INV1', '2026-08-01 00:39:56', 3, 322, 966, 0, 3, 1, 322, 2, 644, 518, 'Tea Tree Oil', 'Bath & Body', 'Body Care', '2026-08-01', 518]
+const ROSEMARY = ['NYK-2', 'ARAVI00000033', 'CONFIG', 'aravi organic', 'INV2', '2026-08-10 13:29:00', 2, 649, 1298, 175.6, 2, 0, 0, 2, 1298, 878, 'Rosemary Oil', 'Hair', 'Hair Care', '2026-08-10', 1053.6]
+const NOTHING = ['NYK-3', 'ARAVI00000099', 'SIMPLE', 'aravi organic', 'INV3', '2026-08-11 10:00:00', 0, 299, 0, 0, 0, 0, 0, 0, 0, 0, 'Dormant SKU', 'Skin', 'Lip Care', '2026-08-11', 0]
 
 const sales = (rows: (string | number)[][] = [TEATREE, ROSEMARY]): RawSheet => [SALES_HEADER, ...rows]
 
@@ -78,25 +84,41 @@ describe('normalizeNykaaWorkbook', () => {
     expect(f.netUnits).toBe(4)
   })
 
-  it('keeps what shoppers paid as a memo, never as revenue', () => {
+  it('splits the shortfall against MRP into the listed price and the promotions', () => {
     const f = run().facts!
     expect(f.customerPaidValue).toBe(518 + 878)
     expect(f.customerPaidValue).toBeLessThan(f.netSalesMrp)
-    expect(f.platformDiscount).toBeCloseTo(175.6, 2)
+    // 1942 of MRP listed at 1571.60 and sold for 1396.
+    expect(f.listDiscount).toBeCloseTo(370.4, 2)
+    expect(f.promoDiscount).toBeCloseTo(175.6, 2)
+    expect(f.listDiscount + f.promoDiscount).toBeCloseTo(f.netSalesMrp - f.customerPaidValue, 6)
   })
 
-  it('takes the coupon value from the Cart Rule file as Nykaa-funded', () => {
-    expect(run().facts!.nykaaFundedCoupon).toBeCloseTo(175.6, 2)
+  it('charges us the shortfall, less only what Nykaa funds itself', () => {
+    const f = run().facts!
+    expect(f.nykaaFundedCoupon).toBeCloseTo(175.6, 2)
+    expect(f.customerDiscount).toBeCloseTo(370.4, 2)
   })
 
-  it('calls out a brand-funded coupon rather than folding it in silently', () => {
+  it('treats a coupon Nykaa did not fund as ours', () => {
     const brandFunded: RawSheet = [
       ['nykaa_orderno', 'cart_rule_discount', 'discount_category'],
       ['NYK-2', 100, 'COUPON_BRAND_FUNDED'],
     ]
     const r = normalizeNykaaWorkbook(sales(), brandFunded, COMBO, MASTER, [], 'imp')
     expect(r.facts!.nykaaFundedCoupon).toBe(0)
-    expect(r.warnings.some((w) => w.includes('not marked Nykaa-funded'))).toBe(true)
+    // Nothing is credited back, so the whole 546 comes off.
+    expect(r.facts!.customerDiscount).toBeCloseTo(370.4 + 175.6, 2)
+    expect(r.warnings.some((w) => w.includes('not marked COUPON_NYKAA_FUNDED'))).toBe(true)
+  })
+
+  it('never pays us to discount, however large the cart-rule file is', () => {
+    const overstated: RawSheet = [
+      ['nykaa_orderno', 'cart_rule_discount', 'discount_category'],
+      ['NYK-2', 99999, 'COUPON_NYKAA_FUNDED'],
+    ]
+    const r = normalizeNykaaWorkbook(sales(), overstated, COMBO, MASTER, [], 'imp')
+    expect(r.facts!.customerDiscount).toBe(0)
   })
 
   it('checks the file\'s own arithmetic and reports the gap', () => {
@@ -122,6 +144,7 @@ describe('normalizeNykaaWorkbook', () => {
     expect(tea.quantity).toBe(2)
     expect(tea.returnUnits).toBe(1)
     expect(tea.raw?.final_sp).toBe(518)
+    expect(tea.raw?.final_subtotal).toBe(518)
   })
 
   it('resolves the product through the SKU mapping and flags what is unlinked', () => {
@@ -146,7 +169,10 @@ describe('normalizeNykaaWorkbook', () => {
 
   it('works with no companion files at all', () => {
     const r = normalizeNykaaWorkbook(sales(), undefined, undefined, MASTER, [], 'imp')
+    // Without the Cart Rule file nothing is known to be Nykaa-funded, so the
+    // whole shortfall is charged to us — the safe direction to be wrong in.
     expect(r.facts!.nykaaFundedCoupon).toBe(0)
+    expect(r.facts!.customerDiscount).toBeCloseTo(546, 2)
     expect(r.facts!.netSalesMrp).toBe(644 + 1298)
   })
 })

@@ -277,10 +277,13 @@ export interface MyntraPnlFacts {
  * Nykaa — one month of the three files Nykaa sends.
  *
  * Nykaa is a B2B channel, which changes where revenue comes from. Nykaa buys
- * the goods and resells them, taking a flat margin on MRP; what a shopper
- * actually paid is Nykaa\'s pricing decision, not our revenue. So every figure
- * that feeds the P&L is measured at MRP, and the customer-facing sale value is
- * carried alongside as a memo — visible, and in no total.
+ * the goods and resells them, taking a flat margin on MRP. So the revenue line
+ * is measured at MRP, which is what Nykaa raises its PO on.
+ *
+ * The discount a shopper gets is a second, separate thing. We fund it: Nykaa
+ * sells below MRP and recovers the difference from us with a Financial Debit
+ * Note, raised without GST. So the sale price is not a memo — the gap between
+ * MRP and it is a real cost, and the fields below carry it.
  *
  * Amounts are positive magnitudes. The statement does the subtracting.
  */
@@ -304,15 +307,31 @@ export interface NykaaPnlFacts {
   commissionPctOfMrp?: number
   outputGstPct?: number
 
-  /** Memo only — never in a total.
-   *
-   * What the shopper paid (Σ final_sp), the platform discount inside that
-   * price (Σ row_discount), and the coupon value from the Cart Rule file,
-   * which is funded by Nykaa and is therefore Nykaa\'s cost and not ours.
-   */
+  /** What the shopper actually paid, Σ final_sp. Everything Nykaa sold below
+   * MRP is recovered from us, so this is where the discount cost comes from. */
   customerPaidValue: number
-  platformDiscount: number
+  /** The standing discount off MRP, Σ (final_mrp − final_subtotal): the gap
+   * between the printed price and the price the product is listed at. */
+  listDiscount: number
+  /** Promotions on top of the listed price, Σ (final_subtotal − final_sp) —
+   * coupons, cart rules, offer codes. */
+  promoDiscount: number
+  /** The slice of `promoDiscount` the Cart Rule file marks COUPON_NYKAA_FUNDED.
+   * Nykaa pays for that one, so it is credited back out of what we owe. */
   nykaaFundedCoupon: number
+  /** What Nykaa recovers by debit note: list + promo, less anything Nykaa
+   * funds itself. A real deduction, carrying no GST and so no input credit. */
+  customerDiscount: number
+
+  /** Nykaa\'s Financial Debit Note for the month, once it arrives — the
+   * document that actually charges the discount back. It is not what the P&L
+   * deducts (it can arrive months late, and the month has to close without
+   * it); it is read to check the figure the sales file already implies. */
+  discountDebitNote?: {
+    amount: number
+    documentNumber: string
+    documentDate: string
+  }
 
   /** Computed here, not by Nykaa: what the goods cost, priced from the
    * company\'s own cost sheet at the month\'s effective cost. */

@@ -15,6 +15,7 @@ import {
   detectNykaaCartRuleSheet, detectNykaaComboSheet, detectNykaaSalesSheet, normalizeNykaaWorkbook,
 } from '@/data/normalize/nykaaSalesWorkbook'
 import { detectNykaaMarketingInvoice, parseNykaaMarketingInvoice } from '@/data/normalize/nykaaMarketingInvoice'
+import { detectNykaaDiscountDebitNote, parseNykaaDiscountDebitNote } from '@/data/normalize/nykaaDiscountDebitNote'
 import { readPdfText } from '@/lib/pdfText'
 import { checkForDuplicates } from '@/data/normalize/duplicates'
 import { useDataStore, type ImportOutcome } from '@/store/dataStore'
@@ -35,6 +36,7 @@ type ReportKind =
   | 'nykaa_sales'
   | 'nykaa_companion'
   | 'nykaa_marketing_invoice'
+  | 'nykaa_discount_debit_note'
   | 'meesho_order_summary'
   | 'meesho_order_payments'
   | 'meesho_settlement_json'
@@ -50,6 +52,7 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   nykaa_sales: 'Nykaa — Monthly Sales Data (B2B, margin on MRP)',
   nykaa_companion: 'Nykaa — Cart Rule / Combo file',
   nykaa_marketing_invoice: 'Nykaa — Marketing Invest (MI) tax invoice',
+  nykaa_discount_debit_note: 'Nykaa — discount Financial Debit Note',
   meesho_order_summary: 'Meesho — Order Summary Report',
   meesho_order_payments: 'Meesho — Aggregated Payment File (Order Payments + Ads Cost)',
   meesho_settlement_json: 'Meesho — Settlement Data (JSON)',
@@ -65,6 +68,7 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   nykaa_sales: 'nykaa',
   nykaa_companion: 'nykaa',
   nykaa_marketing_invoice: 'nykaa',
+  nykaa_discount_debit_note: 'nykaa',
   meesho_order_summary: 'meesho',
   meesho_order_payments: 'meesho',
   meesho_settlement_json: 'meesho',
@@ -87,6 +91,8 @@ interface PreviewState {
   amazonUsaFacts?: AmazonUsaPnlFacts
   myntraFacts?: MyntraPnlFacts
   nykaaFacts?: NykaaPnlFacts
+  /** A debit note edits one month's stored facts rather than importing rows. */
+  nykaaDebitNote?: { month: string; patch: Partial<NykaaPnlFacts> }
   /** A month's ad spend that arrived as an invoice rather than a report. */
   manualAdSpend?: Omit<ManualAdSpend, 'enteredAt'>
   meeshoFactsByMonth?: MeeshoPnlFacts[]
@@ -157,7 +163,10 @@ async function findNykaaCompanions(files: File[]): Promise<NykaaCompanions> {
 }
 
 export function UploadReportsPage() {
-  const { skuMaster, mappings, importReport, importProgress, importSkuMapWorkbook, saveManualAdSpend, clearMeeshoData, meeshoFacts } = useDataStore()
+  const {
+    skuMaster, mappings, importReport, importProgress, importSkuMapWorkbook, saveManualAdSpend,
+    patchNykaaFacts, nykaaFacts, clearMeeshoData, meeshoFacts,
+  } = useDataStore()
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null)
   const { month: filterMonth } = useFilterStore()
   const [stage, setStage] = useState<Stage>('idle')
@@ -228,6 +237,36 @@ export function UploadReportsPage() {
     return buildPreview({ ...base, totalRows: r.totalRows, validRecords: [], adsRecords: r.adsRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
   }
 
+  /**
+   * What the note charges, next to what the month's own files say it should.
+   *
+   * The whole reason to read the note is this comparison. The discount is
+   * deducted from the sales file, which states it per row and arrives on time;
+   * the note turns up months later and is Nykaa's version of the same figure.
+   * Where they disagree, someone has to ask Nykaa, and that only happens if
+   * the difference is put in front of them at upload.
+   */
+  function describeDebitNote(amount: number, month: string): string {
+    const inr = (v: number): string => `₹${v.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+    const facts = nykaaFacts.find((f) => f.month === month)
+    if (!facts) {
+      return (
+        `This note charges ${inr(amount)} against ${month}, but no Nykaa sales file for ${month} is on file, so ` +
+        'there is nothing to check it against and nothing to record it on. Upload that month\'s Sales file first.'
+      )
+    }
+    const expected = facts.customerDiscount ?? 0
+    const gap = amount - expected
+    if (Math.abs(gap) <= Math.max(expected * 0.01, 1)) {
+      return `This note charges ${inr(amount)} against ${month}, which matches the ${inr(expected)} of discount in that month's sales file.`
+    }
+    return (
+      `This note charges ${inr(amount)} against ${month}, but that month's sales file accounts for ${inr(expected)} ` +
+      `— a difference of ${inr(Math.abs(gap))} ${gap > 0 ? 'more than' : 'less than'} expected. The P&L still deducts ` +
+      'the figure from the sales file; take the difference up with Nykaa.'
+    )
+  }
+
   /** Reads one file and works out what it is. Returns the result rather than
    * setting state, so a failure on one file leaves the others alone. */
   async function analyzeFile(file: File, nykaa?: NykaaCompanions): Promise<QueueItem> {
@@ -236,12 +275,37 @@ export function UploadReportsPage() {
     try {
       const lowerName = file.name.toLowerCase()
       if (lowerName.endsWith('.pdf')) {
-        // Nykaa's Marketing Invest bill is emailed as a PDF and is the only
-        // way that cost reaches the business, so it is read here rather than
-        // retyped from the attachment.
+        // Two of Nykaa's charges only ever arrive as emailed PDFs — the
+        // Marketing Invest bill and the debit note that charges the customer
+        // discount back — so both are read here rather than retyped.
         const text = await readPdfText(file)
+        if (detectNykaaDiscountDebitNote(text)) {
+          const r = parseNykaaDiscountDebitNote(text)
+          if (!r.note) return fail(r.warnings[0] ?? 'This Nykaa debit note could not be read.')
+          const failed = r.checks.filter((c) => !c.passed).map((c) => `${c.name}: ${c.detail}`)
+          return { id, fileName: file.name, status: 'ready', preview: await buildPreview({
+            fileName: file.name, reportKind: 'nykaa_discount_debit_note', totalRows: 1,
+            validRecords: [], invalidCount: 0,
+            warnings: [...failed, ...r.warnings, describeDebitNote(r.note.amount, r.note.activityMonth)],
+            nykaaDebitNote: {
+              month: r.note.activityMonth,
+              patch: {
+                discountDebitNote: {
+                  // The whole charge, because the note carries no GST: there
+                  // is no taxable-value-versus-total split to get wrong here,
+                  // unlike the MI invoice.
+                  amount: r.note.amount,
+                  documentNumber: r.note.documentNumber,
+                  documentDate: r.note.documentDate,
+                },
+              },
+            },
+          }) }
+        }
         if (!detectNykaaMarketingInvoice(text)) {
-          return fail('This PDF is not a Nykaa Marketing Invest invoice. No other PDF is read yet.')
+          return fail(
+            'This PDF is not a Nykaa Marketing Invest invoice or discount debit note. No other PDF is read yet.',
+          )
         }
         const r = parseNykaaMarketingInvoice(text)
         if (!r.invoice) return fail(r.warnings[0] ?? 'This Nykaa MI invoice could not be read.')
@@ -428,6 +492,20 @@ export function UploadReportsPage() {
       const preview = item.preview
       if (!preview) throw new Error('Nothing to import for this file.')
 
+      // The debit note does not import anything. It records what Nykaa charged
+      // against a month whose discount the sales file already accounts for, so
+      // the statement can show the two side by side.
+      if (preview.nykaaDebitNote) {
+        await patchNykaaFacts(preview.nykaaDebitNote.month, preview.nykaaDebitNote.patch)
+        const outcome: ImportOutcome = {
+          fileName: preview.fileName, added: 0, skippedAsDuplicate: 0,
+          monthsUpdated: [preview.nykaaDebitNote.month],
+        }
+        setOutcome(outcome)
+        updateItem(item.id, { status: 'done', outcome })
+        return
+      }
+
       // An invoice is not a report: it carries one figure for one channel-month
       // and is stored where the Ads screens and the channel P&L both read it.
       if (preview.manualAdSpend) {
@@ -518,7 +596,8 @@ export function UploadReportsPage() {
           SKU-level P&L exports (or the full P&L workbook), Amazon USA Product Profitability exports, Amazon Ads
           Sponsored Products campaign reports, Meesho Order Summary reports and the Meesho aggregated payment file,
           Myntra&apos;s P&L report, Nykaa&apos;s three monthly files (Sales, Cart Rule, Combo — drop all three in
-          together), and Nykaa&apos;s Marketing Invest invoice as the PDF it is emailed as.
+          together), and Nykaa&apos;s two PDFs as they are emailed: the Marketing Invest invoice and the Financial
+          Debit Note that charges the customer discount back.
         </p>
         {reading && (
           <p className="mt-3 text-sm text-[var(--ink-2)]">
