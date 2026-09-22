@@ -4,7 +4,7 @@ import { Card, CardHeader, Badge } from '@/components/ui/Surface'
 import { useDataStore } from '@/store/dataStore'
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { fxRateForMonth } from '@/data/fxRates'
-import { freightRateForMonth } from '@/data/freightRates'
+import { freightRateForMonth, type FreightLane } from '@/data/freightRates'
 import { monthLabel, toMonthKey } from '@/lib/format'
 
 /**
@@ -182,7 +182,8 @@ export function FxRatesPage() {
         </p>
       </Card>
 
-      <FreightSection />
+      <FreightSection lane="india_usa" />
+      <FreightSection lane="nykaa_inbound" />
     </PageShell>
   )
 }
@@ -202,20 +203,57 @@ export function FxRatesPage() {
  * like the exchange rate and the cost sheet: a closed month keeps what it was
  * closed on, and a correction reaches every month that should see it.
  */
-function FreightSection() {
-  const { freightRates, amazonUsaFacts, saveFreightRate, removeFreightRate } = useDataStore()
+/**
+ * Each lane's copy. They are genuinely different costs: one is an airway bill
+ * with a standing figure behind it, the other a carrier rate card of a rupee
+ * or two a unit, and only the first has a default worth falling back to.
+ */
+const LANE_COPY: Record<FreightLane, {
+  title: string
+  subtitle: string
+  placeholder: string
+  sourceHint: string
+  /** What an unentered month costs. Undefined means nothing is charged. */
+  fallback?: number
+  emptyState: string
+}> = {
+  india_usa: {
+    title: 'India → USA freight',
+    subtitle: "Rupees per unit shipped. Take the month's total inbound freight and divide by the units it carried.",
+    placeholder: NATIVE_PNL_ASSUMPTIONS.indiaUsaFreightPerUnitInr.toFixed(2),
+    sourceHint: 'Forwarder invoice, airway bill, quarter average…',
+    fallback: NATIVE_PNL_ASSUMPTIONS.indiaUsaFreightPerUnitInr,
+    emptyState: 'Nothing entered yet — every Amazon USA month is freighted at the default.',
+  },
+  nykaa_inbound: {
+    title: 'HLPL warehouse → Nykaa warehouse',
+    subtitle:
+      'Rupees per unit, from the carrier rate card. Charged on the units Nykaa sold in the month, so it moves with volume.',
+    placeholder: '1.50',
+    sourceHint: 'Rate card, carrier invoice, negotiated slab…',
+    emptyState: 'Nothing entered yet — Nykaa months carry no delivery cost until a rate is entered.',
+  },
+}
+
+function FreightSection({ lane }: { lane: FreightLane }) {
+  const copy = LANE_COPY[lane]
+  const { freightRates, amazonUsaFacts, nykaaFacts, saveFreightRate, removeFreightRate } = useDataStore()
   const [month, setMonth] = useState(() => toMonthKey(new Date().toISOString().slice(0, 10)))
   const [perUnit, setPerUnit] = useState('')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const usaMonths = useMemo(
-    () => [...new Set(amazonUsaFacts.map((f) => f.month))].sort().reverse(),
-    [amazonUsaFacts],
-  )
-  const missing = usaMonths.filter((m) => !freightRateForMonth(m, freightRates).entered)
-  const sorted = [...freightRates].sort((a, b) => b.month.localeCompare(a.month))
+  // The months worth prompting about are the ones this lane's channel
+  // actually traded in. Listing every month would make the prompt noise.
+  const tradedMonths = useMemo(() => {
+    const facts = lane === 'india_usa' ? amazonUsaFacts : nykaaFacts
+    return [...new Set(facts.map((f) => f.month))].sort().reverse()
+  }, [lane, amazonUsaFacts, nykaaFacts])
+  const missing = tradedMonths.filter((m) => !freightRateForMonth(m, freightRates, lane).entered)
+  const sorted = freightRates
+    .filter((r) => (r.lane ?? 'india_usa') === lane)
+    .sort((a, b) => b.month.localeCompare(a.month))
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -227,7 +265,7 @@ function FreightSection() {
     setBusy(true)
     setError(null)
     try {
-      await saveFreightRate({ month, perUnitInr: value, note: note.trim() || undefined })
+      await saveFreightRate({ month, lane, perUnitInr: value, note: note.trim() || undefined })
       setPerUnit('')
       setNote('')
     } catch (err) {
@@ -240,10 +278,7 @@ function FreightSection() {
   return (
     <>
       <Card>
-        <CardHeader
-          title="India → USA freight"
-          subtitle="Rupees per unit shipped. Take the month's total inbound freight and divide by the units it carried."
-        />
+        <CardHeader title={copy.title} subtitle={copy.subtitle} />
         <form onSubmit={submit} className="mt-4 flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1">
             <span className="text-xs font-medium text-[var(--ink-3)]">Month</span>
@@ -262,7 +297,7 @@ function FreightSection() {
               min="0"
               value={perUnit}
               onChange={(e) => setPerUnit(e.target.value)}
-              placeholder={NATIVE_PNL_ASSUMPTIONS.indiaUsaFreightPerUnitInr.toFixed(2)}
+              placeholder={copy.placeholder}
               className="w-32 rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-3 py-1.5 text-sm tabular-nums text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
             />
           </label>
@@ -272,7 +307,7 @@ function FreightSection() {
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Forwarder invoice, airway bill, quarter average…"
+              placeholder={copy.sourceHint}
               className="w-full rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
             />
           </label>
@@ -287,19 +322,26 @@ function FreightSection() {
         {error && <p className="mt-2 text-sm text-[var(--critical-ink)]">{error}</p>}
         {missing.length > 0 && (
           <p className="mt-3 text-xs text-[var(--ink-3)]">
-            No freight rate entered for {missing.map(monthLabel).join(', ')} — those months are using the default{' '}
-            <Badge tone="neutral">₹{NATIVE_PNL_ASSUMPTIONS.indiaUsaFreightPerUnitInr.toFixed(2)}</Badge> per unit.
+            No rate entered for {missing.map(monthLabel).join(', ')} —{' '}
+            {copy.fallback === undefined ? (
+              <>those months carry <Badge tone="warn">no freight cost at all</Badge>, so their margin is overstated.</>
+            ) : (
+              <>those months are using the default <Badge tone="neutral">₹{copy.fallback.toFixed(2)}</Badge> per unit.</>
+            )}
           </p>
         )}
       </Card>
 
       <Card padded={false}>
         <div className="px-5 pt-5">
-          <CardHeader title="Freight on file" subtitle={`${sorted.length} month${sorted.length === 1 ? '' : 's'}`} />
+          <CardHeader
+            title={`${copy.title} — on file`}
+            subtitle={`${sorted.length} month${sorted.length === 1 ? '' : 's'}`}
+          />
         </div>
         {sorted.length === 0 ? (
           <p className="px-5 pb-5 text-sm text-[var(--ink-3)]">
-            Nothing entered yet — every Amazon USA month is freighted at the default.
+            {copy.emptyState}
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -321,7 +363,7 @@ function FreightSection() {
                     <td className="px-5 py-2.5 text-right">
                       <button
                         type="button"
-                        onClick={() => void removeFreightRate(r.month)}
+                        onClick={() => void removeFreightRate(r.month, lane)}
                         className="text-xs font-medium text-[var(--ink-3)] hover:text-[var(--critical-ink)]"
                       >
                         Remove

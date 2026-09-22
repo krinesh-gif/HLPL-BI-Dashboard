@@ -8,7 +8,7 @@ import type { CostVersion } from '@/data/costVersions'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
 import type { FxRate } from '@/data/fxRates'
-import type { FreightRate } from '@/data/freightRates'
+import type { FreightLane, FreightRate } from '@/data/freightRates'
 import type {
   AdsRecord,
   AmazonUsaPnlFacts,
@@ -155,7 +155,7 @@ interface DataState extends SharedDataset, MappingTablesState {
   saveFxRate: (rate: FxRate) => Promise<void>
   saveFreightRate: (rate: FreightRate) => Promise<void>
   removeFxRate: (month: string) => Promise<void>
-  removeFreightRate: (month: string) => Promise<void>
+  removeFreightRate: (month: string, lane?: FreightLane) => Promise<void>
   /** Saves a month's fixed operating costs. Keyed on (month, category), so
    * saving the same month again corrects it rather than adding to it. */
   saveFixedExpenses: (entries: FixedExpenseEntry[]) => Promise<void>
@@ -347,7 +347,9 @@ export const useDataStore = create<DataState>((set, get) => {
     saveFreightRate: (rate) => writeThen(() => api.post('/api/cost-versions', { freightRates: [rate] })),
 
     removeFxRate: (month) => writeThen(() => api.delete(`/api/cost-versions?fxMonth=${encodeURIComponent(month)}`)),
-    removeFreightRate: (month) => writeThen(() => api.delete(`/api/cost-versions?freightMonth=${encodeURIComponent(month)}`)),
+    removeFreightRate: (month, lane = 'india_usa') => writeThen(() => api.delete(
+      `/api/cost-versions?freightMonth=${encodeURIComponent(month)}&freightLane=${encodeURIComponent(lane)}`,
+    )),
 
     saveFixedExpenses: (entries) => writeThen(() => api.post('/api/cost-versions', { fixedExpenses: entries })),
     removeFixedExpense: (month, category) =>

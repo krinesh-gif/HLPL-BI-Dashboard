@@ -80,6 +80,11 @@ export const NYKAA_LINE_DEFS: NativeLineDef[] = [
     note: 'what a rupee of MRP is finally worth to us, after both the margin and the discount',
   },
 
+  {
+    key: 'inboundFreight', label: 'Less: Freight to Nykaa warehouse', section: 'COST OF GOODS SOLD',
+    kind: 'input', hideWhenZero: true,
+    note: 'net units × the rate card entered for the month — a rupee or two a unit, and six thousand units a month',
+  },
   { key: 'cogsPriced', label: 'Less: COGS — priced SKUs', section: 'COST OF GOODS SOLD', kind: 'input' },
   { key: 'cogsUnpriced', label: 'Less: COGS — unpriced SKUs (est.)', section: 'COST OF GOODS SOLD', kind: 'input', note: '⚠ estimate — goes to zero once every SKU is mapped and priced' },
   { key: 'totalCogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
@@ -189,7 +194,11 @@ export function computeNykaaPnl(facts: NykaaPnlFacts): NativeLineValues {
   const {
     commission, realisationInclGst, outputGst, invoiceRevenueExGst, customerDiscount, netRevenueExGst,
   } = nykaaRevenue(facts)
-  const totalCogs = facts.cogsPriced + facts.cogsUnpriced
+  // Freight to Nykaa's warehouse is part of what the goods cost delivered, so
+  // it sits inside COGS and inside CM1 rather than below it. It is a cost of
+  // having the goods to sell, not a cost of selling them.
+  const inboundFreight = facts.inboundFreight ?? 0
+  const totalCogs = facts.cogsPriced + facts.cogsUnpriced + inboundFreight
   const cm1 = netRevenueExGst - totalCogs
   const cm2 = cm1 - facts.nykaaAds
   const pct = (v: number): number => (netRevenueExGst !== 0 ? (v / netRevenueExGst) * 100 : 0)
@@ -225,6 +234,7 @@ export function computeNykaaPnl(facts: NykaaPnlFacts): NativeLineValues {
     netRevenueExGst,
     realisationPctOfMrp: ofMrp(netRevenueExGst),
 
+    inboundFreight: -inboundFreight,
     cogsPriced: -facts.cogsPriced,
     cogsUnpriced: -facts.cogsUnpriced,
     totalCogs: -totalCogs,
@@ -283,10 +293,16 @@ export function nykaaToCanonicalBuckets(facts: NykaaPnlFacts): PnlLineValues {
     // never revenue — removed here to put Nykaa on the same ex-GST footing as
     // every other channel in the Master P&L.
     otherRevenueAdj: outputGst,
-    cogs: facts.cogsPriced + facts.cogsUnpriced,
+    // Freight to Nykaa's warehouse goes in with the goods, not in a shipping
+    // bucket, because the statement counts it inside COGS. Booking it below
+    // the line instead would have left this month reporting 40.5% gross margin
+    // on the Master P&L and 38.4% CM1 on Nykaa's own page — the same
+    // disagreement that putting Nykaa's trade margin in the wrong bucket
+    // caused, and the same reason not to.
+    cogs: facts.cogsPriced + facts.cogsUnpriced + (facts.inboundFreight ?? 0),
+    shipping: 0,
     marketplaceCommission: 0,
     fulfilment: 0,
-    shipping: 0,
     collectionFees: 0,
     rtoCharges: 0,
     returnCharges: 0,

@@ -50,7 +50,10 @@ interface FxRateInput {
   note?: string
 }
 
-interface FreightRateInput { month: string; perUnitInr: number; note?: string }
+const FREIGHT_LANES = ['india_usa', 'nykaa_inbound'] as const
+type FreightLane = (typeof FREIGHT_LANES)[number]
+
+interface FreightRateInput { month: string; lane?: FreightLane; perUnitInr: number; note?: string }
 
 function isFreightRateArray(v: unknown): v is FreightRateInput[] {
   return (
@@ -60,8 +63,12 @@ function isFreightRateArray(v: unknown): v is FreightRateInput[] {
       const c = x as FreightRateInput
       // Zero is allowed — a month with no inbound shipment really did cost
       // nothing to freight. Negative is not.
+      // The lane is what the rate is for. An unknown one is refused rather
+      // than defaulted, because silently filing a Nykaa rate against the
+      // airway bill would reprice a different channel.
       return (
         isNonEmptyString(c.month) && MONTH_PATTERN.test(c.month) &&
+        (c.lane === undefined || FREIGHT_LANES.includes(c.lane)) &&
         typeof c.perUnitInr === 'number' && Number.isFinite(c.perUnitInr) && c.perUnitInr >= 0
       )
     })
@@ -131,12 +138,13 @@ export async function GET(request: Request): Promise<Response> {
   `) as Row[]
 
   const freightRows = (await sql`
-    SELECT month, per_unit_inr, note, updated_at FROM freight_rates ORDER BY month DESC
+    SELECT month, lane, per_unit_inr, note, updated_at FROM freight_rates ORDER BY lane, month DESC
   `) as Row[]
 
   return json({
     freightRates: freightRows.map((r) => ({
       month: String(r.month),
+      lane: r.lane ? String(r.lane) : 'india_usa',
       perUnitInr: Number(r.per_unit_inr),
       note: r.note ? String(r.note) : undefined,
       updatedAt: r.updated_at ? new Date(String(r.updated_at)).toISOString() : undefined,
@@ -201,19 +209,23 @@ export async function POST(request: Request): Promise<Response> {
 
   if (body && body.freightRates !== undefined) {
     if (!isFreightRateArray(body.freightRates)) {
-      return json({ error: 'Expected { freightRates: [{ month: "yyyy-mm", perUnitInr: number >= 0, note? }] }.' }, 400)
+      return json(
+        { error: 'Expected { freightRates: [{ month: "yyyy-mm", lane?: "india_usa"|"nykaa_inbound", perUnitInr: number >= 0, note? }] }.' },
+        400,
+      )
     }
     if (body.freightRates.length === 0) return json({ saved: 0 })
     await sql.query(
-      `INSERT INTO freight_rates (month, per_unit_inr, note, updated_by)
-       SELECT * FROM UNNEST($1::text[], $2::float8[], $3::text[], $4::text[])
-       ON CONFLICT (month) DO UPDATE SET
+      `INSERT INTO freight_rates (month, lane, per_unit_inr, note, updated_by)
+       SELECT * FROM UNNEST($1::text[], $2::text[], $3::float8[], $4::text[], $5::text[])
+       ON CONFLICT (month, lane) DO UPDATE SET
          per_unit_inr = EXCLUDED.per_unit_inr,
          note = EXCLUDED.note,
          updated_by = EXCLUDED.updated_by,
          updated_at = now()`,
       [
         body.freightRates.map((r) => r.month),
+        body.freightRates.map((r) => r.lane ?? 'india_usa'),
         body.freightRates.map((r) => r.perUnitInr),
         body.freightRates.map((r) => r.note ?? null),
         body.freightRates.map(() => auth.user.id),
@@ -306,7 +318,12 @@ export async function DELETE(request: Request): Promise<Response> {
 
   const freightMonth = url.searchParams.get('freightMonth')
   if (isNonEmptyString(freightMonth)) {
-    await sql`DELETE FROM freight_rates WHERE month = ${freightMonth}`
+    // Without the lane this would delete both lanes' rates for the month. It
+    // defaults to the airway bill, which is what every caller meant before
+    // lanes existed.
+    const lane = url.searchParams.get('freightLane')
+    const freightLane = lane !== null && (FREIGHT_LANES as readonly string[]).includes(lane) ? lane : 'india_usa'
+    await sql`DELETE FROM freight_rates WHERE month = ${freightMonth} AND lane = ${freightLane}`
     return json({ deleted: 1 })
   }
 

@@ -52,7 +52,8 @@ export function usePnlInputs(): {
         ...inputs,
         marketing: marketingFromAds(adsRecords, month, manualAdSpend),
         fxRate: fxRateValue(month, fxRates),
-        freightPerUnitInr: freightRateValue(month, freightRates),
+        freightPerUnitInr: freightRateValue(month, freightRates, 'india_usa'),
+        nykaaFreightPerUnitInr: freightRateValue(month, freightRates, 'nykaa_inbound'),
       }),
     }
   }, [

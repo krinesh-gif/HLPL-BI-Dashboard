@@ -208,3 +208,56 @@ describe('a channel share of the company fixed expenses', () => {
   })
 })
 
+/**
+ * Getting the goods to Nykaa's warehouse is a rate-card cost of a rupee or two
+ * a unit. Small per unit; on a month of 6,567 units it is real money, and it
+ * belongs inside COGS because it is what having the goods to sell costs.
+ */
+describe('freight from our warehouse to Nykaa\'s', () => {
+  const august: NykaaPnlFacts = { ...legacyNykaaAugust, customerDiscount: 783214.13, cogsPriced: 371293 }
+  const build = (perUnit?: number) =>
+    buildChannelPnlView('nykaa', '2026-08', {
+      salesRecords: [], skuMaster, fixedExpenses: [], marketing: {},
+      nykaaFreightPerUnitInr: perUnit,
+      facts: { flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [], nykaaFacts: [august] },
+    })
+
+  it('charges the month\'s net units at the rate entered for the month', () => {
+    const v = build(1.5)
+    expect(v.native?.values.inboundFreight).toBeCloseTo(-6567 * 1.5, 6)
+  })
+
+  it('takes it inside COGS, so it lands above CM1 and not below it', () => {
+    const withFreight = build(2)
+    const without = build(0)
+    expect(withFreight.native?.values.totalCogs).toBeCloseTo(without.native!.values.totalCogs - 6567 * 2, 6)
+    expect(withFreight.native?.values.cm1).toBeCloseTo(without.native!.values.cm1 - 6567 * 2, 6)
+    // Revenue is untouched: this is a cost of the goods, not a deduction from
+    // what Nykaa pays us.
+    expect(withFreight.native?.values.netRevenueExGst).toBeCloseTo(without.native!.values.netRevenueExGst, 6)
+  })
+
+  it('keeps the Master P&L on the same margin as the statement, line for line', () => {
+    const v = build(1.5)
+    // In the goods, not in a shipping bucket: the statement counts it inside
+    // COGS, so anywhere else leaves the two views disagreeing on gross margin.
+    expect(v.canonical.lines.cogs).toBeCloseTo(371293 + 6567 * 1.5, 6)
+    expect(v.canonical.lines.shipping).toBe(0)
+    expect(v.canonical.lines.grossProfit).toBeCloseTo(v.native!.values.cm1, 6)
+    expect(v.canonical.lines.grossMarginPct).toBeCloseTo(v.native!.values.cm1Pct, 6)
+    expect(v.canonical.lines.contributionProfit).toBeCloseTo(v.native!.values.cm2, 6)
+  })
+
+  it('charges nothing and says so when no rate card is on file', () => {
+    const v = build()
+    expect(v.native?.values.inboundFreight).toBe(-0)
+    expect(v.notes.some((n) => n.includes('No warehouse-to-Nykaa freight rate'))).toBe(true)
+  })
+
+  it('restates a closed month when the rate is corrected, rather than freezing it', () => {
+    // The rate is applied when the statement is read, so the same stored month
+    // reprices. A figure multiplied in at import could not do this.
+    expect(build(1).native?.values.inboundFreight).toBeCloseTo(-6567, 6)
+    expect(build(2).native?.values.inboundFreight).toBeCloseTo(-13134, 6)
+  })
+})

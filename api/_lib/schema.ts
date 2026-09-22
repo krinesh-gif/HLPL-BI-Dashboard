@@ -304,6 +304,22 @@ BEGIN
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
   );
 
+  -- A second freight lane arrived after this table existed, so the column is
+  -- added and the key widened rather than the table rebuilt. Every rate stored
+  -- before lanes existed was the airway bill, which is what the default says.
+  ALTER TABLE freight_rates ADD COLUMN IF NOT EXISTS lane TEXT NOT NULL DEFAULT 'india_usa';
+
+  IF EXISTS (
+    SELECT 1 FROM pg_index i
+      JOIN pg_class c ON c.oid = i.indrelid
+      JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = ANY(i.indkey)
+     WHERE c.relname = 'freight_rates' AND i.indisprimary AND a.attname = 'month'
+       AND (SELECT count(*) FROM unnest(i.indkey)) = 1
+  ) THEN
+    ALTER TABLE freight_rates DROP CONSTRAINT freight_rates_pkey;
+    ALTER TABLE freight_rates ADD PRIMARY KEY (month, lane);
+  END IF;
+
   CREATE TABLE IF NOT EXISTS fx_rates (
     month      TEXT NOT NULL,
     pair       TEXT NOT NULL DEFAULT 'USDINR',

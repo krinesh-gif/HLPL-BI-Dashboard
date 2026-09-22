@@ -339,6 +339,10 @@ export interface NykaaPnlFacts {
   cogsUnpriced: number
   /** Manual monthly entry — Nykaa\'s MI/ad invoice carries no report. */
   nykaaAds: number
+  /** Getting the goods to Nykaa\'s warehouse: the month\'s units at the rate
+   * card. Priced when the statement is read, from the rate entered for the
+   * month, so it is never frozen into an import. */
+  inboundFreight?: number
 }
 
 export interface AmazonUsaPnlFacts {

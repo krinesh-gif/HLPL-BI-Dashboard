@@ -260,6 +260,8 @@ export interface ChannelPnlViewInputs {
   fxRate?: number
   /** Rupees of India→USA freight per unit shipped, for this month. */
   freightPerUnitInr?: number
+  /** Rupees a unit from our warehouse to Nykaa's, for the month being read. */
+  nykaaFreightPerUnitInr?: number
   /** Which currency to render Amazon USA's own statement in. The canonical
    * roll-up is always rupees regardless — the Master P&L has one currency. */
   amazonUsaCurrency?: 'USD' | 'INR'
@@ -384,14 +386,28 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       // moves the P&L and the Ads page together, and re-uploading the sales
       // file cannot wipe it.
       const adSpend = inputs.marketing[channel]?.ads ?? 0
+      // Priced when the statement is read, at the month's own rate card, so a
+      // corrected rate restates the months it should and a closed month keeps
+      // the rate it closed on. Charged on net units, matching the freight to
+      // the units whose revenue is in this month.
+      const inboundFreight = (inputs.nykaaFreightPerUnitInr ?? 0) * imported.netUnits
       const facts: NykaaPnlFacts = {
         ...imported,
         ...(recomputed ? { cogsPriced: recomputed.priced, cogsUnpriced: recomputed.unpriced } : {}),
+        inboundFreight,
         nykaaAds: imported.nykaaAds || adSpend,
       }
       const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
       const values = applyNykaaOtherCosts(computeNykaaPnl(facts), otherCosts)
       const notes: string[] = []
+      if (inboundFreight === 0 && imported.netUnits > 0) {
+        notes.push(
+          `No warehouse-to-Nykaa freight rate is on file for ${month}, so the ` +
+          `${imported.netUnits.toLocaleString('en-IN')} unit(s) sold carry no delivery cost. Enter the rate card ` +
+          'on Settings → Rates. It is left at zero rather than estimated, because a guessed rate card is a cost ' +
+          'nobody agreed to.',
+        )
+      }
       if (facts.nykaaAds === 0) {
         notes.push(
           `No Nykaa Marketing Invest is on file for ${month}, so CM2 is the same figure as CM1. Upload the MI ` +
