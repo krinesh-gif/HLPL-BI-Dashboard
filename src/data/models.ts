@@ -323,6 +323,12 @@ export interface NykaaPnlFacts {
    * funds itself. A real deduction, carrying no GST and so no input credit. */
   customerDiscount: number
 
+  /** What Nykaa confirmed by email that it is charging back for the month.
+   * Entered by hand, applied when the statement is read, and it beats every
+   * figure derived from the sales file — which is provisional and routinely
+   * disagrees with what is finally billed. */
+  confirmedDiscount?: number
+
   /** Nykaa\'s Financial Debit Note for the month, once it arrives — the
    * document that actually charges the discount back. It is not what the P&L
    * deducts (it can arrive months late, and the month has to close without

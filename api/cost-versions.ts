@@ -12,6 +12,7 @@ interface SaveBody {
    * with the month it applies to. */
   fxRates?: unknown
   freightRates?: unknown
+  nykaaDiscounts?: unknown
   /** A month's fixed operating costs. Here for the same two reasons as the
    * rates above: the function budget is full, and a fixed expense is the same
    * kind of thing — a financial figure stamped with the month it belongs to. */
@@ -54,6 +55,24 @@ const FREIGHT_LANES = ['india_usa', 'nykaa_inbound'] as const
 type FreightLane = (typeof FREIGHT_LANES)[number]
 
 interface FreightRateInput { month: string; lane?: FreightLane; perUnitInr: number; note?: string }
+
+interface NykaaDiscountInput { month: string; amountInr: number; note?: string }
+
+function isNykaaDiscountArray(v: unknown): v is NykaaDiscountInput[] {
+  return (
+    Array.isArray(v) &&
+    v.every((x) => {
+      if (!x || typeof x !== 'object') return false
+      const c = x as NykaaDiscountInput
+      // Zero is a real answer — a month Nykaa confirmed it is charging nothing
+      // for. Negative is not: the note never credits us.
+      return (
+        isNonEmptyString(c.month) && MONTH_PATTERN.test(c.month) &&
+        typeof c.amountInr === 'number' && Number.isFinite(c.amountInr) && c.amountInr >= 0
+      )
+    })
+  )
+}
 
 function isFreightRateArray(v: unknown): v is FreightRateInput[] {
   return (
@@ -137,11 +156,21 @@ export async function GET(request: Request): Promise<Response> {
     SELECT month, rate, note, updated_at FROM fx_rates WHERE pair = 'USDINR' ORDER BY month DESC
   `) as Row[]
 
+  const nykaaDiscountRows = (await sql`
+    SELECT month, amount_inr, note, updated_at FROM nykaa_discounts ORDER BY month DESC
+  `) as Row[]
+
   const freightRows = (await sql`
     SELECT month, lane, per_unit_inr, note, updated_at FROM freight_rates ORDER BY lane, month DESC
   `) as Row[]
 
   return json({
+    nykaaDiscounts: nykaaDiscountRows.map((r) => ({
+      month: String(r.month),
+      amountInr: Number(r.amount_inr),
+      note: r.note ? String(r.note) : undefined,
+      updatedAt: r.updated_at ? new Date(String(r.updated_at)).toISOString() : undefined,
+    })),
     freightRates: freightRows.map((r) => ({
       month: String(r.month),
       lane: r.lane ? String(r.lane) : 'india_usa',
@@ -205,6 +234,29 @@ export async function POST(request: Request): Promise<Response> {
       ],
     )
     return json({ saved: body.fixedExpenses.length })
+  }
+
+  if (body && body.nykaaDiscounts !== undefined) {
+    if (!isNykaaDiscountArray(body.nykaaDiscounts)) {
+      return json({ error: 'Expected { nykaaDiscounts: [{ month: "yyyy-mm", amountInr: number >= 0, note? }] }.' }, 400)
+    }
+    if (body.nykaaDiscounts.length === 0) return json({ saved: 0 })
+    await sql.query(
+      `INSERT INTO nykaa_discounts (month, amount_inr, note, updated_by)
+       SELECT * FROM UNNEST($1::text[], $2::float8[], $3::text[], $4::text[])
+       ON CONFLICT (month) DO UPDATE SET
+         amount_inr = EXCLUDED.amount_inr,
+         note = EXCLUDED.note,
+         updated_by = EXCLUDED.updated_by,
+         updated_at = now()`,
+      [
+        body.nykaaDiscounts.map((r) => r.month),
+        body.nykaaDiscounts.map((r) => r.amountInr),
+        body.nykaaDiscounts.map((r) => r.note ?? null),
+        body.nykaaDiscounts.map(() => auth.user.id),
+      ],
+    )
+    return json({ saved: body.nykaaDiscounts.length })
   }
 
   if (body && body.freightRates !== undefined) {
@@ -314,6 +366,14 @@ export async function DELETE(request: Request): Promise<Response> {
   if (isNonEmptyString(expenseMonth) && isNonEmptyString(expenseCategory)) {
     await sql`DELETE FROM fixed_expenses WHERE month = ${expenseMonth} AND category = ${expenseCategory}`
     return json({ ok: true })
+  }
+
+  // Removing a confirmed figure puts the month back on what its sales file
+  // says, which is the right way to undo a mistyped confirmation.
+  const nykaaDiscountMonth = url.searchParams.get('nykaaDiscountMonth')
+  if (isNonEmptyString(nykaaDiscountMonth)) {
+    await sql`DELETE FROM nykaa_discounts WHERE month = ${nykaaDiscountMonth}`
+    return json({ deleted: 1 })
   }
 
   const freightMonth = url.searchParams.get('freightMonth')

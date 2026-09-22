@@ -320,6 +320,19 @@ BEGIN
     ALTER TABLE freight_rates ADD PRIMARY KEY (month, lane);
   END IF;
 
+  -- What Nykaa confirms it is charging back as customer discount, which the
+  -- sales file only estimates and an email settles a month or two later. Kept
+  -- out of nykaa_facts on purpose: re-importing a sales file replaces that row
+  -- wholesale, and a confirmed figure a routine re-upload wiped would be worse
+  -- than no field at all.
+  CREATE TABLE IF NOT EXISTS nykaa_discounts (
+    month      TEXT PRIMARY KEY,
+    amount_inr DOUBLE PRECISION NOT NULL,
+    note       TEXT,
+    updated_by TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
   CREATE TABLE IF NOT EXISTS fx_rates (
     month      TEXT NOT NULL,
     pair       TEXT NOT NULL DEFAULT 'USDINR',

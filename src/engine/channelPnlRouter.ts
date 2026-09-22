@@ -28,8 +28,8 @@ import { applyFlipkartOtherCosts, computeFlipkartPnl, flipkartToCanonicalBuckets
 import { applyMeeshoOtherCosts, computeMeeshoPnl, meeshoToCanonicalBuckets, MEESHO_LINE_DEFS } from './nativePnl/meesho'
 import { applyMyntraOtherCosts, computeMyntraPnl, myntraToCanonicalBuckets, MYNTRA_LINE_DEFS } from './nativePnl/myntra'
 import {
-  applyNykaaOtherCosts, computeNykaaPnl, nykaaDiscountRecovered, nykaaDiscountWasDerived,
-  nykaaToCanonicalBuckets, NYKAA_LINE_DEFS,
+  applyNykaaOtherCosts, computeNykaaPnl, nykaaDiscountPerSalesFile, nykaaDiscountRecovered,
+  nykaaDiscountWasDerived, nykaaToCanonicalBuckets, NYKAA_LINE_DEFS,
 } from './nativePnl/nykaa'
 import type { NativeLineDef, NativeLineValues } from './nativePnl/types'
 
@@ -178,6 +178,11 @@ function recomputedCogs(
  * reader scrolls straight past. It belongs on the line it explains.
  */
 function nykaaLineDefsFor(facts: NykaaPnlFacts): NativeLineDef[] {
+  if (facts.confirmedDiscount !== undefined) {
+    return NYKAA_LINE_DEFS.map((d) => (d.key === 'customerDiscount'
+      ? { ...d, note: 'Confirmed with Nykaa and entered by hand — this replaces what the sales file implied' }
+      : d))
+  }
   if (facts.customerDiscount !== undefined) return NYKAA_LINE_DEFS
   const note = nykaaDiscountWasDerived(facts)
     ? 'Derived from this month\'s own MRP and sale totals, because the month predates this line. Upload the Sales '
@@ -262,6 +267,9 @@ export interface ChannelPnlViewInputs {
   freightPerUnitInr?: number
   /** Rupees a unit from our warehouse to Nykaa's, for the month being read. */
   nykaaFreightPerUnitInr?: number
+  /** What Nykaa confirmed it is charging back as discount for this month.
+   * Undefined means nothing has been confirmed and the sales file stands. */
+  confirmedNykaaDiscount?: number
   /** Which currency to render Amazon USA's own statement in. The canonical
    * roll-up is always rupees regardless — the Master P&L has one currency. */
   amazonUsaCurrency?: 'USD' | 'INR'
@@ -395,6 +403,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
         ...imported,
         ...(recomputed ? { cogsPriced: recomputed.priced, cogsUnpriced: recomputed.unpriced } : {}),
         inboundFreight,
+        confirmedDiscount: inputs.confirmedNykaaDiscount,
         nykaaAds: imported.nykaaAds || adSpend,
       }
       const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
@@ -425,11 +434,23 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       // from rather than leaving the number to speak for itself.
       const expectedDiscount = nykaaDiscountRecovered(facts)
       const charged = facts.discountDebitNote?.amount
-      if (expectedDiscount === 0 && facts.netSalesMrp > 0) {
+      if (expectedDiscount === 0 && facts.netSalesMrp > 0 && facts.confirmedDiscount === undefined) {
         notes.push(
           `${month} shows no customer discount, which on this channel means the figure is missing rather than nil: ` +
           'Nykaa sells below MRP and charges the difference back on every month. Revenue here is what Nykaa ' +
           `invoiced, not what we kept, so every margin below it is overstated. Re-upload ${month}'s Nykaa Sales file.`,
+        )
+      } else if (facts.confirmedDiscount !== undefined) {
+        const perFile = nykaaDiscountPerSalesFile(facts)
+        const gap = facts.confirmedDiscount - perFile
+        notes.push(
+          Math.abs(gap) <= 1
+            ? `The ${formatCurrencyFull(expectedDiscount)} of customer discount is the figure confirmed for ${month}, ` +
+              'and it matches what the sales file implied.'
+            : `The ${formatCurrencyFull(expectedDiscount)} of customer discount is the figure confirmed for ${month}, ` +
+              `entered by hand. Its sales file implied ${formatCurrencyFull(perFile)}, ` +
+              `${formatCurrencyFull(Math.abs(gap))} ${gap > 0 ? 'less' : 'more'} — the confirmed figure is the one ` +
+              'deducted, and the file\'s is kept beside it on the statement.',
         )
       } else if (nykaaDiscountWasDerived(facts)) {
         notes.push(

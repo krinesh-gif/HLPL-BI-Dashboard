@@ -73,6 +73,16 @@ export const NYKAA_LINE_DEFS: NativeLineDef[] = [
     key: 'discountPctOfMrp', label: 'Discount, % of net MRP', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
     kind: 'percent', note: 'how far below MRP the channel actually trades',
   },
+  {
+    key: 'discountPerSalesFile', label: 'What the sales file implied', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
+    kind: 'input', memoOf: 'customerDiscount', hideWhenZero: true,
+    note: 'the estimate the month opened on, before Nykaa confirmed the figure',
+  },
+  {
+    key: 'discountConfirmationVariance', label: 'Confirmed less the sales file',
+    section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US', kind: 'input', memoOf: 'customerDiscount', hideWhenZero: true,
+    note: 'positive means Nykaa confirmed more than the file showed',
+  },
 
   { key: 'netRevenueExGst', label: 'NET REVENUE (ex-GST)', section: 'NET REVENUE', kind: 'subtotal', note: '⭐ denominator for every %' },
   {
@@ -146,6 +156,10 @@ export function nykaaOutputGstPct(facts: NykaaPnlFacts): number {
  * deduction negative and pay us to discount.
  */
 export function nykaaDiscountRecovered(facts: NykaaPnlFacts): number {
+  // A figure Nykaa has confirmed beats anything derived from the file. The
+  // file is an estimate that arrives on time; this is the number that gets
+  // billed, and it is entered by hand because it only exists in an email.
+  if (facts.confirmedDiscount !== undefined) return facts.confirmedDiscount
   const nykaaFunded = facts.nykaaFundedCoupon ?? 0
   if (NYKAA_ASSUMPTIONS.discountRecovered === 'promo-only') {
     return Math.max((facts.promoDiscount ?? 0) - nykaaFunded, 0)
@@ -159,7 +173,15 @@ export function nykaaDiscountRecovered(facts: NykaaPnlFacts): number {
  * imported. The figure is right either way; only the split into the listed
  * price and the promotions on top needs the file uploading again. */
 export function nykaaDiscountWasDerived(facts: NykaaPnlFacts): boolean {
-  return facts.customerDiscount === undefined && nykaaDiscountRecovered(facts) > 0
+  return facts.confirmedDiscount === undefined && facts.customerDiscount === undefined &&
+    nykaaDiscountRecovered(facts) > 0
+}
+
+/** What this month's own files say the discount is, whatever was confirmed.
+ * Kept separate so a confirmed figure can be shown against its estimate rather
+ * than replacing it without trace. */
+export function nykaaDiscountPerSalesFile(facts: NykaaPnlFacts): number {
+  return nykaaDiscountRecovered({ ...facts, confirmedDiscount: undefined })
 }
 
 /** What Nykaa pays us, and what is left of it after tax and after the discount
@@ -209,6 +231,11 @@ export function computeNykaaPnl(facts: NykaaPnlFacts): NativeLineValues {
   // On the narrower basis those two disagree, and the statement says which one
   // it took rather than quietly restating the parts to match.
   const debitNote = facts.discountDebitNote?.amount ?? 0
+  // Both figures are on the statement whenever they disagree: replacing an
+  // estimate with a confirmation and showing only the result hides the very
+  // discrepancy the confirmation exists to settle.
+  const perSalesFile = nykaaDiscountPerSalesFile(facts)
+  const confirmed = facts.confirmedDiscount
 
   return {
     grossSalesMrp: facts.grossSalesMrp,
@@ -248,6 +275,9 @@ export function computeNykaaPnl(facts: NykaaPnlFacts): NativeLineValues {
     otherCosts: 0, // filled in by applyNykaaOtherCosts once the allocation is known
     cm3: cm2,
     cm3Pct: pct(cm2),
+
+    discountPerSalesFile: confirmed === undefined ? 0 : -perSalesFile,
+    discountConfirmationVariance: confirmed === undefined ? 0 : confirmed - perSalesFile,
 
     customerPaidValue: facts.customerPaidValue,
     debitNoteAmount: debitNote,

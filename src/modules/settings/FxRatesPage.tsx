@@ -5,7 +5,8 @@ import { useDataStore } from '@/store/dataStore'
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { fxRateForMonth } from '@/data/fxRates'
 import { freightRateForMonth, type FreightLane } from '@/data/freightRates'
-import { monthLabel, toMonthKey } from '@/lib/format'
+import { nykaaDiscountPerSalesFile } from '@/engine/nativePnl/nykaa'
+import { monthLabel, toMonthKey, formatCurrencyFull } from '@/lib/format'
 
 /**
  * The USD→INR rate, entered per month.
@@ -182,6 +183,7 @@ export function FxRatesPage() {
         </p>
       </Card>
 
+      <NykaaDiscountSection />
       <FreightSection lane="india_usa" />
       <FreightSection lane="nykaa_inbound" />
     </PageShell>
@@ -371,6 +373,173 @@ function FreightSection({ lane }: { lane: FreightLane }) {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </>
+  )
+}
+
+/**
+ * The customer discount Nykaa confirms, as against the one its sales file
+ * implies.
+ *
+ * The file arrives on time but is provisional; what Nykaa actually bills is
+ * settled by email a month or two later, and the two routinely differ. A month
+ * cannot wait for the email, so it opens on the file's figure and this screen
+ * replaces it once the real one is known. Both stay on the statement, because
+ * the gap between them is the thing worth arguing with Nykaa about.
+ */
+function NykaaDiscountSection() {
+  const { nykaaDiscounts, nykaaFacts, saveNykaaDiscount, removeNykaaDiscount } = useDataStore()
+  const [month, setMonth] = useState(() => toMonthKey(new Date().toISOString().slice(0, 10)))
+  const [amount, setAmount] = useState('')
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const sorted = [...nykaaDiscounts].sort((a, b) => b.month.localeCompare(a.month))
+  // What the chosen month's own files say, so the person typing can see what
+  // they are replacing before they replace it.
+  const factsForMonth = nykaaFacts.find((f) => f.month === month)
+  const perSalesFile = factsForMonth ? nykaaDiscountPerSalesFile(factsForMonth) : undefined
+  const typed = Number(amount)
+  const variance = perSalesFile !== undefined && amount.trim() !== '' && Number.isFinite(typed)
+    ? typed - perSalesFile
+    : undefined
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!Number.isFinite(typed) || typed < 0) {
+      setError('Enter the confirmed amount in rupees — zero is allowed, negative is not.')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      await saveNykaaDiscount({ month, amountInr: typed, note: note.trim() || undefined })
+      setAmount('')
+      setNote('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const field =
+    'rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none'
+
+  return (
+    <>
+      <Card>
+        <CardHeader
+          title="Nykaa customer discount — confirmed figure"
+          subtitle="What Nykaa confirms it is charging back, once the email settles it. This replaces the figure the sales file implied; both stay on the statement."
+        />
+        <form onSubmit={submit} className="mt-4 flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-[var(--ink-3)]">Month the discount was given</span>
+            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className={field} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-[var(--ink-3)]">₹ confirmed</span>
+            <input
+              type="number" step="0.01" min="0" value={amount} inputMode="decimal"
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder={perSalesFile !== undefined ? perSalesFile.toFixed(0) : '0.00'}
+              className={`${field} w-40 text-right tabular-nums`}
+            />
+          </label>
+          <label className="flex flex-1 flex-col gap-1">
+            <span className="text-xs font-medium text-[var(--ink-3)]">Source</span>
+            <input
+              type="text" value={note} onChange={(e) => setNote(e.target.value)}
+              placeholder="Email of 12 Nov, debit note 1100005020, confirmed by…"
+              className={`${field} w-full`}
+            />
+          </label>
+          <button
+            type="submit" disabled={busy}
+            className="rounded-md bg-[var(--accent)] px-4 py-1.5 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
+          >
+            {busy ? 'Saving…' : 'Save'}
+          </button>
+        </form>
+        {error && <p className="mt-2 text-sm text-[var(--critical-ink)]">{error}</p>}
+        <p className="mt-3 text-xs text-[var(--ink-3)]">
+          {perSalesFile === undefined ? (
+            <>No Nykaa sales file is on file for {monthLabel(month)}, so there is nothing to compare against yet.</>
+          ) : (
+            <>
+              {monthLabel(month)}&apos;s sales file implies{' '}
+              <Badge tone="neutral">{formatCurrencyFull(perSalesFile)}</Badge>
+              {variance !== undefined && Math.abs(variance) > 1 && (
+                <>
+                  {' '}— what you have typed is{' '}
+                  <Badge tone={variance > 0 ? 'bad' : 'good'}>
+                    {formatCurrencyFull(Math.abs(variance))} {variance > 0 ? 'more' : 'less'}
+                  </Badge>
+                </>
+              )}
+              .
+            </>
+          )}
+        </p>
+      </Card>
+
+      <Card padded={false}>
+        <div className="px-5 pt-5">
+          <CardHeader
+            title="Confirmed discounts on file"
+            subtitle={`${sorted.length} month${sorted.length === 1 ? '' : 's'}`}
+          />
+        </div>
+        {sorted.length === 0 ? (
+          <p className="px-5 pb-5 text-sm text-[var(--ink-3)]">
+            Nothing confirmed yet — every Nykaa month is using the figure its own sales file implies.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-[var(--surface-2)] text-[11px] tracking-wide text-[var(--ink-3)] uppercase">
+                <tr>
+                  <th className="px-5 py-2.5 text-left">Month</th>
+                  <th className="px-5 py-2.5 text-right">Confirmed</th>
+                  <th className="px-5 py-2.5 text-right">Sales file</th>
+                  <th className="px-5 py-2.5 text-left">Source</th>
+                  <th className="px-5 py-2.5" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--line)]">
+                {sorted.map((d) => {
+                  const facts = nykaaFacts.find((f) => f.month === d.month)
+                  const implied = facts ? nykaaDiscountPerSalesFile(facts) : undefined
+                  return (
+                    <tr key={d.month} className="hover:bg-[var(--surface-hover)]">
+                      <td className="px-5 py-2.5 font-medium text-[var(--ink)]">{monthLabel(d.month)}</td>
+                      <td className="px-5 py-2.5 text-right tabular-nums text-[var(--ink)]">
+                        {formatCurrencyFull(d.amountInr)}
+                      </td>
+                      <td className="px-5 py-2.5 text-right tabular-nums text-[var(--ink-3)]">
+                        {implied === undefined ? '—' : formatCurrencyFull(implied)}
+                      </td>
+                      <td className="px-5 py-2.5 text-[var(--ink-3)]">{d.note ?? '—'}</td>
+                      <td className="px-5 py-2.5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => void removeNykaaDiscount(d.month)}
+                          title="Put this month back on what its sales file implies"
+                          className="text-xs font-medium text-[var(--ink-3)] hover:text-[var(--critical-ink)]"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

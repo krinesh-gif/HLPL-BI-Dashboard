@@ -261,3 +261,76 @@ describe('freight from our warehouse to Nykaa\'s', () => {
     expect(build(2).native?.values.inboundFreight).toBeCloseTo(-13134, 6)
   })
 })
+
+/**
+ * Nykaa's sales file gives a discount figure on time but not a final one; what
+ * is actually billed is settled by email a month or two later. A month cannot
+ * wait for that, so it opens on the file's figure and a confirmed one replaces
+ * it — with both kept on the statement, because the gap between them is the
+ * thing worth taking up with Nykaa.
+ */
+describe('a confirmed Nykaa discount, entered by hand', () => {
+  const august: NykaaPnlFacts = { ...legacyNykaaAugust, customerDiscount: 783214.13, cogsPriced: 371293 }
+  const build = (confirmed?: number) =>
+    buildChannelPnlView('nykaa', '2026-08', {
+      salesRecords: [], skuMaster, fixedExpenses: [], marketing: {},
+      confirmedNykaaDiscount: confirmed,
+      facts: { flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [], nykaaFacts: [august] },
+    })
+
+  it('replaces what the sales file implied', () => {
+    const v = build(820000)
+    expect(v.native?.values.customerDiscount).toBeCloseTo(-820000, 6)
+    expect(v.native?.values.netRevenueExGst).toBeCloseTo(1413147.08 - 820000, 2)
+  })
+
+  it('keeps the file figure and the gap on the statement, not just the answer', () => {
+    const v = build(820000)
+    expect(v.native?.values.discountPerSalesFile).toBeCloseTo(-783214.13, 2)
+    expect(v.native?.values.discountConfirmationVariance).toBeCloseTo(820000 - 783214.13, 2)
+    expect(v.notes.some((n) => n.includes('confirmed for 2026-08'))).toBe(true)
+  })
+
+  it('shows no memo clutter when nothing has been confirmed', () => {
+    const v = build()
+    expect(v.native?.values.discountPerSalesFile).toBe(0)
+    expect(v.native?.values.discountConfirmationVariance).toBe(0)
+    expect(v.native?.values.customerDiscount).toBeCloseTo(-783214.13, 2)
+  })
+
+  it('is honoured even when it is lower than the file, or zero', () => {
+    // A confirmation of zero is a real answer — Nykaa saying it is charging
+    // nothing back — and must not be read as "nothing was entered".
+    expect(build(0).native?.values.customerDiscount).toBe(-0)
+    expect(build(0).native?.values.netRevenueExGst).toBeCloseTo(1413147.08, 2)
+    expect(build(500000).native?.values.customerDiscount).toBeCloseTo(-500000, 6)
+  })
+
+  it('does not warn about a missing discount on a month confirmed at zero', () => {
+    expect(build(0).notes.some((n) => n.includes('every margin below it is overstated'))).toBe(false)
+  })
+
+  it('survives a month whose sales file was never re-imported', () => {
+    // The confirmed figure is stored apart from the imported month precisely
+    // so a re-upload cannot wipe it. Here the month carries no discount of its
+    // own at all and the confirmation still stands.
+    const legacy = { ...legacyNykaaAugust, customerPaidValue: 0 } as NykaaPnlFacts
+    const v = buildChannelPnlView('nykaa', '2026-08', {
+      salesRecords: [], skuMaster, fixedExpenses: [], marketing: {},
+      confirmedNykaaDiscount: 820000,
+      facts: { flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [], nykaaFacts: [legacy] },
+    })
+    expect(v.native?.values.customerDiscount).toBeCloseTo(-820000, 6)
+  })
+
+  it('keeps the Master P&L on the confirmed figure too', () => {
+    const v = build(820000)
+    expect(v.canonical.lines.netSales).toBeCloseTo(v.native!.values.netRevenueExGst, 6)
+    expect(v.canonical.lines.discounts).toBeCloseTo(2689538 * 0.38 + 820000, 2)
+  })
+
+  it('marks the line as confirmed rather than derived', () => {
+    const line = build(820000).native?.lineDefs.find((d) => d.key === 'customerDiscount')
+    expect(line?.note).toContain('Confirmed with Nykaa')
+  })
+})
