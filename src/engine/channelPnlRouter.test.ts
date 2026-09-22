@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { buildChannelPnlView } from './channelPnlRouter'
-import type { FlipkartPnlFacts, NykaaPnlFacts, SkuMaster } from '@/data/models'
+import type {
+  AmazonUsaPnlFacts, CanonicalSalesRecord, FixedExpenseEntry, FlipkartPnlFacts, NykaaPnlFacts, SkuMaster,
+} from '@/data/models'
 
 const skuMaster: SkuMaster[] = [
   { sku: 'S1', productName: 'Test', category: 'Test', brand: 'HLPL', cogs: 50, mrp: 200, launchDate: '2025-01-01', status: 'active', leadTimeDays: 20, safetyStock: 50 },
@@ -123,3 +125,86 @@ describe('Nykaa months imported before the customer discount was modelled', () =
     expect(fresh.native?.lineDefs.find((d) => d.key === 'customerDiscount')?.note).not.toContain('Derived')
   })
 })
+
+/**
+ * The company's own fixed costs — salaries, rent, software — are entered once
+ * and split across channels by their share of the month's sales. Every channel
+ * with its own statement deducted that share except Amazon USA, and no channel
+ * with its own statement carried it into the multi-month P&L at all.
+ */
+describe('a channel share of the company fixed expenses', () => {
+  const inr = (channel: string, net: number): CanonicalSalesRecord => ({
+    orderId: `${channel}-1`, orderDate: '2026-08-01', channel: channel as never, marketplace: channel,
+    sellerType: 'marketplace', sku: 'S1', productName: 'T', category: 'Test', quantity: 1,
+    grossSales: net, discount: 0, netSales: net, returnUnits: 0, rtoUnits: 0, shippingCost: 0,
+    marketplaceFee: 0, tax: 0, status: 'completed', currency: 'INR', importId: 'x',
+  })
+  // Amazon USA and Flipkart each take half the month's net sales, so each
+  // carries half of the 1,00,000 of fixed cost.
+  const salesRecords = [inr('amazon_us', 100000), inr('flipkart', 100000)]
+  const fixedExpenses: FixedExpenseEntry[] = [
+    { month: '2026-08', category: 'salaries', amount: 60000 },
+    { month: '2026-08', category: 'rent', amount: 40000 },
+  ]
+  const fxRate = 88
+  const amazonUsa: AmazonUsaPnlFacts = {
+    month: '2026-08', schemaVersion: 2, grossSalesUsd: 10000, netSalesUsd: 9000,
+    unitsSoldQty: 100, unitsReturnedQty: 0, netUnitsSoldQty: 100,
+    feeTotalsUsd: { referralFee: 1000 },
+    // The pre-v2 fields are still on the type and still read by the
+    // arithmetic, so a fixture that leaves them out produces NaN rather than a
+    // failing number, and every assertion below it passes vacuously.
+    referralFeeUsd: 0, fbaFulfilmentFeeUsd: 0, storageAgedDisposalUsd: 0, couponDealFeesUsd: 0,
+    refundAdminFeeUsd: 0, fbaReimbursementsUsd: 0, otherAmazonFeesUsd: 0, sponsoredProductsUsd: 0,
+    cogsUsd: 2000, freightUsd: 300, sponsoredBrandsUsd: 0, sponsoredDisplayDspUsd: 0,
+    offAmazonAdsUsd: 0, exportDocsUsd: 0, usImportDutyUsd: 0, amazonSellingPlanUsd: 40,
+    productLiabilityInsuranceUsd: 0, fdaLegalUsd: 0, agencySoftwareUsd: 0, otherOverheadUsd: 0,
+  }
+
+  const build = (channel: 'amazon_us' | 'flipkart', expenses = fixedExpenses) =>
+    buildChannelPnlView(channel, '2026-08', {
+      salesRecords, skuMaster, fixedExpenses: expenses, marketing: {}, fxRate,
+      facts: { flipkartFacts: [flipkartAugust], amazonUsaFacts: [amazonUsa], meeshoFacts: [] },
+    })
+
+  const flipkartAugust: FlipkartPnlFacts = { ...flipkartFacts, month: '2026-08' }
+
+  it('reaches the Amazon USA statement, in the currency that statement is kept in', () => {
+    const v = build('amazon_us')
+    // 50,000 of a 1,00,000 month, converted at the month's rate — not left in
+    // rupees, which the render to INR would then multiply by the rate again.
+    expect(v.native?.values.allocatedOverheadsUsd).toBeCloseTo(-50000 / fxRate, 6)
+    expect(v.native?.values.cm4).toBeCloseTo(v.native!.values.cm3 - 50000 / fxRate, 6)
+    expect(v.native?.values.cm4).toBeLessThan(v.native!.values.cm3)
+  })
+
+  it('leaves Net Profit at CM3 for a month with no fixed expenses entered', () => {
+    const v = build('amazon_us', [])
+    expect(v.native?.values.allocatedOverheadsUsd).toBe(-0)
+    expect(v.native?.values.cm4).toBeCloseTo(v.native!.values.cm3, 6)
+  })
+
+  it('reaches the multi-month P&L for every channel with its own statement', () => {
+    for (const channel of ['amazon_us', 'flipkart'] as const) {
+      const lines = build(channel).canonical.lines
+      expect(lines.salaries, `${channel} salaries`).toBeCloseTo(30000, 6)
+      expect(lines.rent, `${channel} rent`).toBeCloseTo(20000, 6)
+      // EBITDA used to equal contribution on every one of these channels,
+      // which is what made a month of overheads invisible on the report the
+      // company is actually run from.
+      expect(lines.ebitda, `${channel} ebitda`).toBeCloseTo((lines.contributionProfit ?? 0) - 50000, 6)
+      expect(lines.ebitda).toBeLessThan(lines.contributionProfit ?? 0)
+    }
+  })
+
+  it('splits by each channel share of sales, not evenly', () => {
+    const lopsided = [inr('amazon_us', 150000), inr('flipkart', 50000)]
+    const v = buildChannelPnlView('amazon_us', '2026-08', {
+      salesRecords: lopsided, skuMaster, fixedExpenses, marketing: {}, fxRate,
+      facts: { flipkartFacts: [flipkartAugust], amazonUsaFacts: [amazonUsa], meeshoFacts: [] },
+    })
+    expect(v.canonical.lines.salaries).toBeCloseTo(60000 * 0.75, 6)
+    expect(v.native?.values.allocatedOverheadsUsd).toBeCloseTo(-75000 / fxRate, 6)
+  })
+})
+

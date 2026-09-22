@@ -130,6 +130,14 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
   { key: 'totalOverheadsUsd', label: 'Total Overheads & Finance', section: 'FIXED OVERHEADS & FINANCE', kind: 'subtotal' },
   { key: 'cm3', label: 'CM3 — Channel Profit Before Tax', section: 'FIXED OVERHEADS & FINANCE', kind: 'subtotal' },
   { key: 'cm3Pct', label: 'CM3 %', section: 'FIXED OVERHEADS & FINANCE', kind: 'percent' },
+
+  {
+    key: 'allocatedOverheadsUsd', label: 'Less: Allocated company overheads', section: 'ALLOCATED COMPANY OVERHEADS',
+    kind: 'input',
+    note: "this channel's share of the company's own fixed costs — entered on Fixed Expenses, split by sales contribution",
+  },
+  { key: 'cm4', label: 'NET PROFIT (CM4)', section: 'ALLOCATED COMPANY OVERHEADS', kind: 'subtotal' },
+  { key: 'cm4Pct', label: 'Net Profit %', section: 'ALLOCATED COMPANY OVERHEADS', kind: 'percent' },
 ]
 
 /**
@@ -247,11 +255,51 @@ export function computeAmazonUsaPnl(facts: AmazonUsaPnlFacts): NativeLineValues 
     totalOverheadsUsd: -totalOverheadsUsd,
     cm3: known(cm3),
     cm3Pct: known(facts.netSalesUsd !== 0 ? (cm3 / facts.netSalesUsd) * 100 : 0),
+
+    // Filled in by applyAmazonUsaOtherCosts once the month's allocation is
+    // known. Until then Net Profit is CM3, which is what it was before this
+    // line existed.
+    allocatedOverheadsUsd: 0,
+    cm4: known(cm3),
+    cm4Pct: known(facts.netSalesUsd !== 0 ? (cm3 / facts.netSalesUsd) * 100 : 0),
   }
   // Each fee column on its own line, negated so a charge reads as a cost and a
   // credit (a reimbursement, a referral refund) reads as income.
   for (const c of AMAZON_USA_FEE_COLUMNS) values[`fee.${c.id}`] = known(-fee(c.id))
   return values
+}
+
+/**
+ * This month's share of the company's fixed expenses, brought onto the
+ * statement.
+ *
+ * Amazon USA already carries five US-specific overhead lines — the selling
+ * plan, liability insurance, FDA and legal, agency software — but those are
+ * costs of running the US business, entered against this channel. They are not
+ * the company's salaries, rent and software, which every channel shares. Every
+ * other channel's statement deducted its share of those; this one did not, so
+ * its bottom line was the only one on the dashboard that stopped at
+ * contribution and called it profit.
+ *
+ * The allocation is computed in rupees, like the expenses themselves, and is
+ * converted here — the statement is kept in dollars and rendered in rupees at
+ * the month's rate, so a rupee cost has to enter it as dollars or it would be
+ * multiplied by the rate a second time on the way to the screen.
+ */
+export function applyAmazonUsaOtherCosts(
+  computed: NativeLineValues,
+  otherCostsInr: number,
+  fxRate: number,
+  netSalesUsd: number,
+): NativeLineValues {
+  const otherCostsUsd = fxRate > 0 ? otherCostsInr / fxRate : 0
+  const cm4 = computed.cm3 - otherCostsUsd
+  return {
+    ...computed,
+    allocatedOverheadsUsd: -otherCostsUsd,
+    cm4,
+    cm4Pct: netSalesUsd !== 0 ? (cm4 / netSalesUsd) * 100 : 0,
+  }
 }
 
 /** Re-buckets into the canonical structure, converting USD to INR at the

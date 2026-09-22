@@ -9,6 +9,7 @@ import type {
   MeeshoPnlFacts,
   MyntraPnlFacts,
   NykaaPnlFacts,
+  PnlLineValues,
   SkuMaster,
 } from '@/data/models'
 import { channelOfSource } from '@/config/channels'
@@ -19,7 +20,10 @@ import {
   buildChannelPnl, cogsForRecords, computeSubtotals, estimateUncostedCogs,
   type CogsInputs, type MarketingByChannel, type UncostedCogsEstimate,
 } from './pnl'
-import { amazonUsaFactsAtRate, amazonUsaLineDefs, amazonUsaToCanonicalBuckets, amazonUsaValuesInInr, computeAmazonUsaPnl, isLegacyAmazonUsaFacts } from './nativePnl/amazonUsa'
+import {
+  amazonUsaFactsAtRate, amazonUsaLineDefs, amazonUsaToCanonicalBuckets, amazonUsaValuesInInr,
+  applyAmazonUsaOtherCosts, computeAmazonUsaPnl, isLegacyAmazonUsaFacts,
+} from './nativePnl/amazonUsa'
 import { applyFlipkartOtherCosts, computeFlipkartPnl, flipkartToCanonicalBuckets, FLIPKART_LINE_DEFS } from './nativePnl/flipkart'
 import { applyMeeshoOtherCosts, computeMeeshoPnl, meeshoToCanonicalBuckets, MEESHO_LINE_DEFS } from './nativePnl/meesho'
 import { applyMyntraOtherCosts, computeMyntraPnl, myntraToCanonicalBuckets, MYNTRA_LINE_DEFS } from './nativePnl/myntra'
@@ -61,6 +65,30 @@ export interface ChannelFactsStore {
 /** Sums this channel's allocated share (sales-contribution method) of the
  * month's fixed expenses into one lump figure, for channels whose native
  * template has a single "Other Costs" line rather than a category breakdown. */
+/**
+ * A native channel's canonical buckets with its share of the month's fixed
+ * expenses put back in.
+ *
+ * A channel with its own statement returns canonical lines built from that
+ * statement's facts, and those facts describe trading — what was sold, what
+ * the marketplace charged. They say nothing about salaries or rent, so every
+ * native channel reached the multi-month P&L with its OPEX lines empty and an
+ * EBITDA identical to its contribution. The generic path never had this
+ * problem: it allocates the same expenses itself.
+ *
+ * Allocating per category rather than as one lump is what keeps the Master
+ * P&L's own OPEX breakdown adding up to the company total.
+ */
+function withAllocatedOpex(
+  lines: PnlLineValues,
+  inputs: ChannelPnlViewInputs,
+  channel: BusinessChannelId,
+  month: string,
+): PnlLineValues {
+  const allocation = allocateFixedExpensesForMonth(inputs.salesRecords, inputs.fixedExpenses, month)[channel]
+  return allocation ? { ...lines, ...allocation } : lines
+}
+
 function computeAllocatedOtherCosts(
   allRecords: CanonicalSalesRecord[],
   fixedExpenses: FixedExpenseEntry[],
@@ -253,7 +281,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
         : imported
       const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
       const values = applyFlipkartOtherCosts(computeFlipkartPnl(facts), otherCosts)
-      const canonicalLines = computeSubtotals(flipkartToCanonicalBuckets(facts))
+      const canonicalLines = computeSubtotals(withAllocatedOpex(flipkartToCanonicalBuckets(facts), inputs, channel, month))
       return {
         channel, month,
         canonical: { channel, month, lines: canonicalLines },
@@ -288,9 +316,13 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
           }
         : atRate
 
-      const usd = computeAmazonUsaPnl(facts)
+      // Amazon USA's own overhead lines are US costs. This is its share of the
+      // company's fixed expenses, which every other channel's statement
+      // already carried and this one did not.
+      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+      const usd = applyAmazonUsaOtherCosts(computeAmazonUsaPnl(facts), otherCosts, fxRate, facts.netSalesUsd)
       const showInr = inputs.amazonUsaCurrency === 'INR'
-      const canonicalLines = computeSubtotals(amazonUsaToCanonicalBuckets(facts, fxRate))
+      const canonicalLines = computeSubtotals(withAllocatedOpex(amazonUsaToCanonicalBuckets(facts, fxRate), inputs, channel, month))
       // A month imported before the fee columns were kept one-for-one has no
       // column-level figures to show. Saying so is the only honest option:
       // spreading its eight old buckets across Amazon's real column names put
@@ -410,7 +442,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       }
       return {
         channel, month,
-        canonical: { channel, month, lines: computeSubtotals(nykaaToCanonicalBuckets(facts)) },
+        canonical: { channel, month, lines: computeSubtotals(withAllocatedOpex(nykaaToCanonicalBuckets(facts), inputs, channel, month)) },
         native: { lineDefs: nykaaLineDefsFor(facts), values, currency: 'INR' },
         notes,
       }
@@ -450,7 +482,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       }
       return {
         channel, month,
-        canonical: { channel, month, lines: computeSubtotals(myntraToCanonicalBuckets(facts)) },
+        canonical: { channel, month, lines: computeSubtotals(withAllocatedOpex(myntraToCanonicalBuckets(facts), inputs, channel, month)) },
         native: { lineDefs: MYNTRA_LINE_DEFS, values, currency: 'INR' },
         notes,
       }
@@ -482,7 +514,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
           : imported
       const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
       const values = applyMeeshoOtherCosts(computeMeeshoPnl(facts), otherCosts)
-      const canonicalLines = computeSubtotals(meeshoToCanonicalBuckets(facts))
+      const canonicalLines = computeSubtotals(withAllocatedOpex(meeshoToCanonicalBuckets(facts), inputs, channel, month))
       return {
         channel, month,
         canonical: { channel, month, lines: canonicalLines },
