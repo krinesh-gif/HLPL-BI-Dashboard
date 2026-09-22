@@ -42,3 +42,38 @@ describe('allocateFixedExpensesForMonth', () => {
     expect(allocation.flipkart?.rent).toBeCloseTo(40000)
   })
 })
+
+describe('fixed expenses entered as a single figure', () => {
+  /**
+   * The split is worked out in a spreadsheet, so the dashboard takes one total
+   * a month. It has to allocate and roll up exactly as the nine named
+   * categories did, or moving to it would quietly change every channel's net
+   * profit.
+   */
+  const records = [
+    { orderId: '1', orderDate: '2026-08-01', channel: 'flipkart' as const, marketplace: 'flipkart', sellerType: 'marketplace' as const, sku: 'S1', productName: 'T', category: 'T', quantity: 1, grossSales: 75000, discount: 0, netSales: 75000, returnUnits: 0, rtoUnits: 0, shippingCost: 0, marketplaceFee: 0, tax: 0, status: 'completed' as const, currency: 'INR' as const, importId: 'x' },
+    { orderId: '2', orderDate: '2026-08-01', channel: 'nykaa' as const, marketplace: 'nykaa', sellerType: 'marketplace' as const, sku: 'S1', productName: 'T', category: 'T', quantity: 1, grossSales: 25000, discount: 0, netSales: 25000, returnUnits: 0, rtoUnits: 0, shippingCost: 0, marketplaceFee: 0, tax: 0, status: 'completed' as const, currency: 'INR' as const, importId: 'x' },
+  ]
+
+  it('splits the one figure by each channel share of sales', () => {
+    const a = allocateFixedExpensesForMonth(records, [
+      { month: '2026-08', category: 'fixedExpensesTotal', amount: 100000 },
+    ], '2026-08')
+    expect(a.flipkart?.fixedExpensesTotal).toBeCloseTo(75000, 6)
+    expect(a.nykaa?.fixedExpensesTotal).toBeCloseTo(25000, 6)
+  })
+
+  it('allocates the same total however it was entered', () => {
+    const asOne = allocateFixedExpensesForMonth(records, [
+      { month: '2026-08', category: 'fixedExpensesTotal', amount: 100000 },
+    ], '2026-08')
+    const byCategory = allocateFixedExpensesForMonth(records, [
+      { month: '2026-08', category: 'salaries', amount: 60000 },
+      { month: '2026-08', category: 'rent', amount: 40000 },
+    ], '2026-08')
+    const sum = (v: Record<string, number | undefined>): number =>
+      Object.values(v).reduce<number>((acc, x) => acc + (x ?? 0), 0)
+    expect(sum(asOne.flipkart ?? {})).toBeCloseTo(sum(byCategory.flipkart ?? {}), 6)
+    expect(sum(asOne.nykaa ?? {})).toBeCloseTo(sum(byCategory.nykaa ?? {}), 6)
+  })
+})

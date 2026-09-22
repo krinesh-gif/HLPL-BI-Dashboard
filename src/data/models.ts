@@ -121,7 +121,15 @@ export interface InventorySnapshot {
 // ---------------------------------------------------------------------------
 export interface FixedExpenseEntry {
   month: string // yyyy-mm
+  /**
+   * `fixedExpensesTotal` is a month's whole fixed cost as one figure, which is
+   * how the company works them out: the split is done in a spreadsheet and
+   * only the total is worth re-keying. The nine named categories are the older
+   * per-line entry and are still read, so a month entered that way keeps its
+   * detail — the P&L adds them all up either way.
+   */
   category:
+    | 'fixedExpensesTotal'
     | 'salaries'
     | 'rent'
     | 'software'

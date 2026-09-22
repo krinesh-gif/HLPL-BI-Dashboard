@@ -5,6 +5,7 @@ import { filterByMonth } from './sales'
 import { orderBasisNetSales } from './netSales'
 
 const FIXED_EXPENSE_CATEGORIES = [
+  'fixedExpensesTotal',
   'salaries',
   'rent',
   'software',

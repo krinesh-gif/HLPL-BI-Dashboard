@@ -144,3 +144,18 @@ describe('comparing two months', () => {
     expect(margin.growthPct).toBeNull()
   })
 })
+
+describe('fixed expenses entered as one figure', () => {
+  it('reaches the Fixed Expenses row and EBITDA exactly as the categories did', () => {
+    const build = (lines: PnlLineValues) =>
+      buildMultiMonthPnl(['2026-08'], () => computeSubtotals(lines), computeSubtotals)
+    const asOne = build({ grossSales: 100000, cogs: 40000, fixedExpensesTotal: 10000 })
+    const byCategory = build({ grossSales: 100000, cogs: 40000, salaries: 6000, rent: 4000 })
+    const row = (r: ReturnType<typeof build>, key: string) => r.rows.find((x) => x.def.key === key)?.values[0]
+    // The row holds the magnitude; the deduction's sign is applied when it is
+    // rendered, which is why `sign: -1` lives on the row definition.
+    expect(row(asOne, 'fixedExpenses')).toBeCloseTo(10000, 6)
+    expect(row(asOne, 'fixedExpenses')).toBeCloseTo(row(byCategory, 'fixedExpenses')!, 6)
+    expect(row(asOne, 'ebitda')).toBeCloseTo(row(byCategory, 'ebitda')!, 6)
+  })
+})

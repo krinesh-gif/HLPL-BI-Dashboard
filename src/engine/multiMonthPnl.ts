@@ -52,7 +52,7 @@ const MARKETPLACE_COST_KEYS: (keyof PnlLineValues)[] = [
 ]
 const MARKETING_KEYS: (keyof PnlLineValues)[] = ['ads', 'performanceMarketing', 'otherMarketing']
 const FIXED_EXPENSE_KEYS: (keyof PnlLineValues)[] = [
-  'salaries', 'rent', 'software', 'warehouse', 'logistics', 'professionalFees', 'officeExpenses', 'generalExpenses', 'otherOpex',
+  'fixedExpensesTotal', 'salaries', 'rent', 'software', 'warehouse', 'logistics', 'professionalFees', 'officeExpenses', 'generalExpenses', 'otherOpex',
 ]
 
 /** A margin over Net Sales, computed from whatever totals it is handed — so

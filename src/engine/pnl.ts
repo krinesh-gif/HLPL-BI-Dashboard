@@ -190,6 +190,7 @@ export function computeSubtotals(input: PnlLineValues): PnlLineValues {
   lines.contributionMarginPct = netSales !== 0 ? (contributionProfit / netSales) * 100 : 0
 
   const opexTotal =
+    get('fixedExpensesTotal') +
     get('salaries') +
     get('rent') +
     get('software') +

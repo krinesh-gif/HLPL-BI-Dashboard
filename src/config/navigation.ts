@@ -70,7 +70,6 @@ export const NAVIGATION: NavSection[] = [
   { label: 'Product Master', path: '/products/master' },
   { label: 'Cost Master', path: '/products/cost-sheet' },
   { label: 'SKU Mapping', path: '/products/sku-mapping' },
-  { label: 'Fixed Expenses', path: '/pnl/fixed-expenses' },
   { label: 'Net Sales Reconciliation', path: '/pnl/reconciliation' },
   { label: 'Meesho Transaction Review', path: '/meesho/review' },
   {
@@ -84,7 +83,7 @@ export const NAVIGATION: NavSection[] = [
     label: 'Settings',
     children: [
       { label: 'General', path: '/settings' },
-      { label: 'Rates (FX & Freight)', path: '/settings/fx-rates' },
+      { label: 'Monthly Inputs', path: '/settings/monthly-inputs' },
       { label: 'Team', path: '/settings/team' },
     ],
   },

@@ -23,6 +23,7 @@ export type PnlLineKey =
   | 'otherMarketing'
   | 'contributionProfit'
   | 'contributionMarginPct'
+  | 'fixedExpensesTotal'
   | 'salaries'
   | 'rent'
   | 'software'
@@ -80,6 +81,7 @@ export const PNL_STRUCTURE: PnlLineDef[] = [
   { key: 'contributionProfit', label: 'Contribution Profit', section: 'contribution', kind: 'subtotal', sign: 1 },
   { key: 'contributionMarginPct', label: 'Contribution Margin %', section: 'contribution', kind: 'percent', sign: 1 },
 
+  { key: 'fixedExpensesTotal', label: 'Fixed Expenses', section: 'opex', kind: 'input', sign: -1 },
   { key: 'salaries', label: 'Salaries', section: 'opex', kind: 'input', sign: -1 },
   { key: 'rent', label: 'Rent', section: 'opex', kind: 'input', sign: -1 },
   { key: 'software', label: 'Software', section: 'opex', kind: 'input', sign: -1 },
