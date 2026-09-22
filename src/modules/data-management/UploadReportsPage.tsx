@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { PageShell } from '@/components/layout/PageShell'
-import { parseSpreadsheetFile, readCsvRaw, readWorkbookSheetsRaw, type ParsedFile, type RawSheet } from '@/lib/csvParse'
+import { parseSpreadsheetFile, readCsvRaw, readTsvRecords, readWorkbookSheetsRaw, type ParsedFile, type RawSheet } from '@/lib/csvParse'
 import { detectAmazonSellerCentralReport, normalizeAmazonSellerCentralRows } from '@/data/normalize/amazonSellerCentral'
 import { detectFlipkartSkuPnlReport, normalizeFlipkartSkuPnl } from '@/data/normalize/flipkartSkuPnl'
 import { detectFlipkartWorkbook, normalizeFlipkartWorkbook } from '@/data/normalize/flipkartWorkbook'
@@ -16,13 +16,14 @@ import {
 } from '@/data/normalize/nykaaSalesWorkbook'
 import { detectNykaaMarketingInvoice, parseNykaaMarketingInvoice } from '@/data/normalize/nykaaMarketingInvoice'
 import { detectNykaaDiscountDebitNote, parseNykaaDiscountDebitNote } from '@/data/normalize/nykaaDiscountDebitNote'
+import { detectAmazonSettlementReport, normalizeAmazonSettlement } from '@/data/normalize/amazonSellerSettlement'
 import { readPdfText } from '@/lib/pdfText'
 import { checkForDuplicates } from '@/data/normalize/duplicates'
 import { useDataStore, type ImportOutcome } from '@/store/dataStore'
 import { monthLabel } from '@/lib/format'
 import { useFilterStore } from '@/store/filterStore'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
-import type { AdsRecord, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraPnlFacts, NykaaPnlFacts } from '@/data/models'
+import type { AdsRecord, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraPnlFacts, NykaaPnlFacts } from '@/data/models'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
 
@@ -37,6 +38,7 @@ type ReportKind =
   | 'nykaa_companion'
   | 'nykaa_marketing_invoice'
   | 'nykaa_discount_debit_note'
+  | 'amazon_in_settlement'
   | 'meesho_order_summary'
   | 'meesho_order_payments'
   | 'meesho_settlement_json'
@@ -53,6 +55,7 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   nykaa_companion: 'Nykaa — Cart Rule / Combo file',
   nykaa_marketing_invoice: 'Nykaa — Marketing Invest (MI) tax invoice',
   nykaa_discount_debit_note: 'Nykaa — discount Financial Debit Note',
+  amazon_in_settlement: 'Amazon India — Seller Central settlement report',
   meesho_order_summary: 'Meesho — Order Summary Report',
   meesho_order_payments: 'Meesho — Aggregated Payment File (Order Payments + Ads Cost)',
   meesho_settlement_json: 'Meesho — Settlement Data (JSON)',
@@ -69,6 +72,7 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   nykaa_companion: 'nykaa',
   nykaa_marketing_invoice: 'nykaa',
   nykaa_discount_debit_note: 'nykaa',
+  amazon_in_settlement: 'amazon_in_seller',
   meesho_order_summary: 'meesho',
   meesho_order_payments: 'meesho',
   meesho_settlement_json: 'meesho',
@@ -91,6 +95,7 @@ interface PreviewState {
   amazonUsaFacts?: AmazonUsaPnlFacts
   myntraFacts?: MyntraPnlFacts
   nykaaFacts?: NykaaPnlFacts
+  amazonInSellerFacts?: AmazonInSellerPnlFacts[]
   /** A debit note edits one month's stored facts rather than importing rows. */
   nykaaDebitNote?: { month: string; patch: Partial<NykaaPnlFacts> }
   /** A month's ad spend that arrived as an invoice rather than a report. */
@@ -406,6 +411,29 @@ export function UploadReportsPage() {
         // Not a recognized multi-sheet workbook — fall through to the single-sheet path.
       }
 
+      // Amazon India's settlement report is the only tab-separated .txt any
+      // marketplace sends, and it is the only file that carries this
+      // channel's fees at all.
+      if (lowerName.endsWith('.txt') || lowerName.endsWith('.tsv')) {
+        const { headers, rows } = await readTsvRecords(file)
+        if (!detectAmazonSettlementReport(headers)) {
+          return fail(
+            'This text file is not an Amazon India settlement report. Download it from Seller Central under ' +
+            'Payments ▸ Reports Repository, as the flat file (V2).',
+          )
+        }
+        const r = normalizeAmazonSettlement(rows)
+        const failed = r.checks.filter((c) => !c.passed).map((c) => `${c.name}: ${c.detail}`)
+        if (r.factsByMonth.length === 0) {
+          return fail('This settlement report has no dated amounts in it, so there is no month to import it as.')
+        }
+        return { id, fileName: file.name, status: 'ready', preview: await buildPreview({
+          fileName: file.name, reportKind: 'amazon_in_settlement', totalRows: r.totalRows,
+          validRecords: [], invalidCount: 0, warnings: [...failed, ...r.warnings],
+          amazonInSellerFacts: r.factsByMonth,
+        }) }
+      }
+
       if (lowerName.endsWith('.csv')) {
         // Read flat first: Amazon's Vendor Central export puts a line of
         // report settings above the column names, so parsed with the first
@@ -539,6 +567,7 @@ export function UploadReportsPage() {
         amazonUsaFacts: preview.amazonUsaFacts,
         myntraFacts: preview.myntraFacts,
         nykaaFacts: preview.nykaaFacts,
+        amazonInSellerFacts: preview.amazonInSellerFacts,
         meeshoFactsByMonth: preview.meeshoFactsByMonth,
       })
       updateItem(item.id, { status: 'done', outcome: result })
@@ -596,8 +625,9 @@ export function UploadReportsPage() {
           SKU-level P&L exports (or the full P&L workbook), Amazon USA Product Profitability exports, Amazon Ads
           Sponsored Products campaign reports, Meesho Order Summary reports and the Meesho aggregated payment file,
           Myntra&apos;s P&L report, Nykaa&apos;s three monthly files (Sales, Cart Rule, Combo — drop all three in
-          together), and Nykaa&apos;s two PDFs as they are emailed: the Marketing Invest invoice and the Financial
-          Debit Note that charges the customer discount back.
+          together), Nykaa&apos;s two PDFs as they are emailed (the Marketing Invest invoice and the Financial Debit
+          Note that charges the customer discount back), and Amazon India&apos;s Seller Central settlement report as
+          the tab-separated .txt it downloads as.
         </p>
         {reading && (
           <p className="mt-3 text-sm text-[var(--ink-2)]">

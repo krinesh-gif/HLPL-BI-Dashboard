@@ -19,6 +19,7 @@ const FACT_TABLES: Record<string, FactTable> = {
   'amazon-usa': { table: 'amazon_usa_facts', byBasis: false },
   myntra: { table: 'myntra_facts', byBasis: false },
   nykaa: { table: 'nykaa_facts', byBasis: false },
+  'amazon-in-seller': { table: 'amazon_in_seller_facts', byBasis: false },
   meesho: { table: 'meesho_facts', byBasis: true },
 }
 

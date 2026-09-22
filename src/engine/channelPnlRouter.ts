@@ -8,6 +8,7 @@ import type {
   FlipkartPnlFacts,
   MeeshoPnlFacts,
   MyntraPnlFacts,
+  AmazonInSellerPnlFacts,
   NykaaPnlFacts,
   PnlLineValues,
   SkuMaster,
@@ -31,6 +32,10 @@ import {
   applyNykaaOtherCosts, computeNykaaPnl, nykaaDiscountPerSalesFile, nykaaDiscountRecovered,
   nykaaDiscountWasDerived, nykaaToCanonicalBuckets, NYKAA_LINE_DEFS,
 } from './nativePnl/nykaa'
+import {
+  AMAZON_IN_SELLER_LINE_DEFS, amazonInSellerToCanonicalBuckets, applyAmazonInSellerOtherCosts,
+  computeAmazonInSellerPnl,
+} from './nativePnl/amazonInSeller'
 import type { NativeLineDef, NativeLineValues } from './nativePnl/types'
 
 export interface NativePnlView {
@@ -60,6 +65,7 @@ export interface ChannelFactsStore {
    * compiles; every screen in the app passes it. */
   myntraFacts?: MyntraPnlFacts[]
   nykaaFacts?: NykaaPnlFacts[]
+  amazonInSellerFacts?: AmazonInSellerPnlFacts[]
 }
 
 /** Sums this channel's allocated share (sales-contribution method) of the
@@ -481,6 +487,54 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
         channel, month,
         canonical: { channel, month, lines: computeSubtotals(withAllocatedOpex(nykaaToCanonicalBuckets(facts), inputs, channel, month)) },
         native: { lineDefs: nykaaLineDefsFor(facts), values, currency: 'INR' },
+        notes,
+      }
+    }
+  }
+
+  if (channel === 'amazon_in') {
+    const imported = inputs.facts.amazonInSellerFacts?.find((f) => f.month === month)
+    if (imported) {
+      // The settlement report says what Amazon paid, never what the goods
+      // cost. COGS is priced here from the order rows at the month's own
+      // cost, so a corrected cost sheet restates the month.
+      const recomputed = recomputedCogs(channel, month, inputs)
+      // Sponsored Products is billed separately and never appears in a
+      // settlement, so it comes from where the Ads screens keep it. One
+      // figure, one source.
+      const adSpend = inputs.marketing[channel]?.ads ?? 0
+      const facts: AmazonInSellerPnlFacts = {
+        ...imported,
+        ...(recomputed ? { cogsPriced: recomputed.priced, cogsUnpriced: recomputed.unpriced } : {}),
+        ads: imported.ads || adSpend,
+      }
+      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+      const values = applyAmazonInSellerOtherCosts(computeAmazonInSellerPnl(facts), otherCosts)
+      const notes: string[] = []
+      if (!recomputed) {
+        notes.push(
+          `No Amazon India order rows are on file for ${month}, so the statement shows no cost of goods. Upload ` +
+          'the All Orders report for the month — the settlement file carries the money, never what the goods cost.',
+        )
+      }
+      if (Math.abs(values.unrecognised) > 1) {
+        notes.push(
+          `${formatCurrencyFull(Math.abs(values.unrecognised))} of ${month}'s settlement is on charge descriptions ` +
+          'this build does not recognise. It is counted, so the month still ties to the deposit, but it is not on a ' +
+          'named line — send the settlement file over and the descriptions will be added.',
+        )
+      }
+      if (Math.abs(values.settlementCheck) > 0.05) {
+        notes.push(
+          `${month}'s statement does not tie to what Amazon deposited: a gap of ` +
+          `${formatCurrencyFull(values.settlementCheck)}. Every figure below the sales lines should be treated as ` +
+          'suspect until that is explained.',
+        )
+      }
+      return {
+        channel, month,
+        canonical: { channel, month, lines: computeSubtotals(withAllocatedOpex(amazonInSellerToCanonicalBuckets(facts), inputs, channel, month)) },
+        native: { lineDefs: AMAZON_IN_SELLER_LINE_DEFS, values, currency: 'INR' },
         notes,
       }
     }

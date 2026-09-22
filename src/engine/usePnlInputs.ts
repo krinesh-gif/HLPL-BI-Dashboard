@@ -25,7 +25,7 @@ export function usePnlInputs(): {
 } {
   const {
     salesRecords, adsRecords, skuMaster, fixedExpenses,
-    flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts,
+    flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts,
     costVersions, mappings, comboComponents, manualAdSpend, fxRates, freightRates, nykaaDiscounts,
   } = useDataStore()
 
@@ -34,7 +34,7 @@ export function usePnlInputs(): {
       salesRecords,
       skuMaster,
       fixedExpenses,
-      facts: { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts },
+      facts: { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts },
       cogs: {
         // Costs resolve per month, so a closed month keeps the cost it was
         // closed at however many times the cost has changed since.
@@ -60,7 +60,7 @@ export function usePnlInputs(): {
     }
   }, [
     salesRecords, adsRecords, skuMaster, fixedExpenses,
-    flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts,
+    flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts,
     costVersions, mappings, comboComponents, manualAdSpend, fxRates, freightRates, nykaaDiscounts,
   ])
 }

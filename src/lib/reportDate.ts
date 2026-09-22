@@ -42,7 +42,12 @@ export function parseUsSlashDate(raw: string): Date | null {
  * nineties, and a windowed guess would be a second thing to get wrong.
  */
 export function parseInSlashDate(raw: string): Date | null {
-  const m = /^\s*(\d{1,2})[/-](\d{1,2})[/-](\d{2}|\d{4})\s*$/.exec(raw)
+  // Amazon India's settlement report writes the same day-first order with dots
+  // and a trailing UTC timestamp — `02.08.2026 20:42:18 UTC`. Only the date
+  // part is read. That row settled at 01:12 the next morning in Indian time,
+  // so converting the timestamp would file a week's trading against the wrong
+  // day at both ends of every settlement period.
+  const m = /^\s*(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})(?:\s+\d{2}:\d{2}:\d{2}(?:\s+\w+)?)?\s*$/.exec(raw)
   if (!m) return null
   const yearRaw = Number(m[3])
   const year = m[3].length === 2 ? 2000 + yearRaw : yearRaw

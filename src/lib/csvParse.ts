@@ -103,3 +103,23 @@ export function readCsvRaw(file: File): Promise<RawSheet> {
     })
   })
 }
+
+/**
+ * A tab-separated export, read as records keyed by its own header names.
+ *
+ * Amazon India's settlement report is the one file that arrives tab-separated
+ * with a `.txt` extension, and it is split on tabs explicitly rather than left
+ * to delimiter sniffing: its amount descriptions contain commas and
+ * ampersands, and a sniffer that guessed comma would shred every fee line.
+ */
+export async function readTsvRecords(file: File): Promise<{ headers: string[]; rows: Record<string, string>[] }> {
+  const text = await file.text()
+  const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '')
+  if (lines.length === 0) return { headers: [], rows: [] }
+  const headers = lines[0].split('\t').map((h) => h.replace(/^\uFEFF/, '').trim())
+  const rows = lines.slice(1).map((line) => {
+    const cells = line.split('\t')
+    return Object.fromEntries(headers.map((h, i) => [h, (cells[i] ?? '').trim()]))
+  })
+  return { headers, rows }
+}

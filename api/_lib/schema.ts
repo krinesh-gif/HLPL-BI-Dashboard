@@ -325,6 +325,15 @@ BEGIN
   -- out of nykaa_facts on purpose: re-importing a sales file replaces that row
   -- wholesale, and a confirmed figure a routine re-upload wiped would be worse
   -- than no field at all.
+  -- Amazon India Seller Central's weekly settlements, summed into the months
+  -- their rows were posted in. A month is a whole object because the fee
+  -- descriptions Amazon uses are open-ended: querying into them in SQL would
+  -- need a migration every time Amazon named a new charge.
+  CREATE TABLE IF NOT EXISTS amazon_in_seller_facts (
+    month TEXT PRIMARY KEY,
+    data  JSONB NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS nykaa_discounts (
     month      TEXT PRIMARY KEY,
     amount_inr DOUBLE PRECISION NOT NULL,

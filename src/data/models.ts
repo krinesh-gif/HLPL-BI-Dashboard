@@ -351,6 +351,33 @@ export interface NykaaPnlFacts {
   inboundFreight?: number
 }
 
+/**
+ * Amazon India Seller Central, as its settlement report states it.
+ *
+ * Every (amount-type, amount-description) pair the file carries is kept under
+ * its own key rather than mapped into a fixed set of buckets. Amazon adds fee
+ * descriptions without warning, and a closed list silently drops the ones it
+ * has not been taught — the same mistake that left Amazon USA's old eight
+ * buckets unable to tie to its own sheet.
+ */
+export interface AmazonInSellerPnlFacts {
+  month: string
+  schemaVersion: 1
+  /** Which weekly settlements contributed to this month. */
+  settlementIds: string[]
+  /** Slug → rupees, already signed: a charge is negative, a credit positive. */
+  amounts: Record<string, number>
+  /** Every amount in the month, summed. Ties to the deposits. */
+  settlementTotal: number
+  orders: number
+  units: number
+  /** Priced here, not by Amazon, from the order rows at the month's cost. */
+  cogsPriced?: number
+  cogsUnpriced?: number
+  /** Advertising, which the settlement report does not carry. */
+  ads?: number
+}
+
 export interface AmazonUsaPnlFacts {
   month: string
   /** 2 = the fee columns are kept one-for-one with Amazon's export in

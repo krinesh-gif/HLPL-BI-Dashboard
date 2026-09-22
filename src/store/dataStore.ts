@@ -22,6 +22,7 @@ import type {
   MeeshoPnlFacts,
   MyntraPnlFacts,
   NykaaPnlFacts,
+  AmazonInSellerPnlFacts,
   SkuMaster,
 } from '@/data/models'
 
@@ -40,6 +41,9 @@ interface SharedDataset {
   meeshoFacts: MeeshoPnlFacts[]
   myntraFacts: MyntraPnlFacts[]
   nykaaFacts: NykaaPnlFacts[]
+  /** Optional so a workspace whose API has not redeployed yet still loads:
+   * an older /api/state simply does not send this key. */
+  amazonInSellerFacts?: AmazonInSellerPnlFacts[]
   /** Advertising spend typed in by hand, for platforms that bill by invoice. */
   manualAdSpend: ManualAdSpend[]
 }
@@ -57,6 +61,7 @@ const EMPTY_DATASET: SharedDataset = {
   meeshoFacts: [],
   myntraFacts: [],
   nykaaFacts: [],
+  amazonInSellerFacts: [],
   manualAdSpend: [],
 }
 
@@ -71,6 +76,7 @@ export interface ReportImport {
   amazonUsaFacts?: AmazonUsaPnlFacts
   myntraFacts?: MyntraPnlFacts
   nykaaFacts?: NykaaPnlFacts
+  amazonInSellerFacts?: AmazonInSellerPnlFacts[]
   meeshoFactsByMonth?: MeeshoPnlFacts[]
   /** The individual events behind those facts. These are what is stored: a
    * month is summed from them, so an event repeated across uploads cannot be
@@ -205,6 +211,7 @@ export function latestMonthWithData(dataset: SharedDataset): string | null {
     ...dataset.meeshoFacts.map((f) => f.month),
     ...(dataset.myntraFacts ?? []).map((f) => f.month),
     ...(dataset.nykaaFacts ?? []).map((f) => f.month),
+    ...(dataset.amazonInSellerFacts ?? []).map((f) => f.month),
   ].filter(Boolean)
 
   return months.length === 0 ? null : months.reduce((a, b) => (a > b ? a : b))
@@ -257,7 +264,7 @@ export const useDataStore = create<DataState>((set, get) => {
      * file (rows, then one facts call per month) downloaded everything three
      * or more times over, and a large file could not get through at all.
      */
-    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, myntraFacts, nykaaFacts, meeshoFactsByMonth, meeshoTransactions, meeshoAdsRows, meeshoRecoveryRows }) => {
+    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, myntraFacts, nykaaFacts, amazonInSellerFacts, meeshoFactsByMonth, meeshoTransactions, meeshoAdsRows, meeshoRecoveryRows }) => {
       const total = salesRecords.length + adsRecords.length
       set({ importProgress: { sent: 0, total } })
       try {
@@ -317,6 +324,14 @@ export const useDataStore = create<DataState>((set, get) => {
         if (myntraFacts) {
           await api.post('/api/facts/myntra', { facts: myntraFacts })
           monthsUpdated.push(myntraFacts.month)
+        }
+        if (amazonInSellerFacts) {
+          // One settlement file can touch two months, and each is written on
+          // its own so a week that straddles a month end lands in both.
+          for (const facts of amazonInSellerFacts) {
+            await api.post('/api/facts/amazon-in-seller', { facts })
+            monthsUpdated.push(facts.month)
+          }
         }
         if (nykaaFacts) {
           await api.post('/api/facts/nykaa', { facts: nykaaFacts })
