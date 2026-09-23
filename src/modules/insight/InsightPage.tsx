@@ -8,7 +8,6 @@ const CATEGORY_LABEL: Record<Insight['category'], string> = {
   channel: 'Channel',
   sku: 'SKU / Product',
   ads: 'Marketing',
-  inventory: 'Inventory',
 }
 
 const SEVERITY_ICON: Record<Insight['severity'], string> = { red: '🔴', orange: '🟠', green: '🟢' }

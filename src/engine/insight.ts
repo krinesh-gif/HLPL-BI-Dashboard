@@ -8,7 +8,7 @@ export type InsightSeverity = 'red' | 'orange' | 'green'
 
 export interface Insight {
   severity: InsightSeverity
-  category: 'revenue' | 'margin' | 'channel' | 'sku' | 'ads' | 'inventory'
+  category: 'revenue' | 'margin' | 'channel' | 'sku' | 'ads'
   message: string
 }
 
@@ -133,20 +133,3 @@ export function acosInsight(campaignOrChannel: string, acosPct: number): Insight
   return null
 }
 
-export function inventoryInsight(sku: string, productName: string, coverageDays: number): Insight | null {
-  if (coverageDays <= INSIGHT_THRESHOLDS.stockCoverageLowDays) {
-    return {
-      severity: 'red',
-      category: 'inventory',
-      message: `${productName} (${sku}) may stock out within ${Math.round(coverageDays)} days at current sales velocity.`,
-    }
-  }
-  if (coverageDays >= INSIGHT_THRESHOLDS.excessStockDays) {
-    return {
-      severity: 'orange',
-      category: 'inventory',
-      message: `${productName} (${sku}) has ${Math.round(coverageDays)} days of stock coverage — excess inventory.`,
-    }
-  }
-  return null
-}

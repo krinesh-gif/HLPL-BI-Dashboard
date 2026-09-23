@@ -7,7 +7,6 @@ import {
   toAdsRecord,
   toFixedExpense,
   toImportRecord,
-  toInventorySnapshot,
   toSalesRecord,
   toSkuMaster,
 } from './_lib/rows.js'
@@ -30,13 +29,12 @@ export async function GET(request: Request): Promise<Response> {
   // round trip once rather than on every load.
   await ensureSchema()
 
-  const [skuRows, salesRows, adsRows, importRows, inventoryRows, expenseRows, flipkart, amazonUsa, myntra, nykaa, amazonInSeller, meesho, manualAds] =
+  const [skuRows, salesRows, adsRows, importRows, expenseRows, flipkart, amazonUsa, myntra, nykaa, amazonInSeller, meesho, manualAds] =
     await Promise.all([
       sql`SELECT * FROM sku_master ORDER BY sku`,
       sql`SELECT * FROM sales_records ORDER BY order_date`,
       sql`SELECT * FROM ads_records ORDER BY date`,
       sql`SELECT * FROM imports ORDER BY uploaded_at DESC`,
-      sql`SELECT * FROM inventory_snapshots`,
       sql`SELECT * FROM fixed_expenses`,
       sql`SELECT data FROM flipkart_facts ORDER BY month`,
       sql`SELECT data FROM amazon_usa_facts ORDER BY month`,
@@ -57,7 +55,6 @@ export async function GET(request: Request): Promise<Response> {
     salesRecords,
     adsRecords: (adsRows as Row[]).map(toAdsRecord),
     imports: (importRows as Row[]).map(toImportRecord),
-    inventorySnapshots: (inventoryRows as Row[]).map(toInventorySnapshot),
     fixedExpenses: (expenseRows as Row[]).map(toFixedExpense),
     flipkartFacts: (flipkart as Row[]).map((r) => r.data),
     amazonUsaFacts: (amazonUsa as Row[]).map((r) => r.data),

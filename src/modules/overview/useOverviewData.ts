@@ -8,10 +8,7 @@ import { buildAllChannelPnlViews } from '@/engine/channelPnlRouter'
 import { buildMasterPnl } from '@/engine/pnl'
 import { filterByMonth, groupBySku, growthPct } from '@/engine/sales'
 import { asp as aspOf, aov as aovOf, netSalesForMonth, orderBasisNetSales, rtoPct } from '@/engine/netSales'
-import { forecastDemand } from '@/engine/forecast'
-import { INVENTORY_THRESHOLDS } from '@/config/thresholds'
 import {
-  inventoryInsight,
   marginDeclineInsight,
   revenueInsight,
   rtoInsight,
@@ -20,7 +17,7 @@ import {
 } from '@/engine/insight'
 
 export function useOverviewData() {
-  const { salesRecords, adsRecords, skuMaster, inventorySnapshots, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts } = useDataStore()
+  const { salesRecords, adsRecords, skuMaster, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts } = useDataStore()
   const { forMonth } = usePnlInputs()
   const { month } = useFilterStore()
 
@@ -100,29 +97,6 @@ export function useOverviewData() {
     const fastestGrowingSku = [...skuRows].filter((r) => r.growth !== null && r.prevUnits > 0).sort((a, b) => (b.growth ?? 0) - (a.growth ?? 0))[0]
     const decliningSku = [...skuRows].filter((r) => r.growth !== null && r.prevUnits > 0).sort((a, b) => (a.growth ?? 0) - (b.growth ?? 0))[0]
 
-    // Inventory — only SKUs with a known stock position; no snapshot means
-    // unknown coverage, not "excess".
-    const inventoryRows = skuMaster.flatMap((s) => {
-      const snapshot = inventorySnapshots.find((i) => i.sku === s.sku)
-      if (!snapshot) return []
-      const trailingDaily = salesRecords
-        .filter((r) => r.sku === s.sku && r.orderDate <= snapshot.asOfDate)
-        .slice(-90)
-      const series = Object.entries(
-        trailingDaily.reduce<Record<string, number>>((acc, r) => {
-          acc[r.orderDate] = (acc[r.orderDate] ?? 0) + r.quantity
-          return acc
-        }, {}),
-      ).map(([date, units]) => ({ date, units }))
-      const forecast = forecastDemand(series)
-      const coverageDays = forecast.avgDailyUnits > 0 ? snapshot.currentStock / forecast.avgDailyUnits : Infinity
-      return [{ sku: s.sku, productName: s.productName, coverageDays, currentStock: snapshot.currentStock, cogs: s.cogs }]
-    })
-    const stockOutRiskSkus = inventoryRows.filter((r) => r.coverageDays <= INVENTORY_THRESHOLDS.buyNowCoverageDays)
-    const excessInventorySkus = inventoryRows.filter((r) => r.coverageDays >= INVENTORY_THRESHOLDS.excessInventoryCoverageDays)
-    const inventoryValue = inventoryRows.reduce((sum, r) => sum + r.currentStock * r.cogs, 0)
-    const avgCoverageDays =
-      inventoryRows.length > 0 ? inventoryRows.reduce((s, r) => s + (Number.isFinite(r.coverageDays) ? r.coverageDays : 0), 0) / inventoryRows.length : 0
 
     // Insights (Action Required)
     const insights: Insight[] = []
@@ -131,10 +105,6 @@ export function useOverviewData() {
     const marginIns = marginDeclineInsight(masterCurrent.lines, masterPrevious.lines)
     if (marginIns) insights.push(marginIns)
     insights.push(...skuGrowthInsights(skuRows.map((r) => ({ sku: r.sku, productName: r.productName, currentUnits: r.curUnits, previousUnits: r.prevUnits }))))
-    for (const row of inventoryRows) {
-      const ins = inventoryInsight(row.sku, row.productName, row.coverageDays)
-      if (ins) insights.push(ins)
-    }
     for (const c of BUSINESS_CHANNELS) {
       const channelFigure = orderBasisNetSales(filterByMonth(salesRecords, month).filter((r) => r.channel === c.id))
       const ins = rtoInsight(c.id, channelFigure.rtoUnits, channelFigure.shippedUnits)
@@ -178,11 +148,7 @@ export function useOverviewData() {
       topSku,
       fastestGrowingSku,
       decliningSku,
-      stockOutRiskSkus,
-      excessInventorySkus,
-      inventoryValue,
-      avgCoverageDays,
       insights,
     }
-  }, [salesRecords, adsRecords, skuMaster, inventorySnapshots, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, forMonth, month])
+  }, [salesRecords, adsRecords, skuMaster, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, forMonth, month])
 }

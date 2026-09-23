@@ -17,7 +17,6 @@ import type {
   FixedExpenseEntry,
   FlipkartPnlFacts,
   ImportRecord,
-  InventorySnapshot,
   ManualAdSpend,
   MeeshoPnlFacts,
   MyntraPnlFacts,
@@ -45,7 +44,6 @@ interface SharedDataset {
   skuMaster: SkuMaster[]
   salesRecords: CanonicalSalesRecord[]
   adsRecords: AdsRecord[]
-  inventorySnapshots: InventorySnapshot[]
   fixedExpenses: FixedExpenseEntry[]
   imports: ImportRecord[]
   flipkartFacts: FlipkartPnlFacts[]
@@ -65,7 +63,6 @@ const EMPTY_DATASET: SharedDataset = {
   skuMaster: [],
   salesRecords: [],
   adsRecords: [],
-  inventorySnapshots: [],
   fixedExpenses: [],
   imports: [],
   flipkartFacts: [],

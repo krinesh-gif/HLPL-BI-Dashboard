@@ -11,7 +11,7 @@ import { useOverviewData } from './useOverviewData'
  * one wall of identical tiles — and so the colour means "which section", not
  * "which number is important". */
 const SECTION_ACCENT = {
-  Revenue: 1, Profitability: 3, Channels: 7, Products: 2, Marketing: 5, Inventory: 4,
+  Revenue: 1, Profitability: 3, Channels: 7, Products: 2, Marketing: 5,
 } as const
 
 export function OverviewPage() {
@@ -117,7 +117,6 @@ export function OverviewPage() {
           <KPICard accent={2} label="Top SKU" value={d.topSku?.productName ?? '—'} />
           <KPICard accent={2} label="Fastest-Growing SKU" value={d.fastestGrowingSku?.productName ?? '—'} delta={{ pct: d.fastestGrowingSku?.growth ?? null }} />
           <KPICard accent={2} label="Declining SKU" value={d.decliningSku?.productName ?? '—'} delta={{ pct: d.decliningSku?.growth ?? null }} />
-          <KPICard accent={2} label="Stock-Out Risk SKUs" value={String(d.stockOutRiskSkus.length)} tone={d.stockOutRiskSkus.length > 0 ? 'bad' : 'neutral'} />
         </KPIGrid>
       </Section>
 
@@ -130,14 +129,6 @@ export function OverviewPage() {
         </KPIGrid>
       </Section>
 
-      <Section title="Inventory">
-        <KPIGrid>
-          <KPICard accent={4} label="Inventory Value" value={formatCurrencyCompact(d.inventoryValue)} />
-          <KPICard accent={4} label="Avg Stock Coverage" value={`${Math.round(d.avgCoverageDays)} days`} />
-          <KPICard accent={4} label="Stock-Out Risk" value={String(d.stockOutRiskSkus.length)} tone={d.stockOutRiskSkus.length > 0 ? 'bad' : 'neutral'} />
-          <KPICard accent={4} label="Excess Inventory" value={String(d.excessInventorySkus.length)} tone={d.excessInventorySkus.length > 0 ? 'bad' : 'neutral'} />
-        </KPIGrid>
-      </Section>
 
       <ActionRequiredList insights={d.insights} />
     </PageShell>

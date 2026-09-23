@@ -24,19 +24,7 @@ export const ADS_ACTION_THRESHOLDS = {
   protectMinSalesShare: 0.1, // 10% of total ad-attributed sales
 }
 
-export const FORECAST_ASSUMPTIONS = {
-  trailingWindowDays: 90,
-  recentWeightDays: 28,
-  recentWeight: 0.6, // weight given to recent trend vs long-run average
-  defaultExpectedGrowthPct: 0, // used only if user hasn't set a channel/SKU growth assumption
-  minHistoryDaysForSeasonality: 365,
-}
 
-export const INVENTORY_THRESHOLDS = {
-  buyNowCoverageDays: 15,
-  planPurchaseCoverageDays: 30,
-  excessInventoryCoverageDays: 90,
-}
 
 export const FISCAL_YEAR = {
   // India FY: 1 April -> 31 March. startMonth is 0-indexed (3 = April).

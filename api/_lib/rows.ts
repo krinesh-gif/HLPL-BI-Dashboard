@@ -8,7 +8,6 @@ import type {
   CanonicalSalesRecord,
   FixedExpenseEntry,
   ImportRecord,
-  InventorySnapshot,
   SkuMaster,
 } from '../../src/data/models.js'
 import type { ChannelId } from '../../src/config/channels.js'
@@ -97,14 +96,6 @@ export function toImportRecord(r: Row): ImportRecord {
   }
 }
 
-export function toInventorySnapshot(r: Row): InventorySnapshot {
-  return {
-    sku: str(r.sku),
-    asOfDate: str(r.as_of_date),
-    currentStock: num(r.current_stock),
-    inTransit: num(r.in_transit),
-  }
-}
 
 export function toFixedExpense(r: Row): FixedExpenseEntry {
   return {

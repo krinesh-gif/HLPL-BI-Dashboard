@@ -109,12 +109,6 @@ export interface ManualAdSpend {
 // ---------------------------------------------------------------------------
 // Inventory
 // ---------------------------------------------------------------------------
-export interface InventorySnapshot {
-  sku: string
-  asOfDate: string
-  currentStock: number
-  inTransit: number
-}
 
 // ---------------------------------------------------------------------------
 // Fixed Expenses — entered/imported per month, not derived from order data.

@@ -18,6 +18,11 @@ export interface NavSection {
  *
  * P&L is a single top-level section. It is deliberately NOT repeated inside
  * each channel: one report, one format, one place it can be produced from.
+ *
+ * Catalogue holds the three screens that describe what is sold rather than
+ * what was sold: the product list, what each product costs, and how a
+ * marketplace's own code maps onto ours. They were three top-level entries and
+ * are one section, because they are only ever used together.
  */
 export const NAVIGATION: NavSection[] = [
   { label: 'Overview', path: '/' },
@@ -60,18 +65,14 @@ export const NAVIGATION: NavSection[] = [
     ],
   },
   {
-    label: 'Supply Chain',
+    label: 'Catalogue',
     children: [
-      { label: 'Inventory', path: '/supply-chain/inventory' },
-      { label: 'Forecast', path: '/supply-chain/forecast' },
-      { label: 'Procurement', path: '/supply-chain/procurement' },
+      { label: 'Products Master', path: '/products/master' },
+      { label: 'Cost', path: '/products/cost-sheet' },
+      { label: 'SKU Mapping', path: '/products/sku-mapping' },
     ],
   },
-  { label: 'Product Master', path: '/products/master' },
-  { label: 'Cost Master', path: '/products/cost-sheet' },
-  { label: 'SKU Mapping', path: '/products/sku-mapping' },
   { label: 'Net Sales Reconciliation', path: '/pnl/reconciliation' },
-  { label: 'Meesho Transaction Review', path: '/meesho/review' },
   {
     label: 'Data',
     children: [

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { inventoryInsight, marginDeclineInsight, revenueInsight, rtoInsight, skuGrowthInsights } from './insight'
+import { marginDeclineInsight, revenueInsight, rtoInsight, skuGrowthInsights } from './insight'
 
 describe('revenueInsight', () => {
   it('flags strong growth as green', () => {
@@ -67,20 +67,3 @@ describe('rtoInsight', () => {
   })
 })
 
-describe('inventoryInsight', () => {
-  it('flags stock-out risk for low coverage', () => {
-    const insight = inventoryInsight('SKU-1', 'Test Product', 5)
-    expect(insight?.severity).toBe('red')
-    expect(insight?.message).toContain('stock out')
-  })
-
-  it('flags excess inventory for very high coverage', () => {
-    const insight = inventoryInsight('SKU-2', 'Test Product 2', 150)
-    expect(insight?.severity).toBe('orange')
-    expect(insight?.message).toContain('excess inventory')
-  })
-
-  it('returns null for healthy coverage', () => {
-    expect(inventoryInsight('SKU-3', 'Healthy Product', 40)).toBeNull()
-  })
-})

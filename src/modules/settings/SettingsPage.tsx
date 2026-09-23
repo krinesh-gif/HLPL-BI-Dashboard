@@ -1,5 +1,5 @@
 import { PageShell } from '@/components/layout/PageShell'
-import { INSIGHT_THRESHOLDS, ADS_ACTION_THRESHOLDS, FORECAST_ASSUMPTIONS, INVENTORY_THRESHOLDS, FISCAL_YEAR } from '@/config/thresholds'
+import { INSIGHT_THRESHOLDS, ADS_ACTION_THRESHOLDS, FISCAL_YEAR } from '@/config/thresholds'
 import { channelLabel, DEFAULT_ALLOCATION_WEIGHTS, SOURCE_MAP, channelOfSource } from '@/config/channels'
 import type { BusinessChannelId, SalesSourceId } from '@/config/channels'
 import { DEFAULT_CHANNEL_FEE_RATES } from '@/config/marketplaceFees'
@@ -27,7 +27,7 @@ export function SettingsPage() {
     <PageShell title="Settings" subtitle="Business-rule configuration — thresholds and assumptions driving every engine" showFilters={false}>
       <div className="rounded-lg border border-[color-mix(in_oklab,var(--warning)_35%,transparent)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] p-4 text-sm text-[var(--ink-2)]">
         These values live in <code className="rounded bg-[color-mix(in_oklab,var(--warning)_20%,transparent)] px-1 py-0.5">src/config/</code> and are read by every
-        calculation engine (business insight, Amazon Ads actions, inventory forecast, fixed-expense allocation). This
+        calculation engine (business insight, Amazon Ads actions, fixed-expense allocation). This
         milestone ships them as reviewable configuration; an in-app editor is a follow-up.
       </div>
 
@@ -39,14 +39,6 @@ export function SettingsPage() {
         <ConfigTable
           title="Amazon Ads Action Thresholds"
           rows={Object.entries(ADS_ACTION_THRESHOLDS).map(([k, v]) => ({ key: k, value: String(v) }))}
-        />
-        <ConfigTable
-          title="Forecast Assumptions"
-          rows={Object.entries(FORECAST_ASSUMPTIONS).map(([k, v]) => ({ key: k, value: String(v) }))}
-        />
-        <ConfigTable
-          title="Inventory Thresholds"
-          rows={Object.entries(INVENTORY_THRESHOLDS).map(([k, v]) => ({ key: k, value: String(v) }))}
         />
         <ConfigTable title="Fiscal Year" rows={[{ key: 'startMonth (0-indexed)', value: String(FISCAL_YEAR.startMonth) }]} />
         <ConfigTable
