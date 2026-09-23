@@ -607,7 +607,11 @@ export function UploadReportsPage() {
         <input
           type="file"
           multiple
-          accept=".csv,.xlsx,.xls,.json,.pdf"
+          // Every extension analyzeFile knows how to read. A reader added
+          // without its extension here is unreachable: the picker greys the
+          // file out and the person cannot select it at all, which is exactly
+          // what happened to Amazon India's settlement .txt.
+          accept=".csv,.tsv,.txt,.xlsx,.xls,.json,.pdf"
           disabled={busy}
           onChange={(e) => {
             const files = Array.from(e.target.files ?? [])
