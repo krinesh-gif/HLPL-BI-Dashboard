@@ -19,9 +19,22 @@ interface SaveBody {
   fixedExpenses?: unknown
 }
 
-/** The nine OPEX lines the P&L has. A category outside this list would be
- * stored and then never shown, because the statement has nowhere to put it. */
+/**
+ * The OPEX lines the P&L has. A category outside this list would be stored and
+ * then never shown, because the statement has nowhere to put it.
+ *
+ * `fixedExpensesTotal` is a month entered as one figure, which is how the
+ * company works them out — the split is done in a spreadsheet and only the
+ * total is re-keyed. The nine named lines are the older per-category entry and
+ * are still accepted, so a month recorded that way keeps its detail.
+ *
+ * This list has to match `FixedExpenseEntry['category']` in the client's
+ * models, and a test asserts that it does: adding a category on one side only
+ * is how a figure gets refused with a message naming categories that are no
+ * longer the whole list.
+ */
 const EXPENSE_CATEGORIES = new Set([
+  'fixedExpensesTotal',
   'salaries', 'rent', 'software', 'warehouse', 'logistics',
   'professionalFees', 'officeExpenses', 'generalExpenses', 'otherOpex',
 ])
@@ -214,7 +227,11 @@ export async function POST(request: Request): Promise<Response> {
   if (body && body.fixedExpenses !== undefined) {
     if (!isFixedExpenseArray(body.fixedExpenses)) {
       return json(
-        { error: 'Expected { fixedExpenses: [{ month: "yyyy-mm", category: one of the nine OPEX lines, amount: number >= 0, note? }] }.' },
+        {
+          error:
+            'Expected { fixedExpenses: [{ month: "yyyy-mm", category, amount: number >= 0, note? }] }. ' +
+            `Category must be one of: ${[...EXPENSE_CATEGORIES].join(', ')}.`,
+        },
         400,
       )
     }
