@@ -67,20 +67,59 @@ export function ImportHistoryPage() {
         <DataTable
           exportFileName="HLPL_ImportHistory"
           columns={[
-            { key: 'fileName', header: 'File Name', accessor: (r) => r.fileName },
+            {
+              key: 'fileName',
+              header: 'File',
+              accessor: (r) => r.fileName,
+              // Marketplace exports are named by machines and run to eighty
+              // characters. Left to size the column they pushed Reverse off
+              // the right-hand edge, where the whole point is that it is in
+              // reach. Truncated, with the full name on hover.
+              render: (r) => (
+                <span className="block max-w-[20rem] truncate" title={`${r.fileName} — ${r.reportType}`}>
+                  {r.fileName}
+                  <span className="block truncate text-[11px] text-[var(--ink-3)]">{r.reportType}</span>
+                </span>
+              ),
+            },
             { key: 'channel', header: 'Channel', accessor: (r) => CHANNEL_MAP[r.channel]?.label ?? r.channel },
-            { key: 'reportType', header: 'Report Type', accessor: (r) => r.reportType },
-            { key: 'uploadedAt', header: 'Upload Date', accessor: (r) => r.uploadedAt, render: (r) => new Date(r.uploadedAt).toLocaleString('en-IN') },
-            { key: 'recordCount', header: 'Records', accessor: (r) => r.recordCount, align: 'right' },
-            { key: 'validRecordCount', header: 'Valid', accessor: (r) => r.validRecordCount, align: 'right' },
+            {
+              key: 'uploadedAt',
+              header: 'Uploaded',
+              accessor: (r) => r.uploadedAt,
+              render: (r) => new Date(r.uploadedAt).toLocaleDateString('en-IN', {
+                day: '2-digit', month: 'short', year: '2-digit',
+              }),
+            },
+            {
+              key: 'recordCount',
+              header: 'Rows',
+              accessor: (r) => r.recordCount,
+              align: 'right',
+              // One column, because "valid out of total" is the question —
+              // two columns of numbers side by side made the reader do the
+              // comparison themselves.
+              render: (r) => (
+                <span title={`${r.validRecordCount} valid of ${r.recordCount} read`}>
+                  {formatNumber(r.validRecordCount)}
+                  {r.validRecordCount !== r.recordCount && (
+                    <span className="text-[var(--ink-3)]">/{formatNumber(r.recordCount)}</span>
+                  )}
+                </span>
+              ),
+            },
             {
               key: 'status',
               header: 'Status',
               accessor: (r) => r.status,
               render: (r) => (
                 <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                    r.status === 'success' ? 'bg-[color-mix(in_oklab,var(--good)_16%,transparent)] text-[var(--good-ink)]' : r.status === 'partial' ? 'bg-[color-mix(in_oklab,var(--warning)_20%,transparent)] text-[var(--ink-2)]' : 'bg-[color-mix(in_oklab,var(--critical)_16%,transparent)] text-[var(--critical-ink)]'
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    r.status === 'success'
+                      ? 'bg-[color-mix(in_oklab,var(--good)_16%,transparent)] text-[var(--good-ink)]'
+                      : r.status === 'partial'
+                        ? 'bg-[color-mix(in_oklab,var(--warning)_20%,transparent)] text-[var(--ink-2)]'
+                        : 'bg-[color-mix(in_oklab,var(--critical)_16%,transparent)] text-[var(--critical-ink)]'
                   }`}
                 >
                   {r.status}

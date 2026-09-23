@@ -326,45 +326,4 @@ async function storeTransactions(rows: TransactionBody[], importId?: string): Pr
   return usable.length
 }
 
-/**
- * Clears every Meesho event.
- *
- * Uploads add to what is stored, which is right — a month arrives across
- * several files. But it leaves no way back when the stored rows are wrong:
- * figures from a file that was mis-parsed, or from a report that should never
- * have been imported, simply stay. Verifying the importer against the owner's
- * own workbook showed the pipeline producing their totals exactly while the
- * dashboard read about 1.18 lakh higher, and the whole difference was rows
- * left over from earlier uploads that nothing could remove.
- */
-export async function DELETE(request: Request): Promise<Response> {
-  const auth = await requireSection(request, 'data')
-  if (auth.response) return auth.response
-
-  const target = tableFor(request)
-  if (!target?.byBasis) return json({ error: 'Only Meesho stores events.' }, 404)
-  await ensureSchema()
-
-  const events = (await sql.query(`SELECT count(*)::int AS n FROM meesho_transactions`)) as { n: number }[]
-  // The order rows go too. They are a second copy of the same file, written
-  // for Daily Sales and SKU analytics, and the P&L falls back to them when a
-  // month has no events — so leaving them behind meant clearing the events
-  // changed nothing on screen at all.
-  const orders = (await sql.query(
-    `SELECT count(*)::int AS n FROM sales_records WHERE channel = 'meesho'`,
-  )) as { n: number }[]
-
-  await sql.query(`DELETE FROM meesho_transactions`)
-  await sql.query(`DELETE FROM meesho_ads`)
-  await sql.query(`DELETE FROM meesho_platform_recovery`)
-  await sql.query(`DELETE FROM sales_records WHERE channel = 'meesho'`)
-
-  return json({
-    ok: true,
-    cleared: (events[0]?.n ?? 0) + (orders[0]?.n ?? 0),
-    clearedEvents: events[0]?.n ?? 0,
-    clearedOrderRows: orders[0]?.n ?? 0,
-  })
-}
-
-export default createHandler({ GET, POST, PATCH, DELETE })
+export default createHandler({ GET, POST, PATCH })

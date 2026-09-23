@@ -170,38 +170,16 @@ async function findNykaaCompanions(files: File[]): Promise<NykaaCompanions> {
 export function UploadReportsPage() {
   const {
     skuMaster, mappings, importReport, importProgress, importSkuMapWorkbook, saveManualAdSpend,
-    patchNykaaFacts, nykaaFacts, clearMeeshoData, meeshoFacts,
+    patchNykaaFacts, nykaaFacts,
   } = useDataStore()
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null)
   const { month: filterMonth } = useFilterStore()
   const [stage, setStage] = useState<Stage>('idle')
   const [error, setError] = useState<string | null>(null)
   const [queue, setQueue] = useState<QueueItem[]>([])
+  const [dragging, setDragging] = useState(false)
   const [reading, setReading] = useState<{ done: number; total: number } | null>(null)
-  const [resetting, setResetting] = useState(false)
-  const [resetResult, setResetResult] = useState<string | null>(null)
 
-  const meeshoMonths = meeshoFacts.filter((f) => f.basis === 'order').length
-
-  async function resetMeesho() {
-    if (!window.confirm(
-      'Remove every stored Meesho event?\n\nThe P&L for every Meesho month will be empty until you upload the ' +
-      'payment files again. Nothing else is touched.',
-    )) return
-    setResetting(true)
-    setResetResult(null)
-    try {
-      const { clearedEvents, clearedOrderRows } = await clearMeeshoData()
-      setResetResult(
-        `Removed ${clearedEvents.toLocaleString('en-IN')} Meesho event(s) and ` +
-        `${clearedOrderRows.toLocaleString('en-IN')} order row(s). Upload the payment files again to rebuild.`,
-      )
-    } catch (e) {
-      setResetResult(e instanceof Error ? e.message : String(e))
-    } finally {
-      setResetting(false)
-    }
-  }
 
   /** Builds a preview without touching component state, so it can be called
    * once per file while a batch is being read. */
@@ -602,8 +580,35 @@ export function UploadReportsPage() {
   const busy = stage === 'importing' || reading !== null
 
   return (
-    <PageShell title="Upload Reports" subtitle="Upload marketplace reports for normalization and import" showFilters={false}>
-      <div className="rounded-lg border border-dashed border-[var(--line-2)] bg-[var(--surface)] p-6 text-center">
+    <PageShell
+      title="Upload Reports"
+      subtitle="Drop a marketplace report in and it is checked before anything is written"
+      showFilters={false}
+    >
+      {/*
+        The whole panel is the target.
+        //
+        // It used to be a bare file input with a browser-drawn "Choose file"
+        // button and a wall of supported formats under it, and nobody could
+        // tell where to click. The label covers the panel, so the click lands
+        // wherever it is aimed, and dropping files on it works too — which is
+        // what most people try first with a box like this.
+      */}
+      <label
+        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragging(false)
+          const files = Array.from(e.dataTransfer.files ?? [])
+          if (files.length > 0 && !busy) void addFiles(files)
+        }}
+        className={`flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors ${
+          dragging
+            ? 'border-[var(--accent)] bg-[color-mix(in_oklab,var(--accent)_8%,transparent)]'
+            : 'border-[var(--line-2)] bg-[var(--surface)] hover:border-[var(--accent)] hover:bg-[var(--surface-2)]'
+        } ${busy ? 'pointer-events-none opacity-60' : ''}`}
+      >
         <input
           type="file"
           multiple
@@ -618,27 +623,41 @@ export function UploadReportsPage() {
             if (files.length > 0) void addFiles(files)
             e.target.value = ''
           }}
-          className="mx-auto block text-sm text-[var(--ink-2)]"
+          className="sr-only"
         />
-        <p className="mt-2 text-xs font-medium text-[var(--ink-2)]">
-          Pick as many files as you like — a whole year of months in one go. Each is checked on its own before anything
-          is written.
-        </p>
-        <p className="mt-2 text-xs text-[var(--ink-3)]">
-          Supported: Amazon India Seller Central order reports and the Vendor Central monthly sales export, Flipkart
-          SKU-level P&L exports (or the full P&L workbook), Amazon USA Product Profitability exports, Amazon Ads
-          Sponsored Products campaign reports, Meesho Order Summary reports and the Meesho aggregated payment file,
-          Myntra&apos;s P&L report, Nykaa&apos;s three monthly files (Sales, Cart Rule, Combo — drop all three in
-          together), Nykaa&apos;s two PDFs as they are emailed (the Marketing Invest invoice and the Financial Debit
-          Note that charges the customer discount back), and Amazon India&apos;s Seller Central settlement report as
-          the tab-separated .txt it downloads as.
-        </p>
+        <svg viewBox="0 0 24 24" className="h-9 w-9 text-[var(--ink-3)]" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+        </svg>
+        <span className="mt-3 rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--accent-ink)]">
+          Choose files
+        </span>
+        <span className="mt-2.5 text-sm text-[var(--ink-2)]">or drag them here</span>
+        <span className="mt-1 text-xs text-[var(--ink-3)]">
+          As many as you like — a whole year in one go. Each is checked on its own before anything is written.
+        </span>
         {reading && (
-          <p className="mt-3 text-sm text-[var(--ink-2)]">
+          <span className="mt-3 text-sm font-medium text-[var(--accent)]">
             Reading {reading.done} of {reading.total}…
-          </p>
+          </span>
         )}
-      </div>
+      </label>
+
+      <details className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
+        <summary className="cursor-pointer text-sm font-medium text-[var(--ink-2)]">
+          Which reports can I upload?
+        </summary>
+        <ul className="mt-3 space-y-1.5 text-xs text-[var(--ink-2)]">
+          <li><strong>Amazon India</strong> — Seller Central order reports, the settlement report (the tab-separated
+            .txt), and the Vendor Central monthly sales export.</li>
+          <li><strong>Amazon USA</strong> — the Product Profitability export.</li>
+          <li><strong>Amazon Ads</strong> — Sponsored Products campaign reports.</li>
+          <li><strong>Flipkart</strong> — SKU-level P&amp;L exports, or the full P&amp;L workbook.</li>
+          <li><strong>Meesho</strong> — Order Summary reports and the aggregated payment file.</li>
+          <li><strong>Myntra</strong> — the P&amp;L report.</li>
+          <li><strong>Nykaa</strong> — the three monthly files (Sales, Cart Rule, Combo — drop all three in together),
+            plus the two emailed PDFs: the Marketing Invest invoice and the Financial Debit Note.</li>
+        </ul>
+      </details>
 
       {queue.length > 0 && (
         <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)]">
@@ -691,27 +710,6 @@ export function UploadReportsPage() {
       {stage === 'error' && error && (
         <div className="rounded-lg border border-[color-mix(in_oklab,var(--critical)_35%,transparent)] bg-[color-mix(in_oklab,var(--critical)_10%,transparent)] p-4 text-sm text-[var(--critical-ink)]">{error}</div>
       )}
-
-      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
-        <h2 className="text-sm font-semibold text-[var(--ink-2)]">Start Meesho over</h2>
-        <p className="mt-1 text-xs text-[var(--ink-3)]">
-          Uploading a Meesho payment file adds to what is stored, because a month arrives across several files. That
-          leaves no way back if what is stored is wrong — figures from an earlier upload stay whatever you upload next.
-          This removes every Meesho event so the channel is rebuilt from the files alone. Nothing else is touched.
-        </p>
-        <p className="mt-2 text-xs text-[var(--ink-3)]">
-          Currently holding {meeshoMonths} Meesho month(s) on the order-date basis.
-        </p>
-        <button
-          type="button"
-          onClick={resetMeesho}
-          disabled={resetting}
-          className="mt-3 rounded-md border border-[color-mix(in_oklab,var(--critical)_45%,transparent)] px-3 py-1.5 text-xs font-medium text-[var(--critical-ink)] hover:bg-[color-mix(in_oklab,var(--critical)_10%,transparent)] disabled:opacity-50"
-        >
-          {resetting ? 'Removing…' : 'Remove all Meesho data'}
-        </button>
-        {resetResult && <p className="mt-2 text-xs text-[var(--ink-2)]">{resetResult}</p>}
-      </section>
 
       {outcome && stage === 'idle' && (
         <div className="mb-6 rounded-lg border border-[color-mix(in_oklab,var(--good)_45%,transparent)] bg-[color-mix(in_oklab,var(--good)_10%,transparent)] p-4">
