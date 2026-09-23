@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import clsx from 'clsx'
 import { NAVIGATION, type NavSection } from '@/config/navigation'
+import { canAccess, sectionForPath } from '@/config/sections'
 import { useAuthStore } from '@/store/authStore'
 import { useThemeStore } from '@/store/themeStore'
 import { BUILD_COMMIT, buildLabel } from '@/lib/buildInfo'
@@ -117,6 +118,21 @@ function ThemeToggle() {
 export function Sidebar() {
   const { user, logout } = useAuthStore()
 
+  /**
+   * The sidebar shows only what this account can open.
+   *
+   * A section head with no reachable children is dropped whole rather than
+   * left as an empty expander — a heading that opens onto nothing reads like
+   * a bug, not like a permission.
+   */
+  const visible = NAVIGATION.flatMap((section) => {
+    if (section.children) {
+      const children = section.children.filter((c) => canAccess(user?.sections, sectionForPath(c.path)))
+      return children.length > 0 ? [{ ...section, children }] : []
+    }
+    return canAccess(user?.sections, sectionForPath(section.path ?? '/')) ? [section] : []
+  })
+
   return (
     <aside className="flex h-full w-[248px] shrink-0 flex-col border-r border-[var(--line)] bg-[var(--surface)]">
       <div className="flex items-center gap-2.5 px-4 py-4">
@@ -136,7 +152,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2.5 pb-4">
-        {NAVIGATION.map((section) => (
+        {visible.map((section) => (
           <SectionItem key={section.label} section={section} />
         ))}
       </nav>

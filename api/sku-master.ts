@@ -1,6 +1,6 @@
 import { createHandler } from './_lib/handler.js'
 import { sql } from './_lib/db.js'
-import { requireSession } from './_lib/auth.js'
+import { requireSection } from './_lib/auth.js'
 import { isNonEmptyString, json, readJson } from './_lib/http.js'
 import type { SkuMaster } from '../src/data/models.js'
 
@@ -42,7 +42,7 @@ const PATCHABLE: Record<string, string> = {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const auth = await requireSession(request)
+  const auth = await requireSection(request, 'catalogue')
   if (auth.response) return auth.response
 
   const body = await readJson<Body>(request)

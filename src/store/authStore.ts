@@ -1,9 +1,13 @@
 import { create } from 'zustand'
 import { api } from '@/lib/apiClient'
+import type { SectionId } from '@/config/sections'
 
 export interface AuthUser {
   id: string
   email: string
+  /** Sections this account may open. `null` means all of them. */
+  sections: SectionId[] | null
+  isAdmin: boolean
 }
 
 interface AuthState {

@@ -1,6 +1,6 @@
 import { createHandler } from '../_lib/handler.js'
 import { sql } from '../_lib/db.js'
-import { requireSession } from '../_lib/auth.js'
+import { requireSection } from '../_lib/auth.js'
 import { isNonEmptyString, json, readJson } from '../_lib/http.js'
 import { recordKey } from '../../src/data/normalize/dedupKeys.js'
 import type { CanonicalSalesRecord, ImportRecord } from '../../src/data/models.js'
@@ -27,7 +27,7 @@ function isImportRecord(v: unknown): v is ImportRecord {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const auth = await requireSession(request)
+  const auth = await requireSection(request, 'data')
   if (auth.response) return auth.response
 
   const body = await readJson<Body>(request)
@@ -145,7 +145,7 @@ export default createHandler({ POST, DELETE })
  * introduce, so it stays, and the reply says how many.
  */
 export async function DELETE(request: Request): Promise<Response> {
-  const auth = await requireSession(request)
+  const auth = await requireSection(request, 'data')
   if (auth.response) return auth.response
 
   const importId = new URL(request.url).searchParams.get('importId')

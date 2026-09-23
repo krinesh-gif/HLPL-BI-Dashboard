@@ -1,6 +1,6 @@
 import { createHandler } from '../_lib/handler.js'
 import { sql } from '../_lib/db.js'
-import { requireSession } from '../_lib/auth.js'
+import { requireSection } from '../_lib/auth.js'
 import { json, readJson } from '../_lib/http.js'
 
 interface Body {
@@ -15,7 +15,7 @@ interface Body {
  * wasteful.
  */
 export async function POST(request: Request): Promise<Response> {
-  const auth = await requireSession(request)
+  const auth = await requireSection(request, 'data')
   if (auth.response) return auth.response
 
   const body = await readJson<Body>(request)

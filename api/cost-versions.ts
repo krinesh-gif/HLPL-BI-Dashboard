@@ -1,6 +1,6 @@
 import { createHandler } from './_lib/handler.js'
 import { ensureSchema, sql } from './_lib/db.js'
-import { requireSession } from './_lib/auth.js'
+import { requireSection, requireSession } from './_lib/auth.js'
 import { isNonEmptyString, json, readJson } from './_lib/http.js'
 import type { CostVersion } from '../src/data/costVersions.js'
 
@@ -219,7 +219,7 @@ export async function GET(request: Request): Promise<Response> {
  */
 export async function POST(request: Request): Promise<Response> {
   await ensureSchema()
-  const auth = await requireSession(request)
+  const auth = await requireSection(request, 'settings', 'catalogue')
   if (auth.response) return auth.response
 
   const body = await readJson<SaveBody>(request)
@@ -373,7 +373,7 @@ export async function POST(request: Request): Promise<Response> {
  */
 export async function DELETE(request: Request): Promise<Response> {
   await ensureSchema()
-  const auth = await requireSession(request)
+  const auth = await requireSection(request, 'settings', 'catalogue')
   if (auth.response) return auth.response
 
   const url = new URL(request.url)

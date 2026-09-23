@@ -1,57 +1,53 @@
 import { PageShell } from '@/components/layout/PageShell'
-import { INSIGHT_THRESHOLDS, ADS_ACTION_THRESHOLDS, FISCAL_YEAR } from '@/config/thresholds'
-import { channelLabel, DEFAULT_ALLOCATION_WEIGHTS, SOURCE_MAP, channelOfSource } from '@/config/channels'
-import type { BusinessChannelId, SalesSourceId } from '@/config/channels'
+import { Link } from 'react-router-dom'
+import { channelLabel, SOURCE_MAP, channelOfSource } from '@/config/channels'
+import type { SalesSourceId } from '@/config/channels'
 import { DEFAULT_CHANNEL_FEE_RATES } from '@/config/marketplaceFees'
-
-function ConfigTable({ title, rows }: { title: string; rows: { key: string; value: string }[] }) {
-  return (
-    <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
-      <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">{title}</h3>
-      <table className="w-full text-sm">
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.key} className="border-t border-[var(--line)]">
-              <td className="py-1.5 pr-4 text-[var(--ink-3)]">{r.key}</td>
-              <td className="py-1.5 text-right font-medium tabular-nums text-[var(--ink)]">{r.value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
 
 export function SettingsPage() {
   return (
-    <PageShell title="Settings" subtitle="Business-rule configuration — thresholds and assumptions driving every engine" showFilters={false}>
-      <div className="rounded-lg border border-[color-mix(in_oklab,var(--warning)_35%,transparent)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] p-4 text-sm text-[var(--ink-2)]">
-        These values live in <code className="rounded bg-[color-mix(in_oklab,var(--warning)_20%,transparent)] px-1 py-0.5">src/config/</code> and are read by every
-        calculation engine (business insight, Amazon Ads actions, fixed-expense allocation). This
-        milestone ships them as reviewable configuration; an in-app editor is a follow-up.
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <ConfigTable
-          title="Business Insight Thresholds"
-          rows={Object.entries(INSIGHT_THRESHOLDS).map(([k, v]) => ({ key: k, value: String(v) }))}
-        />
-        <ConfigTable
-          title="Amazon Ads Action Thresholds"
-          rows={Object.entries(ADS_ACTION_THRESHOLDS).map(([k, v]) => ({ key: k, value: String(v) }))}
-        />
-        <ConfigTable title="Fiscal Year" rows={[{ key: 'startMonth (0-indexed)', value: String(FISCAL_YEAR.startMonth) }]} />
-        <ConfigTable
-          title="Default Fixed-Expense Allocation Weights"
-          rows={Object.entries(DEFAULT_ALLOCATION_WEIGHTS).map(([k, v]) => ({
-            key: channelLabel(k as BusinessChannelId),
-            value: `${(v * 100).toFixed(0)}%`,
-          }))}
-        />
+    <PageShell
+      title="Settings"
+      subtitle="What this dashboard assumes, and where the figures you control are entered"
+      showFilters={false}
+    >
+      <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4 text-sm text-[var(--ink-2)]">
+        <h3 className="mb-2 text-sm font-semibold text-[var(--ink)]">Where to change things</h3>
+        <ul className="space-y-1.5">
+          <li>
+            <Link to="/settings/monthly-inputs" className="font-medium text-[var(--accent)] hover:underline">
+              Monthly Inputs
+            </Link>{' '}
+            — the exchange rate, both freight rates, Nykaa&apos;s confirmed discount and the month&apos;s fixed
+            expenses. These are the figures that change your P&amp;L.
+          </li>
+          <li>
+            <Link to="/products/cost-sheet" className="font-medium text-[var(--accent)] hover:underline">
+              Catalogue → Cost
+            </Link>{' '}
+            — what each product costs, dated by month.
+          </li>
+          <li>
+            <Link to="/settings/team" className="font-medium text-[var(--accent)] hover:underline">
+              Team
+            </Link>{' '}
+            — who can sign in and which sections each of them can open.
+          </li>
+        </ul>
+        <p className="mt-3 text-xs text-[var(--ink-3)]">
+          This page used to list the engine&apos;s internal thresholds — insight triggers, allocation fallbacks and
+          the like. They were read-only, named after the code rather than the business, and changed nothing you
+          could see, so they have been taken out. If one of them is worth controlling, say which and it will be
+          made editable properly.
+        </p>
       </div>
 
       <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
-        <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">Default Marketplace Fee Rates (used until an actual charge report is uploaded)</h3>
+        <h3 className="text-sm font-semibold text-[var(--ink)]">Assumed marketplace fees</h3>
+        <p className="mb-3 mt-1 text-xs text-[var(--ink-3)]">
+          Used only for a channel-month with no charge report uploaded yet. Once a real settlement or fee
+          report is in, the actual charges replace every figure here.
+        </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

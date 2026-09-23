@@ -1,6 +1,6 @@
 import { createHandler } from '../_lib/handler.js'
 import { ensureSchema, sql } from '../_lib/db.js'
-import { requireSession } from '../_lib/auth.js'
+import { requireSection } from '../_lib/auth.js'
 import { isNonEmptyString, json, readJson } from '../_lib/http.js'
 import { captureFactsUndo, captureUndo } from '../_lib/undo.js'
 
@@ -77,7 +77,7 @@ function tableFor(request: Request): FactTable | null {
 
 /** Replaces one month's facts wholesale (a re-uploaded report for that month). */
 export async function POST(request: Request): Promise<Response> {
-  const auth = await requireSession(request)
+  const auth = await requireSection(request, 'data')
   if (auth.response) return auth.response
 
   const target = tableFor(request)
@@ -172,7 +172,7 @@ async function storeAdsAndRecovery(
 /** Edits individual manual-entry fields on an already-stored month. Merging
  * server-side keeps a concurrent edit from clobbering the whole object. */
 export async function PATCH(request: Request): Promise<Response> {
-  const auth = await requireSession(request)
+  const auth = await requireSection(request, 'data')
   if (auth.response) return auth.response
 
   const target = tableFor(request)
@@ -213,7 +213,7 @@ export async function PATCH(request: Request): Promise<Response> {
  * from a P&L line back to its source rows.
  */
 export async function GET(request: Request): Promise<Response> {
-  const auth = await requireSession(request)
+  const auth = await requireSection(request, 'data')
   if (auth.response) return auth.response
 
   const target = tableFor(request)
@@ -338,7 +338,7 @@ async function storeTransactions(rows: TransactionBody[], importId?: string): Pr
  * left over from earlier uploads that nothing could remove.
  */
 export async function DELETE(request: Request): Promise<Response> {
-  const auth = await requireSession(request)
+  const auth = await requireSection(request, 'data')
   if (auth.response) return auth.response
 
   const target = tableFor(request)

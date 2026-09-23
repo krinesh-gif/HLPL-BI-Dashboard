@@ -1,5 +1,6 @@
 import { createHashRouter, Navigate } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { SectionGuard } from '@/components/layout/SectionGuard'
 import { OverviewPage } from '@/modules/overview/OverviewPage'
 import { MisPage } from '@/modules/mis/MisPage'
 import { PnlPage } from '@/modules/pnl/PnlPage'
@@ -27,7 +28,13 @@ import { TeamPage } from '@/modules/settings/TeamPage'
 export const router = createHashRouter([
   {
     path: '/',
-    element: <AppLayout />,
+    // Every child route goes through the guard, so adding a page cannot
+    // accidentally leave it open to a teammate who has no business on it.
+    element: (
+      <SectionGuard>
+        <AppLayout />
+      </SectionGuard>
+    ),
     children: [
       { index: true, element: <OverviewPage /> },
       { path: 'mis', element: <MisPage /> },

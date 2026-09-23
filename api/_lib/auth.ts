@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { sql } from './db.js'
 import { json } from './http.js'
+import { canAccess, isSectionId, type SectionId } from '../../src/config/sections.js'
 
 const COOKIE_NAME = 'hlpl_session'
 const SESSION_TTL_DAYS = 30
@@ -9,6 +10,9 @@ const BCRYPT_ROUNDS = 12
 export interface SessionUser {
   id: string
   email: string
+  /** The sections this person may use. `null` means all of them. */
+  sections: SectionId[] | null
+  isAdmin: boolean
 }
 
 export function hashPassword(plain: string): Promise<string> {
@@ -63,13 +67,22 @@ export async function getSessionUser(request: Request): Promise<SessionUser | nu
   if (!token) return null
 
   const rows = (await sql`
-    SELECT u.id, u.email
+    SELECT u.id, u.email, u.sections, u.is_admin
     FROM sessions s
     JOIN users u ON u.id = s.user_id
     WHERE s.token = ${token} AND s.expires_at > now()
-  `) as { id: string; email: string }[]
+  `) as { id: string; email: string; sections: unknown; is_admin: boolean }[]
 
-  return rows[0] ?? null
+  const row = rows[0]
+  if (!row) return null
+  return {
+    id: row.id,
+    email: row.email,
+    // Anything that is not a list of known section ids is read as "all", which
+    // is what a column added by the migration holds.
+    sections: Array.isArray(row.sections) ? row.sections.filter(isSectionId) : null,
+    isAdmin: row.is_admin === true,
+  }
 }
 
 /**
@@ -83,4 +96,42 @@ export async function requireSession(
   const user = await getSessionUser(request)
   if (!user) return { response: json({ error: 'Not authenticated' }, 401) }
   return { user }
+}
+
+/**
+ * Authorization for one section, enforced where it counts.
+ *
+ * Hiding a page in the sidebar is a convenience; this is the part that means
+ * something. A route that writes must name the section it belongs to, so a
+ * teammate without it is refused whether they used the screen, a stale tab, or
+ * curl.
+ */
+export async function requireSection(
+  request: Request,
+  ...sections: SectionId[]
+): Promise<{ user: SessionUser; response?: undefined } | { user?: undefined; response: Response }> {
+  const auth = await requireSession(request)
+  if (auth.response) return auth
+  // Several sections means any one of them is enough: a route that serves two
+  // screens is reachable by anyone who can open either.
+  if (sections.some((s) => canAccess(auth.user.sections, s))) return auth
+  return {
+    response: json(
+      { error: `Your account does not have access to ${sections.join(' or ')}. Ask an administrator.` },
+      403,
+    ),
+  }
+}
+
+/** Managing the team is the one thing a non-admin can never do, whatever
+ * sections they have: otherwise anyone could grant themselves the rest. */
+export async function requireAdmin(
+  request: Request,
+): Promise<{ user: SessionUser; response?: undefined } | { user?: undefined; response: Response }> {
+  const auth = await requireSession(request)
+  if (auth.response) return auth
+  if (!auth.user.isAdmin) {
+    return { response: json({ error: 'Only an administrator can manage the team.' }, 403) }
+  }
+  return auth
 }

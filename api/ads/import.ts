@@ -1,6 +1,6 @@
 import { createHandler } from '../_lib/handler.js'
 import { sql } from '../_lib/db.js'
-import { requireSession } from '../_lib/auth.js'
+import { requireSection } from '../_lib/auth.js'
 import { isNonEmptyString, json, readJson } from '../_lib/http.js'
 import { adsRecordKey } from '../../src/data/normalize/dedupKeys.js'
 import type { AdsRecord, ManualAdSpend } from '../../src/data/models.js'
@@ -48,7 +48,7 @@ function isAdsRecordArray(v: unknown): v is AdsRecord[] {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const auth = await requireSession(request)
+  const auth = await requireSection(request, 'data')
   if (auth.response) return auth.response
 
   const body = await readJson<Body>(request)
@@ -134,7 +134,7 @@ export async function POST(request: Request): Promise<Response> {
 /** Removes a manual monthly figure. The month then falls back to whatever
  * report data exists for it, or to no data. */
 export async function DELETE(request: Request): Promise<Response> {
-  const auth = await requireSession(request)
+  const auth = await requireSection(request, 'data')
   if (auth.response) return auth.response
 
   const url = new URL(request.url)

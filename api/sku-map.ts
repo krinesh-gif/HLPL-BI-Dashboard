@@ -1,6 +1,6 @@
 import { createHandler } from './_lib/handler.js'
 import { ensureSchema, sql } from './_lib/db.js'
-import { requireSession } from './_lib/auth.js'
+import { requireSection, requireSession } from './_lib/auth.js'
 import { isNonEmptyString, json, readJson } from './_lib/http.js'
 import type { ComboComponent, SkuMapping } from '../src/data/skuMapping.js'
 
@@ -65,7 +65,7 @@ export async function GET(request: Request): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   await ensureSchema()
-  const auth = await requireSession(request)
+  const auth = await requireSection(request, 'catalogue')
   if (auth.response) return auth.response
 
   const body = await readJson<SaveBody>(request)
@@ -130,7 +130,7 @@ export async function POST(request: Request): Promise<Response> {
 
 export async function DELETE(request: Request): Promise<Response> {
   await ensureSchema()
-  const auth = await requireSession(request)
+  const auth = await requireSection(request, 'catalogue')
   if (auth.response) return auth.response
 
   const channelSku = new URL(request.url).searchParams.get('channelSku')

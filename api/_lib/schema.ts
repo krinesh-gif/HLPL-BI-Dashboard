@@ -19,6 +19,21 @@ BEGIN
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
   );
 
+  -- Which sections a teammate may open. NULL means all of them, which is what
+  -- every account created before access was per-section has — nobody is locked
+  -- out by the migration. An empty list is different: it means somebody was
+  -- deliberately given nothing.
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS sections JSONB;
+
+  -- Only an admin can add a teammate or change what one can see.
+  --
+  -- Added with DEFAULT true so that every account that already exists becomes
+  -- an admin — the alternative locks the owner out of their own team screen —
+  -- and the default is then dropped to false so that accounts created from
+  -- here on are not admins unless they are made one.
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT true;
+  ALTER TABLE users ALTER COLUMN is_admin SET DEFAULT false;
+
   CREATE TABLE IF NOT EXISTS sessions (
     token      TEXT PRIMARY KEY,
     user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
