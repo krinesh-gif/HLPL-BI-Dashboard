@@ -455,11 +455,14 @@ export interface AmazonUsaPnlFacts {
   offAmazonAdsUsd: number
   exportDocsUsd: number
   usImportDutyUsd: number
-  amazonSellingPlanUsd: number
-  productLiabilityInsuranceUsd: number
-  fdaLegalUsd: number
-  agencySoftwareUsd: number
-  otherOverheadUsd: number
+  /**
+   * The five US overhead lines — selling plan, liability insurance, FDA and
+   * legal, agency software, other — are gone. They were a per-channel way of
+   * entering fixed costs, always left at zero, and the company's fixed costs
+   * are now entered once as a monthly total and allocated by sales share.
+   * Keeping them would have offered two places to put the same cost, which is
+   * how it ends up counted twice. Months stored with them simply ignore them.
+   */
 }
 
 /**

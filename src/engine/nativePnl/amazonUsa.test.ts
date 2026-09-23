@@ -57,8 +57,6 @@ function july(over: Partial<AmazonUsaPnlFacts> = {}): AmazonUsaPnlFacts {
     cogsUsd: 0, freightUsd: 0,
     sponsoredBrandsUsd: 0, sponsoredDisplayDspUsd: 0, offAmazonAdsUsd: 0,
     exportDocsUsd: 0, usImportDutyUsd: 0,
-    amazonSellingPlanUsd: 0, productLiabilityInsuranceUsd: 0, fdaLegalUsd: 0,
-    agencySoftwareUsd: 0, otherOverheadUsd: 0,
     ...over,
   }
 }
@@ -184,19 +182,27 @@ describe('the CM ladder continues below the tie-point', () => {
     expect(v.cm2).toBeCloseTo(v.netProceedsUsd - 3250, 4)
   })
 
-  it('takes only the overheads that were actually entered at CM3', () => {
-    const v = computeAmazonUsaPnl(july({ cogsUsd: 3000, freightUsd: 250, amazonSellingPlanUsd: 39.99 }))
-    expect(v.cm3).toBeCloseTo(v.cm2 - 39.99, 4)
+  it('leaves Net Profit at CM2 until the company overhead is allocated', () => {
+    // The five US overhead lines are gone: they were a second place to enter
+    // fixed costs, always left at zero, and the company's are now entered once
+    // as a monthly total and allocated by sales share. Two places to put one
+    // cost is how it gets counted twice.
+    const v = computeAmazonUsaPnl(july({ cogsUsd: 3000, freightUsd: 250 }))
+    expect(v.cm3).toBeCloseTo(v.cm2, 6)
+    for (const gone of ['Amazon Selling Plan', 'Product Liability Insurance', 'FDA / MoCRA, Trademark, Legal',
+      'Agency, Software & Tools', 'Other US Overhead', 'Total Overheads & Finance']) {
+      expect(AMAZON_USA_LINE_DEFS.map((d) => d.label)).not.toContain(gone)
+    }
   })
 
   it('charges nothing for converting the money home', () => {
     // A modelled 0.5% of net sales used to be deducted here. It was an
-    // assumption, not a payment anyone made, and it moved CM3 on every month
+    // assumption, not a payment anyone made, and it moved the bottom line on
+    // every month
     // by a figure no bank statement supported.
     expect(AMAZON_USA_LINE_DEFS.map((d) => d.label)).not.toContain('FX Conversion & Remittance Cost')
     const v = computeAmazonUsaPnl(july())
     expect(v.fxConversionCostUsd).toBeUndefined()
-    expect(v.totalOverheadsUsd).toBe(-0)
     expect(v.cm3).toBeCloseTo(v.cm2, 6)
   })
 })

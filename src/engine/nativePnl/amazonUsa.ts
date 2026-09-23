@@ -122,22 +122,14 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm2', label: 'CM2 — Contribution Margin', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'subtotal' },
   { key: 'cm2Pct', label: 'CM2 %', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'percent' },
 
-  { key: 'amazonSellingPlanUsd', label: 'Amazon Selling Plan', section: 'FIXED OVERHEADS & FINANCE', kind: 'input', note: 'Manual entry' },
-  { key: 'productLiabilityInsuranceUsd', label: 'Product Liability Insurance', section: 'FIXED OVERHEADS & FINANCE', kind: 'input', note: 'Manual entry' },
-  { key: 'fdaLegalUsd', label: 'FDA / MoCRA, Trademark, Legal', section: 'FIXED OVERHEADS & FINANCE', kind: 'input', note: 'Manual entry' },
-  { key: 'agencySoftwareUsd', label: 'Agency, Software & Tools', section: 'FIXED OVERHEADS & FINANCE', kind: 'input', note: 'Manual entry' },
-  { key: 'otherOverheadUsd', label: 'Other US Overhead', section: 'FIXED OVERHEADS & FINANCE', kind: 'input', note: 'Manual entry' },
-  { key: 'totalOverheadsUsd', label: 'Total Overheads & Finance', section: 'FIXED OVERHEADS & FINANCE', kind: 'subtotal' },
-  { key: 'cm3', label: 'CM3 — Channel Profit Before Tax', section: 'FIXED OVERHEADS & FINANCE', kind: 'subtotal' },
-  { key: 'cm3Pct', label: 'CM3 %', section: 'FIXED OVERHEADS & FINANCE', kind: 'percent' },
 
   {
     key: 'allocatedOverheadsUsd', label: 'Less: Allocated company overheads', section: 'ALLOCATED COMPANY OVERHEADS',
     kind: 'input',
     note: "this channel's share of the company's own fixed costs — entered on Fixed Expenses, split by sales contribution",
   },
-  { key: 'cm4', label: 'NET PROFIT (CM4)', section: 'ALLOCATED COMPANY OVERHEADS', kind: 'subtotal' },
-  { key: 'cm4Pct', label: 'Net Profit %', section: 'ALLOCATED COMPANY OVERHEADS', kind: 'percent' },
+  { key: 'cm3', label: 'NET PROFIT (CM3)', section: 'ALLOCATED COMPANY OVERHEADS', kind: 'subtotal' },
+  { key: 'cm3Pct', label: 'Net Profit %', section: 'ALLOCATED COMPANY OVERHEADS', kind: 'percent' },
 ]
 
 /**
@@ -214,10 +206,6 @@ export function computeAmazonUsaPnl(facts: AmazonUsaPnlFacts): NativeLineValues 
   const totalLandedCostUsd = facts.cogsUsd + facts.freightUsd + facts.exportDocsUsd + facts.usImportDutyUsd
   const cm2 = netProceedsUsd - totalLandedCostUsd
 
-  const totalOverheadsUsd =
-    facts.amazonSellingPlanUsd + facts.productLiabilityInsuranceUsd + facts.fdaLegalUsd +
-    facts.agencySoftwareUsd + facts.otherOverheadUsd
-  const cm3 = cm2 - totalOverheadsUsd
 
   const values: NativeLineValues = {
     grossSalesUsd: facts.grossSalesUsd,
@@ -247,21 +235,11 @@ export function computeAmazonUsaPnl(facts: AmazonUsaPnlFacts): NativeLineValues 
     totalLandedCostUsd: -totalLandedCostUsd,
     cm2: known(cm2),
     cm2Pct: known(facts.netSalesUsd !== 0 ? (cm2 / facts.netSalesUsd) * 100 : 0),
-    amazonSellingPlanUsd: -facts.amazonSellingPlanUsd,
-    productLiabilityInsuranceUsd: -facts.productLiabilityInsuranceUsd,
-    fdaLegalUsd: -facts.fdaLegalUsd,
-    agencySoftwareUsd: -facts.agencySoftwareUsd,
-    otherOverheadUsd: -facts.otherOverheadUsd,
-    totalOverheadsUsd: -totalOverheadsUsd,
-    cm3: known(cm3),
-    cm3Pct: known(facts.netSalesUsd !== 0 ? (cm3 / facts.netSalesUsd) * 100 : 0),
-
     // Filled in by applyAmazonUsaOtherCosts once the month's allocation is
-    // known. Until then Net Profit is CM3, which is what it was before this
-    // line existed.
+    // known. Until then Net Profit is CM2.
     allocatedOverheadsUsd: 0,
-    cm4: known(cm3),
-    cm4Pct: known(facts.netSalesUsd !== 0 ? (cm3 / facts.netSalesUsd) * 100 : 0),
+    cm3: known(cm2),
+    cm3Pct: known(facts.netSalesUsd !== 0 ? (cm2 / facts.netSalesUsd) * 100 : 0),
   }
   // Each fee column on its own line, negated so a charge reads as a cost and a
   // credit (a reimbursement, a referral refund) reads as income.
@@ -293,12 +271,12 @@ export function applyAmazonUsaOtherCosts(
   netSalesUsd: number,
 ): NativeLineValues {
   const otherCostsUsd = fxRate > 0 ? otherCostsInr / fxRate : 0
-  const cm4 = computed.cm3 - otherCostsUsd
+  const cm3 = computed.cm2 - otherCostsUsd
   return {
     ...computed,
     allocatedOverheadsUsd: -otherCostsUsd,
-    cm4,
-    cm4Pct: netSalesUsd !== 0 ? (cm4 / netSalesUsd) * 100 : 0,
+    cm3,
+    cm3Pct: netSalesUsd !== 0 ? (cm3 / netSalesUsd) * 100 : 0,
   }
 }
 
@@ -346,10 +324,6 @@ export function amazonUsaToCanonicalBuckets(facts: AmazonUsaPnlFacts, fxRate = N
     ads: inr(byBucket('ads') + facts.sponsoredBrandsUsd + facts.sponsoredDisplayDspUsd),
     performanceMarketing: 0,
     otherMarketing: 0,
-    otherOpex: inr(
-      facts.amazonSellingPlanUsd + facts.productLiabilityInsuranceUsd + facts.fdaLegalUsd +
-      facts.agencySoftwareUsd + facts.otherOverheadUsd,
-    ),
   }
 }
 

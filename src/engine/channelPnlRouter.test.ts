@@ -157,8 +157,7 @@ describe('a channel share of the company fixed expenses', () => {
     referralFeeUsd: 0, fbaFulfilmentFeeUsd: 0, storageAgedDisposalUsd: 0, couponDealFeesUsd: 0,
     refundAdminFeeUsd: 0, fbaReimbursementsUsd: 0, otherAmazonFeesUsd: 0, sponsoredProductsUsd: 0,
     cogsUsd: 2000, freightUsd: 300, sponsoredBrandsUsd: 0, sponsoredDisplayDspUsd: 0,
-    offAmazonAdsUsd: 0, exportDocsUsd: 0, usImportDutyUsd: 0, amazonSellingPlanUsd: 40,
-    productLiabilityInsuranceUsd: 0, fdaLegalUsd: 0, agencySoftwareUsd: 0, otherOverheadUsd: 0,
+    offAmazonAdsUsd: 0, exportDocsUsd: 0, usImportDutyUsd: 0,
   }
 
   const build = (channel: 'amazon_us' | 'flipkart', expenses = fixedExpenses) =>
@@ -174,14 +173,14 @@ describe('a channel share of the company fixed expenses', () => {
     // 50,000 of a 1,00,000 month, converted at the month's rate — not left in
     // rupees, which the render to INR would then multiply by the rate again.
     expect(v.native?.values.allocatedOverheadsUsd).toBeCloseTo(-50000 / fxRate, 6)
-    expect(v.native?.values.cm4).toBeCloseTo(v.native!.values.cm3 - 50000 / fxRate, 6)
-    expect(v.native?.values.cm4).toBeLessThan(v.native!.values.cm3)
+    expect(v.native?.values.cm3).toBeCloseTo(v.native!.values.cm2 - 50000 / fxRate, 6)
+    expect(v.native?.values.cm3).toBeLessThan(v.native!.values.cm2)
   })
 
-  it('leaves Net Profit at CM3 for a month with no fixed expenses entered', () => {
+  it('leaves Net Profit at CM2 for a month with no fixed expenses entered', () => {
     const v = build('amazon_us', [])
     expect(v.native?.values.allocatedOverheadsUsd).toBe(-0)
-    expect(v.native?.values.cm4).toBeCloseTo(v.native!.values.cm3, 6)
+    expect(v.native?.values.cm3).toBeCloseTo(v.native!.values.cm2, 6)
   })
 
   it('reaches the multi-month P&L for every channel with its own statement', () => {
