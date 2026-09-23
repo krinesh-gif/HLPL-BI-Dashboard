@@ -1,14 +1,66 @@
+import { useState } from 'react'
 import { PageShell } from '@/components/layout/PageShell'
 import { DataTable } from '@/components/ui/DataTable'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { CHANNEL_MAP } from '@/config/channels'
-import { useDataStore } from '@/store/dataStore'
+import { useDataStore, type ReverseImportResult } from '@/store/dataStore'
+import { formatNumber } from '@/lib/format'
+
+/**
+ * What a reverse did, in the words of what actually happened.
+ *
+ * A reverse is not a delete, and saying "removed" would be wrong in both
+ * directions: it puts back the facts and the restated rows the import
+ * displaced, and it deliberately leaves Meesho events that were already on
+ * file before this upload arrived. Both are reported.
+ */
+function describeReversal(r: ReverseImportResult): string {
+  const parts: string[] = []
+  if (r.removedSales > 0) parts.push(`${formatNumber(r.removedSales)} sales row(s) removed`)
+  if (r.removedAds > 0) parts.push(`${formatNumber(r.removedAds)} ads row(s) removed`)
+  if (r.removedMeeshoRows > 0) parts.push(`${formatNumber(r.removedMeeshoRows)} Meesho event(s) removed`)
+  if (r.restoredFacts > 0) parts.push(`${r.restoredFacts} month(s) of figures put back`)
+  if (r.removedFacts > 0) parts.push(`${r.removedFacts} month(s) of figures removed`)
+  if (r.restoredRows > 0) parts.push(`${formatNumber(r.restoredRows)} restated row(s) put back`)
+  return parts.length === 0
+    ? `${r.fileName} is reversed. It had written nothing that is still on file.`
+    : `${r.fileName} is reversed — ${parts.join(', ')}.`
+}
 
 export function ImportHistoryPage() {
   const imports = useDataStore((s) => s.imports)
+  const reverseImport = useDataStore((s) => s.reverseImport)
+  const [confirming, setConfirming] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [outcome, setOutcome] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function reverse(id: string): Promise<void> {
+    setBusy(id)
+    setError(null)
+    setOutcome(null)
+    try {
+      setOutcome(describeReversal(await reverseImport(id)))
+      setConfirming(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(null)
+    }
+  }
 
   return (
-    <PageShell title="Import History" subtitle="Every report ever uploaded, with validation outcome" showFilters={false}>
+    <PageShell title="Import History" subtitle="Every report ever uploaded, with its validation outcome — and a way to take one back out" showFilters={false}>
+      {outcome && (
+        <p className="mb-3 rounded-md border border-[color-mix(in_oklab,var(--good)_45%,transparent)] bg-[color-mix(in_oklab,var(--good)_12%,transparent)] px-3 py-2 text-sm text-[var(--ink)]">
+          {outcome}
+        </p>
+      )}
+      {error && (
+        <p className="mb-3 rounded-md border border-[color-mix(in_oklab,var(--critical)_45%,transparent)] bg-[color-mix(in_oklab,var(--critical)_12%,transparent)] px-3 py-2 text-sm text-[var(--ink)]">
+          {error}
+        </p>
+      )}
       {imports.length === 0 ? (
         <EmptyState title="No reports have been uploaded yet." description="Uploaded reports will appear here with their validation results." />
       ) : (
@@ -34,6 +86,37 @@ export function ImportHistoryPage() {
                   {r.status}
                 </span>
               ),
+            },
+            {
+              key: 'reverse',
+              header: 'Reverse',
+              accessor: (r) => r.id,
+              align: 'right',
+              render: (r) => (confirming === r.id ? (
+                <span className="flex items-center justify-end gap-2 whitespace-nowrap">
+                  <button
+                    type="button" disabled={busy === r.id} onClick={() => void reverse(r.id)}
+                    className="rounded-md bg-[var(--critical)] px-2 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-40"
+                  >
+                    {busy === r.id ? 'Reversing…' : 'Yes, reverse'}
+                  </button>
+                  <button
+                    type="button" onClick={() => setConfirming(null)}
+                    className="text-xs font-medium text-[var(--ink-3)] hover:text-[var(--ink)]"
+                  >
+                    Cancel
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setConfirming(r.id); setOutcome(null); setError(null) }}
+                  title="Take this upload back out and put back whatever it replaced"
+                  className="text-xs font-medium text-[var(--ink-3)] hover:text-[var(--critical-ink)]"
+                >
+                  Reverse
+                </button>
+              )),
             },
           ]}
           rows={imports}

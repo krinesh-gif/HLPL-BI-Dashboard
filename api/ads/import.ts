@@ -4,6 +4,7 @@ import { requireSession } from '../_lib/auth.js'
 import { isNonEmptyString, json, readJson } from '../_lib/http.js'
 import { adsRecordKey } from '../../src/data/normalize/dedupKeys.js'
 import type { AdsRecord, ManualAdSpend } from '../../src/data/models.js'
+import { captureUndo } from '../_lib/undo.js'
 
 /**
  * Advertising writes.
@@ -20,6 +21,9 @@ import type { AdsRecord, ManualAdSpend } from '../../src/data/models.js'
 interface Body {
   records?: unknown
   manualSpend?: unknown
+  /** The import this belongs to, when it came from an upload rather than
+   * someone typing the figure in. */
+  importId?: unknown
 }
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/
@@ -58,7 +62,17 @@ export async function POST(request: Request): Promise<Response> {
     }
     const m = body.manualSpend
     // Re-entering a month corrects it rather than adding a second figure,
-    // which would double-count that month's spend.
+    // which would double-count that month's spend. What it corrects is
+    // captured first, so reversing the upload that carried it puts the
+    // previous figure back rather than leaving the month with none.
+    const prior = (await sql.query(
+      `SELECT amount, file_name, note FROM manual_ad_spend WHERE channel = $1 AND month = $2`,
+      [m.channel, m.month],
+    )) as unknown[]
+    await captureUndo(
+      typeof body?.importId === 'string' ? body.importId : undefined,
+      'manual_ad_spend', `${m.channel}|${m.month}`, prior[0] ?? null,
+    )
     await sql.query(
       `INSERT INTO manual_ad_spend (channel, month, amount, file_name, note, entered_by, entered_at)
        VALUES ($1, $2, $3, $4, $5, $6, now())

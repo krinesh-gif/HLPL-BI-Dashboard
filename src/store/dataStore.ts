@@ -28,6 +28,18 @@ import type {
 
 /** The dataset as the server returns it — every page reads from this exactly
  * as it did when the data lived only in the browser. */
+/** What a reverse actually did, so the screen can say so rather than claim
+ * more than happened. */
+export interface ReverseImportResult {
+  fileName: string
+  removedSales: number
+  removedAds: number
+  removedMeeshoRows: number
+  restoredFacts: number
+  removedFacts: number
+  restoredRows: number
+}
+
 interface SharedDataset {
   isEmpty: boolean
   skuMaster: SkuMaster[]
@@ -174,7 +186,9 @@ interface DataState extends SharedDataset, MappingTablesState {
   saveFixedExpenses: (entries: FixedExpenseEntry[]) => Promise<void>
   removeFixedExpense: (month: string, category: FixedExpenseEntry['category']) => Promise<void>
   /** Records a month's ad spend for a channel that has no report to upload. */
-  saveManualAdSpend: (entry: Omit<ManualAdSpend, 'enteredAt'>) => Promise<void>
+  saveManualAdSpend: (entry: Omit<ManualAdSpend, 'enteredAt'>, importId?: string) => Promise<void>
+  /** Takes an upload back out, restoring whatever it displaced. */
+  reverseImport: (importId: string) => Promise<ReverseImportResult>
   removeManualAdSpend: (channel: string, month: string) => Promise<void>
   /** Imports the company's SKU-map workbook: costs, channel-code mappings and
    * combo recipes in one go. */
@@ -268,6 +282,9 @@ export const useDataStore = create<DataState>((set, get) => {
       const total = salesRecords.length + adsRecords.length
       set({ importProgress: { sent: 0, total } })
       try {
+        // Every write an import performs carries its id, so what it displaces
+        // is recorded against it and the upload can be taken back out whole.
+        const importId = importRecord.id
         let sent = 0
         let added = 0
         let skippedAsDuplicate = 0
@@ -314,27 +331,27 @@ export const useDataStore = create<DataState>((set, get) => {
         }
 
         if (flipkartFacts) {
-          await api.post('/api/facts/flipkart', { facts: flipkartFacts })
+          await api.post('/api/facts/flipkart', { importId, facts: flipkartFacts })
           monthsUpdated.push(flipkartFacts.month)
         }
         if (amazonUsaFacts) {
-          await api.post('/api/facts/amazon-usa', { facts: amazonUsaFacts })
+          await api.post('/api/facts/amazon-usa', { importId, facts: amazonUsaFacts })
           monthsUpdated.push(amazonUsaFacts.month)
         }
         if (myntraFacts) {
-          await api.post('/api/facts/myntra', { facts: myntraFacts })
+          await api.post('/api/facts/myntra', { importId, facts: myntraFacts })
           monthsUpdated.push(myntraFacts.month)
         }
         if (amazonInSellerFacts) {
           // One settlement file can touch two months, and each is written on
           // its own so a week that straddles a month end lands in both.
           for (const facts of amazonInSellerFacts) {
-            await api.post('/api/facts/amazon-in-seller', { facts })
+            await api.post('/api/facts/amazon-in-seller', { facts, importId })
             monthsUpdated.push(facts.month)
           }
         }
         if (nykaaFacts) {
-          await api.post('/api/facts/nykaa', { facts: nykaaFacts })
+          await api.post('/api/facts/nykaa', { facts: nykaaFacts, importId })
           monthsUpdated.push(nykaaFacts.month)
         }
         if (meeshoTransactions && meeshoTransactions.length > 0) {
@@ -343,6 +360,7 @@ export const useDataStore = create<DataState>((set, get) => {
           // by its own identity it lands once however often it is uploaded,
           // and a month is summed from its rows when read.
           await api.post('/api/facts/meesho', {
+            importId,
             transactions: meeshoTransactions,
             adsRows: meeshoAdsRows ?? [],
             recoveryRows: meeshoRecoveryRows ?? [],
@@ -402,7 +420,15 @@ export const useDataStore = create<DataState>((set, get) => {
       })
     },
 
-    saveManualAdSpend: (entry) => writeThen(() => api.post('/api/ads/import', { manualSpend: entry })),
+    saveManualAdSpend: (entry, importId) =>
+      writeThen(() => api.post('/api/ads/import', { manualSpend: entry, importId })),
+    reverseImport: async (importId) => {
+      const result = await api.delete<ReverseImportResult>(
+        `/api/sales/import?importId=${encodeURIComponent(importId)}`,
+      )
+      await get().loadState()
+      return result
+    },
 
     removeManualAdSpend: (channel, month) =>
       writeThen(() =>

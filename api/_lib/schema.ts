@@ -329,6 +329,26 @@ BEGIN
   -- their rows were posted in. A month is a whole object because the fee
   -- descriptions Amazon uses are open-ended: querying into them in SQL would
   -- need a migration every time Amazon named a new charge.
+  -- What each import displaced, so it can be put back.
+  --
+  -- An import does not only add rows: it replaces a month's facts, overwrites
+  -- a manually entered ad spend, and deletes the aggregate rows it restates.
+  -- Deleting what an import wrote would therefore leave the month emptier than
+  -- it was before, which is a worse outcome than the bad upload. So whatever
+  -- is about to be overwritten is written here first, and reversing replays it.
+  --
+  -- A null payload means there was nothing there — reversing removes the row
+  -- the import created rather than restoring anything.
+  CREATE TABLE IF NOT EXISTS import_undo (
+    import_id  TEXT NOT NULL,
+    seq        BIGSERIAL PRIMARY KEY,
+    kind       TEXT NOT NULL,
+    target     TEXT NOT NULL,
+    payload    JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+  CREATE INDEX IF NOT EXISTS import_undo_import_idx ON import_undo (import_id);
+
   CREATE TABLE IF NOT EXISTS amazon_in_seller_facts (
     month TEXT PRIMARY KEY,
     data  JSONB NOT NULL

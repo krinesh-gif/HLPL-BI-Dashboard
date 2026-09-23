@@ -2,6 +2,7 @@ import { createHandler } from '../_lib/handler.js'
 import { ensureSchema, sql } from '../_lib/db.js'
 import { requireSession } from '../_lib/auth.js'
 import { isNonEmptyString, json, readJson } from '../_lib/http.js'
+import { captureFactsUndo, captureUndo } from '../_lib/undo.js'
 
 /** The channel segment selects a table, so it is resolved through this map
  * rather than interpolated — an arbitrary URL segment must never become a
@@ -24,6 +25,9 @@ const FACT_TABLES: Record<string, FactTable> = {
 }
 
 interface FactsBody {
+  /** The import this write belongs to, so it can be reversed. Absent for a
+   * manual edit, which is not part of any upload. */
+  importId?: unknown
   facts?: unknown
   month?: unknown
   basis?: unknown
@@ -92,7 +96,8 @@ export async function POST(request: Request): Promise<Response> {
     if (transactions.length > MAX_TRANSACTIONS_PER_REQUEST) {
       return json({ error: `At most ${MAX_TRANSACTIONS_PER_REQUEST} transactions per request.` }, 413)
     }
-    const storedTransactions = await storeTransactions(transactions as TransactionBody[])
+    const meeshoImportId = typeof body?.importId === 'string' ? body.importId : undefined
+    const storedTransactions = await storeTransactions(transactions as TransactionBody[], meeshoImportId)
     const dated = await storeAdsAndRecovery(
       Array.isArray(body?.adsRows) ? (body.adsRows as Parameters<typeof storeAdsAndRecovery>[0]) : [],
       Array.isArray(body?.recoveryRows) ? (body.recoveryRows as Parameters<typeof storeAdsAndRecovery>[1]) : [],
@@ -104,6 +109,10 @@ export async function POST(request: Request): Promise<Response> {
   if (!facts || typeof facts !== 'object' || !isNonEmptyString(facts.month)) {
     return json({ error: 'Expected { facts: { month, ... } }.' }, 400)
   }
+
+  // Captured before the upsert, while the previous month is still there.
+  const importId = typeof body?.importId === 'string' ? body.importId : undefined
+  await captureFactsUndo(importId, target.table, facts.month)
 
   await sql.query(
     `INSERT INTO ${target.table} (month, data) VALUES ($1, $2)
@@ -255,7 +264,7 @@ export async function GET(request: Request): Promise<Response> {
  * appears more than once — the sale on one row, its return or its fee on
  * another — and collapsing them would delete real financial events.
  */
-async function storeTransactions(rows: TransactionBody[]): Promise<number> {
+async function storeTransactions(rows: TransactionBody[], importId?: string): Promise<number> {
   // Keyed on the row's own identity, so an event that arrives in several of
   // Meesho's overlapping downloads is stored once however often it is
   // uploaded. A sub-order alone is not unique — it carries a sale row and a
@@ -264,7 +273,7 @@ async function storeTransactions(rows: TransactionBody[]): Promise<number> {
   if (usable.length === 0) return 0
 
 
-  await sql.query(
+  const result = (await sql.query(
     `INSERT INTO meesho_transactions (
        sub_order_id, transaction_ref, sku, order_date, dispatch_date, payment_date,
        order_status, event_type, confidence, flagged, classification_reason, quantity,
@@ -280,7 +289,8 @@ async function storeTransactions(rows: TransactionBody[]): Promise<number> {
        event_type = EXCLUDED.event_type, confidence = EXCLUDED.confidence,
        flagged = EXCLUDED.flagged, contribution = EXCLUDED.contribution,
        source_file = EXCLUDED.source_file, source_row = EXCLUDED.source_row,
-       data = EXCLUDED.data`,
+       data = EXCLUDED.data
+     RETURNING sub_order_id, transaction_ref, (xmax = 0) AS created`,
     [
       usable.map((t) => s(t.subOrderId)),
       usable.map((t) => s(t.transactionRef)),
@@ -304,7 +314,15 @@ async function storeTransactions(rows: TransactionBody[]): Promise<number> {
       usable.map((t) => JSON.stringify(t.contribution ?? {})),
       usable.map((t) => JSON.stringify(t)),
     ],
-  )
+  )) as { sub_order_id: string; transaction_ref: string; created: boolean }[]
+
+  // Only the rows this import actually created can be taken back out. An event
+  // that was already on file arrived in an earlier download too, and deleting
+  // it would remove a settlement this upload did not introduce — so reversing
+  // leaves those, and says so rather than pretending the month is untouched.
+  const created = result.filter((r) => r.created).map((r) => [r.sub_order_id, r.transaction_ref])
+  if (created.length > 0) await captureUndo(importId, 'meesho_rows', 'meesho_transactions', created)
+
   return usable.length
 }
 
