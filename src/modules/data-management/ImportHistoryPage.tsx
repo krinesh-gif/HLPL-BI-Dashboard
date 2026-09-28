@@ -51,18 +51,23 @@ export function ImportHistoryPage() {
 
   return (
     <PageShell title="Import History" subtitle="Every report ever uploaded, with its validation outcome — and a way to take one back out" showFilters={false}>
+      {/* Same idiom as the queue rows on Data Upload: a coloured rule down the
+          left edge carries the kind, so the two pages read as one section. */}
       {outcome && (
-        <p className="mb-3 rounded-md border border-[color-mix(in_oklab,var(--good)_45%,transparent)] bg-[color-mix(in_oklab,var(--good)_12%,transparent)] px-3 py-2 text-sm text-[var(--ink)]">
+        <p className="mb-3 border-l-2 border-[var(--good)] bg-[color-mix(in_oklab,var(--good)_8%,transparent)] px-3 py-2 text-sm text-[var(--ink-2)]">
           {outcome}
         </p>
       )}
       {error && (
-        <p className="mb-3 rounded-md border border-[color-mix(in_oklab,var(--critical)_45%,transparent)] bg-[color-mix(in_oklab,var(--critical)_12%,transparent)] px-3 py-2 text-sm text-[var(--ink)]">
+        <p className="mb-3 border-l-2 border-[var(--critical)] bg-[color-mix(in_oklab,var(--critical)_8%,transparent)] px-3 py-2 text-sm text-[var(--ink-2)]">
           {error}
         </p>
       )}
       {imports.length === 0 ? (
-        <EmptyState title="No reports have been uploaded yet." description="Uploaded reports will appear here with their validation results." />
+        <EmptyState
+          title="Nothing has been uploaded yet."
+          description="Take a marketplace report to Data ▸ Data Upload. Every file that lands appears here, with what it was read as and a way to take it back out."
+        />
       ) : (
         <DataTable
           exportFileName="HLPL_ImportHistory"
@@ -75,9 +80,11 @@ export function ImportHistoryPage() {
               // characters. Left to size the column they pushed Reverse off
               // the right-hand edge, where the whole point is that it is in
               // reach. Truncated, with the full name on hover.
+              // Mono for the file name: these are machine names, and a trailing
+              // _2025-08 has to be scannable down a column of them.
               render: (r) => (
                 <span className="block max-w-[20rem] truncate" title={`${r.fileName} — ${r.reportType}`}>
-                  {r.fileName}
+                  <span className="block truncate font-mono text-[13px] text-[var(--ink)]">{r.fileName}</span>
                   <span className="block truncate text-[11px] text-[var(--ink-3)]">{r.reportType}</span>
                 </span>
               ),
@@ -112,6 +119,9 @@ export function ImportHistoryPage() {
               key: 'status',
               header: 'Status',
               accessor: (r) => r.status,
+              // The stored values are success / partial / failed, which is how
+              // the import writes them down, not how anyone reads them. The
+              // badge says what happened to the file.
               render: (r) => (
                 <span
                   className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
@@ -122,7 +132,7 @@ export function ImportHistoryPage() {
                         : 'bg-[color-mix(in_oklab,var(--critical)_16%,transparent)] text-[var(--critical-ink)]'
                   }`}
                 >
-                  {r.status}
+                  {r.status === 'success' ? 'Imported' : r.status === 'partial' ? 'Rows skipped' : 'Failed'}
                 </span>
               ),
             },

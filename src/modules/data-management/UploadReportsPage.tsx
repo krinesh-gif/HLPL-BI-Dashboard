@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { PageShell } from '@/components/layout/PageShell'
 import { parseSpreadsheetFile, readCsvRaw, readTsvRecords, readWorkbookSheetsRaw, type ParsedFile, type RawSheet } from '@/lib/csvParse'
 import { detectAmazonSellerCentralReport, normalizeAmazonSellerCentralRows } from '@/data/normalize/amazonSellerCentral'
@@ -170,7 +171,7 @@ async function findNykaaCompanions(files: File[]): Promise<NykaaCompanions> {
 export function UploadReportsPage() {
   const {
     skuMaster, mappings, importReport, importProgress, importSkuMapWorkbook, saveManualAdSpend,
-    patchNykaaFacts, nykaaFacts,
+    patchNykaaFacts, nykaaFacts, imports,
   } = useDataStore()
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null)
   const { month: filterMonth } = useFilterStore()
@@ -578,24 +579,32 @@ export function UploadReportsPage() {
   const readyCount = queue.filter((i) => i.status === 'ready').length
   const needsMonthCount = queue.filter((i) => i.status === 'needs-month').length
   const busy = stage === 'importing' || reading !== null
+  const queued = queue.length > 0
+  // Importing used to end at a green box, and whether the figures had actually
+  // moved was a different entry in a different part of the sidebar. The last
+  // few uploads sit under the panel that made them, with the one link that
+  // leads to taking one back out.
+  const recent = [...imports].sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)).slice(0, 5)
 
   return (
     <PageShell
-      title="Upload Reports"
-      subtitle="Drop a marketplace report in and it is checked before anything is written"
+      title="Data Upload"
+      subtitle="Marketplace reports go in here. Every file is read and reported on before a figure moves."
       showFilters={false}
     >
       {/*
-        The whole panel is the target.
+        Two acts, one object.
         //
-        // It used to be a bare file input with a browser-drawn "Choose file"
-        // button and a wall of supported formats under it, and nobody could
-        // tell where to click. The label covers the panel, so the click lands
-        // wherever it is aimed, and dropping files on it works too — which is
-        // what most people try first with a box like this.
+        // This was a dashed box with a cloud icon and a centred blue button —
+        // which is what every upload control on earth looks like, and was the
+        // reason nobody could find it: it read as decoration rather than as the
+        // thing to use. What is actually distinctive here is not that the page
+        // accepts a file, it is that it recognises the file and says so before
+        // anything is written. So the panel is a sequence — pick, then read —
+        // numbered, because the second act genuinely cannot come first.
       */}
-      <label
-        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+      <section
+        onDragOver={(e) => { e.preventDefault(); if (!busy) setDragging(true) }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => {
           e.preventDefault()
@@ -603,173 +612,272 @@ export function UploadReportsPage() {
           const files = Array.from(e.dataTransfer.files ?? [])
           if (files.length > 0 && !busy) void addFiles(files)
         }}
-        className={`flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors ${
+        className={`overflow-hidden rounded-[var(--radius-card)] border transition-colors ${
           dragging
-            ? 'border-[var(--accent)] bg-[color-mix(in_oklab,var(--accent)_8%,transparent)]'
-            : 'border-[var(--line-2)] bg-[var(--surface)] hover:border-[var(--accent)] hover:bg-[var(--surface-2)]'
-        } ${busy ? 'pointer-events-none opacity-60' : ''}`}
+            ? 'border-[var(--accent)] bg-[color-mix(in_oklab,var(--accent)_6%,var(--surface))]'
+            : 'border-[var(--line)] bg-[var(--surface)]'
+        }`}
       >
-        <input
-          type="file"
-          multiple
-          // Every extension analyzeFile knows how to read. A reader added
-          // without its extension here is unreachable: the picker greys the
-          // file out and the person cannot select it at all, which is exactly
-          // what happened to Amazon India's settlement .txt.
-          accept=".csv,.tsv,.txt,.xlsx,.xls,.json,.pdf"
-          disabled={busy}
-          onChange={(e) => {
-            const files = Array.from(e.target.files ?? [])
-            if (files.length > 0) void addFiles(files)
-            e.target.value = ''
-          }}
-          className="sr-only"
-        />
-        <svg viewBox="0 0 24 24" className="h-9 w-9 text-[var(--ink-3)]" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
-        </svg>
-        <span className="mt-3 rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--accent-ink)]">
-          Choose files
-        </span>
-        <span className="mt-2.5 text-sm text-[var(--ink-2)]">or drag them here</span>
-        <span className="mt-1 text-xs text-[var(--ink-3)]">
-          As many as you like — a whole year in one go. Each is checked on its own before anything is written.
-        </span>
-        {reading && (
-          <span className="mt-3 text-sm font-medium text-[var(--accent)]">
-            Reading {reading.done} of {reading.total}…
-          </span>
-        )}
-      </label>
-
-      <details className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-3">
-        <summary className="cursor-pointer text-sm font-medium text-[var(--ink-2)]">
-          Which reports can I upload?
-        </summary>
-        <ul className="mt-3 space-y-1.5 text-xs text-[var(--ink-2)]">
-          <li><strong>Amazon India</strong> — Seller Central order reports, the settlement report (the tab-separated
-            .txt), and the Vendor Central monthly sales export.</li>
-          <li><strong>Amazon USA</strong> — the Product Profitability export.</li>
-          <li><strong>Amazon Ads</strong> — Sponsored Products campaign reports.</li>
-          <li><strong>Flipkart</strong> — SKU-level P&amp;L exports, or the full P&amp;L workbook.</li>
-          <li><strong>Meesho</strong> — Order Summary reports and the aggregated payment file.</li>
-          <li><strong>Myntra</strong> — the P&amp;L report.</li>
-          <li><strong>Nykaa</strong> — the three monthly files (Sales, Cart Rule, Combo — drop all three in together),
-            plus the two emailed PDFs: the Marketing Invest invoice and the Financial Debit Note.</li>
-        </ul>
-      </details>
-
-      {queue.length > 0 && (
-        <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)]">
-          <div className="flex flex-wrap items-center gap-3 border-b border-[var(--line)] px-4 py-3">
-            <h2 className="text-sm font-semibold text-[var(--ink)]">
-              {queue.length} file{queue.length === 1 ? '' : 's'} ready to import
-            </h2>
-            {needsMonthCount > 0 && (
-              <span className="rounded-full bg-[color-mix(in_oklab,var(--warning)_15%,transparent)] px-2.5 py-0.5 text-xs text-[var(--ink-2)]">
-                {needsMonthCount} need a month set
+        {/* Act one is the label, so a click lands anywhere in this block rather
+            than only on the button. */}
+        <label className={`block ${busy ? 'pointer-events-none opacity-60' : 'cursor-pointer'}`}>
+          <input
+            type="file"
+            multiple
+            // Every extension analyzeFile knows how to read. A reader added
+            // without its extension here is unreachable: the picker greys the
+            // file out and the person cannot select it at all, which is exactly
+            // what happened to Amazon India's settlement .txt.
+            accept=".csv,.tsv,.txt,.xlsx,.xls,.json,.pdf"
+            disabled={busy}
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? [])
+              if (files.length > 0) void addFiles(files)
+              e.target.value = ''
+            }}
+            className="peer sr-only"
+          />
+          <span
+            className="flex flex-wrap items-start gap-x-4 gap-y-3 px-5 py-5 peer-focus-visible:outline-2 peer-focus-visible:-outline-offset-2 peer-focus-visible:outline-[var(--accent)]"
+          >
+            <StepMark n={1} active />
+            {/* A wrap basis, not just flex-1: without it a narrow screen
+                squeezes this column to one word per line rather than dropping
+                the button onto its own row. */}
+            <span className="min-w-0 flex-1 basis-72">
+              <span className="block text-[15px] font-semibold text-[var(--ink)]">Pick the files</span>
+              <span className="mt-1 block max-w-[62ch] text-sm text-[var(--ink-2)]">
+                {dragging
+                  ? 'Let go and they will be read.'
+                  : 'Drop them anywhere on this panel, or use the button. As many as you like — a whole year in one go, each read on its own.'}
               </span>
-            )}
-            <button
-              type="button"
-              onClick={importAll}
-              disabled={readyCount === 0 || busy}
-              className="ml-auto rounded-md bg-[var(--accent)] px-4 py-1.5 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
+            </span>
+            {/* Filled while it is the only thing to do; an outline once there
+                are files, so Import is the one bold control on screen. */}
+            <span
+              className={`shrink-0 self-center rounded-[var(--radius-control)] px-4 py-2 text-sm font-semibold ${
+                queued
+                  ? 'border border-[var(--line-2)] text-[var(--ink-2)]'
+                  : 'bg-[var(--accent)] text-[var(--accent-ink)]'
+              }`}
             >
-              {stage === 'importing'
-                ? importProgress && importProgress.total > 0
-                  ? `Importing ${importProgress.sent.toLocaleString()} of ${importProgress.total.toLocaleString()}…`
-                  : 'Importing…'
-                : `Import ${readyCount} file${readyCount === 1 ? '' : 's'}`}
-            </button>
-            {queue.some((i) => i.status === 'done') && (
-              <button type="button" onClick={clearFinished} disabled={busy} className="text-xs text-[var(--ink-3)] hover:text-[var(--ink-2)] disabled:opacity-40">
-                Clear finished
-              </button>
+              {queued ? 'Add more' : 'Choose files'}
+            </span>
+          </span>
+        </label>
+
+        <div className="border-t border-[var(--line)]">
+          <div className="flex flex-wrap items-start gap-x-4 gap-y-3 px-5 py-4">
+            <StepMark n={2} active={queued || reading !== null} />
+            <div className="min-w-0 flex-1 basis-72">
+              <h2 className="text-[15px] font-semibold text-[var(--ink)]">
+                {reading
+                  ? `Reading ${reading.done} of ${reading.total}…`
+                  : queued
+                    ? `${queue.length} file${queue.length === 1 ? '' : 's'} read`
+                    : 'Check what was read'}
+              </h2>
+              <p className="mt-1 max-w-[62ch] text-sm text-[var(--ink-2)]">
+                {!queued
+                  ? 'Each file is matched against the report formats this dashboard knows and listed here with what it was recognised as, which month it belongs to and what it will change. Nothing is written until you import.'
+                  : needsMonthCount > 0
+                    ? `${needsMonthCount} of these carry no date of their own. Set the month on each before importing.`
+                    : readyCount > 0
+                      ? 'Read each line before importing. A file that quietly failed to be recognised looks much like one that worked.'
+                      : 'Nothing here is ready to import.'}
+              </p>
+            </div>
+            {queued && (
+              <div className="flex shrink-0 items-center gap-3 self-center">
+                <button
+                  type="button"
+                  onClick={importAll}
+                  disabled={readyCount === 0 || busy}
+                  className="rounded-[var(--radius-control)] bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
+                >
+                  {stage === 'importing'
+                    ? importProgress && importProgress.total > 0
+                      ? `Importing ${importProgress.sent.toLocaleString()} of ${importProgress.total.toLocaleString()}…`
+                      : 'Importing…'
+                    : `Import ${readyCount} file${readyCount === 1 ? '' : 's'}`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => queue.some((i) => i.status === 'done') ? clearFinished() : setQueue([])}
+                  disabled={busy}
+                  className="text-xs font-medium text-[var(--ink-3)] hover:text-[var(--ink)] disabled:opacity-40"
+                >
+                  {queue.some((i) => i.status === 'done') ? 'Clear the finished' : 'Clear the list'}
+                </button>
+              </div>
             )}
-            <button type="button" onClick={() => setQueue([])} disabled={busy} className="text-xs text-[var(--ink-3)] hover:text-[var(--ink-2)] disabled:opacity-40">
-              Clear all
-            </button>
           </div>
 
+          {queued && (
+            <ul>
+              {queue.map((item) => (
+                <QueueRow
+                  key={item.id}
+                  item={item}
+                  busy={busy}
+                  onSetMonth={(m: string) => void setItemMonth(item, m)}
+                  onResolveMonth={() => void resolveMonth(item)}
+                  onRemove={() => removeItem(item.id)}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <details className="border-t border-[var(--line)] px-5 py-3">
+          <summary className="cursor-pointer text-xs font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)]">
+            Which reports can I upload?
+          </summary>
+          <ul className="mt-3 grid gap-x-10 gap-y-2 text-xs leading-relaxed text-[var(--ink-2)] sm:grid-cols-2">
+            <li><strong className="text-[var(--ink)]">Amazon India</strong> — Seller Central order reports, the
+              settlement report (the tab-separated .txt), and the Vendor Central monthly sales export.</li>
+            <li><strong className="text-[var(--ink)]">Amazon USA</strong> — the Product Profitability export.</li>
+            <li><strong className="text-[var(--ink)]">Amazon Ads</strong> — Sponsored Products campaign reports.</li>
+            <li><strong className="text-[var(--ink)]">Flipkart</strong> — SKU-level P&amp;L exports, or the full
+              P&amp;L workbook.</li>
+            <li><strong className="text-[var(--ink)]">Meesho</strong> — Order Summary reports and the aggregated
+              payment file.</li>
+            <li><strong className="text-[var(--ink)]">Myntra</strong> — the P&amp;L report.</li>
+            <li className="sm:col-span-2"><strong className="text-[var(--ink)]">Nykaa</strong> — the three monthly
+              files (Sales, Cart Rule, Combo — drop all three in together), plus the two emailed PDFs: the Marketing
+              Invest invoice and the Financial Debit Note.</li>
+          </ul>
+        </details>
+      </section>
+
+      {stage === 'error' && error && (
+        <div className="rounded-[var(--radius-card)] border border-[color-mix(in_oklab,var(--critical)_35%,transparent)] bg-[color-mix(in_oklab,var(--critical)_10%,transparent)] p-4 text-sm text-[var(--critical-ink)]">{error}</div>
+      )}
+
+      {/*
+        The SKU map is the one import whose result does not fit on its own row:
+        it changes product costs, and which cost changed is the reason to look.
+        Every other file now reports on its own line in the queue, so the
+        blanket green success box that used to sit here said nothing twice.
+      */}
+      {outcome?.mapping && stage === 'idle' && (
+        <div className="rounded-[var(--radius-card)] border border-[color-mix(in_oklab,var(--good)_45%,transparent)] bg-[color-mix(in_oklab,var(--good)_8%,transparent)] p-4">
+          <h3 className="text-sm font-semibold text-[var(--ink)]">
+            Imported <span className="font-mono text-[13px]">{outcome.fileName}</span>
+          </h3>
+          <ul className="mt-2 space-y-1 text-sm text-[var(--ink-2)]">
+            <li>{outcome.mapping.mappingsSaved.toLocaleString()} SKU mapping(s) and {outcome.mapping.recipesSaved.toLocaleString()} combo recipe(s) saved.</li>
+            {outcome.mapping.costChanges.length > 0 && (
+              <li>
+                <span className="text-[var(--ink)]">{outcome.mapping.costChanges.length} product cost(s) changed:</span>
+                <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
+                  {outcome.mapping.costChanges.slice(0, 8).map((c) => (
+                    <span key={c.sku} className="whitespace-nowrap">
+                      <span className="font-mono">{c.sku}</span>{' '}
+                      {c.from === null ? 'added at' : `${c.from} →`} {c.to}
+                    </span>
+                  ))}
+                  {outcome.mapping.costChanges.length > 8 && (
+                    <span>+{outcome.mapping.costChanges.length - 8} more</span>
+                  )}
+                </span>
+              </li>
+            )}
+            {outcome.mapping.warnings.slice(0, 4).map((w) => (
+              <li key={w} className="border-l-2 border-[color-mix(in_oklab,var(--warning)_55%,transparent)] pl-2 text-xs">{w}</li>
+            ))}
+          </ul>
+          <div className="mt-3 flex items-center gap-4">
+            <Link to="/products/sku-mapping" className="text-xs font-semibold text-[var(--accent)] hover:underline">
+              Check the results under Catalogue → SKU Mapping
+            </Link>
+            <button
+              type="button"
+              onClick={() => setOutcome(null)}
+              className="text-xs font-medium text-[var(--ink-3)] hover:text-[var(--ink)]"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {recent.length > 0 && (
+        <section className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)]">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-[var(--line)] px-5 py-3">
+            <h2 className="text-sm font-semibold text-[var(--ink)]">Last uploaded</h2>
+            <Link to="/data/import-history" className="text-xs font-medium text-[var(--accent)] hover:underline">
+              Every upload, and how to take one back out
+            </Link>
+          </div>
           <ul className="divide-y divide-[var(--line)]">
-            {queue.map((item) => (
-              <QueueRow
-                key={item.id}
-                item={item}
-                busy={busy}
-                onSetMonth={(m: string) => void setItemMonth(item, m)}
-                onResolveMonth={() => void resolveMonth(item)}
-                onRemove={() => removeItem(item.id)}
-              />
+            {recent.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-5 py-2.5">
+                <span className="min-w-0 flex-1 truncate font-mono text-xs text-[var(--ink)]" title={r.fileName}>
+                  {r.fileName}
+                </span>
+                <span className="w-28 shrink-0 text-right text-xs text-[var(--ink-3)]">{CHANNEL_MAP[r.channel]?.label ?? r.channel}</span>
+                <span className="w-16 shrink-0 text-right text-xs text-[var(--ink-3)]">
+                  {new Date(r.uploadedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                </span>
+              </li>
             ))}
           </ul>
         </section>
       )}
 
-      {stage === 'error' && error && (
-        <div className="rounded-lg border border-[color-mix(in_oklab,var(--critical)_35%,transparent)] bg-[color-mix(in_oklab,var(--critical)_10%,transparent)] p-4 text-sm text-[var(--critical-ink)]">{error}</div>
-      )}
-
-      {outcome && stage === 'idle' && (
-        <div className="mb-6 rounded-lg border border-[color-mix(in_oklab,var(--good)_45%,transparent)] bg-[color-mix(in_oklab,var(--good)_10%,transparent)] p-4">
-          <h3 className="text-sm font-semibold text-[var(--good-ink)]">✓ Imported {outcome.fileName}</h3>
-          <ul className="mt-2 space-y-0.5 text-sm text-[var(--good-ink)]">
-            {outcome.mapping ? (
-              <>
-                <li>{outcome.mapping.mappingsSaved.toLocaleString()} SKU mapping(s) saved.</li>
-                <li>{outcome.mapping.recipesSaved.toLocaleString()} combo recipe(s) saved.</li>
-                {outcome.mapping.costChanges.length > 0 && (
-                  <li>
-                    <span>{outcome.mapping.costChanges.length} product cost(s) changed:</span>
-                    <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
-                      {outcome.mapping.costChanges.slice(0, 8).map((c) => (
-                        <span key={c.sku} className="whitespace-nowrap">
-                          <span className="font-mono">{c.sku}</span>{' '}
-                          {c.from === null ? 'added at' : `${c.from} →`} {c.to}
-                        </span>
-                      ))}
-                      {outcome.mapping.costChanges.length > 8 && (
-                        <span>+{outcome.mapping.costChanges.length - 8} more</span>
-                      )}
-                    </span>
-                  </li>
-                )}
-                {outcome.mapping.warnings.slice(0, 4).map((w) => (
-                  <li key={w} className="text-[var(--ink-2)]">⚠ {w}</li>
-                ))}
-                <li className="pt-1 font-medium">
-                  Check the results under Products → SKU Mapping.
-                </li>
-              </>
-            ) : (
-              <li>{outcome.added.toLocaleString()} new record(s) added to the shared data.</li>
-            )}
-            {!outcome.mapping && outcome.skippedAsDuplicate > 0 && (
-              <li>
-                {outcome.skippedAsDuplicate.toLocaleString()} row(s) were already imported and were skipped, so nothing
-                is double-counted.
-              </li>
-            )}
-            {!outcome.mapping && outcome.monthsUpdated.length > 0 && (
-              <li>P&amp;L updated for {outcome.monthsUpdated.map(monthLabel).join(', ')}.</li>
-            )}
-            {!outcome.mapping && outcome.added === 0 && outcome.skippedAsDuplicate > 0 && (
-              <li className="font-medium">This file had already been imported — nothing changed.</li>
-            )}
-          </ul>
-          <button
-            type="button"
-            onClick={() => setOutcome(null)}
-            className="mt-3 text-xs font-medium text-[var(--good-ink)] hover:text-[var(--good-ink)]"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
     </PageShell>
   )
+}
+
+/** The act number. A ring rather than a filled disc, so the one filled thing on
+ * the panel stays the button you are meant to press. */
+function StepMark({ n, active }: { n: number; active: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
+        active
+          ? 'border-[var(--accent)] text-[var(--accent)]'
+          : 'border-[var(--line-2)] text-[var(--ink-3)]'
+      }`}
+    >
+      {n}
+    </span>
+  )
+}
+
+/**
+ * How a row reads at a glance.
+ *
+ * Status used to be an 8px dot whose meaning was in a `title` and an sr-only
+ * span — so on a batch of twelve you had to hover each one to find the file
+ * that had not been recognised, and a sighted keyboard user had no way at all.
+ * It is now a coloured spine down the row's left edge *and* the status in
+ * words, and colour is never the only carrier.
+ */
+const STATUS_TONE: Record<ItemStatus, { label: string; spine: string; ink: string }> = {
+  ready: { label: 'Ready', spine: 'bg-[var(--accent)]', ink: 'text-[var(--accent)]' },
+  'needs-month': { label: 'Needs a month', spine: 'bg-[var(--warning)]', ink: 'text-[var(--ink-2)]' },
+  error: { label: 'Not recognised', spine: 'bg-[var(--critical)]', ink: 'text-[var(--critical-ink)]' },
+  importing: { label: 'Importing…', spine: 'bg-[var(--accent)] animate-pulse', ink: 'text-[var(--accent)]' },
+  done: { label: 'Imported', spine: 'bg-[var(--good)]', ink: 'text-[var(--good-ink)]' },
+  failed: { label: 'Failed', spine: 'bg-[var(--critical)]', ink: 'text-[var(--critical-ink)]' },
+}
+
+/**
+ * What the file was recognised as, said once.
+ *
+ * Nearly every report label already opens with the marketplace's name, so
+ * appending the channel produced "Amazon USA — Product Profitability Report —
+ * Amazon USA". The channel is only added where the label does not already
+ * carry it.
+ */
+function describeReport(p: PreviewState): string {
+  const label = REPORT_LABELS[p.reportKind]
+  if (p.adsRecords.length > 0) return label
+  const channel = CHANNEL_MAP[REPORT_CHANNEL[p.reportKind]].label
+  return label.toLowerCase().startsWith(channel.toLowerCase()) ? label : `${label} — ${channel}`
 }
 
 /**
@@ -789,32 +897,46 @@ function QueueRow({
   const p = item.preview
   const validCount = p ? p.validRecords.length + p.adsRecords.length : 0
   // A file that was not recognised has no report type to name, and guessing
-  // one would be worse than saying nothing — the row already carries the
-  // reason it was rejected.
+  // one would be worse than saying nothing — the status beside the file name
+  // says it was not recognised and the row carries the reason, so there is no
+  // third line to write.
   const label = item.skuMap
     ? 'SKU Map & Cost workbook'
     : p
-      ? `${REPORT_LABELS[p.reportKind]}${p.adsRecords.length === 0 ? ` — ${CHANNEL_MAP[REPORT_CHANNEL[p.reportKind]].label}` : ''}`
+      ? describeReport(p)
       : item.status === 'needs-month'
         ? 'Flipkart SKU-level P&L'
-        : 'Not recognised'
+        : null
   const months = [
     ...(p?.amazonUsaFacts ? [p.amazonUsaFacts.month] : []),
     ...(p?.flipkartFacts ? [p.flipkartFacts.month] : []),
     ...(p?.meeshoFactsByMonth ?? []).filter((f) => f.basis === 'order').map((f) => f.month),
   ]
 
+  const tone = STATUS_TONE[item.status]
+
   return (
-    <li className="px-4 py-3">
+    <li className="relative border-t border-[var(--line)] py-3 pl-5 pr-4">
+      <span className={`absolute left-0 top-0 h-full w-[3px] ${tone.spine}`} aria-hidden />
       <div className="flex flex-wrap items-start gap-3">
-        <StatusDot status={item.status} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-[var(--ink)]">{item.fileName}</div>
-          <div className="mt-0.5 text-xs text-[var(--ink-3)]">
-            {label}
-            {months.length > 0 && ` · ${[...new Set(months)].sort().map(monthLabel).join(', ')}`}
-            {p && ` · ${validCount.toLocaleString()} of ${p.totalRows.toLocaleString()} rows`}
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            {/* Mono, because these are machine names: a trailing _2025-08 is
+                scannable in a column of them and a 1 is not an l. */}
+            <span className="min-w-0 truncate font-mono text-[13px] font-medium text-[var(--ink)]" title={item.fileName}>
+              {item.fileName}
+            </span>
+            <span className={`shrink-0 text-[11px] font-semibold ${tone.ink}`}>{tone.label}</span>
           </div>
+          {label && <div className="mt-0.5 text-xs text-[var(--ink-2)]">{label}</div>}
+          {(months.length > 0 || p) && (
+            <div className="mt-0.5 text-xs text-[var(--ink-3)]">
+              {[
+                months.length > 0 ? [...new Set(months)].sort().map(monthLabel).join(', ') : null,
+                p ? `${validCount.toLocaleString()} of ${p.totalRows.toLocaleString()} rows` : null,
+              ].filter(Boolean).join(' · ')}
+            </div>
+          )}
 
           {item.status === 'needs-month' && (
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -838,33 +960,36 @@ function QueueRow({
             </div>
           )}
 
+          {/* Counts that only qualify the import stay on one quiet line; the
+              things that need reading get the rule down their left edge. */}
+          {p && item.status === 'ready' && (p.duplicateCount > 0 || p.invalidCount > 0) && (
+            <div className="mt-0.5 text-xs text-[var(--ink-3)]">
+              {[
+                p.duplicateCount > 0 ? `${p.duplicateCount.toLocaleString()} row(s) already on file, skipped` : null,
+                p.invalidCount > 0 ? `${p.invalidCount.toLocaleString()} row(s) failed validation, skipped` : null,
+              ].filter(Boolean).join(' · ')}
+            </div>
+          )}
+
           {p && p.isLikelyReupload && item.status === 'ready' && (
-            <p className="mt-1 text-xs text-[var(--ink-2)]">
-              ⚠ Looks already imported — 90% or more of its rows match rows on file.
-            </p>
-          )}
-          {p && p.duplicateCount > 0 && item.status === 'ready' && (
-            <p className="mt-1 text-xs text-[var(--ink-3)]">
-              {p.duplicateCount.toLocaleString()} row(s) already on file will be skipped.
-            </p>
-          )}
-          {p && p.invalidCount > 0 && (
-            <p className="mt-1 text-xs text-[var(--ink-3)]">
-              {p.invalidCount.toLocaleString()} row(s) failed validation and will be skipped.
+            <p className="mt-1.5 border-l-2 border-[color-mix(in_oklab,var(--warning)_55%,transparent)] pl-2 text-xs text-[var(--ink-2)]">
+              Looks already imported — 90% or more of its rows match rows on file.
             </p>
           )}
           {p?.warnings.slice(0, 3).map((w, i) => (
-            <p key={i} className="mt-1 text-xs text-[var(--ink-2)]">⚠ {w}</p>
+            <p key={i} className="mt-1.5 border-l-2 border-[color-mix(in_oklab,var(--warning)_55%,transparent)] pl-2 text-xs text-[var(--ink-2)]">
+              {w}
+            </p>
           ))}
           {p && p.warnings.length > 3 && (
             <p className="mt-1 text-xs text-[var(--ink-3)]">+{p.warnings.length - 3} more warning(s)</p>
           )}
 
           {item.error && (
-            <p className="mt-1 text-xs text-[var(--critical-ink)]">{item.error}</p>
+            <p className="mt-1.5 border-l-2 border-[var(--critical)] pl-2 text-xs text-[var(--ink-2)]">{item.error}</p>
           )}
           {item.status === 'done' && item.outcome && (
-            <p className="mt-1 text-xs text-[var(--good-ink)]">
+            <p className="mt-1.5 border-l-2 border-[var(--good)] pl-2 text-xs text-[var(--ink-2)]">
               {item.outcome.mapping
                 ? `${item.outcome.mapping.mappingsSaved.toLocaleString()} mapping(s), ${item.outcome.mapping.recipesSaved.toLocaleString()} recipe(s) saved.`
                 : `${item.outcome.added.toLocaleString()} record(s) added` +
@@ -881,30 +1006,12 @@ function QueueRow({
             disabled={busy}
             title="Remove from the list"
             aria-label={`Remove ${item.fileName}`}
-            className="rounded p-1 text-[var(--ink-3)] hover:bg-[var(--surface-hover)] hover:text-[var(--ink)] disabled:opacity-40"
+            className="-mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-base leading-none text-[var(--ink-3)] hover:bg-[var(--surface-hover)] hover:text-[var(--ink)] disabled:opacity-40"
           >
             ×
           </button>
         )}
       </div>
     </li>
-  )
-}
-
-function StatusDot({ status }: { status: ItemStatus }) {
-  const map: Record<ItemStatus, { cls: string; label: string }> = {
-    ready: { cls: 'bg-[var(--accent)]', label: 'Ready' },
-    'needs-month': { cls: 'bg-[var(--warning)]', label: 'Needs a month' },
-    error: { cls: 'bg-[var(--critical)]', label: 'Not recognised' },
-    importing: { cls: 'bg-[var(--accent)] animate-pulse', label: 'Importing' },
-    done: { cls: 'bg-[var(--good)]', label: 'Imported' },
-    failed: { cls: 'bg-[var(--critical)]', label: 'Failed' },
-  }
-  const { cls, label } = map[status]
-  return (
-    <span className="mt-1 flex items-center gap-1.5" title={label}>
-      <span className={`inline-block h-2 w-2 rounded-full ${cls}`} aria-hidden />
-      <span className="sr-only">{label}</span>
-    </span>
   )
 }
