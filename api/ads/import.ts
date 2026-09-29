@@ -92,6 +92,10 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const { records } = body
+  // The import storing these rows, for the same reason the sales rows carry
+  // it: reversing an upload deletes by this column, and the id a record was
+  // stamped with during preview is not the id the import was recorded under.
+  const batchImportId = typeof body?.importId === 'string' ? body.importId : undefined
   let inserted = 0
 
   for (let i = 0; i < records.length; i += CHUNK_SIZE) {
@@ -122,7 +126,7 @@ export async function POST(request: Request): Promise<Response> {
         chunk.map((r) => r.spend),
         chunk.map((r) => r.adSales),
         chunk.map((r) => r.adOrders),
-        chunk.map((r) => r.importId),
+        chunk.map((r) => batchImportId ?? r.importId),
       ],
     )) as unknown[]
     inserted += result.length

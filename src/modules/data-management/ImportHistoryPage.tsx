@@ -23,7 +23,11 @@ function describeReversal(r: ReverseImportResult): string {
   if (r.removedFacts > 0) parts.push(`${r.removedFacts} month(s) of figures removed`)
   if (r.restoredRows > 0) parts.push(`${formatNumber(r.restoredRows)} restated row(s) put back`)
   return parts.length === 0
-    ? `${r.fileName} is reversed. It had written nothing that is still on file.`
+    // Not the same as having written nothing, and saying so would be a guess.
+    // An upload stored before rows carried their import's own id has rows on
+    // file that nothing can match to it, and telling the owner that such a
+    // file wrote nothing is the one reading that is certainly wrong.
+    ? `${r.fileName} is reversed, but nothing on file was matched to it, so nothing was taken back out.`
     : `${r.fileName} is reversed — ${parts.join(', ')}.`
 }
 

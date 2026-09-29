@@ -315,7 +315,7 @@ export const useDataStore = create<DataState>((set, get) => {
         }
 
         for (const batch of batched(adsRecords, UPLOAD_BATCH_SIZE)) {
-          const result = await api.post<BatchResult>('/api/ads/import', { records: batch })
+          const result = await api.post<BatchResult>('/api/ads/import', { records: batch, importId })
           added += result.inserted
           skippedAsDuplicate += result.skippedAsDuplicate
           sent += batch.length

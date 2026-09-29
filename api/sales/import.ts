@@ -117,7 +117,14 @@ export async function POST(request: Request): Promise<Response> {
         chunk.map((r) => r.status),
         chunk.map((r) => r.currency),
         chunk.map((r) => JSON.stringify(r.raw ?? null)),
-        chunk.map((r) => r.importId),
+        // The import that is storing the row, not the one the record was
+        // stamped with. A record is stamped while the file is being previewed,
+        // and the import record is created later, when the upload is
+        // confirmed — two separate ids, so every row ever stored pointed at an
+        // import that does not exist. Reversing an upload deletes by this
+        // column, so it matched nothing and took nothing back out, for every
+        // channel, while reporting that it had worked.
+        chunk.map(() => importId),
         chunk.map((r) => r.isAggregate === true),
       ],
     )) as unknown[]
