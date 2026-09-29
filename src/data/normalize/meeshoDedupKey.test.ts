@@ -81,4 +81,21 @@ describe('the de-dup key itself', () => {
   it('is unchanged for a channel with no line id', () => {
     expect(recordKey({ ...base, channel: 'flipkart' })).toBe('flipkart|SUB1|A|2026-03-11|')
   })
+
+  it('ignores a restated SKU, so renaming one books no second sale', () => {
+    // The payment file reports the seller's own Supplier SKU. Renaming one in
+    // the Meesho catalogue restates it on every historical order, and while
+    // the SKU was part of the key those restated rows matched nothing already
+    // stored: one re-upload booked March to June a second time, 2,001 lines
+    // and ₹4.77 lakh of sales that never happened.
+    expect(recordKey({ ...base, sku: 'Aravi Organic-Rosemary Essential Oil-100 ml', lineId: 'AXIS1' }))
+      .toBe(recordKey({ ...base, sku: 'D1/AO/EO/Rosemary/100', lineId: 'AXIS1' }))
+  })
+
+  it('still tells two SKUs of one order apart where there is no line id', () => {
+    // The SKU is only dropped because the line id does that job. Without one
+    // it is still the only thing separating the lines, so it has to stay.
+    expect(recordKey({ ...base, channel: 'flipkart', sku: 'A' }))
+      .not.toBe(recordKey({ ...base, channel: 'flipkart', sku: 'B' }))
+  })
 })

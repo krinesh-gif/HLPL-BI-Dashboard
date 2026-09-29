@@ -10,17 +10,29 @@
 import type { AdsRecord, CanonicalSalesRecord } from '../models'
 
 /**
- * Channel + Order ID + SKU + Order Date identifies a sales line, plus the
- * line's own id where the marketplace reports several lines against one order.
+ * What identifies a sales line, and deliberately nothing more.
  *
- * Meesho files a sale and its later return under the same sub-order, the same
- * SKU and the same order date. Without the line id those two rows produced the
- * same key, and the insert's ON CONFLICT DO NOTHING kept whichever arrived
- * first and dropped the other — so a month's order rows were a lossy, arbitrary
- * subset of the file, and which half survived depended on upload order.
+ * Where the marketplace gives the line its own id, that id plus the order and
+ * its date *is* the identity, and the SKU is left out. The SKU is an attribute
+ * of the line, not part of what makes it that line, and a marketplace can
+ * restate it: Meesho's payment file reports the seller's own Supplier SKU, so
+ * renaming a supplier SKU in the Meesho catalogue rewrote it on every
+ * historical order. With the SKU in the key those restated rows no longer
+ * matched the rows already stored, and one re-upload booked March to June a
+ * second time — 2,001 lines and ₹4.77 lakh of sales that never happened.
+ * Identity has to be built only from things the marketplace cannot restate.
+ *
+ * Without a line id there is nothing else to separate two lines of one order,
+ * so the SKU stays in the key and does that job. Only Meesho sets a line id
+ * today (the payment batch that settled the event, which is what makes a sale
+ * row and its return row two rows rather than one); every other channel keeps
+ * the older shape, trailing separator included, so their stored keys still
+ * match.
  */
 export function recordKey(r: Pick<CanonicalSalesRecord, 'channel' | 'orderId' | 'sku' | 'orderDate' | 'lineId'>): string {
-  return `${r.channel}|${r.orderId}|${r.sku}|${r.orderDate}|${r.lineId ?? ''}`
+  return r.lineId
+    ? `${r.channel}|${r.orderId}|${r.orderDate}|${r.lineId}`
+    : `${r.channel}|${r.orderId}|${r.sku}|${r.orderDate}|`
 }
 
 /** Channel + Campaign + Date + SKU uniquely identifies one ads report row

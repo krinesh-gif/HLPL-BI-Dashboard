@@ -299,6 +299,35 @@ BEGIN
     ALTER TABLE meesho_transactions ADD PRIMARY KEY (sub_order_id, transaction_ref);
   END IF;
 
+  -- Meesho lines once carried the file's Supplier SKU inside their identity.
+  -- The payment file reports the seller's own Supplier SKU, so renaming one in
+  -- the Meesho catalogue restates it on every historical order; the restated
+  -- rows then matched nothing already stored, and a single re-upload booked
+  -- March to June a second time. Identity is now the sub-order, its order date
+  -- and the payment batch that settled it — none of which Meesho can restate.
+  --
+  -- This only re-keys. Where two rows of one event are both still stored they
+  -- would collapse onto the same key, so the guard leaves those alone rather
+  -- than deciding which is real and deleting the other; a migration that
+  -- silently drops sales rows is not something to run unattended. It matches
+  -- only the old five-part shape, so it is a no-op once it has run, and every
+  -- other channel keeps the shape its stored keys already have.
+  UPDATE sales_records s
+     SET dedup_key = t.new_key
+    FROM (
+      SELECT min(dedup_key) AS old_key,
+             split_part(dedup_key, '|', 1) || '|' || split_part(dedup_key, '|', 2) || '|'
+               || split_part(dedup_key, '|', 4) || '|' || split_part(dedup_key, '|', 5) AS new_key
+        FROM sales_records
+       WHERE channel = 'meesho'
+         AND array_length(string_to_array(dedup_key, '|'), 1) = 5
+         AND split_part(dedup_key, '|', 5) <> ''
+       GROUP BY 2
+      HAVING count(*) = 1
+    ) t
+   WHERE s.dedup_key = t.old_key
+     AND NOT EXISTS (SELECT 1 FROM sales_records o WHERE o.dedup_key = t.new_key);
+
   CREATE INDEX IF NOT EXISTS meesho_transactions_order_month_idx ON meesho_transactions (left(order_date, 7));
   CREATE INDEX IF NOT EXISTS meesho_transactions_payment_month_idx ON meesho_transactions (left(payment_date, 7));
   CREATE INDEX IF NOT EXISTS meesho_transactions_flagged_idx ON meesho_transactions (flagged) WHERE flagged;
