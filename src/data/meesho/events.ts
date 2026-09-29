@@ -24,6 +24,15 @@ export type MeeshoEventType =
  * is visible to Finance rather than silently folded into the P&L. */
 export type EventConfidence = 'certain' | 'probable' | 'needs_review'
 
+/**
+ * What the row is — never what it earns.
+ *
+ * This once also carried a `recognisesRevenue` flag saying cancellations earn
+ * nothing, while MEESHO_REVENUE_POLICY said the opposite and the P&L read the
+ * policy. Nothing anywhere read the flag, so the two disagreed unnoticed for
+ * months and cancelled orders stayed in Net Sales. Revenue treatment now lives
+ * in MEESHO_REVENUE_POLICY and nowhere else; this says only what happened.
+ */
 export interface EventClassification {
   eventType: MeeshoEventType
   confidence: EventConfidence
@@ -34,8 +43,6 @@ export interface EventClassification {
    * Only a real dispatch does — an affiliate fee against an order that was
    * already counted must not be counted again. */
   countsAsDispatch: boolean
-  /** Whether this event recognises revenue in the P&L. */
-  recognisesRevenue: boolean
 }
 
 export interface RowFacts {
@@ -82,7 +89,7 @@ export function classifyRow(row: RowFacts): EventClassification {
         return {
           eventType: 'affiliate_fee', confidence: 'certain',
           reason: `Blank status with a recovery amount and reason "${row.recoveryReason}".`,
-          countsAsDispatch: false, recognisesRevenue: false,
+          countsAsDispatch: false,
         }
       }
       return {
@@ -91,21 +98,21 @@ export function classifyRow(row: RowFacts): EventClassification {
         reason: row.recoveryReason
           ? `Blank status with a recovery amount, reason "${row.recoveryReason}".`
           : 'Blank status with a recovery amount and no reason given.',
-        countsAsDispatch: false, recognisesRevenue: false,
+        countsAsDispatch: false,
       }
     }
     if (has(row.compensation)) {
       return {
         eventType: 'compensation', confidence: row.compensationReason ? 'probable' : 'needs_review',
         reason: `Blank status with a compensation amount${row.compensationReason ? `, reason "${row.compensationReason}"` : ' and no reason given'}.`,
-        countsAsDispatch: false, recognisesRevenue: false,
+        countsAsDispatch: false,
       }
     }
     if (has(row.claims)) {
       return {
         eventType: 'claim', confidence: row.claimsReason ? 'probable' : 'needs_review',
         reason: `Blank status with a claim amount${row.claimsReason ? `, reason "${row.claimsReason}"` : ' and no reason given'}.`,
-        countsAsDispatch: false, recognisesRevenue: false,
+        countsAsDispatch: false,
       }
     }
     if (money) {
@@ -114,13 +121,13 @@ export function classifyRow(row: RowFacts): EventClassification {
       return {
         eventType: 'settlement_adjustment', confidence: 'needs_review',
         reason: 'Blank status with a settlement amount but no sale, recovery, compensation or claim to explain it.',
-        countsAsDispatch: false, recognisesRevenue: false,
+        countsAsDispatch: false,
       }
     }
     return {
       eventType: 'unclassified', confidence: 'needs_review',
       reason: 'Blank status and no financial amount on the row.',
-      countsAsDispatch: false, recognisesRevenue: false,
+      countsAsDispatch: false,
     }
   }
 
@@ -128,7 +135,7 @@ export function classifyRow(row: RowFacts): EventClassification {
     return {
       eventType: 'cancellation', confidence: 'certain',
       reason: 'Order status is Cancelled.',
-      countsAsDispatch: false, recognisesRevenue: false,
+      countsAsDispatch: false,
     }
   }
 
@@ -136,7 +143,7 @@ export function classifyRow(row: RowFacts): EventClassification {
     return {
       eventType: 'rto', confidence: 'certain',
       reason: 'Order status is RTO — dispatched, refused or undelivered, returned to origin.',
-      countsAsDispatch: true, recognisesRevenue: false,
+      countsAsDispatch: true,
     }
   }
 
@@ -146,7 +153,7 @@ export function classifyRow(row: RowFacts): EventClassification {
     return {
       eventType: 'return', confidence: 'certain',
       reason: 'Order status is Return — a reversal of a sale counted on its own row.',
-      countsAsDispatch: false, recognisesRevenue: false,
+      countsAsDispatch: false,
     }
   }
 
@@ -156,7 +163,7 @@ export function classifyRow(row: RowFacts): EventClassification {
     return {
       eventType: 'exchange', confidence: 'probable',
       reason: 'Order status is Exchange — a replacement shipment, not a second sale.',
-      countsAsDispatch: true, recognisesRevenue: false,
+      countsAsDispatch: true,
     }
   }
 
@@ -164,7 +171,7 @@ export function classifyRow(row: RowFacts): EventClassification {
     return {
       eventType: 'sale', confidence: 'certain',
       reason: `Order status is ${row.orderStatus.trim()} with a sale amount.`,
-      countsAsDispatch: true, recognisesRevenue: true,
+      countsAsDispatch: true,
     }
   }
 
@@ -173,6 +180,6 @@ export function classifyRow(row: RowFacts): EventClassification {
   return {
     eventType: 'unclassified', confidence: 'needs_review',
     reason: `Unrecognised order status "${row.orderStatus.trim()}".`,
-    countsAsDispatch: false, recognisesRevenue: false,
+    countsAsDispatch: false,
   }
 }

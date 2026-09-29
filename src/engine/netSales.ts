@@ -192,13 +192,16 @@ export function settlementBasisNetSales(
     // month's trading is judged on.
     const f = facts.meeshoFacts.find((x) => x.month === month && x.basis === meeshoBasis && x.schemaVersion === 3)
     if (!f) return null
-    const netSales = f.grossSalesInclGst - f.salesReturnsInclGst - f.outputGstOnSales
+    const netSales =
+      f.grossSalesInclGst - f.cancellationsInclGst - f.salesReturnsInclGst - f.outputGstOnSales
     return {
       ...EMPTY_FIGURE,
       grossSales: f.grossSalesInclGst,
-      // Output GST was never revenue. Grouping it with returns here keeps the
-      // identity net = gross - discounts - returns intact while removing it.
-      returnsValue: f.salesReturnsInclGst + f.outputGstOnSales,
+      // Output GST was never revenue, and a cancelled order never was either —
+      // the file bills it in gross and writes no return against it. Grouping
+      // both with returns here keeps the identity
+      // net = gross - discounts - returns intact while removing them.
+      returnsValue: f.cancellationsInclGst + f.salesReturnsInclGst + f.outputGstOnSales,
       netSales,
       units: f.unitsDispatched,
       orders: f.subOrdersDispatched,

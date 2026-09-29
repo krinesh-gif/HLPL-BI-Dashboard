@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { detectMeeshoOrderPaymentsSheet, normalizeMeeshoOrderPayments } from './meeshoOrderPayments'
+import { computeMeeshoPnl, meeshoToCanonicalBuckets } from '@/engine/nativePnl/meesho'
 import type { RawSheet } from '@/lib/csvParse'
 import type { SkuMaster } from '@/data/models'
 
@@ -300,6 +301,55 @@ describe('rows that are not orders', () => {
     expect(f.cogsUnitsSold).toBe(0)         // and no stock left the shelf
     expect(f.netSettlementPerFile).toBe(279.36)
     expect(r.exceptions.map((e) => e.eventType)).toContain('cancellation')
+  })
+
+  /**
+   * The bug this pins down.
+   *
+   * Meesho bills a cancelled order in Total Sale Amount and leaves Sale Return
+   * Amount blank, because nothing shipped and so nothing came back. Gross Sales
+   * took the amount, the returns line took nothing, and the whole cancelled
+   * value stayed in Net Sales with Output GST charged on top of it.
+   */
+  it('reverses a cancelled order back out, since the file never does', () => {
+    const cancelled = dataRow({ 0: 'SUB8', 7: 'Cancelled', 15: 323, 16: 0, 13: 279.36 })
+    const r = normalizeMeeshoOrderPayments([['g'], realHeaderRow(), [''], cancelled], undefined, skuMaster, 'i')
+    const f = factsOf(r, 'order', '2026-07')
+
+    expect(f.grossSalesInclGst).toBe(323)      // still ties to the file's column
+    expect(f.salesReturnsInclGst).toBe(0)      // the file writes no return
+    expect(f.cancellationsInclGst).toBe(323)   // so the reversal comes from here
+    expect(f.outputGstOnSales).toBe(0)         // and no GST is due on it
+
+    const values = computeMeeshoPnl(f)
+    expect(values.netSalesInclGst).toBeCloseTo(0, 6)
+    expect(values.netRevenue).toBeCloseTo(0, 6)
+    // Both views have to agree, or the Master P&L and the statement diverge.
+    expect(meeshoToCanonicalBuckets(f).returns).toBeCloseTo(323, 6)
+  })
+
+  it('does not reverse an RTO twice — it already reverses itself on its own row', () => {
+    // The trap in fixing cancellations: RTO looks identical in status terms but
+    // carries its own negative return, so deducting it again would wipe out a
+    // month of revenue that was correctly stated all along.
+    const rto = dataRow({ 0: 'SUB5', 7: 'RTO', 15: 199, 16: -199 })
+    const f = factsOf(
+      normalizeMeeshoOrderPayments([['g'], realHeaderRow(), [''], rto], undefined, skuMaster, 'i'),
+      'order', '2026-07',
+    )
+    expect(f.grossSalesInclGst).toBe(199)
+    expect(f.salesReturnsInclGst).toBe(199)
+    expect(f.cancellationsInclGst).toBe(0)
+    expect(computeMeeshoPnl(f).netSalesInclGst).toBeCloseTo(0, 6)
+  })
+
+  it('leaves a delivered order’s revenue alone', () => {
+    const f = factsOf(
+      normalizeMeeshoOrderPayments([['g'], realHeaderRow(), [''], dataRow({ 15: 279, 16: 0 })], undefined, skuMaster, 'i'),
+      'order', '2026-07',
+    )
+    expect(f.cancellationsInclGst).toBe(0)
+    expect(computeMeeshoPnl(f).netSalesInclGst).toBeCloseTo(279, 6)
   })
 
   it('sends the judgement calls to review rather than deciding silently', () => {

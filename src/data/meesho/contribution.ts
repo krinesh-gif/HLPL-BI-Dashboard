@@ -16,7 +16,7 @@ export type MeeshoContribution = Omit<MeeshoPnlFacts, 'schemaVersion' | 'month' 
 /** Every field a contribution carries. Named once, so the client's summing and
  * the database's aggregation cannot drift apart. */
 export const CONTRIBUTION_FIELDS = [
-  'grossSalesInclGst', 'salesReturnsInclGst', 'outputGstOnSales',
+  'grossSalesInclGst', 'salesReturnsInclGst', 'cancellationsInclGst', 'outputGstOnSales',
   'cogsUnitsSold', 'cogsRtoWriteOff', 'cogsReturnWriteOff',
   'forwardShipping', 'returnShipping', 'otherMarketplaceFees',
   'adsSpendExGst', 'adCredits', 'affiliateFee',

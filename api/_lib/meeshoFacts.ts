@@ -14,7 +14,7 @@ import { sql } from './db.js'
 /** Every figure a month carries. Must match CONTRIBUTION_FIELDS on the client;
  * a test asserts the two lists are identical. */
 export const CONTRIBUTION_FIELDS = [
-  'grossSalesInclGst', 'salesReturnsInclGst', 'outputGstOnSales',
+  'grossSalesInclGst', 'salesReturnsInclGst', 'cancellationsInclGst', 'outputGstOnSales',
   'cogsUnitsSold', 'cogsRtoWriteOff', 'cogsReturnWriteOff',
   'forwardShipping', 'returnShipping', 'otherMarketplaceFees',
   'adsSpendExGst', 'adCredits', 'affiliateFee',
@@ -26,10 +26,45 @@ export const CONTRIBUTION_FIELDS = [
 
 type Facts = Record<string, unknown>
 
-/** `sum((contribution->>'field')::float8)` for each field, aliased to it. */
+const fromContribution = (f: string): string => `(contribution->>'${f}')::float8`
+
+/**
+ * Two figures are read from the row's own columns instead of from the
+ * contribution it was stored with, and that is deliberate.
+ *
+ * A cancelled order is billed in the file's Total Sale Amount column and never
+ * reversed there, because nothing shipped, so nothing came back. Until this was
+ * found, the whole cancelled amount stayed in Net Sales and carried Output GST
+ * with it. Deriving both from `event_type` and `sale_amount` — real columns on
+ * every row — corrects every month already stored, rather than only the ones
+ * uploaded after the fix. A month is still the sum of its events; this only
+ * changes which part of the event it sums.
+ */
+const SQL_OVERRIDE: Record<string, string> = {
+  cancellationsInclGst: `sum(sale_amount) FILTER (WHERE event_type = 'cancellation')`,
+  outputGstOnSales: `sum(CASE WHEN event_type = 'cancellation' THEN 0 ELSE ${fromContribution('outputGstOnSales')} END)`,
+}
+
+/** One summed expression per field, aliased to it. */
 const sumList = CONTRIBUTION_FIELDS
-  .map((f) => `coalesce(sum((contribution->>'${f}')::float8), 0) AS "${f}"`)
+  .map((f) => `coalesce(${SQL_OVERRIDE[f] ?? `sum(${fromContribution(f)})`}, 0) AS "${f}"`)
   .join(',\n         ')
+
+/**
+ * The month query, for one of the two date columns.
+ *
+ * Exported so a test can run it against a real PostgreSQL. The last two defects
+ * in this file were both in SQL that typechecked perfectly and only misbehaved
+ * on a live database, so the query a test runs has to be this exact string
+ * rather than a copy of it.
+ */
+export function monthlyFactsQuery(dateColumn: 'order_date' | 'payment_date'): string {
+  return `SELECT left(${dateColumn}, 7) AS month,
+              ${sumList}
+         FROM meesho_transactions
+        WHERE ${dateColumn} <> ''
+        GROUP BY 1`
+}
 
 function blankFacts(month: string, basis: string): Facts {
   const facts: Facts = { schemaVersion: 3, month, basis }
@@ -62,13 +97,7 @@ export async function meeshoFactsFromEvents(): Promise<Facts[]> {
   }
 
   for (const [basis, dateColumn] of [['order', 'order_date'], ['settlement', 'payment_date']] as const) {
-    const rows = (await sql.query(
-      `SELECT left(${dateColumn}, 7) AS month,
-              ${sumList}
-         FROM meesho_transactions
-        WHERE ${dateColumn} <> ''
-        GROUP BY 1`,
-    )) as Facts[]
+    const rows = (await sql.query(monthlyFactsQuery(dateColumn))) as Facts[]
     absorb(rows, basis)
 
     // Advertising and platform recovery are dated, not ordered, so the same

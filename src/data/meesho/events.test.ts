@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { classifyRow, type RowFacts } from './events'
+import { MEESHO_REVENUE_POLICY } from './policy'
+
+/**
+ * What the P&L does with a row of this kind.
+ *
+ * These used to assert a `recognisesRevenue` flag on the classification, which
+ * nothing read — so it could say a cancellation earns nothing while the policy
+ * table said it enters revenue, and only the table was obeyed. Asserting
+ * through the table means a test can no longer pass while the statement is
+ * wrong.
+ */
+const treatmentOf = (type: keyof typeof MEESHO_REVENUE_POLICY) => MEESHO_REVENUE_POLICY[type]
 
 /**
  * Every case here was found in the company's real August payment file, not
@@ -18,7 +30,7 @@ describe('a blank order status', () => {
     // being counted as a delivered sale.
     const c = classifyRow(row({ saleAmount: 0, settlementAmount: -28.25, recovery: -28.25, recoveryReason: 'Affiliate Fee' }))
     expect(c.eventType).toBe('affiliate_fee')
-    expect(c.recognisesRevenue).toBe(false)
+    expect(treatmentOf(c.eventType).entersRevenue).toBe(false)
     expect(c.countsAsDispatch).toBe(false)
   })
 
@@ -33,8 +45,8 @@ describe('a blank order status', () => {
   it('is never revenue, even when the settlement is positive', () => {
     // The spec's case: sale 0, status blank, settlement +200.
     const c = classifyRow(row({ saleAmount: 0, settlementAmount: 200 }))
-    expect(c.recognisesRevenue).toBe(false)
     expect(c.eventType).toBe('settlement_adjustment')
+    expect(treatmentOf(c.eventType).entersRevenue).toBe(false)
     expect(c.confidence).toBe('needs_review')
   })
 
@@ -48,26 +60,35 @@ describe('a blank order status', () => {
 describe('order statuses the file actually carries', () => {
   it('recognises a delivered sale', () => {
     const c = classifyRow(row({ orderStatus: 'Delivered', saleAmount: 309.21, settlementAmount: 273.43 }))
-    expect(c).toMatchObject({ eventType: 'sale', recognisesRevenue: true, countsAsDispatch: true })
+    expect(c).toMatchObject({ eventType: 'sale', countsAsDispatch: true })
+    expect(treatmentOf(c.eventType).entersRevenue).toBe(true)
   })
 
-  it('counts RTO as a dispatch but not as revenue', () => {
-    // The parcel moved and cost money to move; the customer never paid.
-    const c = classifyRow(row({ orderStatus: 'RTO', saleAmount: 160 }))
-    expect(c).toMatchObject({ eventType: 'rto', countsAsDispatch: true, recognisesRevenue: false })
+  it('counts RTO as a dispatch, and lets its own row reverse its revenue', () => {
+    // The parcel moved and cost money to move; the customer never paid. The
+    // file states that itself — an RTO row carries both the sale and its
+    // negative — so it must not be reversed a second time from the policy.
+    const c = classifyRow(row({ orderStatus: 'RTO', saleAmount: 160, returnAmount: -160 }))
+    expect(c).toMatchObject({ eventType: 'rto', countsAsDispatch: true })
+    expect(treatmentOf(c.eventType).reversedInFull).toBe(false)
   })
 
   it('treats a return row as a reversal, not a second shipment', () => {
     // The dispatch was already counted on the sale row for this sub-order.
     const c = classifyRow(row({ orderStatus: 'Return', returnAmount: -160, settlementAmount: -251.18 }))
-    expect(c).toMatchObject({ eventType: 'return', countsAsDispatch: false, recognisesRevenue: false })
+    expect(c).toMatchObject({ eventType: 'return', countsAsDispatch: false })
+    // A return does enter the revenue block — as the negative that reverses the
+    // sale row. What it must not do is claim a second shipment.
+    expect(treatmentOf(c.eventType).entersVolume).toBe(false)
   })
 
   it('keeps an exchange from becoming a second sale', () => {
     const c = classifyRow(row({ orderStatus: 'Exchange', saleAmount: 249 }))
     expect(c.eventType).toBe('exchange')
-    expect(c.recognisesRevenue).toBe(false)
     expect(c.countsAsDispatch).toBe(true)
+    // Kept in gross so the top line ties to the file, and always flagged,
+    // because a replacement against an order already counted is a judgement.
+    expect(treatmentOf(c.eventType).alwaysReview).toBe(true)
   })
 
   it('recognises Shipped as a sale, since the file settles it as one', () => {
@@ -75,9 +96,17 @@ describe('order statuses the file actually carries', () => {
     expect(c.eventType).toBe('sale')
   })
 
-  it('gives cancellations no revenue and no dispatch', () => {
+  it('gives cancellations no net revenue and no dispatch', () => {
     const c = classifyRow(row({ orderStatus: 'Cancelled', saleAmount: 199 }))
-    expect(c).toMatchObject({ eventType: 'cancellation', recognisesRevenue: false, countsAsDispatch: false })
+    expect(c).toMatchObject({ eventType: 'cancellation', countsAsDispatch: false })
+    // Billed in gross so the top line ties to the file, then reversed in full.
+    // The file writes no return against a cancelled row — Sale Return Amount is
+    // blank — so without the reversal the whole 199 stayed in Net Sales.
+    const treatment = treatmentOf(c.eventType)
+    expect(treatment.entersRevenue).toBe(true)
+    expect(treatment.reversedInFull).toBe(true)
+    expect(treatment.entersVolume).toBe(false)
+    expect(treatment.entersCogs).toBe(false)
   })
 })
 
@@ -88,7 +117,7 @@ describe('a status this app has never seen', () => {
     const c = classifyRow(row({ orderStatus: 'Lost In Transit', saleAmount: 500 }))
     expect(c.eventType).toBe('unclassified')
     expect(c.confidence).toBe('needs_review')
-    expect(c.recognisesRevenue).toBe(false)
+    expect(treatmentOf(c.eventType).entersRevenue).toBe(false)
     expect(c.reason).toContain('Lost In Transit')
   })
 })
@@ -98,6 +127,7 @@ describe('a delivered order that also carries a recovery', () => {
     // 72 rows in the real file. The sale must not be netted away by the fee.
     const c = classifyRow(row({ orderStatus: 'Delivered', saleAmount: 500, recovery: -20, recoveryReason: 'Affiliate Fee' }))
     expect(c.eventType).toBe('sale')
-    expect(c.recognisesRevenue).toBe(true)
+    expect(treatmentOf(c.eventType).entersRevenue).toBe(true)
+    expect(treatmentOf(c.eventType).reversedInFull).toBe(false)
   })
 })

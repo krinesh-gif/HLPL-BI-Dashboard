@@ -30,6 +30,13 @@ import type { NativeLineDef, NativeLineValues } from './types'
  */
 export const MEESHO_LINE_DEFS: NativeLineDef[] = [
   { key: 'grossSales', label: 'Gross Sales (incl. GST)', section: 'REVENUE', kind: 'input' },
+  {
+    // Its own line rather than folded into returns: a cancellation happens
+    // before the parcel moves, so it is a different problem from one that comes
+    // back, and burying it in the return rate would hide the cancellation rate.
+    key: 'cancellations', label: 'Less: Cancellations (incl. GST)', section: 'REVENUE', kind: 'input',
+    note: 'Billed in gross by the file, which writes no return against them',
+  },
   { key: 'salesReturns', label: 'Less: Sales Returns & RTO (incl. GST)', section: 'REVENUE', kind: 'input' },
   { key: 'netSalesInclGst', label: 'Net Sales (incl. GST)', section: 'REVENUE', kind: 'subtotal' },
   { key: 'outputGst', label: 'Less: Output GST on sales', section: 'REVENUE', kind: 'input' },
@@ -103,7 +110,8 @@ export const MEESHO_LINE_DEFS: NativeLineDef[] = [
 const pct = (value: number, base: number): number => (base !== 0 ? (value / base) * 100 : 0)
 
 export function computeMeeshoPnl(facts: MeeshoPnlFacts, overheads = 0): NativeLineValues {
-  const netSalesInclGst = facts.grossSalesInclGst - facts.salesReturnsInclGst
+  const netSalesInclGst =
+    facts.grossSalesInclGst - facts.cancellationsInclGst - facts.salesReturnsInclGst
   const netRevenue = netSalesInclGst - facts.outputGstOnSales
 
   const totalCogs = facts.cogsUnitsSold + facts.cogsRtoWriteOff + facts.cogsReturnWriteOff
@@ -142,6 +150,7 @@ export function computeMeeshoPnl(facts: MeeshoPnlFacts, overheads = 0): NativeLi
 
   return {
     grossSales: facts.grossSalesInclGst,
+    cancellations: -facts.cancellationsInclGst,
     salesReturns: -facts.salesReturnsInclGst,
     netSalesInclGst,
     outputGst: -facts.outputGstOnSales,
@@ -242,7 +251,11 @@ export function meeshoToCanonicalBuckets(facts: MeeshoPnlFacts): PnlLineValues {
   return {
     grossSales: facts.grossSalesInclGst,
     discounts: 0,
-    returns: facts.salesReturnsInclGst,
+    // Cancellations ride with returns in the canonical shape, which has no
+    // bucket of its own for them. They are a deduction from gross either way,
+    // so Net Sales agrees with the statement; only the native view splits them
+    // out, which is where the split is worth seeing.
+    returns: facts.salesReturnsInclGst + facts.cancellationsInclGst,
     // Output GST was never revenue; removing it here is what makes the
     // canonical Net Sales equal the native NET REVENUE line.
     otherRevenueAdj: facts.outputGstOnSales,

@@ -11,7 +11,7 @@ export function meeshoFacts(over: Partial<MeeshoPnlFacts> & { month: string; bas
   return {
     schemaVersion: 3,
     basis: 'order',
-    grossSalesInclGst: 0, salesReturnsInclGst: 0, outputGstOnSales: 0,
+    grossSalesInclGst: 0, salesReturnsInclGst: 0, cancellationsInclGst: 0, outputGstOnSales: 0,
     cogsUnitsSold: 0, cogsRtoWriteOff: 0, cogsReturnWriteOff: 0,
     forwardShipping: 0, returnShipping: 0, otherMarketplaceFees: 0,
     adsSpendExGst: 0, adCredits: 0, affiliateFee: 0,

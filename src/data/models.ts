@@ -489,6 +489,17 @@ export interface MeeshoPnlFacts {
   // --- Revenue -------------------------------------------------------------
   grossSalesInclGst: number
   salesReturnsInclGst: number
+  /**
+   * Orders billed in Gross Sales that were cancelled before anything shipped.
+   *
+   * On its own line rather than inside `salesReturnsInclGst` because a
+   * cancellation is not a return: merging them would bury the cancellation rate
+   * inside the return rate, and the two have different causes and different
+   * fixes. Derived from the stored event type rather than from the file, which
+   * writes no return amount against a cancelled row at all — which is exactly
+   * how these came to be recognised as revenue.
+   */
+  cancellationsInclGst: number
   /** Output GST inside net sales, summed per row at that product's own rate —
    * the catalogue mixes 5% and 18% lines, so a single blended rate would be
    * wrong. */

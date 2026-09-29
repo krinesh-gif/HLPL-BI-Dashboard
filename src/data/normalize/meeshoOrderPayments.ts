@@ -353,7 +353,11 @@ export function normalizeMeeshoOrderPayments(
     const rowContribution: Partial<MeeshoContribution> = {
       grossSalesInclGst: policy.entersRevenue ? saleAmount : 0,
       salesReturnsInclGst: policy.entersRevenue ? returnValue : 0,
-      outputGstOnSales: policy.entersRevenue ? outputGst : 0,
+      // A cancellation is billed in Gross Sales and taken straight back out
+      // here, so the top line still ties to the file while Net Sales stops
+      // carrying orders that never shipped. No GST is due on it either.
+      cancellationsInclGst: policy.reversedInFull ? saleAmount : 0,
+      outputGstOnSales: policy.entersRevenue && !policy.reversedInFull ? outputGst : 0,
 
       cogsUnitsSold: policy.entersCogs ? cogsUnitsSold : 0,
       cogsRtoWriteOff: policy.entersCogs ? cogsRtoWriteOff : 0,
@@ -405,12 +409,15 @@ export function normalizeMeeshoOrderPayments(
         quantity: policy.entersVolume ? quantity : 0,
         grossSales: policy.entersRevenue ? saleAmount : 0,
         discount: 0,
-        netSales: policy.entersRevenue ? Math.max(0, netInclGst - outputGst) : 0,
+        // A cancelled order keeps its gross, which is what the file bills, and
+        // earns no net: nothing shipped, so nothing was sold. The same
+        // reversal the statement makes on its own line.
+        netSales: policy.entersRevenue && !policy.reversedInFull ? Math.max(0, netInclGst - outputGst) : 0,
         returnUnits: isReturn ? quantity : 0,
         rtoUnits: isRto ? quantity : 0,
         shippingCost: forwardShipping + returnShipping,
         marketplaceFee: otherFees,
-        tax: outputGst,
+        tax: policy.reversedInFull ? 0 : outputGst,
         status: isRto ? 'rto' : isReturn ? 'returned' : classification.eventType === 'cancellation' ? 'cancelled' : 'completed',
         currency: 'INR',
         importId,
@@ -574,6 +581,8 @@ function buildChecks(input: {
   const order = input.facts.filter((f) => f.basis === 'order')
   const settledTotal = order.reduce((n, f) => n + f.netSettlementPerFile, 0)
   const grossTotal = order.reduce((n, f) => n + f.grossSalesInclGst, 0)
+  const cancelledTotal = order.reduce((n, f) => n + f.cancellationsInclGst, 0)
+  const returnsTotal = order.reduce((n, f) => n + f.salesReturnsInclGst, 0)
   const near = (a: number, b: number): boolean => Math.abs(a - b) < 1
 
   return [
@@ -590,7 +599,21 @@ function buildChecks(input: {
     {
       name: 'Recognised gross sales never exceed the file’s sale total',
       passed: grossTotal <= input.rawSaleTotal + 1,
-      detail: `Recognised ₹${grossTotal.toFixed(2)} of ₹${input.rawSaleTotal.toFixed(2)} on the file; the difference is cancelled and exchange rows, which earn no revenue.`,
+      detail:
+        `Recognised ₹${grossTotal.toFixed(2)} of ₹${input.rawSaleTotal.toFixed(2)} on the file; the difference is ` +
+        'affiliate, recovery and unclassified rows, which carry no sale.',
+    },
+    {
+      // The check that would have caught this months ago. Gross carries the
+      // cancelled orders so the top line ties to the file, which means Net
+      // Sales is only right if the same amount comes back out below.
+      name: 'Cancelled orders are reversed out of net sales',
+      passed: cancelledTotal >= 0 && cancelledTotal <= grossTotal + 1,
+      detail:
+        cancelledTotal > 0
+          ? `₹${cancelledTotal.toFixed(2)} of cancelled orders sits in gross sales of ₹${grossTotal.toFixed(2)} ` +
+            `and is deducted again on its own line, alongside ₹${returnsTotal.toFixed(2)} of returns and RTO.`
+          : 'No cancelled orders in this file.',
     },
     {
       name: 'Every row carries a classification',

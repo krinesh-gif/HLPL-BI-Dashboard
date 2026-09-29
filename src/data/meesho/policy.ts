@@ -20,7 +20,12 @@ import type { MeeshoEventType } from './events'
  *    ₹45,681 reversed). The revenue therefore cancels itself out; what is
  *    left is the logistics cost of a parcel that travelled twice.
  *  - Cancelled rows still carried a settlement (₹621 of sale, ₹446 settled),
- *    so they sit in Gross Sales but ship nothing and cost nothing.
+ *    so they sit in Gross Sales but ship nothing and cost nothing. They are
+ *    then reversed in full on their own line, because unlike an RTO the file
+ *    writes no return against a cancellation — nothing was ever shipped, so
+ *    there is nothing to send back. Leaving them unreversed recognised revenue
+ *    on orders that never happened: Net Sales carried the whole cancelled
+ *    amount, and Output GST was charged on it too.
  *  - Exchange rows carry a sale amount but settle negative, because the
  *    replacement shipment costs return freight. They stay in Gross Sales and
  *    stay flagged, so the double-count question is visible rather than decided
@@ -29,6 +34,15 @@ import type { MeeshoEventType } from './events'
 export interface RevenuePolicy {
   /** Contributes its sale and return amounts to Gross Sales / Returns. */
   entersRevenue: boolean
+  /**
+   * Sits in Gross Sales so the top line ties to the file's Total Sale Amount
+   * column, then comes straight back out on its own line below it.
+   *
+   * Only a status the file bills but never reverses needs this. An RTO reverses
+   * itself on its own row and must not be listed here, or it would be taken out
+   * twice.
+   */
+  reversedInFull: boolean
   /** Contributes a shipment and its units to volume, ASP and per-shipment
    * fulfilment cost. */
   entersVolume: boolean
@@ -41,36 +55,36 @@ export interface RevenuePolicy {
 }
 
 export const MEESHO_REVENUE_POLICY: Record<MeeshoEventType, RevenuePolicy> = {
-  sale: { entersRevenue: true, entersVolume: true, entersCogs: true, alwaysReview: false,
+  sale: { entersRevenue: true, reversedInFull: false, entersVolume: true, entersCogs: true, alwaysReview: false,
     note: 'A delivered or shipped order: revenue, volume and cost of goods.' },
 
-  rto: { entersRevenue: true, entersVolume: true, entersCogs: true, alwaysReview: false,
+  rto: { entersRevenue: true, reversedInFull: false, entersVolume: true, entersCogs: true, alwaysReview: false,
     note: 'Books and reverses its own sale on one row, so revenue nets to nil; the parcel still shipped, so it counts as volume and its unsaleable stock is written off.' },
 
-  return: { entersRevenue: true, entersVolume: false, entersCogs: true, alwaysReview: false,
+  return: { entersRevenue: true, reversedInFull: false, entersVolume: false, entersCogs: true, alwaysReview: false,
     note: 'A reversal of a sale counted on another row. No second shipment.' },
 
-  cancellation: { entersRevenue: true, entersVolume: false, entersCogs: false, alwaysReview: true,
-    note: 'Carried in Gross Sales because the order was placed and the file bills it there, but no parcel shipped, so it earns no volume and costs no stock.' },
+  cancellation: { entersRevenue: true, reversedInFull: true, entersVolume: false, entersCogs: false, alwaysReview: true,
+    note: 'Carried in Gross Sales because the order was placed and the file bills it there, then reversed in full on its own line: no parcel shipped, so it earns no revenue, no volume and no stock cost. The file writes no return against it, so the reversal has to come from here.' },
 
-  exchange: { entersRevenue: true, entersVolume: true, entersCogs: true, alwaysReview: true,
+  exchange: { entersRevenue: true, reversedInFull: false, entersVolume: true, entersCogs: true, alwaysReview: true,
     note: 'A replacement shipment. Carried in Gross Sales so the total ties to the file, and flagged here because a replacement against an order already counted is a judgement worth seeing.' },
 
-  affiliate_fee: { entersRevenue: false, entersVolume: false, entersCogs: false, alwaysReview: false,
+  affiliate_fee: { entersRevenue: false, reversedInFull: false, entersVolume: false, entersCogs: false, alwaysReview: false,
     note: 'Demand-acquisition cost. Reported under Advertising & Marketing, never as a marketplace fee and never in COGS.' },
 
-  recovery: { entersRevenue: false, entersVolume: false, entersCogs: false, alwaysReview: false,
+  recovery: { entersRevenue: false, reversedInFull: false, entersVolume: false, entersCogs: false, alwaysReview: false,
     note: 'Money Meesho took back. A cost, mapped by its stated reason.' },
 
-  compensation: { entersRevenue: false, entersVolume: false, entersCogs: false, alwaysReview: false,
+  compensation: { entersRevenue: false, reversedInFull: false, entersVolume: false, entersCogs: false, alwaysReview: false,
     note: 'Money Meesho paid us outside a sale. Not revenue.' },
 
-  claim: { entersRevenue: false, entersVolume: false, entersCogs: false, alwaysReview: false,
+  claim: { entersRevenue: false, reversedInFull: false, entersVolume: false, entersCogs: false, alwaysReview: false,
     note: 'A settled claim. Not revenue.' },
 
-  settlement_adjustment: { entersRevenue: false, entersVolume: false, entersCogs: false, alwaysReview: true,
+  settlement_adjustment: { entersRevenue: false, reversedInFull: false, entersVolume: false, entersCogs: false, alwaysReview: true,
     note: 'Money moved with no sale and no stated reason. Never revenue until the reason is known.' },
 
-  unclassified: { entersRevenue: false, entersVolume: false, entersCogs: false, alwaysReview: true,
+  unclassified: { entersRevenue: false, reversedInFull: false, entersVolume: false, entersCogs: false, alwaysReview: true,
     note: 'The row does not say what it is. Held out of every figure and shown to Finance.' },
 }
