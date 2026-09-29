@@ -346,17 +346,33 @@ export const useDataStore = create<DataState>((set, get) => {
           await api.post('/api/facts/nykaa', { facts: nykaaFacts, importId })
           monthsUpdated.push(nykaaFacts.month)
         }
-        if (meeshoTransactions && meeshoTransactions.length > 0) {
-          // Events are sent, never months. Meesho's downloads carry earlier
-          // rows forward, so the same event arrives in several files; stored
-          // by its own identity it lands once however often it is uploaded,
-          // and a month is summed from its rows when read.
+        // Events are sent, never months. Meesho's downloads carry earlier
+        // rows forward, so the same event arrives in several files; stored
+        // by its own identity it lands once however often it is uploaded,
+        // and a month is summed from its rows when read.
+        //
+        // They go up in batches for the same reason the order rows do, and
+        // here it was not a nicety: an event carries its untouched source row,
+        // so one file's events serialise to about 10 MB, and a request that
+        // size is refused by the platform before it reaches the function. No
+        // event, advertising row or recovery row was ever stored, nothing
+        // surfaced, and every Meesho month fell back to the order rows
+        // instead of the settlement events it is supposed to be built from.
+        const meeshoBatches = batched(meeshoTransactions ?? [], UPLOAD_BATCH_SIZE)
+        const meeshoHasDatedRows = (meeshoAdsRows?.length ?? 0) > 0 || (meeshoRecoveryRows?.length ?? 0) > 0
+        // Advertising and recovery are dated, not ordered, so they belong to
+        // the file rather than to any batch of it. They ride with the first
+        // request, and still go up on their own if a file carries no events.
+        if (meeshoBatches.length === 0 && meeshoHasDatedRows) meeshoBatches.push([])
+        for (const [index, batch] of meeshoBatches.entries()) {
           await api.post('/api/facts/meesho', {
             importId,
-            transactions: meeshoTransactions,
-            adsRows: meeshoAdsRows ?? [],
-            recoveryRows: meeshoRecoveryRows ?? [],
+            transactions: batch,
+            adsRows: index === 0 ? meeshoAdsRows ?? [] : [],
+            recoveryRows: index === 0 ? meeshoRecoveryRows ?? [] : [],
           })
+        }
+        if (meeshoBatches.length > 0) {
           for (const facts of meeshoFactsByMonth ?? []) monthsUpdated.push(facts.month)
         }
 
