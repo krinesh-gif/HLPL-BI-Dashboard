@@ -548,6 +548,13 @@ export function UploadReportsPage() {
         nykaaFacts: preview.nykaaFacts,
         amazonInSellerFacts: preview.amazonInSellerFacts,
         meeshoFactsByMonth: preview.meeshoFactsByMonth,
+        // The events themselves, which the preview has built all along and
+        // this call simply never passed on. Meesho's statement is summed from
+        // them; without them every month silently fell back to the order rows,
+        // and meesho_transactions stayed empty upload after upload.
+        meeshoTransactions: preview.meeshoTransactions,
+        meeshoAdsRows: preview.meeshoAdsRows,
+        meeshoRecoveryRows: preview.meeshoRecoveryRows,
       })
       updateItem(item.id, { status: 'done', outcome: result })
     } catch (e) {
