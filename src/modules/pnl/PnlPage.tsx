@@ -441,6 +441,8 @@ export function PnlPage() {
                 data={r.channelBreakdown.map((c) => ({ name: channelLabel(c.channel), value: c.netSales }))}
                 xKey="name" yKey="value" horizontal
                 valueFormatter={(v) => formatCurrencyCompact(v)}
+                tooltipFormatter={(v) => formatCurrencyFull(v)}
+                valueLabel="Net revenue"
               />
             </ChartCard>
           )}

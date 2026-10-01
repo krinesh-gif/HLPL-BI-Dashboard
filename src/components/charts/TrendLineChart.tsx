@@ -76,6 +76,11 @@ export function TrendLineChart({
             // Big enough to hit comfortably, ringed in the surface so it stays
             // legible where lines cross.
             activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--surface)' }}
+            // No draw-on animation, for the same reason the bars have none: it
+            // is motion nobody asked for, it delays the figure being readable
+            // on every filter change, and a line that draws itself over half a
+            // second cannot be captured or printed.
+            isAnimationActive={false}
           />
         ))}
       </LineChart>

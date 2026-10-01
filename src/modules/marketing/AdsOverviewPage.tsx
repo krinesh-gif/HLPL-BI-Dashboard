@@ -154,6 +154,8 @@ export function AdsOverviewPage() {
             data={figures.filter((f) => f.spend > 0).map((f) => ({ name: label(f.channel), value: f.spend }))}
             xKey="name" yKey="value" horizontal
             valueFormatter={(v) => formatCurrencyCompact(v)}
+            tooltipFormatter={(v) => formatCurrencyFull(v)}
+            valueLabel="Ad spend"
           />
         </div>
       )}

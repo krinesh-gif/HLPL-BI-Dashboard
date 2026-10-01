@@ -82,7 +82,7 @@ export function FlipkartFees() {
                     )}
                   </span>
                   <span className="shrink-0 text-xs tabular-nums text-[var(--ink)]">
-                    {formatCurrencyFull(s.def.isCredit ? s.total : -s.total)}
+                    {formatCurrencyFull(s.total)}
                   </span>
                 </button>
               </li>
@@ -101,7 +101,7 @@ export function FlipkartFees() {
           <div className="flex flex-wrap gap-x-8 gap-y-2">
             <Stat
               label="Total over the period"
-              value={formatCurrencyFull(selected.def.isCredit ? selected.total : -selected.total)}
+              value={formatCurrencyFull(selected.total)}
             />
             {/* "₹12,400" against a cost that fell reads as a rise. Direction is
                 the whole point of the figure, so it is said in words rather
@@ -136,14 +136,22 @@ export function FlipkartFees() {
             </p>
           )}
 
+          {/* A fee is drawn as the amount charged, climbing as it gets worse.
+              Drawing a cost as a negative sends the line down exactly when the
+              news is bad, and everyone reads a falling line as an improvement
+              before they read the axis. The sign convention belongs on the
+              statement, where a cost sits among revenue and has to be told
+              apart from it; here every line is a charge and the screen says
+              so, so there is nothing for a minus to distinguish. */}
           <div className="mt-4">
             <TrendLineChart
               data={selected.points.map((p) => ({
                 month: monthLabel(p.month),
-                amount: selected.def.isCredit ? p.amount : -p.amount,
+                amount: p.amount,
               }))}
               xKey="month"
               series={[{ key: 'amount', label: selected.def.label }]}
+              valueFormatter={(v) => formatCurrencyFull(v)}
             />
           </div>
 
@@ -186,11 +194,11 @@ export function FlipkartFees() {
                         <td className="py-2 pr-4 text-[var(--ink-2)]" title={row.sku}>{label(row.sku).title}</td>
                         {row.byMonth.map((amount, i) => (
                           <td key={i} className="py-2 pr-4 text-right tabular-nums text-[var(--ink-3)]">
-                            {amount === 0 ? '—' : formatCurrencyFull(selected.def.isCredit ? amount : -amount)}
+                            {amount === 0 ? '—' : formatCurrencyFull(amount)}
                           </td>
                         ))}
                         <td className="py-2 text-right font-semibold tabular-nums text-[var(--ink)]">
-                          {formatCurrencyFull(selected.def.isCredit ? row.total : -row.total)}
+                          {formatCurrencyFull(row.total)}
                         </td>
                         <td className="py-2 pl-4 text-right tabular-nums text-[var(--ink-3)]">{formatPercent(row.sharePct)}</td>
                       </tr>

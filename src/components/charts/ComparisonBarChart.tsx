@@ -71,6 +71,8 @@ export function ComparisonBarChart({
   valueFormatter,
   horizontal = false,
   categoryWidth = 240,
+  tooltipFormatter,
+  valueLabel = 'Value',
 }: {
   data: Record<string, string | number>[]
   xKey: string
@@ -81,6 +83,16 @@ export function ComparisonBarChart({
   /** How much room the category labels get. Wider suits product names, narrower
    * suits months — the chart cannot tell which it has been given. */
   categoryWidth?: number
+  /**
+   * The tooltip's own formatter. An axis wants ₹3.5L, because a tick repeated
+   * five times has to stay short; a tooltip is one figure the reader asked
+   * for by pointing at it, and rounding it there throws away the precision
+   * they went looking for. Falls back to the axis formatter.
+   */
+  tooltipFormatter?: (v: number) => string
+  /** What the figure is called in the tooltip. Without it recharts prints the
+   * data key, so every chart said "value". */
+  valueLabel?: string
 }) {
   // A horizontal chart grows with its rows. Fixed height meant that asking for
   // the top 20 of anything made every label unreadable, so the control that
@@ -115,7 +127,13 @@ export function ComparisonBarChart({
             <YAxis {...CHART_AXIS_PROPS} tickFormatter={(v) => (valueFormatter ? valueFormatter(v) : String(v))} />
           </>
         )}
-        <Tooltip {...CHART_TOOLTIP_STYLE} formatter={(v) => (valueFormatter ? valueFormatter(Number(v)) : String(v))} />
+        <Tooltip
+          {...CHART_TOOLTIP_STYLE}
+          formatter={(v) => {
+            const format = tooltipFormatter ?? valueFormatter
+            return [format ? format(Number(v)) : String(v), valueLabel]
+          }}
+        />
         {/* No grow-in animation. It is motion nobody asked for, it delays the
             figure being readable on every filter change, and a chart that
             draws itself over half a second cannot be captured or printed. */}

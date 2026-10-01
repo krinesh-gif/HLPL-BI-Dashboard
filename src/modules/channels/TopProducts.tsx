@@ -157,6 +157,11 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
   const chartFormat = (v: number) =>
     rankBy === 'growth' ? formatPercent(v) : rankBy === 'units' || rankBy === 'orders' ? formatNumber(v) : formatCurrencyCompact(v)
 
+  /** The axis shortens a tick repeated five times; a tooltip is the one figure
+   * the reader pointed at, so it keeps every rupee. */
+  const tooltipFormat = (v: number) =>
+    rankBy === 'growth' ? formatPercent(v) : rankBy === 'units' || rankBy === 'orders' ? formatNumber(v) : formatCurrencyFull(v)
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
@@ -206,6 +211,8 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
           yKey="value"
           horizontal
           valueFormatter={chartFormat}
+          tooltipFormatter={tooltipFormat}
+          valueLabel={RANKINGS.find((r) => r.key === rankBy)?.label ?? 'Value'}
         />
       </div>
 

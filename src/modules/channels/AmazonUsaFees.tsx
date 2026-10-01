@@ -86,7 +86,7 @@ export function AmazonUsaFees() {
                     )}
                   </span>
                   <span className="shrink-0 text-xs tabular-nums text-[var(--ink)]">
-                    {formatCurrencyFull(-s.total, 'USD')}
+                    {formatCurrencyFull(s.total, 'USD')}
                   </span>
                 </button>
               </li>
@@ -103,7 +103,7 @@ export function AmazonUsaFees() {
               subtitle={`Charged in ${selected.monthsCharged} of ${months.length} month${months.length === 1 ? '' : 's'}`}
             />
             <div className="mt-3 flex flex-wrap gap-x-8 gap-y-2">
-              <Stat label="Total over the period" value={formatCurrencyFull(-selected.total, 'USD')} />
+              <Stat label="Total over the period" value={formatCurrencyFull(selected.total, 'USD')} />
               {/* "$2,388.36" against a cost that fell reads as a rise. The
                   direction is the whole point of the number, so it is said in
                   words rather than left to a colour. */}
@@ -142,7 +142,7 @@ export function AmazonUsaFees() {
             <CardHeader title="Month by month" subtitle="Charges shown as costs, so a rising line is a worsening one." />
             <div className="mt-2">
               <TrendLineChart
-                data={selected.points.map((p) => ({ month: monthLabel(p.month), amount: -p.amount }))}
+                data={selected.points.map((p) => ({ month: monthLabel(p.month), amount: p.amount }))}
                 xKey="month"
                 series={[{ key: 'amount', label: selected.column.header.replace(/ total$/, '') }]}
                 valueFormatter={(v) => formatCurrencyFull(v, 'USD')}
@@ -190,7 +190,7 @@ export function AmazonUsaFees() {
                             </td>
                           ))}
                           <td className="px-5 py-2 text-right font-medium tabular-nums text-[var(--ink)]">
-                            {formatCurrencyFull(-row.total, 'USD')}
+                            {formatCurrencyFull(row.total, 'USD')}
                           </td>
                           <td className="px-5 py-2 text-right tabular-nums text-[var(--ink-3)]">
                             {formatPercent(row.sharePct)}
