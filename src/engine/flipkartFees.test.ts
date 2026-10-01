@@ -82,3 +82,64 @@ describe('the list of fees', () => {
     }
   })
 })
+
+describe('the products carrying a fee', () => {
+  it('splits the fee by SKU, biggest first', () => {
+    const facts = [
+      month({
+        month: '2026-08', storageFee: 1000,
+        feeBySku: { 'AO/A': { storageFee: 700 }, 'AO/B': { storageFee: 300 } },
+      }),
+    ]
+    const s = buildFlipkartFeeSeries(storage, ['2026-08'], facts)
+    expect(s.skus.map((r) => r.sku)).toEqual(['AO/A', 'AO/B'])
+    expect(s.skus[0].total).toBe(700)
+    expect(s.skus[0].sharePct).toBeCloseTo(70)
+    expect(s.skuCoveragePct).toBeCloseTo(100)
+    expect(s.topThreeSharePct).toBeCloseTo(100)
+  })
+
+  it('adds a SKU up across months, keeping each month in its own column', () => {
+    const facts = [
+      month({ month: '2026-07', storageFee: 400, feeBySku: { 'AO/A': { storageFee: 400 } } }),
+      month({ month: '2026-08', storageFee: 600, feeBySku: { 'AO/A': { storageFee: 600 } } }),
+    ]
+    const s = buildFlipkartFeeSeries(storage, ['2026-07', '2026-08'], facts)
+    expect(s.skus[0].byMonth).toEqual([400, 600])
+    expect(s.skus[0].total).toBe(1000)
+  })
+
+  it('leaves a month with no split out rather than spreading its total', () => {
+    // July predates the per-SKU capture. Its ₹900 is real and stays in the
+    // fee's total; what it must not do is get apportioned across August's
+    // products, which would invent a figure per product.
+    const facts = [
+      month({ month: '2026-07', storageFee: 900 }),
+      month({ month: '2026-08', storageFee: 100, feeBySku: { 'AO/A': { storageFee: 100 } } }),
+    ]
+    const s = buildFlipkartFeeSeries(storage, ['2026-07', '2026-08'], facts)
+    expect(s.total).toBe(1000)
+    expect(s.skus).toHaveLength(1)
+    expect(s.skus[0].byMonth).toEqual([0, 100])
+    // The table accounts for a tenth of the fee, and the screen says so.
+    expect(s.skuCoveragePct).toBeCloseTo(10)
+  })
+
+  it('reads each fee out of the split independently', () => {
+    const facts = [
+      month({
+        month: '2026-08', storageFee: 500, recallFee: 200,
+        feeBySku: { 'AO/A': { storageFee: 500, recallFee: 200 } },
+      }),
+    ]
+    const recall = FLIPKART_FEE_LINES.find((d) => d.id === 'recallFee')!
+    expect(buildFlipkartFeeSeries(storage, ['2026-08'], facts).skus[0].total).toBe(500)
+    expect(buildFlipkartFeeSeries(recall, ['2026-08'], facts).skus[0].total).toBe(200)
+  })
+
+  it('has no products when nothing was uploaded with a split', () => {
+    const s = buildFlipkartFeeSeries(storage, MONTHS, REAL_FACTS)
+    expect(s.skus).toEqual([])
+    expect(s.skuCoveragePct).toBe(0)
+  })
+})

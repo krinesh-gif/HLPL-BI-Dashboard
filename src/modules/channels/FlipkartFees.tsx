@@ -1,10 +1,11 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Card, CardHeader } from '@/components/ui/Surface'
 import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { useDataStore } from '@/store/dataStore'
+import { productLabelResolver } from '@/data/productLabel'
 import { buildFlipkartFeeSeries, flipkartFeeSeries, FLIPKART_FEE_LINES } from '@/engine/flipkartFees'
-import { formatCurrencyFull, monthLabel } from '@/lib/format'
+import { formatCurrencyFull, formatPercent, monthLabel } from '@/lib/format'
 
 /**
  * Flipkart's fees, month by month.
@@ -19,7 +20,7 @@ import { formatCurrencyFull, monthLabel } from '@/lib/format'
  * the products behind a fee would mean splitting it by guesswork.
  */
 export function FlipkartFees() {
-  const { flipkartFacts } = useDataStore()
+  const { flipkartFacts, skuMaster, mappings, comboComponents } = useDataStore()
   const [params, setParams] = useSearchParams()
 
   const months = useMemo(
@@ -27,6 +28,12 @@ export function FlipkartFees() {
     [flipkartFacts],
   )
   const list = useMemo(() => flipkartFeeSeries(months, flipkartFacts), [months, flipkartFacts])
+
+  const [showAllSkus, setShowAllSkus] = useState(false)
+  const label = useMemo(
+    () => productLabelResolver({ skuMaster, mappings, comboComponents }),
+    [skuMaster, mappings, comboComponents],
+  )
 
   const requested = params.get('fee')
   const selectedId = list.some((s) => s.def.id === requested) ? requested! : list[0]?.def.id
@@ -139,6 +146,69 @@ export function FlipkartFees() {
               series={[{ key: 'amount', label: selected.def.label }]}
             />
           </div>
+
+          <h4 className="mt-6 text-[13px] font-semibold text-[var(--ink)]">Products carrying it</h4>
+          {selected.skus.length === 0 ? (
+            <p className="mt-1.5 text-sm text-[var(--ink-3)]">
+              None of these months was uploaded with its per-product split. Re-upload the SKU-level P&amp;L export for a
+              month and the products behind this fee appear here.
+            </p>
+          ) : (
+            <>
+              {/* Below full coverage the table is a part of the fee, not the
+                  fee. Saying which part stops it being read as the whole. */}
+              {selected.skuCoveragePct < 99.5 && (
+                <p className="mt-1.5 text-sm text-[var(--ink-3)]">
+                  Covers {formatPercent(selected.skuCoveragePct)} of the fee. The rest is in months uploaded before the
+                  per-product split was kept — re-upload those and they fill in.
+                </p>
+              )}
+              <p className="mt-1.5 text-sm text-[var(--ink-3)]">
+                {selected.topThreeSharePct >= 60
+                  ? `The worst three carry ${formatPercent(selected.topThreeSharePct)} of it — a shortlist.`
+                  : `Spread across the range; the worst three are ${formatPercent(selected.topThreeSharePct)} of it.`}
+              </p>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--line)] text-left text-xs font-semibold text-[var(--ink-3)]">
+                      <th className="py-2 pr-4">Product</th>
+                      {months.map((m) => (
+                        <th key={m} className="py-2 pr-4 text-right font-semibold">{monthLabel(m)}</th>
+                      ))}
+                      <th className="py-2 text-right font-semibold">Total</th>
+                      <th className="py-2 pl-4 text-right font-semibold">Share</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(showAllSkus ? selected.skus : selected.skus.slice(0, 15)).map((row) => (
+                      <tr key={row.sku} className="border-b border-[var(--line)]">
+                        <td className="py-2 pr-4 text-[var(--ink-2)]" title={row.sku}>{label(row.sku).title}</td>
+                        {row.byMonth.map((amount, i) => (
+                          <td key={i} className="py-2 pr-4 text-right tabular-nums text-[var(--ink-3)]">
+                            {amount === 0 ? '—' : formatCurrencyFull(selected.def.isCredit ? amount : -amount)}
+                          </td>
+                        ))}
+                        <td className="py-2 text-right font-semibold tabular-nums text-[var(--ink)]">
+                          {formatCurrencyFull(selected.def.isCredit ? row.total : -row.total)}
+                        </td>
+                        <td className="py-2 pl-4 text-right tabular-nums text-[var(--ink-3)]">{formatPercent(row.sharePct)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {selected.skus.length > 15 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllSkus((v) => !v)}
+                  className="mt-3 text-xs font-medium text-[var(--accent)] hover:underline"
+                >
+                  {showAllSkus ? 'Show the worst 15 only' : `Show all ${selected.skus.length} products`}
+                </button>
+              )}
+            </>
+          )}
         </Card>
       )}
     </div>

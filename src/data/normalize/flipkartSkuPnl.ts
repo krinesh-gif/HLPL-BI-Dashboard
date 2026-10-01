@@ -81,16 +81,36 @@ export function normalizeFlipkartSkuPnl(
     facts.estimatedNetSales += estimatedNetSales
     if (skuRecord) facts.cogsPriced += cogsPerUnit * netUnits
     else facts.cogsUnpriced += orderItemValue * 0.25 // unpriced-SKU estimate, matches the real model's fallback bucket
-    facts.commissionFee += num(row, COLUMNS.commissionFee)
-    facts.collectionFee += num(row, COLUMNS.collectionFee)
-    facts.fixedFee += num(row, COLUMNS.fixedFee)
-    facts.pickPackFee += num(row, COLUMNS.pickAndPack)
-    facts.forwardShippingFee += num(row, COLUMNS.forwardShipping)
-    facts.reverseShippingFee += num(row, COLUMNS.reverseShipping)
-    facts.storageFee += num(row, COLUMNS.storageFee)
-    facts.recallFee += num(row, COLUMNS.recallFee)
-    facts.otherMarketplaceFees += OTHER_FEE_COLUMNS.reduce((sum, c) => sum + num(row, [c]), 0)
-    facts.rewardsSpf += REWARDS_COLUMNS.reduce((sum, c) => sum + num(row, [c]), 0)
+    // Each fee is added to the month and kept against the SKU that carried it.
+    // The report is one row per SKU, so the split is the file's own and costs
+    // nothing to keep — and without it the statement can say a fee cost
+    // ₹69,228 but not which products it came from, which is the half that
+    // leads to a decision.
+    const perSku: Record<string, number> = {}
+    const charge = (field: keyof FlipkartPnlFacts & string, amount: number): void => {
+      if (amount === 0) return
+      ;(facts[field] as number) += amount
+      perSku[field] = (perSku[field] ?? 0) + amount
+    }
+
+    charge('commissionFee', num(row, COLUMNS.commissionFee))
+    charge('collectionFee', num(row, COLUMNS.collectionFee))
+    charge('fixedFee', num(row, COLUMNS.fixedFee))
+    charge('pickPackFee', num(row, COLUMNS.pickAndPack))
+    charge('forwardShippingFee', num(row, COLUMNS.forwardShipping))
+    charge('reverseShippingFee', num(row, COLUMNS.reverseShipping))
+    charge('storageFee', num(row, COLUMNS.storageFee))
+    charge('recallFee', num(row, COLUMNS.recallFee))
+    charge('otherMarketplaceFees', OTHER_FEE_COLUMNS.reduce((sum, c) => sum + num(row, [c]), 0))
+    charge('rewardsSpf', REWARDS_COLUMNS.reduce((sum, c) => sum + num(row, [c]), 0))
+
+    if (Object.keys(perSku).length > 0) {
+      // A SKU can legitimately appear on more than one row, so its fees add up
+      // rather than the later row replacing the earlier one.
+      const existing = (facts.feeBySku ??= {})[sku]
+      if (existing) for (const [field, amount] of Object.entries(perSku)) existing[field] = (existing[field] ?? 0) + amount
+      else facts.feeBySku[sku] = perSku
+    }
 
     validRecords.push({
       orderId: `flipkart-${sku}-${month}`,

@@ -183,6 +183,17 @@ export interface FlipkartPnlFacts {
   recallFee: number
   otherMarketplaceFees: number
   rewardsSpf: number
+  /**
+   * Each fee split by the SKU carrying it, keyed by the same field names as
+   * the totals above.
+   *
+   * Optional, and absent on two kinds of month: one imported before this was
+   * captured, and one taken from the monthly summary workbook, which states
+   * the month's totals and no rows at all. A month without it contributes
+   * nothing to the per-SKU view rather than having its total spread across
+   * SKUs by guesswork.
+   */
+  feeBySku?: Record<string, Record<string, number>>
   flipkartAds: number
   /** Manual monthly entries — not present in the SKU-level P&L export. */
   sellerFundedDiscount: number
