@@ -5,11 +5,11 @@ import { OverviewPage } from '@/modules/overview/OverviewPage'
 import { MisPage } from '@/modules/mis/MisPage'
 import { PnlPage } from '@/modules/pnl/PnlPage'
 import { NetSalesReconciliationPage } from '@/modules/pnl/NetSalesReconciliationPage'
-import { AmazonUsaFeesPage } from '@/modules/channels/AmazonUsaFeesPage'
 import { MonthlyInputsPage } from '@/modules/settings/MonthlyInputsPage'
 import { CostSheetPage } from '@/modules/products/CostSheetPage'
 import { InsightPage } from '@/modules/insight/InsightPage'
 import { ChannelDashboardPage } from '@/modules/channels/ChannelDashboardPage'
+import { AmazonUsaFeesRedirect } from '@/modules/channels/AmazonUsaFees'
 import { AdsOverviewPage } from '@/modules/marketing/AdsOverviewPage'
 import { AdsChannelPage } from '@/modules/marketing/AdsChannelPage'
 import { SkuAnalyticsPage } from '@/modules/products/SkuAnalyticsPage'
@@ -40,7 +40,11 @@ export const router = createHashRouter([
       { path: 'mis', element: <MisPage /> },
       { path: 'pnl', element: <PnlPage /> },
       { path: 'pnl/reconciliation', element: <NetSalesReconciliationPage /> },
-      { path: 'channels/amazon-usa/fees', element: <AmazonUsaFeesPage /> },
+      // The fee breakdown is a section of the Amazon USA channel page now, not
+      // a page of its own. The statement deep-links a single fee with ?fee=,
+      // so the search string has to survive the redirect or the link lands on
+      // the page with nothing selected.
+      { path: 'channels/amazon-usa/fees', element: <AmazonUsaFeesRedirect /> },
       { path: 'settings/monthly-inputs', element: <MonthlyInputsPage /> },
       // The rates form and the fixed-expenses page were merged into one
       // month-per-row grid. Both old paths are kept so a bookmark or a link

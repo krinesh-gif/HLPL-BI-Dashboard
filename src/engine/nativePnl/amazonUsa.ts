@@ -41,7 +41,7 @@ const feeLineDefs = (
     kind: 'input' as const,
     group: section,
     memoOf: nested.has(c.id) && c.componentOf ? `fee.${c.componentOf}` : undefined,
-    href: `#/channels/amazon-usa/fees?fee=${c.id}`,
+    href: `#/channels/amazon_us?fee=${c.id}`,
   }))
 
 /**

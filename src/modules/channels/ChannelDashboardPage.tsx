@@ -16,6 +16,7 @@ import {
 import { formatCurrencyCompact, formatCurrencyFull, formatNumber, formatPercent } from '@/lib/format'
 import { useChannelData } from './useChannelData'
 import { TopProducts } from './TopProducts'
+import { AmazonUsaFees } from './AmazonUsaFees'
 
 /**
  * One business channel's operating analytics.
@@ -218,6 +219,19 @@ export function ChannelDashboardPage() {
         <h2 className="mb-2 text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink)]">Top products</h2>
         <TopProducts channel={channel} source={source === 'all' ? undefined : source} />
       </section>
+
+      {/* Amazon USA is the one channel whose export itemises every fee it
+          charges, so the breakdown lives here with the channel it is about
+          rather than on a tab of its own. The other channels' reports carry no
+          equivalent, which is why nothing like it appears for them. */}
+      {channel === 'amazon_us' && (
+        <section>
+          <h2 className="mb-3 text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink)]">
+            Fees Amazon charges
+          </h2>
+          <AmazonUsaFees />
+        </section>
+      )}
 
       <p className="text-xs text-[var(--ink-3)]">
         This channel's P&amp;L is in the <Link to="/pnl" className="font-medium text-[var(--accent)] underline">P&amp;L</Link> section, in the
