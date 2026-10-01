@@ -145,7 +145,7 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
 
   if (rows.all.length === 0) {
     return (
-      <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6 text-center text-sm text-[var(--ink-3)]">
+      <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-6 text-center text-sm text-[var(--ink-3)]">
         No product-level sales for this channel in this month.
       </div>
     )
@@ -199,7 +199,7 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
         </button>
       </div>
 
-      <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+      <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
         <ComparisonBarChart
           data={rows.top.map((r) => ({ name: r.productName, value: chartValue(r) }))}
           xKey="name"
@@ -209,7 +209,7 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
         />
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+      <div className="overflow-x-auto rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
         <table className="w-full text-sm">
           <thead className="bg-[var(--surface-2)]">
             <tr>

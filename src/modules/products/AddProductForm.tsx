@@ -93,7 +93,7 @@ export function AddProductForm() {
   const label = 'block text-xs font-medium text-[var(--ink-3)]'
 
   return (
-    <section className="mb-4 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+    <section className="mb-4 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
       <h3 className="text-sm font-semibold text-[var(--ink)]">Add a product</h3>
       <p className="mt-1 text-xs text-[var(--ink-2)]">
         Use the Unicommerce SKU code. The cost you enter here is what every channel&apos;s P&amp;L will charge

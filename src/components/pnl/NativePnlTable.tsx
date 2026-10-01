@@ -53,11 +53,16 @@ export function NativePnlTable({
   const parentKeys = new Set(visible.map((d) => d.memoOf).filter((k): k is string => Boolean(k)))
   const rows = visible.map((def, i) => ({
     def,
-    showSectionHeader: i === 0 || def.section !== visible[i - 1].section,
+    showSectionHeader:
+      (i === 0 || def.section !== visible[i - 1].section) &&
+      // A section whose first line repeats its own name prints the same words
+      // twice and reads as a mistake in the statement. The line carries the
+      // figure, so the band is what goes.
+      def.section !== def.label,
   }))
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+    <div className="overflow-hidden overflow-x-auto rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
       <table className="w-full text-sm">
         <tbody>
           {rows.map(({ def, showSectionHeader }) => {
@@ -69,7 +74,7 @@ export function NativePnlTable({
               <Fragment key={def.key}>
                 {showSectionHeader && !collapsible && (
                   <tr className="bg-[var(--surface-2)]">
-                    <td colSpan={2} className="px-4 py-1.5 text-xs font-semibold text-[var(--ink-3)]">
+                    <td colSpan={2} className="px-5 py-2.5 text-[12px] font-semibold text-[var(--ink-2)]">
                       {def.section}
                     </td>
                   </tr>
@@ -77,14 +82,14 @@ export function NativePnlTable({
                 <tr
                   className={clsx(
                     'border-t border-[var(--line)]',
-                    def.kind === 'subtotal' && 'bg-[var(--accent-soft)]/50 font-semibold text-[var(--ink)]',
+                    def.kind === 'subtotal' && 'bg-[var(--accent-soft)] font-semibold text-[var(--ink)]',
                     parentKeys.has(def.key) && 'font-semibold text-[var(--ink)]',
                     def.memoOf && 'text-[var(--ink-3)]',
                   )}
                 >
                   <td
                     className={clsx(
-                      'px-4 py-2',
+                      'px-5 py-2.5',
                       def.kind === 'input' && 'pl-8 text-[var(--ink-2)]',
                       def.kind === 'percent' && 'pl-8 text-[var(--ink-3)] italic',
                       parentKeys.has(def.key) && 'font-semibold text-[var(--ink)]',
@@ -136,7 +141,7 @@ export function NativePnlTable({
                   </td>
                   <td
                     className={clsx(
-                      'px-4 py-2 text-right tabular-nums',
+                      'px-5 py-2.5 text-right tabular-nums',
                       // Green for money in, red for money out. A memo line
                       // keeps its grey: it is already inside the line above,
                       // and colouring it would make it look like it counts.

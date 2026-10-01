@@ -185,7 +185,7 @@ export function SkuMappingPage() {
 
       {/* One strip rather than three cards: the numbers are a status line for
           the work below, not the point of the page. */}
-      <div className="mb-3 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5">
+      <div className="mb-3 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] px-4 py-2.5">
         <Stat label="Still estimated" value={formatCurrencyFull(work.unmappedNetSales)} note={`${formatPercent(unmappedShare)} of net sales · ${work.unmapped.length} SKUs`} tone="amber" />
         <Stat label="Awaiting your check" value={String(work.needsVerification.length)} note="costed from a guess" tone="indigo" />
         <Stat label="Confirmed" value={String(work.done.length)} note="real component costs" tone="emerald" />
@@ -257,7 +257,7 @@ export function SkuMappingPage() {
       )}
 
       {rows.length === 0 ? (
-        <p className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6 text-center text-sm text-[var(--ink-3)]">
+        <p className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-6 text-center text-sm text-[var(--ink-3)]">
           {search
             ? `Nothing matches “${search}” in this tab.`
             : tab === 'unmapped'
@@ -265,7 +265,7 @@ export function SkuMappingPage() {
               : 'Nothing here yet.'}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+        <div className="overflow-x-auto rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
           <table className="w-full text-sm">
             <thead className="bg-[var(--surface-2)]">
               <tr>

@@ -38,7 +38,7 @@ export function NetSalesReconciliationPage() {
       title="Net Sales Reconciliation"
       subtitle={`Order reports against settlement reports — ${monthLabel(month)}`}
     >
-      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+      <section className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
         <h3 className="text-sm font-semibold text-[var(--ink)]">How Net Sales is calculated</h3>
         <p className="mt-1 text-sm text-[var(--ink-2)]">
           Every screen in this dashboard — Overview, channel pages, P&amp;L, Investor MIS, Business Insight — now reads Net Sales from one
@@ -58,11 +58,11 @@ export function NetSalesReconciliationPage() {
       </section>
 
       {comparable.length === 0 ? (
-        <p className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6 text-center text-sm text-[var(--ink-3)]">
+        <p className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-6 text-center text-sm text-[var(--ink-3)]">
           No channel has both an order report and a settlement report for {monthLabel(month)}, so there is nothing to reconcile.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+        <div className="overflow-x-auto rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
           <table className="w-full text-sm">
             <thead className="bg-[var(--surface-2)]">
               <tr>
@@ -89,7 +89,7 @@ export function NetSalesReconciliationPage() {
       )}
 
       {orderOnly.length > 0 && (
-        <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+        <section className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
           <h3 className="text-sm font-semibold text-[var(--ink)]">Order reports only</h3>
           <p className="mt-1 text-sm text-[var(--ink-2)]">
             These channels have no settlement report for {monthLabel(month)}, so their Net Sales comes from order rows and there is

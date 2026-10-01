@@ -11,7 +11,7 @@ export function SettingsPage() {
       subtitle="What this dashboard assumes, and where the figures you control are entered"
       showFilters={false}
     >
-      <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4 text-sm text-[var(--ink-2)]">
+      <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4 text-sm text-[var(--ink-2)]">
         <h3 className="mb-2 text-sm font-semibold text-[var(--ink)]">Where to change things</h3>
         <ul className="space-y-1.5">
           <li>
@@ -42,7 +42,7 @@ export function SettingsPage() {
         </p>
       </div>
 
-      <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+      <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
         <h3 className="text-sm font-semibold text-[var(--ink)]">Assumed marketplace fees</h3>
         <p className="mb-3 mt-1 text-xs text-[var(--ink-3)]">
           Used only for a channel-month with no charge report uploaded yet. Once a real settlement or fee

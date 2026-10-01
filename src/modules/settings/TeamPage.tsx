@@ -109,7 +109,7 @@ export function TeamPage() {
     >
       {error && <p className="mb-4 rounded-md bg-[color-mix(in_oklab,var(--critical)_10%,transparent)] px-3 py-2 text-sm text-[var(--critical-ink)]">{error}</p>}
 
-      <form onSubmit={addMember} className="mb-6 flex flex-wrap items-end gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+      <form onSubmit={addMember} className="mb-6 flex flex-wrap items-end gap-3 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
         <div>
           <label className="block text-xs font-semibold text-[var(--ink-2)]" htmlFor="new-email">Email</label>
           <input
@@ -155,7 +155,7 @@ export function TeamPage() {
         </fieldset>
       </form>
 
-      <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+      <div className="overflow-x-auto rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
         <table className="w-full text-sm">
           <thead className="bg-[var(--surface-2)]">
             <tr>

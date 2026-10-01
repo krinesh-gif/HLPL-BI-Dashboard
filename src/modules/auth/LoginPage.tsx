@@ -4,6 +4,29 @@ import { useAuthStore } from '@/store/authStore'
 
 type Mode = 'checking' | 'login' | 'setup' | 'no-database' | 'blocked'
 
+/** The mark and the product name, in one place.
+ *
+ * It was written out twice, and the two copies had drifted: both printed
+ * "Business Intelligence" under the name and then again as a line of their
+ * own, so the first thing anyone saw on signing in was the same four words
+ * twice. */
+function Brand() {
+  return (
+    <div className="flex items-center gap-3">
+      <div
+        className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-chip)] bg-[var(--accent)] text-sm font-bold text-[var(--accent-ink)] shadow-[var(--shadow-accent)]"
+        aria-hidden
+      >
+        H
+      </div>
+      <div>
+        <h1 className="text-[17px] leading-tight font-bold tracking-[-0.01em] text-[var(--ink)]">HLPL</h1>
+        <p className="text-xs text-[var(--ink-3)]">Business Intelligence</p>
+      </div>
+    </div>
+  )
+}
+
 export function LoginPage() {
   const { login, setUp } = useAuthStore()
   const [mode, setMode] = useState<Mode>('checking')
@@ -57,20 +80,9 @@ export function LoginPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--plane)] px-4">
         <div className="w-full max-w-md rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-8 shadow-[var(--shadow-pop)]">
-          <div className="mb-5 flex items-center gap-3">
-            <div
-              className="flex h-10 w-10 items-center justify-center rounded-[12px] text-sm font-bold text-white"
-              style={{ background: 'linear-gradient(135deg, var(--accent), var(--series-5))' }}
-              aria-hidden
-            >H</div>
-            <div>
-              <h1 className="text-lg leading-tight font-bold text-[var(--ink)]">HLPL</h1>
-              <p className="text-xs text-[var(--ink-3)]">Business Intelligence</p>
-            </div>
-          </div>
-          <p className="mt-1 text-sm text-[var(--ink-3)]">Business Intelligence</p>
+          <Brand />
 
-          <div className="mt-5 rounded-md bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] px-4 py-3">
+          <div className="mt-6 rounded-[var(--radius-control)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] px-4 py-3">
             <p className="text-sm font-semibold text-[var(--ink)]">Setup isn&apos;t finished yet</p>
             <p className="mt-1 text-sm text-[var(--ink-2)]">
               {mode === 'no-database'
@@ -108,51 +120,48 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--plane)] px-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm rounded-lg border border-[var(--line)] bg-[var(--surface)] p-8 shadow-sm">
-        <div className="mb-5 flex items-center gap-3">
-            <div
-              className="flex h-10 w-10 items-center justify-center rounded-[12px] text-sm font-bold text-white"
-              style={{ background: 'linear-gradient(135deg, var(--accent), var(--series-5))' }}
-              aria-hidden
-            >H</div>
-            <div>
-              <h1 className="text-lg leading-tight font-bold text-[var(--ink)]">HLPL</h1>
-              <p className="text-xs text-[var(--ink-3)]">Business Intelligence</p>
-            </div>
-          </div>
-        <p className="mt-1 text-sm text-[var(--ink-3)]">Business Intelligence</p>
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-sm rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-8 shadow-[var(--shadow-pop)]"
+      >
+        <Brand />
+
+        <h2 className="mt-6 text-[20px] leading-tight font-bold tracking-[-0.02em] text-[var(--ink)]">
+          {isSetup ? 'Set up your dashboard' : 'Sign in'}
+        </h2>
 
         {isSetup && (
-          <div className="mt-5 rounded-md bg-[var(--accent-soft)] px-3 py-3">
-            <p className="text-sm font-semibold text-[var(--accent)]">Welcome — let&apos;s set up your dashboard</p>
-            <p className="mt-1 text-xs text-[var(--accent)]">
-              Choose the email and password you&apos;ll sign in with. This creates the database tables and loads your
-              product list. You can add your team afterwards from Settings.
-            </p>
-          </div>
+          <p className="mt-2 text-[13px] leading-relaxed text-[var(--ink-2)]">
+            Choose the email and password you&apos;ll sign in with. This creates the database tables and loads your
+            product list. You can add your team afterwards from Settings.
+          </p>
         )}
 
-        <label className="mt-6 block text-xs font-semibold text-[var(--ink-2)]" htmlFor="email">Email</label>
+        <label className="mt-6 block text-[13px] font-medium text-[var(--ink-2)]" htmlFor="email">Email</label>
         <input
           id="email" type="email" autoComplete="username" required value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mt-1 w-full rounded-[var(--radius-control)] border border-[var(--line-2)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
+          className="mt-1.5 w-full rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface-2)] px-3.5 py-2.5 text-sm text-[var(--ink)] transition-colors focus:border-[var(--accent)] focus:bg-[var(--surface)] focus:outline-none"
         />
 
-        <label className="mt-4 block text-xs font-semibold text-[var(--ink-2)]" htmlFor="password">Password</label>
+        <label className="mt-4 block text-[13px] font-medium text-[var(--ink-2)]" htmlFor="password">Password</label>
         <input
           id="password" type="password" required minLength={isSetup ? 8 : undefined}
           autoComplete={isSetup ? 'new-password' : 'current-password'}
           value={password} onChange={(e) => setPassword(e.target.value)}
-          className="mt-1 w-full rounded-[var(--radius-control)] border border-[var(--line-2)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
+          className="mt-1.5 w-full rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface-2)] px-3.5 py-2.5 text-sm text-[var(--ink)] transition-colors focus:border-[var(--accent)] focus:bg-[var(--surface)] focus:outline-none"
         />
         {isSetup && <p className="mt-1 text-xs text-[var(--ink-3)]">At least 8 characters.</p>}
 
-        {error && <p className="mt-4 rounded-md bg-[color-mix(in_oklab,var(--critical)_10%,transparent)] px-3 py-2 text-sm text-[var(--critical-ink)]">{error}</p>}
+        {error && (
+          <p className="mt-4 rounded-[var(--radius-control)] bg-[color-mix(in_oklab,var(--critical)_10%,transparent)] px-3.5 py-2.5 text-sm text-[var(--critical-ink)]">
+            {error}
+          </p>
+        )}
 
         <button
           type="submit" disabled={submitting}
-          className="mt-6 w-full rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
+          className="mt-6 w-full rounded-[var(--radius-control)] bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-ink)] shadow-[var(--shadow-accent)] transition-opacity hover:opacity-90 disabled:opacity-40 disabled:shadow-none"
         >
           {submitting ? (isSetup ? 'Setting up…' : 'Signing in…') : isSetup ? 'Create my account' : 'Sign in'}
         </button>

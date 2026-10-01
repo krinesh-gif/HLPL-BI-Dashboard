@@ -82,11 +82,11 @@ export function RtoAnalysisPage() {
       </p>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+        <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
           <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">RTO % trend</h3>
           <TrendLineChart data={chartData} xKey="month" series={[{ key: 'rtoPct', label: 'RTO %' }]} valueFormatter={(v) => formatPercent(v)} />
         </div>
-        <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+        <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
           <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">RTO units trend</h3>
           <TrendLineChart data={chartData} xKey="month" series={[{ key: 'rtoUnits', label: 'RTO Units' }]} valueFormatter={(v) => formatNumber(v)} />
         </div>
@@ -125,11 +125,11 @@ export function RtoAnalysisPage() {
       </MomControls>
 
       {m.rows.length === 0 ? (
-        <p className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6 text-center text-sm text-[var(--ink-3)]">
+        <p className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-6 text-center text-sm text-[var(--ink-3)]">
           No shipments in {monthLabel(m.month)} or {monthLabel(m.compareMonth)} at this level.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+        <div className="overflow-x-auto rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
           <table className="w-full text-sm">
             <thead className="bg-[var(--surface-2)]">
               <tr>

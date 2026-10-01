@@ -8,11 +8,16 @@ import { amountTone } from './amountTone'
 export function PnlTable({ lines, currency = 'INR' }: { lines: PnlLineValues; currency?: 'INR' | 'USD' }) {
   const rowsWithHeaderFlag = PNL_STRUCTURE.map((def, i) => ({
     def,
-    showSectionHeader: i === 0 || def.section !== PNL_STRUCTURE[i - 1].section,
+    showSectionHeader:
+      (i === 0 || def.section !== PNL_STRUCTURE[i - 1].section) &&
+      // A section whose first line repeats its own name — Gross Profit above
+      // Gross Profit — prints the same words twice and reads as a mistake in
+      // the statement. The line carries the figure, so the band is what goes.
+      SECTION_LABELS[def.section as PnlSection] !== def.label,
   }))
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+    <div className="overflow-hidden overflow-x-auto rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
       <table className="w-full text-sm">
         <tbody>
           {rowsWithHeaderFlag.map(({ def, showSectionHeader }) => {
@@ -24,7 +29,7 @@ export function PnlTable({ lines, currency = 'INR' }: { lines: PnlLineValues; cu
               <Fragment key={def.key}>
                 {showSectionHeader && (
                   <tr key={`${def.section}-header`} className="bg-[var(--surface-2)]">
-                    <td colSpan={2} className="px-4 py-1.5 text-xs font-semibold text-[var(--ink-3)]">
+                    <td colSpan={2} className="px-5 py-2.5 text-[12px] font-semibold text-[var(--ink-2)]">
                       {SECTION_LABELS[def.section as PnlSection]}
                     </td>
                   </tr>
@@ -32,13 +37,13 @@ export function PnlTable({ lines, currency = 'INR' }: { lines: PnlLineValues; cu
                 <tr
                   className={clsx(
                     'border-t border-[var(--line)]',
-                    def.kind === 'subtotal' && 'bg-[var(--accent-soft)]/50 font-semibold text-[var(--ink)]',
+                    def.kind === 'subtotal' && 'bg-[var(--accent-soft)] font-semibold text-[var(--ink)]',
                   )}
                 >
-                  <td className={clsx('px-4 py-2', def.kind === 'input' && 'pl-8 text-[var(--ink-2)]', def.kind === 'percent' && 'pl-8 text-[var(--ink-3)] italic')}>
+                  <td className={clsx('px-5 py-2.5', def.kind === 'input' && 'pl-8 text-[var(--ink-2)]', def.kind === 'percent' && 'pl-8 text-[var(--ink-3)] italic')}>
                     {def.label}
                   </td>
-                  <td className={clsx('px-4 py-2 text-right tabular-nums', amountTone(value))}>
+                  <td className={clsx('px-5 py-2.5 text-right tabular-nums', amountTone(value))}>
                     {def.kind === 'percent' ? formatPercent(value) : formatCurrencyFull(value, currency)}
                   </td>
                 </tr>

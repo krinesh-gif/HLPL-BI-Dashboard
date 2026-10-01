@@ -75,7 +75,7 @@ export function DailySalesPage() {
 
   return (
     <PageShell title="Daily Sales" subtitle="Day-level revenue, units, orders, ASP and RTO" showFilters={false}>
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+      <div className="flex flex-wrap items-end gap-3 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
         <Field label="Level">
           <div className="flex rounded-md border border-[var(--line-2)] bg-[var(--surface)] p-0.5">
             {LEVELS.map((l) => (
@@ -182,7 +182,7 @@ export function DailySalesPage() {
       </div>
 
       {d.rows.length === 0 ? (
-        <p className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6 text-center text-sm text-[var(--ink-3)]">
+        <p className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-6 text-center text-sm text-[var(--ink-3)]">
           No sales between {formatDate(d.filters.from)} and {formatDate(d.filters.to)} for this selection.
         </p>
       ) : (
@@ -200,7 +200,7 @@ export function DailySalesPage() {
             <KPICard label="ASP in range" value={d.total.units > 0 ? formatCurrencyFull(d.total.netSales / d.total.units) : '—'} />
           </KPIGrid>
 
-          <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+          <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
             <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">
               {level === 'channel' ? 'Daily revenue by channel' : METRICS.find((m) => m.key === metric)!.label}
             </h3>
@@ -212,7 +212,7 @@ export function DailySalesPage() {
             />
           </div>
 
-          <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+          <div className="overflow-x-auto rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
             <table className="w-full text-sm">
               <thead className="bg-[var(--surface-2)]">
                 <tr>

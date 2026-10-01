@@ -58,7 +58,7 @@ export function AspAnalysisPage() {
         <KPICard label={`Units — ${monthLabel(m.month)}`} value={formatNumber(m.master.current.units)} />
       </KPIGrid>
 
-      <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+      <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
         <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">ASP trend</h3>
         <TrendLineChart
           data={chartData}
@@ -79,11 +79,11 @@ export function AspAnalysisPage() {
       </MomControls>
 
       {m.rows.length === 0 ? (
-        <p className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6 text-center text-sm text-[var(--ink-3)]">
+        <p className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-6 text-center text-sm text-[var(--ink-3)]">
           No sales in {monthLabel(m.month)} or {monthLabel(m.compareMonth)} at this level.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+        <div className="overflow-x-auto rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
           <table className="w-full text-sm">
             <thead className="bg-[var(--surface-2)]">
               <tr>

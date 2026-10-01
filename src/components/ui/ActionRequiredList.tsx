@@ -9,7 +9,7 @@ const SEVERITY_ICON: Record<Insight['severity'], string> = {
 export function ActionRequiredList({ insights, title = 'Action Required' }: { insights: Insight[]; title?: string }) {
   if (insights.length === 0) {
     return (
-      <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+      <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
         <div className="text-sm font-semibold text-[var(--ink)]">{title}</div>
         <div className="mt-2 text-sm text-[var(--ink-3)]">No significant items detected for the current filters.</div>
       </div>
@@ -17,7 +17,7 @@ export function ActionRequiredList({ insights, title = 'Action Required' }: { in
   }
 
   return (
-    <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+    <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
       <div className="text-sm font-semibold text-[var(--ink)]">{title}</div>
       <ul className="mt-3 space-y-2">
         {insights.map((insight, i) => (

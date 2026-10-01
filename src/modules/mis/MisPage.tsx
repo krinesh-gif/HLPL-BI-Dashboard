@@ -23,7 +23,7 @@ export function MisPage() {
 
   return (
     <PageShell title="Investor MIS" subtitle={`Management-level reporting for ${monthLabel(month)}`}>
-      <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+      <div className="overflow-x-auto rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
         <table className="w-full text-sm">
           <thead className="bg-[var(--surface-2)]">
             <tr>

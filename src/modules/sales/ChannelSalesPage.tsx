@@ -97,7 +97,7 @@ export function ChannelSalesPage() {
   if (activeChannels.length === 0) {
     return (
       <PageShell title="Channel Sales" subtitle="Month-by-month revenue across every marketplace" showFilters={false}>
-        <p className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-6 text-center text-sm text-[var(--ink-3)]">
+        <p className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-6 text-center text-sm text-[var(--ink-3)]">
           No sales in the {monthsShown} months ending {monthLabel(month)}. Upload a report, or move the month filter.
         </p>
       </PageShell>
@@ -142,7 +142,7 @@ export function ChannelSalesPage() {
         </button>
       </div>
 
-      <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+      <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
         <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">{METRICS.find((m) => m.key === metric)!.label} by month</h3>
         <TrendLineChart
           data={chartData}
@@ -152,7 +152,7 @@ export function ChannelSalesPage() {
         />
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+      <div className="overflow-x-auto rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
         <table className="w-full text-sm">
           <thead className="bg-[var(--surface-2)]">
             <tr>

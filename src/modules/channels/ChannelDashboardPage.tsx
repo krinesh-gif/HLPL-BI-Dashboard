@@ -123,7 +123,7 @@ export function ChannelDashboardPage() {
       </KPIGrid>
 
       {source === 'all' && d.sourceBreakdown.length > 0 && (
-        <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3">
+        <section className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-3">
           <h3 className="text-sm font-semibold text-[var(--ink-2)]">Sales sources</h3>
           <p className="mt-0.5 text-xs text-[var(--ink-3)]">
             {channelDef.label} is one business channel fed by {d.sourceBreakdown.length} reports. This is how the month splits between
@@ -235,7 +235,7 @@ const TREND_SERIES: SeriesDef[] = [
 
 function ChartCard({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <div className="h-full rounded-lg border border-[var(--line)] bg-[var(--surface)] p-3">
+    <div className="h-full rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-3">
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-[var(--ink-2)]">{title}</h3>
         {action}

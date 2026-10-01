@@ -72,7 +72,7 @@ export function ManualAdSpendForm({
   }
 
   return (
-    <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+    <section className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
       <h3 className="text-sm font-semibold text-[var(--ink)]">{def.label} {def.invoiceLabel ?? 'monthly value'}</h3>
       <p className="mt-1 text-sm text-[var(--ink-2)]">
         {def.label} bills by monthly invoice rather than publishing a campaign report, so the figure is entered here. It counts as

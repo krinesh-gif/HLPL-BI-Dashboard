@@ -43,7 +43,7 @@ export function MonthlySalesPage() {
 
   return (
     <PageShell title="Monthly Sales" subtitle="Trailing 12-month revenue, units, orders and ASP" showFilters={false}>
-      <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+      <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
         <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">Net Sales Trend</h3>
         <TrendLineChart data={rows} xKey="label" series={[{ key: 'netSales', label: 'Net Sales' }]} valueFormatter={formatCurrencyFull} />
       </div>

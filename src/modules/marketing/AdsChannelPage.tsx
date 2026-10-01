@@ -105,11 +105,11 @@ export function AdsChannelPage() {
       {def.usesMonthlyInvoice && <ManualAdSpendForm channel={channel} def={def} month={month} current={figure} />}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+        <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
           <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">Ad spend trend</h3>
           <TrendLineChart data={trend} xKey="month" series={[{ key: 'spend', label: 'Spend' }]} valueFormatter={(v) => formatCurrencyCompact(v)} />
         </div>
-        <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+        <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
           <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">ROAS trend</h3>
           <TrendLineChart data={trend} xKey="month" series={[{ key: 'roas', label: 'ROAS' }]} valueFormatter={(v) => `${v.toFixed(2)}x`} />
         </div>

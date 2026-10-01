@@ -44,7 +44,7 @@ export function PnlPage() {
   return (
     <PageShell title="P&L" subtitle="Management accounts by month, for the company and each channel" showFilters={false}>
       {/* ---- Header controls ------------------------------------------- */}
-      <div className="flex flex-wrap items-end gap-4 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+      <div className="flex flex-wrap items-end gap-4 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow-card)]">
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium text-[var(--ink-3)]">View</span>
           <select
@@ -166,11 +166,11 @@ export function PnlPage() {
       </div>
 
       {/* ---- The report -------------------------------------------------- */}
-      <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+      <div className="overflow-x-auto rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
         <table className="w-full min-w-max text-sm">
           <thead>
             <tr className="border-b-2 border-[var(--line-2)] bg-[var(--surface-2)]">
-              <th className="sticky left-0 z-20 min-w-56 bg-[var(--surface-2)] px-4 py-2.5 text-left text-xs font-semibold text-[var(--ink-3)]">
+              <th className="sticky left-0 z-20 min-w-56 bg-[var(--surface-2)] px-5 py-3 text-left text-xs font-semibold text-[var(--ink-2)]">
                 {r.view === 'master' ? 'Master Company' : channelLabel(r.view)}
                 {/* The figures below change currency, so the table says which
                     one it is in rather than leaving it to the symbol. */}
@@ -181,11 +181,11 @@ export function PnlPage() {
                 )}
               </th>
               {r.months.map((m) => (
-                <th key={m} className="min-w-28 px-4 py-2.5 text-right text-xs font-semibold text-[var(--ink-2)]">
+                <th key={m} className="min-w-28 px-5 py-3 text-right text-xs font-semibold text-[var(--ink-2)]">
                   {monthLabel(m)}
                 </th>
               ))}
-              <th className="min-w-32 border-l-2 border-[var(--line-2)] bg-[var(--surface-2)] px-4 py-2.5 text-right text-xs font-bold text-[var(--ink-2)]">
+              <th className="min-w-32 border-l-2 border-[var(--line-2)] bg-[var(--surface-2)] px-5 py-3 text-right text-xs font-bold text-[var(--ink)]">
                 Total
               </th>
             </tr>
@@ -209,7 +209,7 @@ export function PnlPage() {
                   className={`border-b border-[var(--line)] ${isSubtotal ? 'bg-[var(--surface-2)] font-semibold' : ''} ${isPercent ? 'italic text-[var(--ink-2)]' : ''}`}
                 >
                   <th
-                    className={`sticky left-0 z-10 px-4 py-2 text-left font-normal ${
+                    className={`sticky left-0 z-10 px-5 py-2.5 text-left font-normal ${
                       isSubtotal ? 'bg-[var(--surface-2)] font-semibold text-[var(--ink)]' : 'bg-[var(--surface)] text-[var(--ink-2)]'
                     } ${row.def.indent ? 'pl-8 text-[var(--ink-3)]' : ''}`}
                   >
@@ -220,14 +220,14 @@ export function PnlPage() {
                     return (
                       <td
                         key={r.months[i]}
-                        className={`px-4 py-2 text-right tabular-nums ${amountTone(shown)}`}
+                        className={`px-5 py-2.5 text-right tabular-nums ${amountTone(shown)}`}
                       >
                         {shown === 0 && !isPercent ? '—' : format(shown)}
                       </td>
                     )
                   })}
                   <td
-                    className={`border-l-2 border-[var(--line-2)] bg-[var(--surface-2)] px-4 py-2 text-right font-semibold tabular-nums ${amountTone(signed(row.total))}`}
+                    className={`border-l-2 border-[var(--line-2)] bg-[var(--surface-2)] px-5 py-2.5 text-right font-semibold tabular-nums ${amountTone(signed(row.total))}`}
                   >
                     {signed(row.total) === 0 && !isPercent ? '—' : format(signed(row.total))}
                   </td>
@@ -301,7 +301,7 @@ export function PnlPage() {
 
       {/* ---- Channel drill-down ------------------------------------------ */}
       {r.channelBreakdown.length > 0 && (
-        <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+        <section className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow-card)]">
           <h3 className="text-sm font-semibold text-[var(--ink-2)]">Net Sales by channel — {monthLabel(r.latestMonth)}</h3>
           <table className="mt-3 w-full text-sm">
             <tbody>
@@ -339,7 +339,7 @@ export function PnlPage() {
 
       {/* ---- Comparison --------------------------------------------------- */}
       {r.comparison && (
-        <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+        <section className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow-card)]">
           <h3 className="text-sm font-semibold text-[var(--ink-2)]">
             {monthLabel(r.comparison.laterMonth)} vs {monthLabel(r.comparison.earlierMonth)}
           </h3>
@@ -452,7 +452,7 @@ export function PnlPage() {
 
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+    <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow-card)]">
       <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">{title}</h3>
       {children}
     </div>

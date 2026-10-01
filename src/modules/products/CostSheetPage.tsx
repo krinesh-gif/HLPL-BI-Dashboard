@@ -110,7 +110,7 @@ export function CostSheetPage() {
       subtitle="Upload new costs with the month they take effect. Closed months keep the cost they were closed at."
       showFilters={false}
     >
-      <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+      <section className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
         <h3 className="text-sm font-semibold text-[var(--ink)]">Upload a cost sheet</h3>
         <p className="mt-1 text-sm text-[var(--ink-2)]">
           Excel or CSV, with a <strong>SKU</strong> column and a <strong>New COGS</strong> (or <strong>COGS</strong>) column. Add an{' '}
@@ -313,7 +313,7 @@ function CostHistory({
   }, [versions, search, nameBySku, month, index])
 
   return (
-    <section className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+    <section className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-[var(--ink)]">Cost history</h3>

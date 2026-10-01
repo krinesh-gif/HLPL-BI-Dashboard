@@ -70,7 +70,7 @@ export function AdsOverviewPage() {
         </button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-[var(--surface)]">
+      <div className="overflow-x-auto rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
         <table className="w-full text-sm">
           <thead className="bg-[var(--surface-2)]">
             <tr>
@@ -148,7 +148,7 @@ export function AdsOverviewPage() {
       )}
 
       {figures.some((f) => f.spend > 0) && (
-        <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">
+        <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
           <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">Ad spend by channel</h3>
           <ComparisonBarChart
             data={figures.filter((f) => f.spend > 0).map((f) => ({ name: label(f.channel), value: f.spend }))}
