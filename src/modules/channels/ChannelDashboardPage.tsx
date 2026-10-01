@@ -17,6 +17,7 @@ import { formatCurrencyCompact, formatCurrencyFull, formatNumber, formatPercent 
 import { useChannelData } from './useChannelData'
 import { TopProducts } from './TopProducts'
 import { AmazonUsaFees } from './AmazonUsaFees'
+import { FlipkartFees } from './FlipkartFees'
 
 /**
  * One business channel's operating analytics.
@@ -230,6 +231,15 @@ export function ChannelDashboardPage() {
             Fees Amazon charges
           </h2>
           <AmazonUsaFees />
+        </section>
+      )}
+
+      {channel === 'flipkart' && (
+        <section>
+          <h2 className="mb-3 text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink)]">
+            Fees Flipkart charges
+          </h2>
+          <FlipkartFees />
         </section>
       )}
 
