@@ -1,16 +1,13 @@
 import { useMemo, useState } from 'react'
 import { PageShell } from '@/components/layout/PageShell'
 import { Card, CardHeader } from '@/components/ui/Surface'
-import { DataTable } from '@/components/ui/DataTable'
 import { useDataStore } from '@/store/dataStore'
-import { BUSINESS_CHANNELS } from '@/config/channels'
-import { computeSalesContributionWeights } from '@/engine/allocation'
 import { fxRateForMonth } from '@/data/fxRates'
 import { freightRateForMonth } from '@/data/freightRates'
 import { nykaaDiscountForMonth } from '@/data/nykaaDiscounts'
 import { nykaaDiscountPerSalesFile } from '@/engine/nativePnl/nykaa'
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
-import { addMonths, formatCurrencyFull, formatPercent, monthLabel, toMonthKey } from '@/lib/format'
+import { addMonths, monthLabel, toMonthKey } from '@/lib/format'
 import type { FixedExpenseEntry } from '@/data/models'
 
 /**
@@ -182,17 +179,6 @@ export function MonthlyInputsPage() {
     }
   }
 
-  const weights = useMemo(
-    () => computeSalesContributionWeights(salesRecords, months[0] ?? thisMonth),
-    [salesRecords, months, thisMonth],
-  )
-  const latestFixed = fixedTotalFor(months[0] ?? thisMonth) ?? 0
-  const allocationRows = BUSINESS_CHANNELS.map((c) => ({
-    channel: c.label,
-    weight: weights[c.id] ?? 0,
-    allocated: latestFixed * (weights[c.id] ?? 0),
-  }))
-
   const field =
     'w-full rounded border border-[var(--line-2)] bg-[var(--surface)] px-2 py-1 text-right text-sm tabular-nums text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none'
 
@@ -200,6 +186,11 @@ export function MonthlyInputsPage() {
     <PageShell
       title="Monthly Inputs"
       subtitle="Every figure the marketplace reports cannot tell us — one row per month, editable any time"
+      // This page is a table of every month at once, and the figures on it are
+      // entered per month and per channel in their own cells. A month, channel
+      // or category picker above it filters nothing here, so it can only read
+      // as a control that has stopped working.
+      showFilters={false}
     >
       <Card padded={false}>
         <div className="flex flex-wrap items-start justify-between gap-3 px-5 pt-5">
@@ -285,25 +276,6 @@ export function MonthlyInputsPage() {
         </p>
       </Card>
 
-      <section>
-        <h2 className="mb-3 text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink)]">
-          Fixed expenses for {monthLabel(months[0] ?? thisMonth)}, by channel — {formatCurrencyFull(latestFixed)}
-        </h2>
-        <p className="mb-3 text-xs text-[var(--ink-2)]">
-          Each channel carries the share that matches its share of the month&apos;s net sales. This is what turns a
-          channel&apos;s contribution margin into its net profit.
-        </p>
-        <DataTable
-          columns={[
-            { key: 'channel', header: 'Channel', accessor: (r) => r.channel },
-            { key: 'weight', header: 'Sales Share', accessor: (r) => r.weight * 100, align: 'right', render: (r) => formatPercent(r.weight * 100) },
-            { key: 'allocated', header: 'Allocated Amount', accessor: (r) => r.allocated, align: 'right', render: (r) => formatCurrencyFull(r.allocated) },
-          ]}
-          rows={allocationRows}
-          searchable={false}
-          exportFileName={`HLPL_FixedExpenseAllocation_${months[0] ?? thisMonth}`}
-        />
-      </section>
     </PageShell>
   )
 }
