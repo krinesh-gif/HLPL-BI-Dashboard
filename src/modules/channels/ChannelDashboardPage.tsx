@@ -16,6 +16,7 @@ import {
 import { formatCurrencyCompact, formatCurrencyFull, formatNumber, formatPercent } from '@/lib/format'
 import { useChannelData } from './useChannelData'
 import { TopProducts } from './TopProducts'
+import { ChannelMark } from '@/components/ui/ChannelMark'
 import { AmazonUsaFees } from './AmazonUsaFees'
 import { FlipkartFees } from './FlipkartFees'
 
@@ -65,7 +66,7 @@ export function ChannelDashboardPage() {
 
   if (d.currentFacts.units === 0 && d.currentFacts.netSales === 0) {
     return (
-      <PageShell showChannelFilter={false} title={channelDef.label} subtitle="Channel dashboard">
+      <PageShell showChannelFilter={false} title={<ChannelMark channel={channel} />} subtitle="Channel dashboard">
         {sourcePicker && <div className="mb-4">{sourcePicker}</div>}
         <EmptyState
           title={`No ${channelDef.label} data available for this month.`}
@@ -78,7 +79,7 @@ export function ChannelDashboardPage() {
   return (
     <PageShell
       showChannelFilter={false}
-      title={channelDef.label}
+      title={<ChannelMark channel={channel} />}
       subtitle={source === 'all' ? 'Sales, products, growth and returns' : `Sales source: ${sourcesOfChannel(channel).find((s) => s.id === source)?.label}`}
     >
       {sourcePicker && <div>{sourcePicker}</div>}

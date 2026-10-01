@@ -453,6 +453,23 @@ BEGIN
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
   );
 
+  -- ---------------------------------------------------------------------------
+  -- A channel's logo, as the small PNG the browser produced when it was chosen.
+  --
+  -- Held in the row rather than as a file because this deployment has no object
+  -- store, and the alternative — a second service to keep in step — is a lot of
+  -- moving parts for one mark per marketplace. The browser scales each one down
+  -- before upload, so a row is a few kilobytes rather than whatever came off
+  -- someone's desktop.
+  -- ---------------------------------------------------------------------------
+  CREATE TABLE IF NOT EXISTS channel_logos (
+    channel    TEXT PRIMARY KEY,
+    data_url   TEXT NOT NULL,
+    file_name  TEXT NOT NULL DEFAULT '',
+    updated_by TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
   CREATE TABLE IF NOT EXISTS combo_components (
     combo_sku     TEXT NOT NULL,
     component_sku TEXT NOT NULL,

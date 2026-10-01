@@ -10,6 +10,9 @@ import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrd
 import type { FxRate } from '@/data/fxRates'
 import type { FreightLane, FreightRate } from '@/data/freightRates'
 import type { NykaaDiscountEntry } from '@/data/nykaaDiscounts'
+import type { ChannelLogo } from '@/data/channelLogos'
+import { prepareLogoForUpload } from '@/data/channelLogos'
+import type { BusinessChannelId } from '@/config/channels'
 import type {
   AdsRecord,
   AmazonUsaPnlFacts,
@@ -74,7 +77,7 @@ const EMPTY_DATASET: SharedDataset = {
   manualAdSpend: [],
 }
 
-const EMPTY_MAPPINGS: MappingTablesState = { mappings: [], comboComponents: [], costVersions: [], fxRates: [], freightRates: [], nykaaDiscounts: [] }
+const EMPTY_MAPPINGS: MappingTablesState = { mappings: [], comboComponents: [], costVersions: [], fxRates: [], freightRates: [], nykaaDiscounts: [], channelLogos: [] }
 
 /** Everything one uploaded report contributes, imported as a single unit. */
 export interface ReportImport {
@@ -135,6 +138,9 @@ interface MappingTablesState {
   fxRates: FxRate[]
   freightRates: FreightRate[]
   nykaaDiscounts: NykaaDiscountEntry[]
+  /** Each marketplace's own mark, where one has been uploaded. A channel
+   * without one shows its name. */
+  channelLogos: ChannelLogo[]
 }
 
 interface DataState extends SharedDataset, MappingTablesState {
@@ -171,6 +177,9 @@ interface DataState extends SharedDataset, MappingTablesState {
   /** Records what Nykaa confirmed it is charging back for a month, which
    * replaces the figure its sales file implied. */
   saveNykaaDiscount: (entry: NykaaDiscountEntry) => Promise<void>
+  /** Scales the chosen image down in the browser, then stores it. */
+  saveChannelLogo: (channel: BusinessChannelId, file: File) => Promise<void>
+  removeChannelLogo: (channel: BusinessChannelId) => Promise<void>
   /** Puts a month back on its sales file's figure. */
   removeNykaaDiscount: (month: string) => Promise<void>
   /** Saves a month's fixed operating costs. Keyed on (month, category), so
@@ -244,12 +253,12 @@ export const useDataStore = create<DataState>((set, get) => {
         const [dataset, mapping, costs] = await Promise.all([
           api.get<SharedDataset>('/api/state'),
           api.get<Omit<MappingTablesState, 'costVersions' | 'fxRates' | 'freightRates' | 'nykaaDiscounts'>>('/api/sku-map'),
-          api.get<{ versions: CostVersion[]; fxRates?: FxRate[]; freightRates?: FreightRate[]; nykaaDiscounts?: NykaaDiscountEntry[] }>('/api/cost-versions'),
+          api.get<{ versions: CostVersion[]; fxRates?: FxRate[]; freightRates?: FreightRate[]; nykaaDiscounts?: NykaaDiscountEntry[]; channelLogos?: ChannelLogo[] }>('/api/cost-versions'),
         ])
         set({
           ...dataset, ...mapping, costVersions: costs.versions,
           fxRates: costs.fxRates ?? [], freightRates: costs.freightRates ?? [],
-          nykaaDiscounts: costs.nykaaDiscounts ?? [],
+          nykaaDiscounts: costs.nykaaDiscounts ?? [], channelLogos: costs.channelLogos ?? [],
           loading: false, error: null,
         })
         // Point the dashboard at the newest month that has data. Left on the
@@ -393,6 +402,16 @@ export const useDataStore = create<DataState>((set, get) => {
     saveFxRate: (rate) => writeThen(() => api.post('/api/cost-versions', { fxRates: [rate] })),
     saveFreightRate: (rate) => writeThen(() => api.post('/api/cost-versions', { freightRates: [rate] })),
     saveNykaaDiscount: (entry) => writeThen(() => api.post('/api/cost-versions', { nykaaDiscounts: [entry] })),
+
+    saveChannelLogo: async (channel, file) => {
+      const dataUrl = await prepareLogoForUpload(file)
+      await writeThen(() => api.post('/api/cost-versions', {
+        channelLogos: [{ channel, dataUrl, fileName: file.name }],
+      }))
+    },
+    removeChannelLogo: (channel) => writeThen(() => api.delete(
+      `/api/cost-versions?logoChannel=${encodeURIComponent(channel)}`,
+    )),
     removeNykaaDiscount: (month) => writeThen(() => api.delete(
       `/api/cost-versions?nykaaDiscountMonth=${encodeURIComponent(month)}`,
     )),

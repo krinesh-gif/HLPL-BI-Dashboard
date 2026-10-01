@@ -17,6 +17,26 @@ interface SaveBody {
    * rates above: the function budget is full, and a fixed expense is the same
    * kind of thing — a financial figure stamped with the month it belongs to. */
   fixedExpenses?: unknown
+  /** A channel's logo. Here for the same reason as the rest: the function
+   * budget is full, and this is another hand-entered setting the dashboard
+   * reads once at load. */
+  channelLogos?: unknown
+}
+
+interface ChannelLogoInput { channel: string; dataUrl: string; fileName?: string }
+
+/** Roughly a megabyte of base64, which is about 750 KB of image. Anything
+ * larger has not been through the browser's downscale, and a logo drawn at
+ * twenty pixels has no business weighing more than the page around it. */
+const MAX_LOGO_CHARS = 1_400_000
+
+function isChannelLogoArray(v: unknown): v is ChannelLogoInput[] {
+  return (
+    Array.isArray(v) &&
+    v.every((l) => l && typeof l === 'object'
+      && isNonEmptyString((l as ChannelLogoInput).channel)
+      && isNonEmptyString((l as ChannelLogoInput).dataUrl))
+  )
 }
 
 /**
@@ -177,7 +197,17 @@ export async function GET(request: Request): Promise<Response> {
     SELECT month, lane, per_unit_inr, note, updated_at FROM freight_rates ORDER BY lane, month DESC
   `) as Row[]
 
+  const logoRows = (await sql`
+    SELECT channel, data_url, file_name, updated_at FROM channel_logos ORDER BY channel
+  `) as Row[]
+
   return json({
+    channelLogos: logoRows.map((r) => ({
+      channel: String(r.channel),
+      dataUrl: String(r.data_url),
+      fileName: r.file_name ? String(r.file_name) : '',
+      updatedAt: r.updated_at ? new Date(String(r.updated_at)).toISOString() : undefined,
+    })),
     nykaaDiscounts: nykaaDiscountRows.map((r) => ({
       month: String(r.month),
       amountInr: Number(r.amount_inr),
@@ -223,6 +253,37 @@ export async function POST(request: Request): Promise<Response> {
   if (auth.response) return auth.response
 
   const body = await readJson<SaveBody>(request)
+
+  if (body && body.channelLogos !== undefined) {
+    if (!isChannelLogoArray(body.channelLogos)) {
+      return json({ error: 'Expected { channelLogos: [{ channel, dataUrl }] }.' }, 400)
+    }
+    if (body.channelLogos.length === 0) return json({ saved: 0 })
+    for (const logo of body.channelLogos) {
+      // An image bigger than this is one the browser failed to scale down, and
+      // storing it would put a megabyte into every page load of the dashboard.
+      if (logo.dataUrl.length > MAX_LOGO_CHARS) {
+        return json({ error: `The logo for ${logo.channel} is too large. Use an image under 1 MB.` }, 413)
+      }
+      if (!/^data:image\/(png|jpeg|webp|svg\+xml);base64,/.test(logo.dataUrl)) {
+        return json({ error: 'A logo must be a PNG, JPEG, WEBP or SVG image.' }, 400)
+      }
+    }
+    await sql.query(
+      `INSERT INTO channel_logos (channel, data_url, file_name, updated_by)
+       SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::text[])
+       ON CONFLICT (channel) DO UPDATE SET
+         data_url = EXCLUDED.data_url, file_name = EXCLUDED.file_name,
+         updated_by = EXCLUDED.updated_by, updated_at = now()`,
+      [
+        body.channelLogos.map((l) => l.channel),
+        body.channelLogos.map((l) => l.dataUrl),
+        body.channelLogos.map((l) => l.fileName ?? ''),
+        body.channelLogos.map(() => auth.user.id),
+      ],
+    )
+    return json({ saved: body.channelLogos.length })
+  }
 
   if (body && body.fixedExpenses !== undefined) {
     if (!isFixedExpenseArray(body.fixedExpenses)) {
@@ -377,6 +438,14 @@ export async function DELETE(request: Request): Promise<Response> {
   if (auth.response) return auth.response
 
   const url = new URL(request.url)
+
+  // Removing a logo puts the channel back to showing its name, which is what
+  // it did before one was uploaded.
+  const logoChannel = url.searchParams.get('logoChannel')
+  if (isNonEmptyString(logoChannel)) {
+    await sql`DELETE FROM channel_logos WHERE channel = ${logoChannel}`
+    return json({ deleted: 1 })
+  }
 
   const expenseMonth = url.searchParams.get('expenseMonth')
   const expenseCategory = url.searchParams.get('expenseCategory')

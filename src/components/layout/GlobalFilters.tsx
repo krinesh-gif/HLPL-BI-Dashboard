@@ -34,7 +34,7 @@ export function GlobalFilters({ showChannel = true }: { showChannel?: boolean })
     // The filters float on the plane as their own controls rather than sitting
     // in a bordered strip, so the eye goes straight from the page title to the
     // first card instead of crossing two full-width rules to get there.
-    <div className="flex flex-wrap items-center gap-2.5 px-6 pb-2">
+    <div className="flex flex-wrap items-center gap-2">
       <FilterSelect
         label="Month"
         value={month}
@@ -57,7 +57,7 @@ export function GlobalFilters({ showChannel = true }: { showChannel?: boolean })
         <button
           type="button"
           onClick={reset}
-          className="ml-auto rounded-full border border-[var(--line)] bg-[var(--surface)] px-3.5 py-2 text-xs font-medium text-[var(--ink-2)] shadow-[var(--shadow-card)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--ink)]"
+          className="rounded-full border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] shadow-[var(--shadow-card)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--ink)]"
         >
           Reset filters
         </button>

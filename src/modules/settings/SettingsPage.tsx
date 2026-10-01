@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { channelLabel, SOURCE_MAP, channelOfSource } from '@/config/channels'
 import type { SalesSourceId } from '@/config/channels'
 import { DEFAULT_CHANNEL_FEE_RATES } from '@/config/marketplaceFees'
+import { ChannelLogoSettings } from './ChannelLogoSettings'
 
 export function SettingsPage() {
   return (
@@ -11,6 +12,8 @@ export function SettingsPage() {
       subtitle="What this dashboard assumes, and where the figures you control are entered"
       showFilters={false}
     >
+      <ChannelLogoSettings />
+
       <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4 text-sm text-[var(--ink-2)]">
         <h3 className="mb-2 text-sm font-semibold text-[var(--ink)]">Where to change things</h3>
         <ul className="space-y-1.5">

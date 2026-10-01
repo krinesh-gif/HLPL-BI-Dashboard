@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import type { ReactNode } from 'react'
+import { Children, type ReactNode } from 'react'
 
 export interface KPICardProps {
   label: string
@@ -48,9 +48,14 @@ export function KPICard({ label, value, delta, tone = 'neutral', note, spark, ac
   const color = `var(--series-${accent})`
 
   return (
+    // The tile sizes itself to the width it is given rather than to the grid,
+    // so eight across and four across are the same component. A row of eight
+    // leaves each about 150px: at that width the chip shrinks, the sparkline
+    // goes, and the figure steps down a size — all of which is better than
+    // eight figures too small to read, which is what a fixed size would give.
     <div
       className={clsx(
-        'group relative flex flex-col justify-between overflow-hidden rounded-[var(--radius-card)] p-4',
+        '@container group relative flex flex-col justify-between overflow-hidden rounded-[var(--radius-card)] p-3 @[190px]:p-4',
         'border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)]',
         'transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-pop)]',
       )}
@@ -60,17 +65,17 @@ export function KPICard({ label, value, delta, tone = 'neutral', note, spark, ac
           size that reads without competing with the figure. */}
       <span
         aria-hidden
-        className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-chip)]"
+        className="flex h-7 w-7 items-center justify-center rounded-[10px] @[190px]:h-9 @[190px]:w-9 @[190px]:rounded-[var(--radius-chip)]"
         style={{ background: `color-mix(in oklab, ${color} 14%, transparent)` }}
       >
-        <span className="h-3 w-3 rounded-[5px]" style={{ background: color }} />
+        <span className="h-2.5 w-2.5 rounded-[4px] @[190px]:h-3 @[190px]:w-3 @[190px]:rounded-[5px]" style={{ background: color }} />
       </span>
 
-      <div className="mt-3.5 min-w-0">
-        <div className="truncate text-[13px] font-medium text-[var(--ink-3)]">{label}</div>
+      <div className="mt-2.5 min-w-0 @[190px]:mt-3.5">
+        <div className="truncate text-[12px] font-medium text-[var(--ink-3)] @[190px]:text-[13px]" title={label}>{label}</div>
         <div
           className={clsx(
-            'mt-1.5 text-[24px] leading-none font-bold tracking-[-0.02em]',
+            'mt-1 text-[18px] leading-none font-bold tracking-[-0.02em] @[190px]:mt-1.5 @[190px]:text-[24px]',
             tone === 'good' && 'text-[var(--good-ink)]',
             tone === 'bad' && 'text-[var(--critical-ink)]',
             tone === 'neutral' && 'text-[var(--ink)]',
@@ -81,7 +86,7 @@ export function KPICard({ label, value, delta, tone = 'neutral', note, spark, ac
       </div>
 
       {(delta || (spark && spark.length > 1)) && (
-        <div className="mt-3 flex items-end justify-between gap-2">
+        <div className="mt-2.5 flex items-end justify-between gap-2 @[190px]:mt-3">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             {delta && (
               <span
@@ -100,7 +105,11 @@ export function KPICard({ label, value, delta, tone = 'neutral', note, spark, ac
             {delta?.label && <span className="truncate text-[11px] text-[var(--ink-3)]">{delta.label}</span>}
           </div>
           {spark && spark.length > 1 && (
-            <div className="shrink-0">
+            // The shape goes before the figure does. In a narrow tile it is
+            // the first thing that can be spared, because the number above it
+            // carries the magnitude and the delta beside it carries the
+            // direction; the sparkline only says how it got there.
+            <div className="hidden shrink-0 @[190px]:block">
               <Sparkline points={spark} color={color} />
             </div>
           )}
@@ -113,12 +122,24 @@ export function KPICard({ label, value, delta, tone = 'neutral', note, spark, ac
 }
 
 /**
- * Four across on a wide screen, not eight.
+ * One row, however many tiles there are.
  *
- * Eight fitted only because the tiles were small enough to be unreadable at a
- * glance, which is the one thing a figure at the top of a page has to be. A
- * second row of four costs nothing on a scrolling page.
+ * The column count follows the number of tiles rather than being fixed, so a
+ * page with eight gets eight across and a page with four gets four — neither
+ * wraps onto a second row, and neither leaves half a row empty. The tiles
+ * themselves adapt to the width that leaves them.
  */
 export function KPIGrid({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{children}</div>
+  const count = Children.count(children)
+  const wide: Record<number, string> = {
+    1: 'lg:grid-cols-1', 2: 'lg:grid-cols-2', 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4',
+    5: 'lg:grid-cols-5', 6: 'lg:grid-cols-6', 7: 'lg:grid-cols-7', 8: 'lg:grid-cols-8',
+  }
+  return (
+    // Spelled out rather than built as `lg:grid-cols-${n}`, because Tailwind
+    // reads the source for class names and never sees an interpolated one.
+    <div className={clsx('grid grid-cols-2 gap-3 sm:grid-cols-4', wide[Math.min(count, 8)] ?? 'lg:grid-cols-8')}>
+      {children}
+    </div>
+  )
 }
