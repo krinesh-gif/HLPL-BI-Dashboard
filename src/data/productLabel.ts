@@ -1,5 +1,5 @@
 import type { SkuMaster } from './models'
-import type { SkuMapping } from './skuMapping'
+import type { ComboComponent, SkuMapping } from './skuMapping'
 
 /**
  * What a product is called on screen.
@@ -32,6 +32,8 @@ export interface ProductLabel {
 export interface ProductLabelTables {
   skuMaster: SkuMaster[]
   mappings?: SkuMapping[]
+  /** Recipes, so a combo can be named by what is in it. */
+  comboComponents?: ComboComponent[]
 }
 
 /** Builds the lookups once, for a table that resolves several hundred rows. */
@@ -39,10 +41,45 @@ export function productLabelResolver(tables: ProductLabelTables): (sku: string, 
   const master = new Map(tables.skuMaster.map((s) => [s.sku, s]))
   const mapped = new Map((tables.mappings ?? []).map((m) => [m.channelSku, m.internalSku]))
 
+  const recipes = new Map<string, ComboComponent[]>()
+  for (const component of tables.comboComponents ?? []) {
+    const existing = recipes.get(component.comboSku)
+    if (existing) existing.push(component)
+    else recipes.set(component.comboSku, [component])
+  }
+
+  /**
+   * A combo has no Product Master row of its own — it is defined by its
+   * recipe, and giving every combo a second name to keep in step with its
+   * parts would be a copy that drifts. So it is named from what is in it.
+   *
+   * NX/Spray/Sunscreen/300 is three of NX/Spray/Sunscreen/100, and before this
+   * it was reported as unmapped on the channel dashboards while SKU Mapping
+   * showed it fully mapped and costed. Both were reading the same tables; only
+   * one of them knew what a combo was.
+   */
+  const nameCombo = (sku: string): string | null => {
+    const parts = recipes.get(sku)
+    if (!parts || parts.length === 0) return null
+    const described = parts.map((part) => {
+      // One level only. A component that is itself a combo is named by its own
+      // code rather than expanded, which keeps a recipe that refers back to
+      // itself from looping for ever.
+      const partMaster = master.get(mapped.get(part.componentSku) ?? part.componentSku) ?? master.get(part.componentSku)
+      const name = partMaster?.productName ?? part.componentSku
+      return part.quantity === 1 ? name : `${name} × ${part.quantity}`
+    })
+    return described.join(' + ')
+  }
+
   return (sku: string, fallbackTitle?: string): ProductLabel => {
     const internal = mapped.get(sku) ?? sku
     const found = master.get(internal) ?? master.get(sku)
     if (found) return { title: found.productName, sku: found.sku, resolved: true }
+
+    const combo = nameCombo(internal) ?? nameCombo(sku)
+    if (combo) return { title: combo, sku: internal, resolved: true }
+
     // Nothing in the master. A marketplace title that merely repeats the code
     // adds nothing, so the code alone is shown rather than printed twice.
     const title = fallbackTitle && fallbackTitle !== sku ? fallbackTitle : sku

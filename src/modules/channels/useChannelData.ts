@@ -31,7 +31,7 @@ const TREND_MONTHS = 6
  * the P&L lives in one place so a channel's numbers cannot be defined twice.
  */
 export function useChannelData(channel: BusinessChannelId, source?: SalesSourceId) {
-  const { salesRecords, skuMaster, mappings, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts } = useDataStore()
+  const { salesRecords, skuMaster, mappings, comboComponents, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts } = useDataStore()
   const { month, monthChosenByUser } = useFilterStore()
   const defaultMonthTo = useFilterStore((s) => s.defaultMonthTo)
   const fallbackMonthTo = useFilterStore((s) => s.fallbackMonthTo)
@@ -110,7 +110,7 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
     const categorySales = Array.from(categoryTotals.entries()).map(([name, value]) => ({ name, value }))
 
     const bySku = groupBySku(currentRecords)
-    const label = productLabelResolver({ skuMaster, mappings })
+    const label = productLabelResolver({ skuMaster, mappings, comboComponents })
     const skuRows = Array.from(bySku.entries()).map(([sku, records]) => {
       const facts = orderBasisNetSales(records)
       return { sku, productName: label(sku, records[0]?.productName).title, netSales: facts.netSales, units: facts.units }
@@ -149,5 +149,5 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
       topSkus: [...skuRows].sort((a, b) => b.netSales - a.netSales).slice(0, 5),
       bottomSkus: [...skuRows].sort((a, b) => a.netSales - b.netSales).slice(0, 5),
     }
-  }, [salesRecords, skuMaster, mappings, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, channel, source, month])
+  }, [salesRecords, skuMaster, mappings, comboComponents, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, channel, source, month])
 }

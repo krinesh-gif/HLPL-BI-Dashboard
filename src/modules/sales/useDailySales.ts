@@ -53,7 +53,7 @@ function isoDaysAgo(from: string, days: number): string {
  * over here.
  */
 export function useDailySales() {
-  const { salesRecords, skuMaster, mappings } = useDataStore()
+  const { salesRecords, skuMaster, mappings, comboComponents } = useDataStore()
 
   const latestDate = useMemo(() => {
     let latest = ''
@@ -141,7 +141,7 @@ export function useDailySales() {
     // The Product Master name, reached through the channel-code mapping, so a
     // SKU reads the same here as everywhere else rather than carrying whatever
     // title the marketplace happened to list it under.
-    const label = productLabelResolver({ skuMaster, mappings })
+    const label = productLabelResolver({ skuMaster, mappings, comboComponents })
     return {
       categories: distinctCategories(salesRecords.map((r) => r.category)),
       // Only SKUs that actually sold — the full Product Master is hundreds of
@@ -151,7 +151,7 @@ export function useDailySales() {
         label: label(sku).title,
       })),
     }
-  }, [salesRecords, skuMaster, mappings])
+  }, [salesRecords, skuMaster, mappings, comboComponents])
 
   return { ...result, filters: { ...filters, from, to }, setFilters, options, latestDate }
 }

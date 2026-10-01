@@ -63,3 +63,69 @@ describe('resolving a table of rows', () => {
     expect(resolve('UNKNOWN', 'Some title').resolved).toBe(false)
   })
 })
+
+/**
+ * The owner's own combo: NX/Spray/Sunscreen/300 is three of the 100 ml spray.
+ *
+ * It had no Product Master row — a combo is defined by its recipe, and giving
+ * every combo a second name to keep in step with its parts would be a copy
+ * that drifts. The channel dashboards called it unmapped while SKU Mapping
+ * showed it mapped, costed and verified. Both read the same tables; only one
+ * of them knew what a combo was.
+ */
+describe('a combo, which has no Product Master row of its own', () => {
+  const comboMaster: SkuMaster[] = [
+    { sku: 'NX/Spray/Sunscreen/100', productName: 'Aravi Organic NX Sunscreen Spray - 100 ml', category: 'Sun Care',
+      brand: 'AO', cogs: 95, mrp: 599, launchDate: '2026-01-01', status: 'active', leadTimeDays: 21, safetyStock: 0 },
+  ]
+  const comboTables = {
+    skuMaster: comboMaster,
+    mappings: [
+      { channelSku: 'NX/Spray/Sunscreen/300', internalSku: 'NX/Spray/Sunscreen/300', kind: 'COMBO', source: 'manual', verified: true },
+    ] as SkuMapping[],
+    comboComponents: [
+      { comboSku: 'NX/Spray/Sunscreen/300', componentSku: 'NX/Spray/Sunscreen/100', quantity: 3, source: 'manual' as const },
+    ],
+  }
+
+  it('names it from what is in it, and does not call it unmapped', () => {
+    expect(productLabel('NX/Spray/Sunscreen/300', comboTables)).toEqual({
+      title: 'Aravi Organic NX Sunscreen Spray - 100 ml × 3',
+      sku: 'NX/Spray/Sunscreen/300',
+      resolved: true,
+    })
+  })
+
+  it('still reports a code with neither a master row nor a recipe as unmapped', () => {
+    expect(productLabel('NX/Spray/Sunscreen/500', comboTables).resolved).toBe(false)
+  })
+
+  it('leaves a quantity of one unlabelled rather than writing × 1', () => {
+    const single = {
+      ...comboTables,
+      comboComponents: [{ comboSku: 'KIT/A', componentSku: 'NX/Spray/Sunscreen/100', quantity: 1, source: 'manual' as const }],
+    }
+    expect(productLabel('KIT/A', single).title).toBe('Aravi Organic NX Sunscreen Spray - 100 ml')
+  })
+
+  it('joins a recipe with more than one part', () => {
+    const pair = {
+      ...comboTables,
+      comboComponents: [
+        { comboSku: 'KIT/B', componentSku: 'NX/Spray/Sunscreen/100', quantity: 2, source: 'manual' as const },
+        { comboSku: 'KIT/B', componentSku: 'AO/Unknown/Code', quantity: 1, source: 'manual' as const },
+      ],
+    }
+    // A part with no master row of its own is named by its code rather than
+    // dropped: a recipe that lists two things has to print two things.
+    expect(productLabel('KIT/B', pair).title).toBe('Aravi Organic NX Sunscreen Spray - 100 ml × 2 + AO/Unknown/Code')
+  })
+
+  it('does not loop on a recipe that refers back to itself', () => {
+    const cyclic = {
+      ...comboTables,
+      comboComponents: [{ comboSku: 'KIT/C', componentSku: 'KIT/C', quantity: 2, source: 'manual' as const }],
+    }
+    expect(productLabel('KIT/C', cyclic).title).toBe('KIT/C × 2')
+  })
+})

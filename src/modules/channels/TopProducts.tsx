@@ -82,7 +82,7 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
     // One name per product, from the Product Master, reached through the SKU
     // mapping. Marketplace listing titles differ per channel, run to four
     // wrapped lines, and are sometimes just the SKU code repeated.
-    const label = productLabelResolver({ skuMaster, mappings })
+    const label = productLabelResolver({ skuMaster, mappings, comboComponents })
 
     const result: ProductRow[] = [...currentBySku.entries()].map(([sku, records]) => {
       const figure = orderBasisNetSales(records)
