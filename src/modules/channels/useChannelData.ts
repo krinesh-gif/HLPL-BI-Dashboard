@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
 import type { BusinessChannelId, SalesSourceId } from '@/config/channels'
@@ -32,7 +32,57 @@ const TREND_MONTHS = 6
  */
 export function useChannelData(channel: BusinessChannelId, source?: SalesSourceId) {
   const { salesRecords, skuMaster, mappings, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts } = useDataStore()
-  const { month } = useFilterStore()
+  const { month, monthChosenByUser } = useFilterStore()
+  const defaultMonthTo = useFilterStore((s) => s.defaultMonthTo)
+  const fallbackMonthTo = useFilterStore((s) => s.fallbackMonthTo)
+
+  /**
+   * The newest month this channel itself has anything for.
+   *
+   * The app-wide default is the newest month *any* channel has, which is the
+   * right answer for a consolidated screen and the wrong one here: a channel
+   * whose last upload stopped a month or two earlier opens on a month it has
+   * no data for, and an empty dashboard looks exactly like a failed import.
+   * Settlement months count as well as order rows, because a channel can be
+   * settled for a month whose order report has not been uploaded.
+   */
+  const monthsWithData = useMemo(() => {
+    const months: string[] = salesRecords
+      .filter((r) => (source ? r.channel === source : channelOfSource(r.channel) === channel))
+      .map((r) => r.orderDate.slice(0, 7))
+
+    const settlementMonths: Record<BusinessChannelId, { month: string }[]> = {
+      flipkart: flipkartFacts, amazon_us: amazonUsaFacts, meesho: meeshoFacts,
+      myntra: myntraFacts ?? [], nykaa: nykaaFacts ?? [], amazon_in: [], purplle: [],
+    }
+    // Narrowing to one report inside a channel rules the settlement months
+    // out: a settlement covers the whole channel, not one of its reports.
+    if (!source) months.push(...settlementMonths[channel].map((f) => f.month))
+
+    return new Set(months.filter(Boolean))
+  }, [salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, channel, source])
+
+  const latestMonthForChannel = useMemo(
+    () => (monthsWithData.size === 0 ? null : [...monthsWithData].reduce((a, b) => (a > b ? a : b))),
+    [monthsWithData],
+  )
+
+  /**
+   * Open on the newest month this channel has.
+   *
+   * Two separate cases. Nobody has picked a month, so the app-wide default is
+   * in force — that default is the newest month *any* channel has, which is
+   * the wrong answer for a channel whose uploads stopped earlier. And someone
+   * has picked a month that this channel has nothing for, which is not really
+   * a choice about this screen: it is a blank page, and a blank page here
+   * reads as a failed import rather than as a month with no trade.
+   */
+  useEffect(() => {
+    if (!latestMonthForChannel) return
+    if (monthsWithData.has(month)) return
+    if (monthChosenByUser) fallbackMonthTo(latestMonthForChannel)
+    else defaultMonthTo(latestMonthForChannel)
+  }, [latestMonthForChannel, monthsWithData, month, monthChosenByUser, defaultMonthTo, fallbackMonthTo])
 
   return useMemo(() => {
     const previousMonth = addMonths(month, -1)

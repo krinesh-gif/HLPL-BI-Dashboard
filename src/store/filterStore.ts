@@ -21,6 +21,16 @@ interface FilterState extends GlobalFilters {
    * Without this the app opens on the current calendar month and every page
    * looks empty whenever the latest upload covers an earlier period. */
   defaultMonthTo: (month: string) => void
+  /**
+   * Moves the month to one the screen being opened actually has data for.
+   *
+   * Unlike `defaultMonthTo` this overrides a month the user picked, and only a
+   * screen that has established the current one is empty for it should call
+   * it. A month chosen on a channel that has figures for it is a real choice;
+   * the same month on a channel whose data stops earlier is not a choice, it
+   * is a blank page that reads as a failed import.
+   */
+  fallbackMonthTo: (month: string) => void
   reset: () => void
 }
 
@@ -40,5 +50,6 @@ export const useFilterStore = create<FilterState>((set) => ({
   setSku: (sku) => set({ sku }),
   defaultMonthTo: (month) =>
     set((state) => (state.monthChosenByUser || !month ? {} : { month })),
+  fallbackMonthTo: (month) => set((state) => (month && month !== state.month ? { month } : {})),
   reset: () => set({ ...DEFAULTS, monthChosenByUser: false }),
 }))
