@@ -24,7 +24,7 @@ export function OverviewPage() {
       <Card className="overflow-hidden !p-0">
         <div className="grid gap-6 lg:grid-cols-[minmax(240px,340px)_1fr]">
           <div className="flex flex-col justify-center gap-1 border-b border-[var(--line)] p-6 lg:border-r lg:border-b-0">
-            <div className="text-[11px] font-semibold tracking-wide text-[var(--ink-3)] uppercase">
+            <div className="text-[11px] font-semibold text-[var(--ink-3)]">
               Net Sales · {monthLabel(d.month)}
             </div>
             <div className="text-[40px] leading-none font-semibold text-[var(--ink)]">
@@ -53,7 +53,7 @@ export function OverviewPage() {
                 ['EBITDA margin', formatPercent(d.masterCurrent.lines.ebitdaMarginPct ?? 0)],
               ].map(([k, v]) => (
                 <div key={k}>
-                  <dt className="text-[10px] font-semibold tracking-wide text-[var(--ink-3)] uppercase">{k}</dt>
+                  <dt className="text-[10px] font-semibold text-[var(--ink-3)]">{k}</dt>
                   <dd className="mt-0.5 text-[15px] font-semibold text-[var(--ink)]">{v}</dd>
                 </div>
               ))}
@@ -139,7 +139,7 @@ function Section({ title, children }: { title: keyof typeof SECTION_ACCENT; chil
   const accent = SECTION_ACCENT[title]
   return (
     <section>
-      <h2 className="mb-3 flex items-center gap-2 text-[11px] font-semibold tracking-wide text-[var(--ink-3)] uppercase">
+      <h2 className="mb-3 flex items-center gap-2 text-[11px] font-semibold text-[var(--ink-3)]">
         <span aria-hidden className="h-2.5 w-2.5 rounded-full" style={{ background: `var(--series-${accent})` }} />
         {title}
       </h2>

@@ -35,7 +35,14 @@ export function Card({
   )
 }
 
-/** A card's heading row: title on the left, controls on the right. */
+/**
+ * A card's heading row: title on the left, controls on the right.
+ *
+ * Sentence case at reading size, not a tracked-out uppercase label. A panel
+ * here is a thing with a name — "Net sales by channel" — and setting that name
+ * in capitals turns it into a field label on a form, which is both harder to
+ * read and a smaller-feeling piece of furniture than the panel deserves.
+ */
 export function CardHeader({
   title,
   subtitle,
@@ -48,10 +55,10 @@ export function CardHeader({
   className?: string
 }) {
   return (
-    <div className={clsx('mb-4 flex items-start justify-between gap-4', className)}>
+    <div className={clsx('mb-5 flex items-start justify-between gap-4', className)}>
       <div className="min-w-0">
-        <h3 className="text-[13px] font-semibold tracking-wide text-[var(--ink)] uppercase">{title}</h3>
-        {subtitle && <p className="mt-1 text-xs text-[var(--ink-3)]">{subtitle}</p>}
+        <h3 className="truncate text-[15px] leading-tight font-semibold tracking-[-0.01em] text-[var(--ink)]">{title}</h3>
+        {subtitle && <p className="mt-1 text-[12px] text-[var(--ink-3)]">{subtitle}</p>}
       </div>
       {actions && <div className="shrink-0">{actions}</div>}
     </div>

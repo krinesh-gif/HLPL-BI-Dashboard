@@ -220,7 +220,7 @@ export function MonthlyInputsPage() {
 
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-[var(--surface-2)] text-[11px] uppercase tracking-wide text-[var(--ink-3)]">
+            <thead className="bg-[var(--surface-2)] text-[11px] font-semibold text-[var(--ink-3)]">
               <tr>
                 <th className="sticky left-0 z-10 bg-[var(--surface-2)] px-5 py-2.5 text-left">Month</th>
                 {COLUMNS.map((c) => (
@@ -286,7 +286,7 @@ export function MonthlyInputsPage() {
       </Card>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--ink-3)]">
+        <h2 className="mb-3 text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink)]">
           Fixed expenses for {monthLabel(months[0] ?? thisMonth)}, by channel — {formatCurrencyFull(latestFixed)}
         </h2>
         <p className="mb-3 text-xs text-[var(--ink-2)]">

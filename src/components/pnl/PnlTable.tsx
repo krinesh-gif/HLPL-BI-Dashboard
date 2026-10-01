@@ -24,7 +24,7 @@ export function PnlTable({ lines, currency = 'INR' }: { lines: PnlLineValues; cu
               <Fragment key={def.key}>
                 {showSectionHeader && (
                   <tr key={`${def.section}-header`} className="bg-[var(--surface-2)]">
-                    <td colSpan={2} className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">
+                    <td colSpan={2} className="px-4 py-1.5 text-xs font-semibold text-[var(--ink-3)]">
                       {SECTION_LABELS[def.section as PnlSection]}
                     </td>
                   </tr>

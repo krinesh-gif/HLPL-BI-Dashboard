@@ -77,8 +77,8 @@ export function DataTable<T>({ columns, rows, pageSize = 20, searchable = true, 
   }
 
   return (
-    <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)]">
-      <div className="flex items-center justify-between gap-2 border-b border-[var(--line)] p-3">
+    <div className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
+      <div className="flex items-center justify-between gap-2 p-4">
         {searchable ? (
           <input
             value={search}
@@ -86,8 +86,8 @@ export function DataTable<T>({ columns, rows, pageSize = 20, searchable = true, 
               setSearch(e.target.value)
               setPage(0)
             }}
-            placeholder="Search..."
-            className="w-56 rounded-md border border-[var(--line-2)] px-3 py-1.5 text-sm focus:border-[var(--accent)] focus:outline-none"
+            placeholder="Search this table"
+            className="w-64 rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:border-[var(--accent)] focus:bg-[var(--surface)] focus:outline-none"
           />
         ) : (
           <div />
@@ -95,7 +95,7 @@ export function DataTable<T>({ columns, rows, pageSize = 20, searchable = true, 
         <button
           type="button"
           onClick={handleExport}
-          className="rounded-md border border-[var(--line-2)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--surface-hover)]"
+          className="rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface-2)] px-3.5 py-2 text-xs font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--ink)]"
         >
           Export CSV
         </button>
@@ -109,7 +109,7 @@ export function DataTable<T>({ columns, rows, pageSize = 20, searchable = true, 
                   key={col.key}
                   onClick={() => handleSort(col.key)}
                   className={clsx(
-                    'cursor-pointer select-none whitespace-nowrap px-3 py-2 text-xs font-semibold text-[var(--ink-3)] hover:text-[var(--ink)]',
+                    'cursor-pointer select-none whitespace-nowrap px-4 py-3 text-xs font-semibold text-[var(--ink-3)] hover:text-[var(--ink)]',
                     col.align === 'right' ? 'text-right' : 'text-left',
                   )}
                 >
@@ -121,11 +121,11 @@ export function DataTable<T>({ columns, rows, pageSize = 20, searchable = true, 
           </thead>
           <tbody>
             {pageRows.map((row, i) => (
-              <tr key={i} className="border-t border-[var(--line)] hover:bg-[var(--surface-hover)]">
+              <tr key={i} className="border-t border-[var(--line)] transition-colors hover:bg-[var(--surface-hover)]">
                 {columns.map((col) => (
                   <td
                     key={col.key}
-                    className={clsx('whitespace-nowrap px-3 py-2 text-[var(--ink-2)]', col.align === 'right' ? 'text-right tabular-nums' : 'text-left')}
+                    className={clsx('whitespace-nowrap px-4 py-3 text-[var(--ink-2)]', col.align === 'right' ? 'text-right tabular-nums' : 'text-left')}
                   >
                     {col.render ? col.render(row) : col.accessor(row)}
                   </td>

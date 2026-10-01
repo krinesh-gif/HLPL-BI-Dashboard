@@ -17,7 +17,7 @@ function sectionContainsPath(section: NavSection, pathname: string): boolean {
 /** The active pill, shared by top-level items and children so "where am I"
  * looks the same at both depths. */
 const itemBase =
-  'group relative flex items-center gap-2.5 rounded-[var(--radius-control)] px-3 py-2 text-[13px] font-medium transition-colors'
+  'group relative flex items-center gap-2.5 rounded-[var(--radius-control)] px-3 py-2.5 text-[13px] font-medium transition-colors'
 
 function SectionItem({ section }: { section: NavSection }) {
   const location = useLocation()
@@ -32,7 +32,7 @@ function SectionItem({ section }: { section: NavSection }) {
           clsx(
             itemBase,
             isActive
-              ? 'bg-[var(--accent)] text-[var(--accent-ink)] shadow-[0_2px_8px_color-mix(in_oklab,var(--accent)_35%,transparent)]'
+              ? 'bg-[var(--accent)] text-[var(--accent-ink)] shadow-[var(--shadow-accent)]'
               : 'text-[var(--ink-2)] hover:bg-[var(--surface-hover)] hover:text-[var(--ink)]',
           )
         }
@@ -135,12 +135,12 @@ export function Sidebar() {
 
   return (
     <aside className="flex h-full w-[248px] shrink-0 flex-col border-r border-[var(--line)] bg-[var(--surface)]">
-      <div className="flex items-center gap-2.5 px-4 py-4">
-        {/* The one place a gradient earns its keep: it makes the mark read as a
-            logo rather than as another UI chip. */}
+      <div className="flex items-center gap-2.5 px-4 py-5">
+        {/* Solid accent, lifted on its own shadow: the mark is the one piece of
+            chrome allowed to carry the brand colour at full strength, which is
+            what keeps it reading as a logo rather than as another UI chip. */}
         <div
-          className="flex h-9 w-9 items-center justify-center rounded-[11px] text-[13px] font-bold text-white"
-          style={{ background: 'linear-gradient(135deg, var(--accent), var(--series-5))' }}
+          className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-chip)] bg-[var(--accent)] text-[13px] font-bold text-[var(--accent-ink)] shadow-[var(--shadow-accent)]"
           aria-hidden
         >
           H

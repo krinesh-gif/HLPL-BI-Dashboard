@@ -38,7 +38,7 @@ export const CHART_TOOLTIP_STYLE = {
   contentStyle: {
     background: 'var(--surface)',
     border: '1px solid var(--line)',
-    borderRadius: 12,
+    borderRadius: 14,
     boxShadow: 'var(--shadow-pop)',
     fontSize: 12,
     color: 'var(--ink)',
@@ -48,9 +48,15 @@ export const CHART_TOOLTIP_STYLE = {
   cursor: { fill: 'var(--surface-hover)' },
 }
 
-/** Axis props shared by every chart, so ticks are recessive everywhere. */
+/**
+ * Axis props shared by every chart, so ticks are recessive everywhere.
+ *
+ * No axis line. The grid already says where the values are, and a drawn axis
+ * on top of it boxes the plot in without adding a reading — the series should
+ * be the darkest thing in the frame.
+ */
 export const CHART_AXIS_PROPS = {
   tick: { fontSize: 11, fill: 'var(--ink-3)' },
-  axisLine: { stroke: 'var(--axis)' },
+  axisLine: false,
   tickLine: false,
 } as const

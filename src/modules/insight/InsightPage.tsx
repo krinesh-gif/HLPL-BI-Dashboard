@@ -31,7 +31,7 @@ export function InsightPage() {
       )}
       {Object.entries(byCategory).map(([category, insights]) => (
         <section key={category}>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--ink-3)]">
+          <h2 className="mb-3 text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink)]">
             {CATEGORY_LABEL[category as Insight['category']]}
           </h2>
           <div className="space-y-2 rounded-lg border border-[var(--line)] bg-[var(--surface)] p-4">

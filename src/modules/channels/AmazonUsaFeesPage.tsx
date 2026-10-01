@@ -88,7 +88,7 @@ export function AmazonUsaFeesPage() {
                         {s.column.header.replace(/ total$/, '')}
                       </span>
                       {s.column.lever && (
-                        <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-[var(--good-ink)]">
+                        <span className="mt-0.5 block text-[10px] font-medium text-[var(--good-ink)]">
                           Actionable
                         </span>
                       )}
@@ -178,7 +178,7 @@ export function AmazonUsaFeesPage() {
                 <>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-[var(--surface-2)] text-[11px] uppercase tracking-wide text-[var(--ink-3)]">
+                      <thead className="bg-[var(--surface-2)] text-[11px] font-semibold text-[var(--ink-3)]">
                         <tr>
                           <th className="px-5 py-2.5 text-left">SKU</th>
                           {months.map((m) => (

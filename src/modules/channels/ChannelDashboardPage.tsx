@@ -215,7 +215,7 @@ export function ChannelDashboardPage() {
       </div>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[var(--ink-3)]">Top Products</h2>
+        <h2 className="mb-2 text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink)]">Top products</h2>
         <TopProducts channel={channel} source={source === 'all' ? undefined : source} />
       </section>
 

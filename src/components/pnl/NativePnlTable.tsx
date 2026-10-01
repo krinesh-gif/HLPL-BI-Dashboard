@@ -69,7 +69,7 @@ export function NativePnlTable({
               <Fragment key={def.key}>
                 {showSectionHeader && !collapsible && (
                   <tr className="bg-[var(--surface-2)]">
-                    <td colSpan={2} className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">
+                    <td colSpan={2} className="px-4 py-1.5 text-xs font-semibold text-[var(--ink-3)]">
                       {def.section}
                     </td>
                   </tr>

@@ -8,8 +8,9 @@
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
   /* Radii — generous, but not so round that dense tables look like toys. */
-  --radius-card: 16px;
-  --radius-control: 10px;
+  --radius-card: 18px;
+  --radius-control: 12px;
+  --radius-chip: 14px;
 }
 
 /*
@@ -23,22 +24,23 @@
 :root {
   color-scheme: light;
 
-  --plane: #f6f7f9;          /* page behind the cards */
+  --plane: #f4f6fa;          /* page behind the cards */
   --surface: #ffffff;        /* card / chart surface */
-  --surface-2: #f8f9fb;      /* nested panel, table header */
-  --surface-hover: #f1f3f7;
+  --surface-2: #f7f9fc;      /* nested panel, table header */
+  --surface-hover: #eff3f9;
 
-  --ink: #0f1115;            /* primary text */
-  --ink-2: #4b5563;          /* secondary */
-  --ink-3: #8b93a1;          /* muted: axis, captions */
+  --ink: #171a23;            /* primary text */
+  --ink-2: #5a6376;          /* secondary */
+  --ink-3: #959cad;          /* muted: axis, captions */
 
-  --line: #e6e8ee;           /* hairline border */
-  --line-2: #d7dae2;         /* stronger divider */
+  --line: #ecf0f6;           /* hairline border */
+  --line-2: #dde2ec;         /* stronger divider */
 
-  --accent: #5b5bd6;         /* UI accent — deliberately not a series colour,
+  --accent: #3b5bdb;         /* UI accent — deliberately not a series colour,
                                 so chrome never competes with the data */
   --accent-ink: #ffffff;
-  --accent-soft: #eeeefc;
+  --accent-soft: #eef1fd;
+  --accent-deep: #2c3f9e;    /* the weightier blue, for a filled feature panel */
 
   --good: #0ca30c;
   --warning: #fab219;
@@ -47,8 +49,8 @@
   --good-ink: #006300;       /* success text on light needs a darker step */
   --critical-ink: #b02a2a;
 
-  --grid: #e6e8ee;
-  --axis: #c9cdd6;
+  --grid: #eef1f7;
+  --axis: #d4d9e3;
 
   --series-1: #2a78d6;
   --series-2: #eb6834;
@@ -59,8 +61,12 @@
   --series-7: #4a3aa7;
   --series-8: #e34948;
 
-  --shadow-card: 0 1px 2px rgb(15 17 21 / 0.04), 0 4px 16px rgb(15 17 21 / 0.04);
-  --shadow-pop: 0 8px 32px rgb(15 17 21 / 0.10);
+  /* Diffuse and nearly colourless: on this plane a card should look set down
+     on the page rather than outlined on it, so the shadow does the separating
+     and the border is only there to hold the edge when it cannot. */
+  --shadow-card: 0 1px 2px rgb(23 26 35 / 0.03), 0 6px 24px -6px rgb(23 26 35 / 0.07);
+  --shadow-pop: 0 12px 40px -8px rgb(23 26 35 / 0.14);
+  --shadow-accent: 0 8px 24px -6px color-mix(in oklab, var(--accent) 45%, transparent);
 }
 
 :root[data-theme="dark"] {
@@ -78,9 +84,10 @@
   --line: #262a33;
   --line-2: #333845;
 
-  --accent: #7b7bf0;
+  --accent: #7d93f5;
   --accent-ink: #0e1014;
-  --accent-soft: #1e1f3d;
+  --accent-soft: #1c2447;
+  --accent-deep: #2b3b86;
 
   --good: #0ca30c;
   --warning: #fab219;
@@ -102,8 +109,9 @@
   --series-7: #9085e9;
   --series-8: #e66767;
 
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.3);
-  --shadow-pop: 0 8px 32px rgb(0 0 0 / 0.5);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 24px -6px rgb(0 0 0 / 0.45);
+  --shadow-pop: 0 12px 40px -8px rgb(0 0 0 / 0.6);
+  --shadow-accent: 0 8px 24px -6px color-mix(in oklab, var(--accent) 35%, transparent);
 }
 
 html, body, #root { height: 100%; }

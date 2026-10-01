@@ -170,7 +170,7 @@ export function PnlPage() {
         <table className="w-full min-w-max text-sm">
           <thead>
             <tr className="border-b-2 border-[var(--line-2)] bg-[var(--surface-2)]">
-              <th className="sticky left-0 z-20 min-w-56 bg-[var(--surface-2)] px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">
+              <th className="sticky left-0 z-20 min-w-56 bg-[var(--surface-2)] px-4 py-2.5 text-left text-xs font-semibold text-[var(--ink-3)]">
                 {r.view === 'master' ? 'Master Company' : channelLabel(r.view)}
                 {/* The figures below change currency, so the table says which
                     one it is in rather than leaving it to the symbol. */}
@@ -185,7 +185,7 @@ export function PnlPage() {
                   {monthLabel(m)}
                 </th>
               ))}
-              <th className="min-w-32 border-l-2 border-[var(--line-2)] bg-[var(--surface-2)] px-4 py-2.5 text-right text-xs font-bold uppercase tracking-wide text-[var(--ink-2)]">
+              <th className="min-w-32 border-l-2 border-[var(--line-2)] bg-[var(--surface-2)] px-4 py-2.5 text-right text-xs font-bold text-[var(--ink-2)]">
                 Total
               </th>
             </tr>
@@ -287,7 +287,7 @@ export function PnlPage() {
 
       {r.native && (
         <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--ink-3)]">
+          <h2 className="mb-3 text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink)]">
             {channelLabel(r.view as Exclude<PnlView, 'master'>)} — full statement, {monthLabel(r.nativeMonth)}
           </h2>
           {r.nativeNotes.map((note) => (

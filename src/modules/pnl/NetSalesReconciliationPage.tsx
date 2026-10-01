@@ -189,7 +189,7 @@ function ReconciliationRow({ row, open, onToggle }: { row: ChannelReconciliation
 function CauseList({ title, note, causes }: { title: string; note?: string; causes: ReconciliationCause[] }) {
   return (
     <div className="mt-3">
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">{title}</h4>
+      <h4 className="text-xs font-semibold text-[var(--ink-3)]">{title}</h4>
       {note && <p className="mt-0.5 text-xs text-[var(--ink-3)]">{note}</p>}
       <ul className="mt-1.5 space-y-1.5">
         {causes.map((c) => (
