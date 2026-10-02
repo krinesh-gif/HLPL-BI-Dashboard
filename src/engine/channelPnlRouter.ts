@@ -13,7 +13,7 @@ import type {
   PnlLineValues,
   SkuMaster,
 } from '@/data/models'
-import { channelOfSource } from '@/config/channels'
+import { channelLabel, channelOfSource } from '@/config/channels'
 import { MEESHO_ASSUMPTIONS, NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { formatCurrencyFull, toMonthKey } from '@/lib/format'
 import { allocateFixedExpensesForMonth } from './allocation'
@@ -615,10 +615,34 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
     }
   }
 
-  // Every other channel (and these three before any real facts are uploaded)
-  // falls back to the generic template built from order-level sales records.
+  // Every other channel (and these before any real facts are uploaded) falls
+  // back to the generic template built from order-level sales records.
+  //
+  // The fallback used to be silent, which is how a channel whose settlement
+  // events were never stored went months reading as though its statement were
+  // the real one. A template built from order rows is a different figure on a
+  // different basis — it cannot show the fees the settlement states, and its
+  // Gross Sales will not tie to the file's own column — so a month on it says
+  // so rather than letting the reader assume otherwise.
   const canonical = buildChannelPnl(inputs.salesRecords, inputs.skuMaster, inputs.fixedExpenses, channel, month, inputs.marketing, inputs.cogs)
-  return { channel, month, canonical, notes: [] }
+  const source = NATIVE_STATEMENT_SOURCE[channel]
+  return {
+    channel, month, canonical,
+    notes: source
+      ? [`No settlement report is stored for ${channelLabel(channel)} in ${month}, so this is built from the order rows instead. Its Gross Sales will not tie to the ${source}. Upload that report for the month to replace it.`]
+      : [],
+  }
+}
+
+/** What a channel's own statement is read from, for the six that have one. A
+ * channel missing from here has no native statement to be missing. */
+const NATIVE_STATEMENT_SOURCE: Partial<Record<BusinessChannelId, string>> = {
+  meesho: 'aggregated payment file',
+  flipkart: 'SKU-level P&L export',
+  myntra: 'P&L report',
+  nykaa: 'monthly sales file',
+  amazon_us: 'Product Profitability export',
+  amazon_in: 'settlement report',
 }
 
 export function buildAllChannelPnlViews(channels: BusinessChannelId[], month: string, inputs: ChannelPnlViewInputs): ChannelPnlView[] {

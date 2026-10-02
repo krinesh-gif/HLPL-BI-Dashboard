@@ -333,3 +333,49 @@ describe('a confirmed Nykaa discount, entered by hand', () => {
     expect(line?.note).toContain('Confirmed with Nykaa')
   })
 })
+
+/**
+ * A month on the order-row template says so.
+ *
+ * Meesho's settlement events were never stored, and because the fallback was
+ * silent the generic template stood in for its statement for months while
+ * reading as though it were the real one. The two are different figures on
+ * different bases — the template cannot show the fees the settlement states,
+ * and its Gross Sales does not tie to the file's own column.
+ */
+describe('a month with no settlement report', () => {
+  const empty = {
+    salesRecords: [], skuMaster, fixedExpenses: [], marketing: {},
+    facts: { flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [] },
+  }
+
+  it('says which report is missing, for a channel that has one', () => {
+    const view = buildChannelPnlView('meesho', '2026-08', empty)
+    expect(view.native).toBeUndefined()
+    expect(view.notes).toHaveLength(1)
+    expect(view.notes[0]).toContain('Meesho')
+    expect(view.notes[0]).toContain('2026-08')
+    expect(view.notes[0]).toContain('aggregated payment file')
+  })
+
+  it('names each channel’s own report rather than one generic phrase', () => {
+    expect(buildChannelPnlView('flipkart', '2026-08', empty).notes[0]).toContain('SKU-level P&L export')
+    expect(buildChannelPnlView('nykaa', '2026-08', empty).notes[0]).toContain('monthly sales file')
+    expect(buildChannelPnlView('amazon_us', '2026-08', empty).notes[0]).toContain('Product Profitability export')
+  })
+
+  it('stays quiet for a channel that has no statement to be missing', () => {
+    // Purplle is read from order rows by design, so the template is not
+    // standing in for anything and there is nothing to warn about.
+    expect(buildChannelPnlView('purplle', '2026-08', empty).notes).toEqual([])
+  })
+
+  it('says nothing once the month has its facts', () => {
+    const view = buildChannelPnlView('flipkart', '2026-06', {
+      ...empty,
+      facts: { flipkartFacts: [flipkartFacts], amazonUsaFacts: [], meeshoFacts: [] },
+    })
+    expect(view.native).toBeDefined()
+    expect(view.notes).toEqual([])
+  })
+})

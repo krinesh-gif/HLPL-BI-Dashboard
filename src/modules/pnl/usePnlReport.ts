@@ -130,15 +130,25 @@ export function usePnlReport() {
     let native: ReturnType<typeof buildChannelPnlView>['native']
     let nativeNotes: string[] = []
     let nativeMonth = latestMonth
+    // Why there is no statement, when there is none. The note used to ride
+    // along with the statement, so the one case it was written for — a channel
+    // with no settlement events stored at all — was the one case it never
+    // appeared in, and the order-row template stood in silently.
+    let missingStatementNote: string | null = null
     if (view !== 'master') {
       for (let i = months.length - 1; i >= 0; i--) {
         const built = buildChannelPnlView(view, months[i], { ...forMonth(months[i]), meeshoBasis, amazonUsaCurrency })
         if (built.native) { native = built.native; nativeNotes = built.notes; nativeMonth = months[i]; break }
       }
+      if (!native) {
+        const built = buildChannelPnlView(view, latestMonth, { ...forMonth(latestMonth), meeshoBasis, amazonUsaCurrency })
+        missingStatementNote = built.notes[0] ?? null
+      }
     }
 
     return {
       view, setView,
+      missingStatementNote,
       meeshoBasis, setMeeshoBasis,
       amazonUsaCurrency, setAmazonUsaCurrency,
       displayCurrency,

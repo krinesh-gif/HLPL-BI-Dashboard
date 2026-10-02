@@ -285,6 +285,12 @@ export function PnlPage() {
         </p>
       )}
 
+      {r.missingStatementNote && (
+        <p className="rounded-[var(--radius-control)] border border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] px-3.5 py-2.5 text-sm text-[var(--ink)]">
+          {r.missingStatementNote}
+        </p>
+      )}
+
       {r.native && (
         <section>
           <h2 className="mb-3 text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink)]">
