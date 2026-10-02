@@ -24,7 +24,13 @@ const RANKINGS: { key: RankBy; label: string }[] = [
 const TOP_N_OPTIONS = [5, 10, 15, 20]
 
 interface ProductRow {
+  /** The code the marketplace listed it under. Kept because it is what a
+   * Flipkart or Meesho report has to be traced back to. */
   sku: string
+  /** The Uniware code the SKU mapping resolves it to — one code per product
+   * across every channel, which is what makes two channels' rows comparable.
+   * Falls back to the channel's own code when nothing is mapped. */
+  internalSku: string
   productName: string
   /** False when the Product Master has no entry for this SKU. */
   resolvedName: boolean
@@ -94,10 +100,13 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
           ? null
           : figure.netSales - unitCost * figure.units - figure.marketplaceFee - figure.shippingCost
 
+      const named = label(sku, records[0]?.productName)
+
       return {
         sku,
-        productName: label(sku, records[0]?.productName).title,
-        resolvedName: label(sku, records[0]?.productName).resolved,
+        internalSku: named.sku,
+        productName: named.title,
+        resolvedName: named.resolved,
         netSales: figure.netSales,
         units: figure.units,
         orders: figure.orders,
@@ -132,7 +141,8 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
       `HLPL_Top${topN}_${source ?? channel}_${month}`,
       rows.top.map((r, i) => ({
         Rank: i + 1,
-        SKU: r.sku,
+        'Uniware SKU': r.internalSku,
+        'Channel SKU': r.sku,
         Product: r.productName,
         'Net Sales': Math.round(r.netSales),
         Units: r.units,
@@ -206,7 +216,11 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
 
       <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
         <ComparisonBarChart
-          data={rows.top.map((r) => ({ name: r.productName, value: chartValue(r) }))}
+          // Labelled by Uniware code rather than product name. The names run
+          // past the axis and several share a long prefix, so a column of them
+          // reads as near-identical; the codes are short, unique and the thing
+          // the warehouse and the cost sheet are both keyed on.
+          data={rows.top.map((r) => ({ name: r.internalSku, value: chartValue(r) }))}
           xKey="name"
           yKey="value"
           horizontal
@@ -221,7 +235,7 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
           <thead className="bg-[var(--surface-2)]">
             <tr>
               <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">#</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Product</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Uniware SKU</th>
               <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Net Sales</th>
               <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Share</th>
               <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Units</th>
@@ -235,18 +249,26 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
               <tr key={r.sku} className="border-t border-[var(--line)]">
                 <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-3)]">{i + 1}</td>
                 <td className="max-w-[26rem] px-3 py-2">
-                  <div className="truncate text-[var(--ink)]" title={r.productName}>
-                    {r.productName}
+                  <div className="truncate font-mono text-[var(--ink)]" title={r.internalSku}>
+                    {r.internalSku}
                     {!r.resolvedName && (
                       <span
-                        className="ml-1.5 rounded bg-[color-mix(in_oklab,var(--warning)_18%,transparent)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--ink-2)]"
-                        title="Not in the Product Master — showing the marketplace's own name. Map it on SKU Mapping."
+                        className="ml-1.5 rounded bg-[color-mix(in_oklab,var(--warning)_18%,transparent)] px-1.5 py-0.5 font-sans text-[10px] font-medium text-[var(--ink-2)]"
+                        title="Not mapped to a Uniware code — this is the marketplace's own. Link it on SKU Mapping."
                       >
                         unmapped
                       </span>
                     )}
                   </div>
-                  <div className="font-mono text-xs text-[var(--ink-3)]">{r.sku}</div>
+                  {/* The name stays, underneath: the code says which product
+                      without saying what it is, and a reader checking a figure
+                      needs both. */}
+                  <div className="truncate text-xs text-[var(--ink-3)]" title={r.productName}>{r.productName}</div>
+                  {r.internalSku !== r.sku && (
+                    // Only when they differ, so the common case stays quiet and
+                    // a Meesho row can still be traced back to its own report.
+                    <div className="font-mono text-[11px] text-[var(--ink-3)]">listed as {r.sku}</div>
+                  )}
                 </td>
                 <td className="px-3 py-2 text-right font-medium tabular-nums text-[var(--ink)]">{formatCurrencyFull(r.netSales)}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-3)]">
