@@ -3,6 +3,7 @@ import { useDataStore } from '@/store/dataStore'
 import { buildCostIndex } from '@/data/costVersions'
 import { fxRateValue } from '@/data/fxRates'
 import { freightRateValue } from '@/data/freightRates'
+import { packagingRateValue } from '@/data/packagingRates'
 import { nykaaDiscountForMonth } from '@/data/nykaaDiscounts'
 import { marketingFromAds } from '@/engine/marketing'
 import type { ChannelPnlViewInputs } from '@/engine/channelPnlRouter'
@@ -26,7 +27,7 @@ export function usePnlInputs(): {
   const {
     salesRecords, adsRecords, skuMaster, fixedExpenses,
     flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts,
-    costVersions, mappings, comboComponents, manualAdSpend, fxRates, freightRates, nykaaDiscounts,
+    costVersions, mappings, comboComponents, manualAdSpend, fxRates, freightRates, packagingRates, nykaaDiscounts,
   } = useDataStore()
 
   return useMemo(() => {
@@ -55,12 +56,13 @@ export function usePnlInputs(): {
         fxRate: fxRateValue(month, fxRates),
         freightPerUnitInr: freightRateValue(month, freightRates, 'india_usa'),
         nykaaFreightPerUnitInr: freightRateValue(month, freightRates, 'nykaa_inbound'),
+        packagingPerShipmentInr: packagingRateValue(month, packagingRates),
         confirmedNykaaDiscount: nykaaDiscountForMonth(month, nykaaDiscounts)?.amountInr,
       }),
     }
   }, [
     salesRecords, adsRecords, skuMaster, fixedExpenses,
     flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts,
-    costVersions, mappings, comboComponents, manualAdSpend, fxRates, freightRates, nykaaDiscounts,
+    costVersions, mappings, comboComponents, manualAdSpend, fxRates, freightRates, packagingRates, nykaaDiscounts,
   ])
 }

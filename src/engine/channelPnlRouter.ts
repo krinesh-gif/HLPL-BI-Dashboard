@@ -273,6 +273,9 @@ export interface ChannelPnlViewInputs {
   freightPerUnitInr?: number
   /** Rupees a unit from our warehouse to Nykaa's, for the month being read. */
   nykaaFreightPerUnitInr?: number
+  /** Rupees to pack one parcel, for the month being read. Meesho's statement
+   * charges it per shipment; no marketplace report carries it. */
+  packagingPerShipmentInr?: number
   /** What Nykaa confirmed it is charging back as discount for this month.
    * Undefined means nothing has been confirmed and the sales file stands. */
   confirmedNykaaDiscount?: number
@@ -604,8 +607,11 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
             }
           : imported
       const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
-      const values = applyMeeshoOtherCosts(computeMeeshoPnl(facts), otherCosts)
-      const canonicalLines = computeSubtotals(withAllocatedOpex(meeshoToCanonicalBuckets(facts), inputs, channel, month))
+      const packaging = inputs.packagingPerShipmentInr
+      const values = applyMeeshoOtherCosts(computeMeeshoPnl(facts, 0, packaging), otherCosts)
+      const canonicalLines = computeSubtotals(
+        withAllocatedOpex(meeshoToCanonicalBuckets(facts, packaging), inputs, channel, month),
+      )
       return {
         channel, month,
         canonical: { channel, month, lines: canonicalLines },

@@ -12,6 +12,7 @@ interface SaveBody {
    * with the month it applies to. */
   fxRates?: unknown
   freightRates?: unknown
+  packagingRates?: unknown
   nykaaDiscounts?: unknown
   /** A month's fixed operating costs. Here for the same two reasons as the
    * rates above: the function budget is full, and a fixed expense is the same
@@ -88,6 +89,24 @@ const FREIGHT_LANES = ['india_usa', 'nykaa_inbound'] as const
 type FreightLane = (typeof FREIGHT_LANES)[number]
 
 interface FreightRateInput { month: string; lane?: FreightLane; perUnitInr: number; note?: string }
+
+interface PackagingRateInput { month: string; perShipmentInr: number; note?: string }
+
+function isPackagingRateArray(v: unknown): v is PackagingRateInput[] {
+  return (
+    Array.isArray(v) &&
+    v.every((x) => {
+      if (!x || typeof x !== 'object') return false
+      const c = x as PackagingRateInput
+      // Zero is allowed and means something: a month whose parcels genuinely
+      // cost nothing to pack, because the packaging was already paid for.
+      return (
+        isNonEmptyString(c.month) && MONTH_PATTERN.test(c.month) &&
+        typeof c.perShipmentInr === 'number' && Number.isFinite(c.perShipmentInr) && c.perShipmentInr >= 0
+      )
+    })
+  )
+}
 
 interface NykaaDiscountInput { month: string; amountInr: number; note?: string }
 
@@ -197,6 +216,10 @@ export async function GET(request: Request): Promise<Response> {
     SELECT month, lane, per_unit_inr, note, updated_at FROM freight_rates ORDER BY lane, month DESC
   `) as Row[]
 
+  const packagingRows = (await sql`
+    SELECT month, per_shipment_inr, note, updated_at FROM packaging_rates ORDER BY month DESC
+  `) as Row[]
+
   const logoRows = (await sql`
     SELECT channel, data_url, file_name, updated_at FROM channel_logos ORDER BY channel
   `) as Row[]
@@ -211,6 +234,12 @@ export async function GET(request: Request): Promise<Response> {
     nykaaDiscounts: nykaaDiscountRows.map((r) => ({
       month: String(r.month),
       amountInr: Number(r.amount_inr),
+      note: r.note ? String(r.note) : undefined,
+      updatedAt: r.updated_at ? new Date(String(r.updated_at)).toISOString() : undefined,
+    })),
+    packagingRates: packagingRows.map((r) => ({
+      month: String(r.month),
+      perShipmentInr: Number(r.per_shipment_inr),
       note: r.note ? String(r.note) : undefined,
       updatedAt: r.updated_at ? new Date(String(r.updated_at)).toISOString() : undefined,
     })),
@@ -364,6 +393,29 @@ export async function POST(request: Request): Promise<Response> {
     return json({ saved: body.freightRates.length })
   }
 
+  if (body && body.packagingRates !== undefined) {
+    if (!isPackagingRateArray(body.packagingRates)) {
+      return json({ error: 'Expected { packagingRates: [{ month: "yyyy-mm", perShipmentInr: number >= 0, note? }] }.' }, 400)
+    }
+    if (body.packagingRates.length === 0) return json({ saved: 0 })
+    await sql.query(
+      `INSERT INTO packaging_rates (month, per_shipment_inr, note, updated_by)
+       SELECT * FROM UNNEST($1::text[], $2::float8[], $3::text[], $4::text[])
+       ON CONFLICT (month) DO UPDATE SET
+         per_shipment_inr = EXCLUDED.per_shipment_inr,
+         note = EXCLUDED.note,
+         updated_by = EXCLUDED.updated_by,
+         updated_at = now()`,
+      [
+        body.packagingRates.map((r) => r.month),
+        body.packagingRates.map((r) => r.perShipmentInr),
+        body.packagingRates.map((r) => r.note ?? null),
+        body.packagingRates.map(() => auth.user.id),
+      ],
+    )
+    return json({ saved: body.packagingRates.length })
+  }
+
   if (body && body.fxRates !== undefined) {
     if (!isFxRateArray(body.fxRates)) {
       return json({ error: 'Expected { fxRates: [{ month: "yyyy-mm", rate: number > 0, note? }] }.' }, 400)
@@ -470,6 +522,12 @@ export async function DELETE(request: Request): Promise<Response> {
     const lane = url.searchParams.get('freightLane')
     const freightLane = lane !== null && (FREIGHT_LANES as readonly string[]).includes(lane) ? lane : 'india_usa'
     await sql`DELETE FROM freight_rates WHERE month = ${freightMonth} AND lane = ${freightLane}`
+    return json({ deleted: 1 })
+  }
+
+  const packagingMonth = url.searchParams.get('packagingMonth')
+  if (isNonEmptyString(packagingMonth)) {
+    await sql`DELETE FROM packaging_rates WHERE month = ${packagingMonth}`
     return json({ deleted: 1 })
   }
 

@@ -4,9 +4,10 @@ import { Card, CardHeader } from '@/components/ui/Surface'
 import { useDataStore } from '@/store/dataStore'
 import { fxRateForMonth } from '@/data/fxRates'
 import { freightRateForMonth } from '@/data/freightRates'
+import { packagingRateForMonth } from '@/data/packagingRates'
 import { nykaaDiscountForMonth } from '@/data/nykaaDiscounts'
 import { nykaaDiscountPerSalesFile } from '@/engine/nativePnl/nykaa'
-import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
+import { MEESHO_ASSUMPTIONS, NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { addMonths, monthLabel, toMonthKey } from '@/lib/format'
 import type { FixedExpenseEntry } from '@/data/models'
 
@@ -42,9 +43,9 @@ interface Column {
 
 export function MonthlyInputsPage() {
   const {
-    fxRates, freightRates, nykaaDiscounts, fixedExpenses, nykaaFacts,
+    fxRates, freightRates, packagingRates, nykaaDiscounts, fixedExpenses, nykaaFacts,
     salesRecords, amazonUsaFacts, flipkartFacts, myntraFacts, meeshoFacts,
-    saveFxRate, removeFxRate, saveFreightRate, removeFreightRate,
+    saveFxRate, removeFxRate, saveFreightRate, removeFreightRate, savePackagingRate, removePackagingRate,
     saveNykaaDiscount, removeNykaaDiscount, saveFixedExpenses, removeFixedExpense,
   } = useDataStore()
 
@@ -92,6 +93,15 @@ export function MonthlyInputsPage() {
       clear: (m) => removeFreightRate(m, 'nykaa_inbound'),
     },
     {
+      key: 'packaging', label: 'Packaging per parcel', unit: '₹/shipment', step: '0.01',
+      hint: "The month's packaging spend divided by the parcels it covered — mailer, wrap, tape and invoice, ex-GST. Charged per parcel, not per unit.",
+      entered: (m) => (packagingRateForMonth(m, packagingRates).entered
+        ? packagingRateForMonth(m, packagingRates).perShipmentInr : undefined),
+      fallback: () => MEESHO_ASSUMPTIONS.packagingPerShipment,
+      save: (m, v) => savePackagingRate({ month: m, perShipmentInr: v }),
+      clear: (m) => removePackagingRate(m),
+    },
+    {
       key: 'nykaaDiscount', label: 'Nykaa discount (confirmed)', unit: '₹', step: '0.01',
       hint: 'What Nykaa confirms by email that it is charging back. Replaces the figure its sales file implies.',
       entered: (m) => nykaaDiscountForMonth(m, nykaaDiscounts)?.amountInr,
@@ -133,11 +143,12 @@ export function MonthlyInputsPage() {
     for (const f of [...amazonUsaFacts, ...flipkartFacts, ...myntraFacts, ...nykaaFacts, ...meeshoFacts]) set.add(f.month)
     for (const r of fxRates) set.add(r.month)
     for (const r of freightRates) set.add(r.month)
+    for (const r of packagingRates) set.add(r.month)
     for (const d of nykaaDiscounts) set.add(d.month)
     for (const e of fixedExpenses) set.add(e.month)
     return [...set].filter((m) => /^\d{4}-\d{2}$/.test(m)).sort().reverse()
   }, [thisMonth, extraMonths, salesRecords, amazonUsaFacts, flipkartFacts, myntraFacts, nykaaFacts, meeshoFacts,
-    fxRates, freightRates, nykaaDiscounts, fixedExpenses])
+    fxRates, freightRates, packagingRates, nykaaDiscounts, fixedExpenses])
 
   const cellId = (month: string, key: string): string => `${month}:${key}`
   const shown = (month: string, col: Column): string => {

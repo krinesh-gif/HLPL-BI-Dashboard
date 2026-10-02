@@ -21,10 +21,18 @@ export const NATIVE_PNL_ASSUMPTIONS = {
  * estimate of how the operation behaves, not a fact about a particular month.
  */
 export const MEESHO_ASSUMPTIONS = {
-  /** Mailer, bubble wrap, tape, invoice. Ex-GST, per shipment. */
+  /** Mailer, bubble wrap, tape, invoice. Ex-GST, per shipment.
+   *
+   * The standing figure from the company's own Meesho model, used only for a
+   * month with no rate entered in Monthly Inputs. A month that has one uses
+   * that instead, so a correction restates the months it applies to.
+   *
+   * A fulfilment-labour rate of ₹2 a parcel sat beside this and has been
+   * removed: picking and packing is paid in salaries, which are already in the
+   * month's fixed expenses and allocated to the channel by its share of sales,
+   * so charging it here as well put the same wage in the statement twice.
+   */
   packagingPerShipment: 5,
-  /** Pick, pack and dispatch labour, per sub-order. */
-  fulfilmentLabourPerShipment: 2,
   /** RTO stock that comes back in saleable condition. The balance is written
    * off as shrinkage. */
   rtoSaleablePct: 0.95,

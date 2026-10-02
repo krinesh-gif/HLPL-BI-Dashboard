@@ -18,10 +18,17 @@ import type { NativeLineDef, NativeLineValues } from './types'
  *     unsaleable, and an opened customer return, are shrinkage. They are
  *     separated from the cost of units actually sold so the loss is visible.
  *
- *  3. OWN FULFILMENT COSTS MONEY. Packaging and the labour to pick, pack and
- *     dispatch are real per-shipment costs that Meesho never bills, so they
- *     appear on no marketplace report. Omitting them makes every shipment look
- *     more profitable than it is.
+ *  3. OWN FULFILMENT COSTS MONEY. Packaging is a real per-shipment cost that
+ *     Meesho never bills, so it appears on no marketplace report. Omitting it
+ *     makes every shipment look more profitable than it is. The rate comes
+ *     from Monthly Inputs, dated by month, because what a mailer costs is a
+ *     business figure and not something any report can tell us.
+ *
+ *     A warehouse-labour line sat beside it at a flat ₹2 a parcel. It was
+ *     taken out rather than made editable: picking and packing is paid for in
+ *     salaries, which are already in the month's fixed expenses and allocated
+ *     to this channel by its share of sales, so charging it again here put the
+ *     same wage in the statement twice.
  *
  * The margin ladder answers "where did the money go", in the order it goes:
  * gross profit, then after the marketplace's charges (CM1), after advertising
@@ -65,9 +72,10 @@ export const MEESHO_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm2Pct', label: 'CM2 %', section: 'ADVERTISING', kind: 'percent' },
   { key: 'acosPct', label: 'ACOS % (ad spend / net revenue)', section: 'ADVERTISING', kind: 'percent' },
 
+  // No "Total Own Fulfilment Cost" row: with labour gone it would restate the
+  // single line above it. The value is still computed, so a caller that wants
+  // the section's total has it without the statement printing it twice.
   { key: 'packaging', label: 'Packaging material', section: 'OWN FULFILMENT COST', kind: 'input' },
-  { key: 'fulfilmentLabour', label: 'Fulfilment / warehouse labour', section: 'OWN FULFILMENT COST', kind: 'input' },
-  { key: 'totalOwnFulfilment', label: 'Total Own Fulfilment Cost', section: 'OWN FULFILMENT COST', kind: 'subtotal' },
   { key: 'cm3', label: 'CONTRIBUTION MARGIN 3 (after fulfilment)', section: 'OWN FULFILMENT COST', kind: 'subtotal' },
   { key: 'cm3Pct', label: 'CM3 %', section: 'OWN FULFILMENT COST', kind: 'percent' },
 
@@ -109,7 +117,13 @@ export const MEESHO_LINE_DEFS: NativeLineDef[] = [
  * is not a number worth printing, and the table renders 0 as a dash. */
 const pct = (value: number, base: number): number => (base !== 0 ? (value / base) * 100 : 0)
 
-export function computeMeeshoPnl(facts: MeeshoPnlFacts, overheads = 0): NativeLineValues {
+export function computeMeeshoPnl(
+  facts: MeeshoPnlFacts,
+  overheads = 0,
+  /** Rupees to pack one parcel in this month, from Monthly Inputs. Defaults to
+   * the company model's standing figure when the month has no rate entered. */
+  packagingPerShipment: number = MEESHO_ASSUMPTIONS.packagingPerShipment,
+): NativeLineValues {
   const netSalesInclGst =
     facts.grossSalesInclGst - facts.cancellationsInclGst - facts.salesReturnsInclGst
   const netRevenue = netSalesInclGst - facts.outputGstOnSales
@@ -130,11 +144,10 @@ export function computeMeeshoPnl(facts: MeeshoPnlFacts, overheads = 0): NativeLi
   const totalAdvertising = facts.adsSpendExGst - facts.adCredits + facts.gstOnAds + facts.affiliateFee
   const cm2 = cm1 - totalAdvertising
 
-  // Charged per shipment, not per unit: one parcel takes one mailer and one
-  // pick regardless of how many items are in it.
-  const packaging = facts.subOrdersDispatched * MEESHO_ASSUMPTIONS.packagingPerShipment
-  const fulfilmentLabour = facts.subOrdersDispatched * MEESHO_ASSUMPTIONS.fulfilmentLabourPerShipment
-  const totalOwnFulfilment = packaging + fulfilmentLabour
+  // Charged per shipment, not per unit: one parcel takes one mailer whatever
+  // is in it.
+  const packaging = facts.subOrdersDispatched * packagingPerShipment
+  const totalOwnFulfilment = packaging
   const cm3 = cm2 - totalOwnFulfilment
 
   const netPlatformAdjustments =
@@ -180,7 +193,6 @@ export function computeMeeshoPnl(facts: MeeshoPnlFacts, overheads = 0): NativeLi
     acosPct: pct(totalAdvertising, netRevenue),
 
     packaging: -packaging,
-    fulfilmentLabour: -fulfilmentLabour,
     totalOwnFulfilment: -totalOwnFulfilment,
     cm3,
     cm3Pct: pct(cm3, netRevenue),
@@ -243,10 +255,11 @@ export function applyMeeshoOtherCosts(computed: NativeLineValues, otherCosts: nu
  * to them; until then Meesho at least agrees with itself, which is the more
  * important of the two.
  */
-export function meeshoToCanonicalBuckets(facts: MeeshoPnlFacts): PnlLineValues {
-  const packagingAndLabour =
-    facts.subOrdersDispatched *
-    (MEESHO_ASSUMPTIONS.packagingPerShipment + MEESHO_ASSUMPTIONS.fulfilmentLabourPerShipment)
+export function meeshoToCanonicalBuckets(
+  facts: MeeshoPnlFacts,
+  packagingPerShipment: number = MEESHO_ASSUMPTIONS.packagingPerShipment,
+): PnlLineValues {
+  const packaging = facts.subOrdersDispatched * packagingPerShipment
 
   return {
     grossSales: facts.grossSalesInclGst,
@@ -261,7 +274,7 @@ export function meeshoToCanonicalBuckets(facts: MeeshoPnlFacts): PnlLineValues {
     otherRevenueAdj: facts.outputGstOnSales,
     cogs: facts.cogsUnitsSold + facts.cogsRtoWriteOff + facts.cogsReturnWriteOff,
     marketplaceCommission: facts.otherMarketplaceFees,
-    fulfilment: packagingAndLabour,
+    fulfilment: packaging,
     shipping: facts.forwardShipping + facts.returnShipping,
     collectionFees: 0,
     rtoCharges: 0,

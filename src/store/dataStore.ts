@@ -9,6 +9,7 @@ import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
 import type { FxRate } from '@/data/fxRates'
 import type { FreightLane, FreightRate } from '@/data/freightRates'
+import type { PackagingRate } from '@/data/packagingRates'
 import type { NykaaDiscountEntry } from '@/data/nykaaDiscounts'
 import type { ChannelLogo } from '@/data/channelLogos'
 import { prepareLogoForUpload } from '@/data/channelLogos'
@@ -77,7 +78,7 @@ const EMPTY_DATASET: SharedDataset = {
   manualAdSpend: [],
 }
 
-const EMPTY_MAPPINGS: MappingTablesState = { mappings: [], comboComponents: [], costVersions: [], fxRates: [], freightRates: [], nykaaDiscounts: [], channelLogos: [] }
+const EMPTY_MAPPINGS: MappingTablesState = { mappings: [], comboComponents: [], costVersions: [], fxRates: [], freightRates: [], packagingRates: [], nykaaDiscounts: [], channelLogos: [] }
 
 /** Everything one uploaded report contributes, imported as a single unit. */
 export interface ReportImport {
@@ -137,6 +138,7 @@ interface MappingTablesState {
    * dollars, so this scales the whole channel wherever it rolls into rupees. */
   fxRates: FxRate[]
   freightRates: FreightRate[]
+  packagingRates: PackagingRate[]
   nykaaDiscounts: NykaaDiscountEntry[]
   /** Each marketplace's own mark, where one has been uploaded. A channel
    * without one shows its name. */
@@ -172,8 +174,10 @@ interface DataState extends SharedDataset, MappingTablesState {
    * closed month keeps the rate it was closed on. */
   saveFxRate: (rate: FxRate) => Promise<void>
   saveFreightRate: (rate: FreightRate) => Promise<void>
+  savePackagingRate: (rate: PackagingRate) => Promise<void>
   removeFxRate: (month: string) => Promise<void>
   removeFreightRate: (month: string, lane?: FreightLane) => Promise<void>
+  removePackagingRate: (month: string) => Promise<void>
   /** Records what Nykaa confirmed it is charging back for a month, which
    * replaces the figure its sales file implied. */
   saveNykaaDiscount: (entry: NykaaDiscountEntry) => Promise<void>
@@ -252,12 +256,13 @@ export const useDataStore = create<DataState>((set, get) => {
       try {
         const [dataset, mapping, costs] = await Promise.all([
           api.get<SharedDataset>('/api/state'),
-          api.get<Omit<MappingTablesState, 'costVersions' | 'fxRates' | 'freightRates' | 'nykaaDiscounts'>>('/api/sku-map'),
-          api.get<{ versions: CostVersion[]; fxRates?: FxRate[]; freightRates?: FreightRate[]; nykaaDiscounts?: NykaaDiscountEntry[]; channelLogos?: ChannelLogo[] }>('/api/cost-versions'),
+          api.get<Omit<MappingTablesState, 'costVersions' | 'fxRates' | 'freightRates' | 'packagingRates' | 'nykaaDiscounts'>>('/api/sku-map'),
+          api.get<{ versions: CostVersion[]; fxRates?: FxRate[]; freightRates?: FreightRate[]; packagingRates?: PackagingRate[]; nykaaDiscounts?: NykaaDiscountEntry[]; channelLogos?: ChannelLogo[] }>('/api/cost-versions'),
         ])
         set({
           ...dataset, ...mapping, costVersions: costs.versions,
           fxRates: costs.fxRates ?? [], freightRates: costs.freightRates ?? [],
+          packagingRates: costs.packagingRates ?? [],
           nykaaDiscounts: costs.nykaaDiscounts ?? [], channelLogos: costs.channelLogos ?? [],
           loading: false, error: null,
         })
@@ -401,6 +406,7 @@ export const useDataStore = create<DataState>((set, get) => {
 
     saveFxRate: (rate) => writeThen(() => api.post('/api/cost-versions', { fxRates: [rate] })),
     saveFreightRate: (rate) => writeThen(() => api.post('/api/cost-versions', { freightRates: [rate] })),
+    savePackagingRate: (rate) => writeThen(() => api.post('/api/cost-versions', { packagingRates: [rate] })),
     saveNykaaDiscount: (entry) => writeThen(() => api.post('/api/cost-versions', { nykaaDiscounts: [entry] })),
 
     saveChannelLogo: async (channel, file) => {
@@ -419,6 +425,9 @@ export const useDataStore = create<DataState>((set, get) => {
     removeFxRate: (month) => writeThen(() => api.delete(`/api/cost-versions?fxMonth=${encodeURIComponent(month)}`)),
     removeFreightRate: (month, lane = 'india_usa') => writeThen(() => api.delete(
       `/api/cost-versions?freightMonth=${encodeURIComponent(month)}&freightLane=${encodeURIComponent(lane)}`,
+    )),
+    removePackagingRate: (month) => writeThen(() => api.delete(
+      `/api/cost-versions?packagingMonth=${encodeURIComponent(month)}`,
     )),
 
     saveFixedExpenses: (entries) => writeThen(() => api.post('/api/cost-versions', { fixedExpenses: entries })),

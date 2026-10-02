@@ -364,6 +364,22 @@ BEGIN
     ALTER TABLE freight_rates ADD PRIMARY KEY (month, lane);
   END IF;
 
+  -- ---------------------------------------------------------------------------
+  -- What one outbound parcel costs us to pack, in the month it was packed.
+  --
+  -- No marketplace report carries it: Meesho settles what Meesho charged and
+  -- knows nothing about our packing bench. Dated by month and read when the
+  -- statement is read, so a closed month keeps the rate it was closed on and a
+  -- correction reaches every month that should see it.
+  -- ---------------------------------------------------------------------------
+  CREATE TABLE IF NOT EXISTS packaging_rates (
+    month             TEXT PRIMARY KEY,
+    per_shipment_inr  DOUBLE PRECISION NOT NULL,
+    note              TEXT,
+    updated_by        TEXT,
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
   -- What Nykaa confirms it is charging back as customer discount, which the
   -- sales file only estimates and an email settles a month or two later. Kept
   -- out of nykaa_facts on purpose: re-importing a sales file replaces that row

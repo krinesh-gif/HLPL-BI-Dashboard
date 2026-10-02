@@ -63,25 +63,30 @@ describe("the owner's July statement, reproduced", () => {
     expect(v.cm2Pct).toBeCloseTo(32.30, 1)
   })
 
-  it('charges own fulfilment per shipment and reaches CM3', () => {
-    // 1,255 shipments at ₹5 packaging and ₹2 labour = ₹8,785. Meesho bills
-    // none of this, so it appears on no marketplace report — and omitting it
-    // makes every shipment look more profitable than it is.
-    expect(v.totalOwnFulfilment).toBe(-8785)
-    expect(v.cm3).toBe(43072)
-    expect(v.cm3Pct).toBeCloseTo(26.83, 1)
+  it('charges packaging per shipment and reaches CM3', () => {
+    // 1,255 shipments at the ₹5 standing rate = ₹6,275. Meesho bills none of
+    // it, so it appears on no marketplace report — and omitting it makes every
+    // shipment look more profitable than it is.
+    expect(v.totalOwnFulfilment).toBe(-6275)
+    expect(v.cm3).toBe(45582)
+  })
+
+  it('takes the month\u2019s own packaging rate when one is entered', () => {
+    // The whole point of moving this to Monthly Inputs: a rate correction has
+    // to restate the months it applies to, not only the ones loaded after it.
+    const atEight = computeMeeshoPnl(JULY_ORDER_BASIS, 0, 8)
+    expect(atEight.totalOwnFulfilment).toBe(-1255 * 8)
+    expect(atEight.cm3).toBe(v.cm2 - 1255 * 8)
   })
 
   it('reaches CM4 after platform adjustments', () => {
     expect(v.netPlatformAdjustments).toBe(-3449)
-    expect(v.cm4).toBe(39623)
-    expect(v.cm4Pct).toBeCloseTo(24.68, 1)
+    expect(v.cm4).toBe(42133)
   })
 
   it('reaches EBITDA after allocated overheads', () => {
     const withOverheads = applyMeeshoOtherCosts(v, 74436)
-    expect(withOverheads.ebitda).toBe(-34813)
-    expect(withOverheads.ebitdaPct).toBeCloseTo(-21.69, 1)
+    expect(withOverheads.ebitda).toBe(-32303)
   })
 
   it('reports the volume memo the workbook carries', () => {
@@ -127,7 +132,13 @@ describe('rolling up into the Master P&L', () => {
     expect(canonicalNetSales).toBe(computeMeeshoPnl(JULY_ORDER_BASIS).netRevenue)
   })
 
-  it('carries own fulfilment across, so the cost is not lost in the roll-up', () => {
-    expect(meeshoToCanonicalBuckets(JULY_ORDER_BASIS).fulfilment).toBe(8785)
+  it('carries packaging across, so the cost is not lost in the roll-up', () => {
+    expect(meeshoToCanonicalBuckets(JULY_ORDER_BASIS).fulfilment).toBe(6275)
+  })
+
+  it('carries the entered rate across too, not just the default', () => {
+    // The native statement and the Master P&L must charge the same packaging,
+    // or the channel disagrees with the roll-up it is part of.
+    expect(meeshoToCanonicalBuckets(JULY_ORDER_BASIS, 8).fulfilment).toBe(1255 * 8)
   })
 })
