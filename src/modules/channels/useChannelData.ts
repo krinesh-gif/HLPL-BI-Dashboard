@@ -17,6 +17,7 @@ import {
 } from '@/engine/netSales'
 import { reconcileChannelMonth } from '@/engine/reconciliation'
 import { productLabelResolver } from '@/data/productLabel'
+import { fxRateValue } from '@/data/fxRates'
 
 const TREND_MONTHS = 6
 
@@ -31,8 +32,8 @@ const TREND_MONTHS = 6
  * the P&L lives in one place so a channel's numbers cannot be defined twice.
  */
 export function useChannelData(channel: BusinessChannelId, source?: SalesSourceId) {
-  const { salesRecords, skuMaster, mappings, comboComponents, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts } = useDataStore()
-  const { month, monthChosenByUser } = useFilterStore()
+  const { salesRecords, skuMaster, mappings, comboComponents, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, fxRates } = useDataStore()
+  const { month, monthChosenByUser, amazonUsaCurrency } = useFilterStore()
   const defaultMonthTo = useFilterStore((s) => s.defaultMonthTo)
   const fallbackMonthTo = useFilterStore((s) => s.fallbackMonthTo)
 
@@ -84,8 +85,17 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
     else defaultMonthTo(latestMonthForChannel)
   }, [latestMonthForChannel, monthsWithData, month, monthChosenByUser, defaultMonthTo, fallbackMonthTo])
 
+  /**
+   * Amazon USA's rows are stored in dollars and converted on the way out. Read
+   * in dollars, nothing is converted at all — the rate is 1 — so the figures
+   * are the export's own and the round trip that a convert-and-divide-back
+   * would make is avoided entirely.
+   */
+  const displayCurrency: 'INR' | 'USD' = channel === 'amazon_us' && amazonUsaCurrency === 'USD' ? 'USD' : 'INR'
+
   return useMemo(() => {
     const previousMonth = addMonths(month, -1)
+    const rate = displayCurrency === 'USD' ? 1 : fxRateValue(month, fxRates)
     const channelFacts = { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts }
 
     const inScope = (r: { channel: SalesSourceId }) =>
@@ -94,7 +104,12 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
     const currentRecords = channelRecordsAllTime.filter((r) => r.orderDate.slice(0, 7) === month)
 
     const figureFor = (m: string) =>
-      netSalesForChannelMonth({ records: salesRecords, channel, month: m, facts: channelFacts, source })
+      netSalesForChannelMonth({
+        records: salesRecords, channel, month: m, facts: channelFacts, source,
+        // Each month at its own rate, so a closed month keeps the rate it was
+        // closed on — the same rule the statements follow.
+        fxRate: displayCurrency === 'USD' ? 1 : fxRateValue(m, fxRates),
+      })
 
     const currentFacts = figureFor(month)
     const previousFacts = figureFor(previousMonth)
@@ -112,7 +127,7 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
     const bySku = groupBySku(currentRecords)
     const label = productLabelResolver({ skuMaster, mappings, comboComponents })
     const skuRows = Array.from(bySku.entries()).map(([sku, records]) => {
-      const facts = orderBasisNetSales(records)
+      const facts = orderBasisNetSales(records, rate)
       return { sku, productName: label(sku, records[0]?.productName).title, netSales: facts.netSales, units: facts.units }
     })
 
@@ -120,11 +135,12 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
     // Central plus ₹20 L Vendor Central. Only offered where a channel actually
     // has more than one report behind it.
     const sourceBreakdown = hasMultipleSources(channel)
-      ? netSalesBySource(salesRecords, channel, month)
+      ? netSalesBySource(salesRecords, channel, month, rate)
       : []
 
     return {
       month,
+      displayCurrency,
       channel,
       source,
       currentFacts,
@@ -149,5 +165,5 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
       topSkus: [...skuRows].sort((a, b) => b.netSales - a.netSales).slice(0, 5),
       bottomSkus: [...skuRows].sort((a, b) => a.netSales - b.netSales).slice(0, 5),
     }
-  }, [salesRecords, skuMaster, mappings, comboComponents, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, channel, source, month])
+  }, [salesRecords, skuMaster, mappings, comboComponents, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, fxRates, channel, source, month, displayCurrency])
 }

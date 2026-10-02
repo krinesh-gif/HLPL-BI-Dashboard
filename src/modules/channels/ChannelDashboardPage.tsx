@@ -4,6 +4,7 @@ import { PageShell } from '@/components/layout/PageShell'
 import { KPICard, KPIGrid } from '@/components/ui/KPICard'
 import { TrendLineChart, type SeriesDef } from '@/components/charts/TrendLineChart'
 import { SegmentedControl } from '@/components/ui/Surface'
+import { useFilterStore } from '@/store/filterStore'
 import { MixDonutChart } from '@/components/charts/MixDonutChart'
 import { EmptyState } from '@/components/ui/EmptyState'
 import {
@@ -32,6 +33,8 @@ export function ChannelDashboardPage() {
   const { channelId } = useParams<{ channelId: string }>()
   const channel = channelId as BusinessChannelId
   const channelDef = BUSINESS_CHANNEL_MAP[channel]
+  const amazonUsaCurrency = useFilterStore((s) => s.amazonUsaCurrency)
+  const setAmazonUsaCurrency = useFilterStore((s) => s.setAmazonUsaCurrency)
 
   // Amazon India is fed by two reports. Management sees the consolidated
   // channel by default and can narrow to either source when they want to know
@@ -81,6 +84,19 @@ export function ChannelDashboardPage() {
       showChannelFilter={false}
       title={<ChannelMark channel={channel} />}
       subtitle={source === 'all' ? 'Sales, products, growth and returns' : `Sales source: ${sourcesOfChannel(channel).find((s) => s.id === source)?.label}`}
+      // Only Amazon USA is denominated in anything but rupees, so only Amazon
+      // USA is offered the choice. On every other channel the control would be
+      // a switch with one position.
+      headerActions={
+        channel === 'amazon_us' ? (
+          <SegmentedControl
+            value={amazonUsaCurrency}
+            options={[{ value: 'USD', label: 'USD' }, { value: 'INR', label: 'INR' }]}
+            onChange={setAmazonUsaCurrency}
+            size="sm"
+          />
+        ) : undefined
+      }
     >
       {sourcePicker && <div>{sourcePicker}</div>}
 
@@ -97,7 +113,7 @@ export function ChannelDashboardPage() {
       <KPIGrid>
         <KPICard
           label="Net Sales"
-          value={formatCurrencyCompact(d.currentFacts.netSales)}
+          value={formatCurrencyCompact(d.currentFacts.netSales, d.displayCurrency)}
           delta={{ pct: d.growth, label: 'MoM' }}
           note={d.sourceLabel}
         />
@@ -112,10 +128,10 @@ export function ChannelDashboardPage() {
         />
         <KPICard
           label="AOV"
-          value={d.aov === null ? '—' : formatCurrencyCompact(d.aov)}
+          value={d.aov === null ? '—' : formatCurrencyCompact(d.aov, d.displayCurrency)}
           note={d.aov === null ? 'needs an order count' : undefined}
         />
-        <KPICard label="ASP" value={formatCurrencyCompact(d.asp)} />
+        <KPICard label="ASP" value={formatCurrencyCompact(d.asp, d.displayCurrency)} />
         <KPICard label="RTO %" value={formatPercent(d.rtoRate)} tone={d.rtoRate > 5 ? 'bad' : 'neutral'} />
         <KPICard label="Returns %" value={formatPercent(d.returnRate)} />
         <KPICard
@@ -149,7 +165,7 @@ export function ChannelDashboardPage() {
                 return (
                   <tr key={row.source} className="border-b border-[var(--line)] last:border-0">
                     <td className="py-1.5 text-[var(--ink)]">{row.label}</td>
-                    <td className="py-1.5 text-right tabular-nums text-[var(--ink)]">{formatCurrencyFull(row.figure.netSales)}</td>
+                    <td className="py-1.5 text-right tabular-nums text-[var(--ink)]">{formatCurrencyFull(row.figure.netSales, d.displayCurrency)}</td>
                     <td className="py-1.5 text-right tabular-nums text-[var(--ink-2)]">{formatNumber(row.figure.units)}</td>
                     <td className="py-1.5 text-right tabular-nums text-[var(--ink-2)]">{row.figure.hasAggregateRows ? '—' : formatNumber(row.figure.orders)}</td>
                     <td className="py-1.5 text-right tabular-nums text-[var(--ink-3)]">
@@ -205,15 +221,15 @@ export function ChannelDashboardPage() {
               // worth its width when there are two magnitudes to separate.
               series={
                 trendView === 'both'
-                  ? TREND_SERIES
-                  : TREND_SERIES.filter((s) => s.key === (trendView === 'sales' ? 'netSales' : 'units'))
+                  ? trendSeries(d.displayCurrency)
+                  : trendSeries(d.displayCurrency).filter((s) => s.key === (trendView === 'sales' ? 'netSales' : 'units'))
                       .map((s) => ({ ...s, axis: 'left' as const }))
               }
             />
           </ChartCard>
         </div>
         <ChartCard title="Category Performance">
-          <MixDonutChart data={d.categorySales} height={248} valueFormatter={(v) => formatCurrencyCompact(v)} />
+          <MixDonutChart data={d.categorySales} height={248} valueFormatter={(v) => formatCurrencyCompact(v, d.displayCurrency)} />
         </ChartCard>
       </div>
 
@@ -253,8 +269,8 @@ export function ChannelDashboardPage() {
 }
 
 /** The two trend lines, each on its own scale and its own colour. */
-const TREND_SERIES: SeriesDef[] = [
-  { key: 'netSales', label: 'Net Sales', axis: 'left', color: 'var(--series-1)', valueFormatter: (v: number) => formatCurrencyCompact(v) },
+const trendSeries = (currency: 'INR' | 'USD'): SeriesDef[] => [
+  { key: 'netSales', label: 'Net Sales', axis: 'left', color: 'var(--series-1)', valueFormatter: (v: number) => formatCurrencyCompact(v, currency) },
   { key: 'units', label: 'Units', axis: 'right', color: 'var(--series-2)', valueFormatter: (v: number) => formatNumber(v) },
 ]
 

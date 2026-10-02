@@ -3,6 +3,8 @@ import { Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { Card, CardHeader } from '@/components/ui/Surface'
 import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { useDataStore } from '@/store/dataStore'
+import { useFilterStore } from '@/store/filterStore'
+import { fxRateValue } from '@/data/fxRates'
 import { amazonUsaFeeSeries, buildSeries } from '@/engine/amazonUsaFees'
 import { AMAZON_USA_FEE_COLUMNS } from '@/data/amazonUsa/feeColumns'
 import { formatCurrencyFull, formatPercent, monthLabel } from '@/lib/format'
@@ -23,7 +25,18 @@ import { formatCurrencyFull, formatPercent, monthLabel } from '@/lib/format'
  * nobody can move.
  */
 export function AmazonUsaFees() {
-  const { amazonUsaFacts } = useDataStore()
+  const { amazonUsaFacts, fxRates } = useDataStore()
+  const amazonUsaCurrency = useFilterStore((s) => s.amazonUsaCurrency)
+
+  /**
+   * Amazon states these fees in dollars. Read in rupees, each month is
+   * converted at its own rate rather than the period at one — a fee charged in
+   * April and a fee charged in August were paid at different rates, and
+   * flattening them to a single rate would restate a closed month.
+   */
+  const toDisplay = (amount: number, month: string): number =>
+    amazonUsaCurrency === 'USD' ? amount : amount * fxRateValue(month, fxRates)
+  const money = (v: number) => formatCurrencyFull(v, amazonUsaCurrency)
   const [params, setParams] = useSearchParams()
 
   const months = useMemo(
@@ -86,7 +99,7 @@ export function AmazonUsaFees() {
                     )}
                   </span>
                   <span className="shrink-0 text-xs tabular-nums text-[var(--ink)]">
-                    {formatCurrencyFull(s.total, 'USD')}
+                    {money(s.points.reduce((sum, p) => sum + toDisplay(p.amount, p.month), 0))}
                   </span>
                 </button>
               </li>
@@ -103,7 +116,10 @@ export function AmazonUsaFees() {
               subtitle={`Charged in ${selected.monthsCharged} of ${months.length} month${months.length === 1 ? '' : 's'}`}
             />
             <div className="mt-3 flex flex-wrap gap-x-8 gap-y-2">
-              <Stat label="Total over the period" value={formatCurrencyFull(selected.total, 'USD')} />
+              <Stat
+                label="Total over the period"
+                value={money(selected.points.reduce((sum, p) => sum + toDisplay(p.amount, p.month), 0))}
+              />
               {/* "$2,388.36" against a cost that fell reads as a rise. The
                   direction is the whole point of the number, so it is said in
                   words rather than left to a colour. */}
@@ -114,7 +130,7 @@ export function AmazonUsaFees() {
                     ? '—'
                     : selected.changeLastMonth === 0
                       ? 'no change'
-                      : `${formatCurrencyFull(Math.abs(selected.changeLastMonth), 'USD')} ${selected.changeLastMonth > 0 ? 'higher' : 'lower'}`
+                      : `${money(Math.abs(toDisplay(selected.changeLastMonth, selected.points[selected.points.length - 1]?.month ?? '')))} ${selected.changeLastMonth > 0 ? 'higher' : 'lower'}`
                 }
                 tone={selected.changeLastMonth === null || selected.changeLastMonth === 0 ? 'flat' : selected.changeLastMonth > 0 ? 'bad' : 'good'}
               />
@@ -142,10 +158,10 @@ export function AmazonUsaFees() {
             <CardHeader title="Month by month" subtitle="Charges shown as costs, so a rising line is a worsening one." />
             <div className="mt-2">
               <TrendLineChart
-                data={selected.points.map((p) => ({ month: monthLabel(p.month), amount: p.amount }))}
+                data={selected.points.map((p) => ({ month: monthLabel(p.month), amount: toDisplay(p.amount, p.month) }))}
                 xKey="month"
                 series={[{ key: 'amount', label: selected.column.header.replace(/ total$/, '') }]}
-                valueFormatter={(v) => formatCurrencyFull(v, 'USD')}
+                valueFormatter={(v) => money(v)}
               />
             </div>
           </Card>
@@ -186,11 +202,11 @@ export function AmazonUsaFees() {
                           <td className="px-5 py-2 font-mono text-xs text-[var(--ink-2)]">{row.sku}</td>
                           {row.byMonth.map((v, i) => (
                             <td key={i} className="px-3 py-2 text-right tabular-nums text-[var(--ink-3)]">
-                              {v === 0 ? '—' : formatCurrencyFull(-v, 'USD')}
+                              {v === 0 ? '—' : money(toDisplay(v, months[i] ?? ''))}
                             </td>
                           ))}
                           <td className="px-5 py-2 text-right font-medium tabular-nums text-[var(--ink)]">
-                            {formatCurrencyFull(row.total, 'USD')}
+                            {money(row.byMonth.reduce((sum, v, i) => sum + toDisplay(v, months[i] ?? ''), 0))}
                           </td>
                           <td className="px-5 py-2 text-right tabular-nums text-[var(--ink-3)]">
                             {formatPercent(row.sharePct)}

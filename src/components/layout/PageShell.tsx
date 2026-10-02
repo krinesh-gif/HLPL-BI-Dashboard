@@ -7,6 +7,7 @@ export function PageShell({
   subtitle,
   showFilters = true,
   showChannelFilter = true,
+  headerActions,
   children,
 }: {
   /** A node, not a string, so a channel can lead with its logo. */
@@ -15,6 +16,9 @@ export function PageShell({
   showFilters?: boolean
   /** Off on a page that is already about one channel. */
   showChannelFilter?: boolean
+  /** A control belonging to this page, shown beside the filters — the currency
+   * Amazon USA is read in, say. */
+  headerActions?: ReactNode
   children: ReactNode
 }) {
   return (
@@ -26,7 +30,14 @@ export function PageShell({
       <Header
         title={title}
         subtitle={subtitle}
-        actions={showFilters ? <GlobalFilters showChannel={showChannelFilter} /> : undefined}
+        actions={
+          headerActions || showFilters ? (
+            <>
+              {headerActions}
+              {showFilters && <GlobalFilters showChannel={showChannelFilter} />}
+            </>
+          ) : undefined
+        }
       />
       <main className="mx-auto w-full max-w-[1600px] flex-1 space-y-5 px-6 pt-2 pb-8">{children}</main>
     </div>
