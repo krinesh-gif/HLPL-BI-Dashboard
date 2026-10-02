@@ -1,8 +1,5 @@
 import { PageShell } from '@/components/layout/PageShell'
 import { Link } from 'react-router-dom'
-import { channelLabel, SOURCE_MAP, channelOfSource } from '@/config/channels'
-import type { SalesSourceId } from '@/config/channels'
-import { DEFAULT_CHANNEL_FEE_RATES } from '@/config/marketplaceFees'
 import { ChannelLogoSettings } from './ChannelLogoSettings'
 
 export function SettingsPage() {
@@ -38,54 +35,12 @@ export function SettingsPage() {
           </li>
         </ul>
         <p className="mt-3 text-xs text-[var(--ink-3)]">
-          This page used to list the engine&apos;s internal thresholds — insight triggers, allocation fallbacks and
-          the like. They were read-only, named after the code rather than the business, and changed nothing you
-          could see, so they have been taken out. If one of them is worth controlling, say which and it will be
-          made editable properly.
+          This page used to list the engine&apos;s internal thresholds, and a table of assumed marketplace fee
+          rates per channel. Both were read-only, and the fee table was read by nothing at all — no commission,
+          shipping or RTO figure anywhere in the app came from it, so a reader could check a rate against their
+          contract, correct it here in their head, and change nothing. They have been taken out. If a figure is
+          worth controlling, say which and it will be made editable properly.
         </p>
-      </div>
-
-      <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
-        <h3 className="text-sm font-semibold text-[var(--ink)]">Assumed marketplace fees</h3>
-        <p className="mb-3 mt-1 text-xs text-[var(--ink-3)]">
-          Used only for a channel-month with no charge report uploaded yet. Once a real settlement or fee
-          report is in, the actual charges replace every figure here.
-        </p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs font-semibold text-[var(--ink-3)]">
-                <th className="py-1.5 pr-4">Channel</th>
-                <th className="py-1.5 pr-4 text-right">Commission %</th>
-                <th className="py-1.5 pr-4 text-right">Fulfilment %</th>
-                <th className="py-1.5 pr-4 text-right">Shipping %</th>
-                <th className="py-1.5 pr-4 text-right">Collection %</th>
-                <th className="py-1.5 pr-4 text-right">RTO Rate %</th>
-                <th className="py-1.5 text-right">Return Rate %</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(DEFAULT_CHANNEL_FEE_RATES).map(([channel, rates]) => (
-                <tr key={channel} className="border-t border-[var(--line)]">
-                  <td className="py-1.5 pr-4 text-[var(--ink-2)]">
-                    {(() => {
-                      const source = channel as SalesSourceId
-                      const owner = channelLabel(channelOfSource(source))
-                      const name = SOURCE_MAP[source]?.label ?? source
-                      return name === owner ? owner : `${owner} — ${name}`
-                    })()}
-                  </td>
-                  <td className="py-1.5 pr-4 text-right tabular-nums">{rates.commissionPct}</td>
-                  <td className="py-1.5 pr-4 text-right tabular-nums">{rates.fulfilmentPct}</td>
-                  <td className="py-1.5 pr-4 text-right tabular-nums">{rates.shippingPct}</td>
-                  <td className="py-1.5 pr-4 text-right tabular-nums">{rates.collectionPct}</td>
-                  <td className="py-1.5 pr-4 text-right tabular-nums">{rates.rtoRatePct}</td>
-                  <td className="py-1.5 text-right tabular-nums">{rates.returnRatePct}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
     </PageShell>
   )
