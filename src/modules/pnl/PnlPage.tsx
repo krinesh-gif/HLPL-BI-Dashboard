@@ -42,7 +42,30 @@ export function PnlPage() {
   }
 
   return (
-    <PageShell title="P&L" subtitle="Management accounts by month, for the company and each channel" showFilters={false}>
+    <PageShell
+      title="P&L"
+      subtitle="Management accounts by month, for the company and each channel"
+      showFilters={false}
+      // Carries whatever is on screen into the snapshot, so the link reports
+      // the same view, period, basis and currency the reader was looking at.
+      headerActions={
+        <Link
+          to={{
+            pathname: '/pnl/snapshot',
+            search: new URLSearchParams({
+              view: r.view,
+              from: r.months[0] ?? r.latestMonth,
+              to: r.months[r.months.length - 1] ?? r.latestMonth,
+              basis: r.meeshoBasis,
+              cur: r.displayCurrency,
+            }).toString(),
+          }}
+          className="rounded-[var(--radius-control)] border border-[var(--line-2)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--surface-hover)]"
+        >
+          Snapshot
+        </Link>
+      }
+    >
       {/* ---- Header controls ------------------------------------------- */}
       <div className="flex flex-wrap items-end gap-4 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-[var(--shadow-card)]">
         <label className="flex flex-col gap-1">

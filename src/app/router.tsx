@@ -4,6 +4,7 @@ import { SectionGuard } from '@/components/layout/SectionGuard'
 import { OverviewPage } from '@/modules/overview/OverviewPage'
 import { MisPage } from '@/modules/mis/MisPage'
 import { PnlPage } from '@/modules/pnl/PnlPage'
+import { PnlSnapshotPage } from '@/modules/pnl/PnlSnapshotPage'
 import { NetSalesReconciliationPage } from '@/modules/pnl/NetSalesReconciliationPage'
 import { MonthlyInputsPage } from '@/modules/settings/MonthlyInputsPage'
 import { CostSheetPage } from '@/modules/products/CostSheetPage'
@@ -41,6 +42,9 @@ export const router = createHashRouter([
       { path: 'mis', element: <MisPage /> },
       { path: 'pnl', element: <PnlPage /> },
       { path: 'pnl/reconciliation', element: <NetSalesReconciliationPage /> },
+      // Under /pnl, so the section guard opens it to exactly the people the
+      // statements are open to and nobody else.
+      { path: 'pnl/snapshot', element: <PnlSnapshotPage /> },
       // The fee breakdown is a section of the Amazon USA channel page now, not
       // a page of its own. The statement deep-links a single fee with ?fee=,
       // so the search string has to survive the redirect or the link lands on

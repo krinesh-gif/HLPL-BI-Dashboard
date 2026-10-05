@@ -34,20 +34,31 @@ export interface PnlPeriod {
  * keeps the two reports in the same format and stops them from being
  * calculated two different ways.
  */
-export function usePnlReport() {
+/**
+ * Where the report should start. Only initial values: the snapshot opens on
+ * the selection it was linked with, and the controls still work from there.
+ */
+export interface PnlReportStart {
+  view?: PnlView
+  period?: PnlPeriod
+  meeshoBasis?: PnlBasis
+  amazonUsaCurrency?: 'USD' | 'INR'
+}
+
+export function usePnlReport(start: PnlReportStart = {}) {
   const { salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, fxRates } = useDataStore()
   const { month } = useFilterStore()
   const { forMonth } = usePnlInputs()
 
-  const [view, setView] = useState<PnlView>('master')
+  const [view, setView] = useState<PnlView>(start.view ?? 'master')
   // Meesho carries both an order-date and a payment-date statement. Order
   // basis is the default: it is what a month's trading is judged on.
-  const [meeshoBasis, setMeeshoBasis] = useState<PnlBasis>('order')
+  const [meeshoBasis, setMeeshoBasis] = useState<PnlBasis>(start.meeshoBasis ?? 'order')
   // Amazon USA earns and is charged in dollars, so its own statement reads
   // naturally in dollars. Rupees is the second view, for reading it beside the
   // other channels. The Master P&L is always rupees — one report, one currency.
-  const [amazonUsaCurrency, setAmazonUsaCurrency] = useState<'USD' | 'INR'>('USD')
-  const [period, setPeriod] = useState<PnlPeriod>({ mode: 'quick', quick: '6m', from: month, to: month })
+  const [amazonUsaCurrency, setAmazonUsaCurrency] = useState<'USD' | 'INR'>(start.amazonUsaCurrency ?? 'USD')
+  const [period, setPeriod] = useState<PnlPeriod>(start.period ?? { mode: 'quick', quick: '6m', from: month, to: month })
 
   const monthsWithData = useMemo(() => {
     const set = new Set<string>()
