@@ -147,3 +147,44 @@ h1, h2, h3 { letter-spacing: -0.011em; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ---------------------------------------------------------------------------
+   Printing
+   ---------------------------------------------------------------------------
+   One screen is meant to leave the building as a file: the channel snapshot a
+   marketplace manager is sent. Printing is how it becomes one, so the page is
+   given a paper size and a margin, and the app's chrome is dropped.
+
+   Colours are forced to print. A browser drops background fills by default,
+   which would take the tint off a warning banner and leave the sentence
+   looking like an ordinary note — the opposite of what it is there to say.
+   --------------------------------------------------------------------------- */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  :root {
+    /* Paper is white. A snapshot taken while the dashboard is in dark mode
+       must not print a black page. */
+    color-scheme: light;
+  }
+
+  html, body {
+    background: #fff !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* The app lives in a full-height flex shell that scrolls internally; on
+     paper that clips everything past the first screen. */
+  body * {
+    overflow: visible !important;
+  }
+}

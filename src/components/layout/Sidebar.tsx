@@ -134,7 +134,7 @@ export function Sidebar() {
   })
 
   return (
-    <aside className="flex h-full w-[248px] shrink-0 flex-col border-r border-[var(--line)] bg-[var(--surface)]">
+    <aside className="print:hidden flex h-full w-[248px] shrink-0 flex-col border-r border-[var(--line)] bg-[var(--surface)]">
       <div className="flex items-center gap-2.5 px-4 py-5">
         {/* Solid accent, lifted on its own shadow: the mark is the one piece of
             chrome allowed to carry the brand colour at full strength, which is

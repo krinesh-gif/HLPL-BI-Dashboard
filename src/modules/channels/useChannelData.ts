@@ -128,7 +128,14 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
     const label = productLabelResolver({ skuMaster, mappings, comboComponents })
     const skuRows = Array.from(bySku.entries()).map(([sku, records]) => {
       const facts = orderBasisNetSales(records, rate)
-      return { sku, productName: label(sku, records[0]?.productName).title, netSales: facts.netSales, units: facts.units }
+      const named = label(sku, records[0]?.productName)
+      // The Uniware code as well as the name: the code is what the warehouse
+      // and the cost sheet are keyed on, and it is the same code on every
+      // channel, so two channels' lists can be put side by side.
+      return {
+        sku, internalSku: named.sku, productName: named.title,
+        netSales: facts.netSales, units: facts.units,
+      }
     })
 
     // The breakdown that lets ₹1 Cr of Amazon India be read as ₹80 L Seller

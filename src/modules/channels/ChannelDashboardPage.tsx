@@ -88,14 +88,24 @@ export function ChannelDashboardPage() {
       // USA is offered the choice. On every other channel the control would be
       // a switch with one position.
       headerActions={
-        channel === 'amazon_us' ? (
-          <SegmentedControl
-            value={amazonUsaCurrency}
-            options={[{ value: 'USD', label: 'USD' }, { value: 'INR', label: 'INR' }]}
-            onChange={setAmazonUsaCurrency}
-            size="sm"
-          />
-        ) : undefined
+        <>
+          {channel === 'amazon_us' && (
+            <SegmentedControl
+              value={amazonUsaCurrency}
+              options={[{ value: 'USD', label: 'USD' }, { value: 'INR', label: 'INR' }]}
+              onChange={setAmazonUsaCurrency}
+              size="sm"
+            />
+          )}
+          {/* For sending to whoever runs this channel. One page, this channel
+              only, and no costs or margins on it. */}
+          <Link
+            to={`/channels/${channel}/snapshot`}
+            className="rounded-[var(--radius-control)] border border-[var(--line-2)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--surface-hover)]"
+          >
+            Snapshot
+          </Link>
+        </>
       }
     >
       {sourcePicker && <div>{sourcePicker}</div>}

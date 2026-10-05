@@ -9,6 +9,7 @@ import { MonthlyInputsPage } from '@/modules/settings/MonthlyInputsPage'
 import { CostSheetPage } from '@/modules/products/CostSheetPage'
 import { InsightPage } from '@/modules/insight/InsightPage'
 import { ChannelDashboardPage } from '@/modules/channels/ChannelDashboardPage'
+import { ChannelSnapshotPage } from '@/modules/channels/ChannelSnapshotPage'
 import { AmazonUsaFeesRedirect } from '@/modules/channels/AmazonUsaFees'
 import { AdsOverviewPage } from '@/modules/marketing/AdsOverviewPage'
 import { AdsChannelPage } from '@/modules/marketing/AdsChannelPage'
@@ -53,6 +54,9 @@ export const router = createHashRouter([
       { path: 'pnl/fixed-expenses', element: <Navigate to="/settings/monthly-inputs" replace /> },
       { path: 'insight', element: <InsightPage /> },
       { path: 'channels/:channelId', element: <ChannelDashboardPage /> },
+      // Under /channels on purpose: the section guard keys off the path, so the
+      // snapshot is open to exactly the people the channel dashboards are.
+      { path: 'channels/:channelId/snapshot', element: <ChannelSnapshotPage /> },
       { path: 'marketing/ads', element: <AdsOverviewPage /> },
       { path: 'marketing/ads/:adsChannelId', element: <AdsChannelPage /> },
       { path: 'products/sku-analytics', element: <SkuAnalyticsPage /> },
