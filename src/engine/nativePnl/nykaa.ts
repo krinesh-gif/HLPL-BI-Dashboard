@@ -40,7 +40,7 @@ export const NYKAA_LINE_DEFS: NativeLineDef[] = [
   { key: 'netSalesMrp', label: 'NET SALES AT MRP', section: 'SALES — AT MRP', kind: 'subtotal', note: 'what Nykaa owes against, before its margin' },
 
   { key: 'commissionPct', label: "Nykaa's margin, % of MRP", section: "NYKAA'S MARGIN", kind: 'percent' },
-  { key: 'commission', label: "Less: Nykaa commission on MRP", section: "NYKAA'S MARGIN", kind: 'input' },
+  { key: 'commission', label: "Less: Nykaa commission on MRP", section: "NYKAA'S MARGIN", kind: 'input', fee: 'commission' },
   { key: 'netRealisationInclGst', label: 'NET REALISATION (incl. GST)', section: "NYKAA'S MARGIN", kind: 'subtotal', note: 'what Nykaa pays us' },
 
   { key: 'outputGst', label: 'Less: Output GST', section: 'REVENUE', kind: 'input', note: 'MRP is tax-inclusive, so the realisation is too' },
@@ -101,7 +101,7 @@ export const NYKAA_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 
-  { key: 'nykaaAds', label: 'Less: Nykaa Ads / MI', section: 'ADVERTISING', kind: 'input', note: 'Manual entry — billed by invoice, not reported' },
+  { key: 'nykaaAds', label: 'Less: Nykaa Ads / MI', section: 'ADVERTISING', kind: 'input', fee: 'advertising', note: 'Manual entry — billed by invoice, not reported' },
   { key: 'cm2', label: 'CONTRIBUTION MARGIN (CM2)', section: 'ADVERTISING', kind: 'subtotal', note: '⭐ the number to manage the channel on' },
   { key: 'cm2Pct', label: 'CM2 %', section: 'ADVERTISING', kind: 'percent' },
 

@@ -42,6 +42,7 @@ const feeLineDefs = (
     group: section,
     memoOf: nested.has(c.id) && c.componentOf ? `fee.${c.componentOf}` : undefined,
     href: `#/channels/amazon_us?fee=${c.id}`,
+    fee: c.fee,
   }))
 
 /**
@@ -88,7 +89,7 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
 
   { key: 'totalMarketplaceChargesUsd', label: 'Marketplace Charges', section: 'MARKETPLACE CHARGES', kind: 'subtotal', isGroupHead: true, group: 'MARKETPLACE CHARGES' },
   ...feeLineDefs('marketplace', 'MARKETPLACE CHARGES', DEFAULT_NESTED),
-  { key: 'unmappedFeesUsd', label: 'Fee columns not yet mapped', section: 'MARKETPLACE CHARGES', kind: 'input', group: 'MARKETPLACE CHARGES', hideWhenZero: true, note: 'New Amazon column — check the import warnings' },
+  { key: 'unmappedFeesUsd', label: 'Fee columns not yet mapped', section: 'MARKETPLACE CHARGES', kind: 'input', fee: 'otherFees', group: 'MARKETPLACE CHARGES', hideWhenZero: true, note: 'New Amazon column — check the import warnings' },
 
   // What the month earned after the marketplace has taken its cut, before a
   // rupee of advertising. It is the line that says whether the product pays
@@ -101,8 +102,8 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
   // Amazon does not report these two in the Product Profitability export, so
   // they are typed in monthly. Zero today; the lines are here so the spend
   // lands in the right place the first month it happens.
-  { key: 'sponsoredBrandsUsd', label: 'Sponsored Brands', section: 'ADVERTISING FEES', kind: 'input', group: 'ADVERTISING FEES', note: 'Manual entry' },
-  { key: 'sponsoredDisplayDspUsd', label: 'Sponsored Display / DSP', section: 'ADVERTISING FEES', kind: 'input', group: 'ADVERTISING FEES', note: 'Manual entry' },
+  { key: 'sponsoredBrandsUsd', label: 'Sponsored Brands', section: 'ADVERTISING FEES', kind: 'input', fee: 'advertising', group: 'ADVERTISING FEES', note: 'Manual entry' },
+  { key: 'sponsoredDisplayDspUsd', label: 'Sponsored Display / DSP', section: 'ADVERTISING FEES', kind: 'input', fee: 'advertising', group: 'ADVERTISING FEES', note: 'Manual entry' },
 
   { key: 'netProceedsUsd', label: 'Net proceeds total', section: 'NET PROCEEDS', kind: 'subtotal' },
   // Sponsored Brands and Display are billed outside this report, so Amazon's

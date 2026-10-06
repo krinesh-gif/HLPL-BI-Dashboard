@@ -39,6 +39,7 @@ export const NAVIGATION: NavSection[] = [
       { label: 'Myntra', path: '/channels/myntra' },
       { label: 'Nykaa', path: '/channels/nykaa' },
       { label: 'Purplle', path: '/channels/purplle' },
+      { label: 'Blinkit', path: '/channels/blinkit' },
     ],
   },
   {
@@ -71,6 +72,7 @@ export const NAVIGATION: NavSection[] = [
       { label: 'SKU Mapping', path: '/products/sku-mapping' },
     ],
   },
+  { label: 'Marketplace Fees', path: '/pnl/fees' },
   { label: 'Net Sales Reconciliation', path: '/pnl/reconciliation' },
   {
     label: 'Data',

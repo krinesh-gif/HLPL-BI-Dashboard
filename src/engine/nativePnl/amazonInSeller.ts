@@ -79,15 +79,15 @@ export const AMAZON_IN_SELLER_LINE_DEFS: NativeLineDef[] = [
   { key: 'promotions', label: 'Less: Seller-funded promotions', section: 'SALES', kind: 'input', note: 'Coupons, rebates and the shipping we absorb' },
   { key: 'netSales', label: 'NET SALES (ex-GST)', section: 'SALES', kind: 'subtotal', note: '⭐ denominator for every %' },
 
-  { key: 'commission', label: 'Less: Commission', section: 'AMAZON FEES', kind: 'input' },
-  { key: 'closingFee', label: 'Less: Fixed closing fee', section: 'AMAZON FEES', kind: 'input' },
-  { key: 'fbaFees', label: 'Less: FBA pick, pack, weight and storage', section: 'AMAZON FEES', kind: 'input', hideWhenZero: true },
-  { key: 'shippingFees', label: 'Less: Easy Ship postage', section: 'AMAZON FEES', kind: 'input', hideWhenZero: true, note: 'Net of the reversals Amazon credits back' },
-  { key: 'unrecognised', label: 'Less: Charges this build does not recognise', section: 'AMAZON FEES', kind: 'input', hideWhenZero: true, note: '⚠ a new Amazon description — counted so the month still ties, but not yet named' },
+  { key: 'commission', label: 'Less: Commission', section: 'AMAZON FEES', kind: 'input', fee: 'commission' },
+  { key: 'closingFee', label: 'Less: Fixed closing fee', section: 'AMAZON FEES', kind: 'input', fee: 'fixedFee' },
+  { key: 'fbaFees', label: 'Less: FBA pick, pack, weight and storage', section: 'AMAZON FEES', kind: 'input', fee: 'fulfilment', hideWhenZero: true },
+  { key: 'shippingFees', label: 'Less: Easy Ship postage', section: 'AMAZON FEES', kind: 'input', fee: 'shipping', hideWhenZero: true, note: 'Net of the reversals Amazon credits back' },
+  { key: 'unrecognised', label: 'Less: Charges this build does not recognise', section: 'AMAZON FEES', kind: 'input', fee: 'otherFees', hideWhenZero: true, note: '⚠ a new Amazon description — counted so the month still ties, but not yet named' },
   { key: 'totalFees', label: 'Total Amazon fees', section: 'AMAZON FEES', kind: 'subtotal' },
   { key: 'feesPctOfSales', label: 'Fees, % of net sales', section: 'AMAZON FEES', kind: 'percent' },
 
-  { key: 'reimbursements', label: 'Add: Reimbursements', section: 'OTHER SETTLEMENT ITEMS', kind: 'input', hideWhenZero: true, note: 'Lost and damaged stock Amazon pays for' },
+  { key: 'reimbursements', label: 'Add: Reimbursements', section: 'OTHER SETTLEMENT ITEMS', kind: 'input', fee: 'otherFees', hideWhenZero: true, note: 'Lost and damaged stock Amazon pays for' },
   { key: 'contributionBeforeCogs', label: 'SETTLED REVENUE AFTER FEES', section: 'OTHER SETTLEMENT ITEMS', kind: 'subtotal' },
 
   { key: 'cogsPriced', label: 'Less: COGS — priced SKUs', section: 'COST OF GOODS SOLD', kind: 'input' },
@@ -96,7 +96,7 @@ export const AMAZON_IN_SELLER_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 
-  { key: 'ads', label: 'Less: Advertising', section: 'ADVERTISING', kind: 'input', note: 'Sponsored Products — billed separately, not in the settlement' },
+  { key: 'ads', label: 'Less: Advertising', section: 'ADVERTISING', kind: 'input', fee: 'advertising', note: 'Sponsored Products — billed separately, not in the settlement' },
   { key: 'cm2', label: 'CONTRIBUTION MARGIN (CM2)', section: 'ADVERTISING', kind: 'subtotal', note: '⭐ the number to manage the channel on' },
   { key: 'cm2Pct', label: 'CM2 %', section: 'ADVERTISING', kind: 'percent' },
 
@@ -105,9 +105,9 @@ export const AMAZON_IN_SELLER_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm3Pct', label: 'Net Profit %', section: 'YOUR OTHER COSTS', kind: 'percent' },
 
   { key: 'outputGst', label: 'GST collected on sales', section: 'MONEY HELD, NOT EARNED OR SPENT', kind: 'input', note: 'Collected from the shopper and paid onward — never revenue' },
-  { key: 'feeGst', label: 'GST charged on Amazon fees', section: 'MONEY HELD, NOT EARNED OR SPENT', kind: 'input', note: 'Input tax credit — recoverable, so it is not in any margin above' },
-  { key: 'tcs', label: 'TCS withheld by Amazon', section: 'MONEY HELD, NOT EARNED OR SPENT', kind: 'input', note: 'Set against our GST liability when it is filed' },
-  { key: 'tds', label: 'TDS withheld (Section 194-O)', section: 'MONEY HELD, NOT EARNED OR SPENT', kind: 'input', note: 'Set against our income tax' },
+  { key: 'feeGst', label: 'GST charged on Amazon fees', section: 'MONEY HELD, NOT EARNED OR SPENT', kind: 'input', fee: 'feeTax', note: 'Input tax credit — recoverable, so it is not in any margin above' },
+  { key: 'tcs', label: 'TCS withheld by Amazon', section: 'MONEY HELD, NOT EARNED OR SPENT', kind: 'input', fee: 'withholding', note: 'Set against our GST liability when it is filed' },
+  { key: 'tds', label: 'TDS withheld (Section 194-O)', section: 'MONEY HELD, NOT EARNED OR SPENT', kind: 'input', fee: 'withholding', note: 'Set against our income tax' },
   { key: 'settlementTotal', label: 'AMOUNT DEPOSITED BY AMAZON', section: 'MONEY HELD, NOT EARNED OR SPENT', kind: 'subtotal', note: 'Every line of the settlement, including the four above' },
   { key: 'settlementCheck', label: 'Deposit less the statement above', section: 'MONEY HELD, NOT EARNED OR SPENT', kind: 'input', hideWhenZero: true, note: '⚠ must be zero — anything else means a line was read twice or not at all' },
 ]

@@ -5,6 +5,7 @@ import { OverviewPage } from '@/modules/overview/OverviewPage'
 import { MisPage } from '@/modules/mis/MisPage'
 import { PnlPage } from '@/modules/pnl/PnlPage'
 import { PnlSnapshotPage } from '@/modules/pnl/PnlSnapshotPage'
+import { FeesPage } from '@/modules/pnl/FeesPage'
 import { NetSalesReconciliationPage } from '@/modules/pnl/NetSalesReconciliationPage'
 import { MonthlyInputsPage } from '@/modules/settings/MonthlyInputsPage'
 import { CostSheetPage } from '@/modules/products/CostSheetPage'
@@ -42,6 +43,9 @@ export const router = createHashRouter([
       { path: 'mis', element: <MisPage /> },
       { path: 'pnl', element: <PnlPage /> },
       { path: 'pnl/reconciliation', element: <NetSalesReconciliationPage /> },
+      // Under /pnl because it is built from the same channel statements the
+      // P&L is, and so the section guard opens it to the same people.
+      { path: 'pnl/fees', element: <FeesPage /> },
       // Under /pnl, so the section guard opens it to exactly the people the
       // statements are open to and nobody else.
       { path: 'pnl/snapshot', element: <PnlSnapshotPage /> },
