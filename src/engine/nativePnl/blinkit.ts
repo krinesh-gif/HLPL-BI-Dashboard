@@ -65,11 +65,11 @@ export const BLINKIT_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm3', label: 'CONTRIBUTION MARGIN 3 (after adjustments)', section: 'ADJUSTMENTS', kind: 'subtotal' },
   { key: 'cm3Pct', label: 'CM3 %', section: 'ADJUSTMENTS', kind: 'percent' },
 
-  { key: 'cogs', label: 'Less: Cost of goods sold', section: 'PROFIT', kind: 'input',
+  { key: 'cogs', label: 'Less: COGS', section: 'PROFIT', kind: 'input',
     note: 'From the cost sheet, for the units Blinkit sold' },
   { key: 'grossProfit', label: 'Gross Profit (after COGS)', section: 'PROFIT', kind: 'subtotal' },
   { key: 'grossMarginPct', label: 'Gross Margin %', section: 'PROFIT', kind: 'percent' },
-  { key: 'overheads', label: 'Less: Allocated overheads', section: 'PROFIT', kind: 'input',
+  { key: 'overheads', label: 'Less: Allocated Fixed Expenses', section: 'PROFIT', kind: 'input',
     note: 'This channel’s share of the month’s fixed expenses, by its share of sales' },
   { key: 'ebitda', label: 'EBITDA', section: 'PROFIT', kind: 'subtotal' },
   { key: 'ebitdaPct', label: 'EBITDA %', section: 'PROFIT', kind: 'percent' },

@@ -95,9 +95,9 @@ export const NYKAA_LINE_DEFS: NativeLineDef[] = [
     kind: 'input', hideWhenZero: true,
     note: 'net units × the rate card entered for the month — a rupee or two a unit, and six thousand units a month',
   },
-  { key: 'cogsPriced', label: 'Less: COGS — priced SKUs', section: 'COST OF GOODS SOLD', kind: 'input' },
-  { key: 'cogsUnpriced', label: 'Less: COGS — unpriced SKUs (est.)', section: 'COST OF GOODS SOLD', kind: 'input', note: '⚠ estimate — goes to zero once every SKU is mapped and priced' },
-  { key: 'totalCogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'cogsPriced', label: 'COGS — priced SKUs', section: 'COST OF GOODS SOLD', kind: 'input' },
+  { key: 'cogsUnpriced', label: 'COGS — unpriced SKUs (est.)', section: 'COST OF GOODS SOLD', kind: 'input', note: '⚠ estimate — goes to zero once every SKU is mapped and priced' },
+  { key: 'totalCogs', label: 'Less: COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 
@@ -105,9 +105,9 @@ export const NYKAA_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm2', label: 'CONTRIBUTION MARGIN (CM2)', section: 'ADVERTISING', kind: 'subtotal', note: '⭐ the number to manage the channel on' },
   { key: 'cm2Pct', label: 'CM2 %', section: 'ADVERTISING', kind: 'percent' },
 
-  { key: 'otherCosts', label: 'Less: Other Costs (allocated fixed expenses)', section: 'YOUR OTHER COSTS', kind: 'input' },
-  { key: 'cm3', label: 'NET PROFIT (CM3)', section: 'YOUR OTHER COSTS', kind: 'subtotal' },
-  { key: 'cm3Pct', label: 'Net Profit %', section: 'YOUR OTHER COSTS', kind: 'percent' },
+  { key: 'otherCosts', label: 'Less: Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input' },
+  { key: 'cm3', label: 'NET PROFIT (CM3)', section: 'FIXED EXPENSES', kind: 'subtotal' },
+  { key: 'cm3Pct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
 
   {
     key: 'customerPaidValue', label: 'Value shoppers actually paid', section: 'MEMO',

@@ -90,9 +90,9 @@ export const AMAZON_IN_SELLER_LINE_DEFS: NativeLineDef[] = [
   { key: 'reimbursements', label: 'Add: Reimbursements', section: 'OTHER SETTLEMENT ITEMS', kind: 'input', fee: 'otherFees', hideWhenZero: true, note: 'Lost and damaged stock Amazon pays for' },
   { key: 'contributionBeforeCogs', label: 'SETTLED REVENUE AFTER FEES', section: 'OTHER SETTLEMENT ITEMS', kind: 'subtotal' },
 
-  { key: 'cogsPriced', label: 'Less: COGS — priced SKUs', section: 'COST OF GOODS SOLD', kind: 'input' },
-  { key: 'cogsUnpriced', label: 'Less: COGS — unpriced SKUs (est.)', section: 'COST OF GOODS SOLD', kind: 'input', hideWhenZero: true, note: '⚠ estimate — goes to zero once every SKU is mapped and priced' },
-  { key: 'totalCogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'cogsPriced', label: 'COGS — priced SKUs', section: 'COST OF GOODS SOLD', kind: 'input' },
+  { key: 'cogsUnpriced', label: 'COGS — unpriced SKUs (est.)', section: 'COST OF GOODS SOLD', kind: 'input', hideWhenZero: true, note: '⚠ estimate — goes to zero once every SKU is mapped and priced' },
+  { key: 'totalCogs', label: 'Less: COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 
@@ -100,9 +100,9 @@ export const AMAZON_IN_SELLER_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm2', label: 'CONTRIBUTION MARGIN (CM2)', section: 'ADVERTISING', kind: 'subtotal', note: '⭐ the number to manage the channel on' },
   { key: 'cm2Pct', label: 'CM2 %', section: 'ADVERTISING', kind: 'percent' },
 
-  { key: 'otherCosts', label: 'Less: Other Costs (allocated fixed expenses)', section: 'YOUR OTHER COSTS', kind: 'input' },
-  { key: 'cm3', label: 'NET PROFIT (CM3)', section: 'YOUR OTHER COSTS', kind: 'subtotal' },
-  { key: 'cm3Pct', label: 'Net Profit %', section: 'YOUR OTHER COSTS', kind: 'percent' },
+  { key: 'otherCosts', label: 'Less: Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input' },
+  { key: 'cm3', label: 'NET PROFIT (CM3)', section: 'FIXED EXPENSES', kind: 'subtotal' },
+  { key: 'cm3Pct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
 
   { key: 'outputGst', label: 'GST collected on sales', section: 'MONEY HELD, NOT EARNED OR SPENT', kind: 'input', note: 'Collected from the shopper and paid onward — never revenue' },
   { key: 'feeGst', label: 'GST charged on Amazon fees', section: 'MONEY HELD, NOT EARNED OR SPENT', kind: 'input', fee: 'feeTax', note: 'Input tax credit — recoverable, so it is not in any margin above' },

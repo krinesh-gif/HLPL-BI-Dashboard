@@ -52,7 +52,7 @@ export const MEESHO_LINE_DEFS: NativeLineDef[] = [
   { key: 'cogsUnitsSold', label: 'COGS — units sold', section: 'COST OF GOODS SOLD', kind: 'input' },
   { key: 'cogsRtoWriteOff', label: 'COGS — RTO write-off (unsaleable)', section: 'COST OF GOODS SOLD', kind: 'input' },
   { key: 'cogsReturnWriteOff', label: 'COGS — customer return write-off (unsaleable)', section: 'COST OF GOODS SOLD', kind: 'input' },
-  { key: 'totalCogs', label: 'Total Cost of Goods Sold', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'totalCogs', label: 'Less: COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'grossProfit', label: 'GROSS PROFIT', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'grossMarginPct', label: 'Gross Margin %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 
@@ -87,9 +87,9 @@ export const MEESHO_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm4', label: 'CONTRIBUTION MARGIN 4 (after adjustments)', section: 'PLATFORM ADJUSTMENTS', kind: 'subtotal' },
   { key: 'cm4Pct', label: 'CM4 %', section: 'PLATFORM ADJUSTMENTS', kind: 'percent' },
 
-  { key: 'overheads', label: 'Total Operating Overheads', section: 'OPERATING OVERHEADS', kind: 'input' },
-  { key: 'ebitda', label: 'CHANNEL EBITDA', section: 'OPERATING OVERHEADS', kind: 'subtotal' },
-  { key: 'ebitdaPct', label: 'EBITDA %', section: 'OPERATING OVERHEADS', kind: 'percent' },
+  { key: 'overheads', label: 'Less: Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input' },
+  { key: 'ebitda', label: 'CHANNEL EBITDA', section: 'FIXED EXPENSES', kind: 'subtotal' },
+  { key: 'ebitdaPct', label: 'EBITDA %', section: 'FIXED EXPENSES', kind: 'percent' },
 
   { key: 'tcs', label: 'TCS collected u/s 52 (creditable)', section: 'MEMO — STATUTORY (not charged to P&L)', kind: 'input', fee: 'withholding' },
   { key: 'tds', label: 'TDS deducted u/s 194-O (creditable)', section: 'MEMO — STATUTORY (not charged to P&L)', kind: 'input', fee: 'withholding', feeSign: 'amount' },

@@ -113,7 +113,7 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
   { key: 'sheetNetProceedsUsd', label: 'Net proceeds per Amazon export', section: 'NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
   { key: 'netProceedsDiffUsd', label: 'Difference', section: 'NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
 
-  { key: 'cogsUsd', label: 'Cost of Goods Sold', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input' },
+  { key: 'cogsUsd', label: 'Less: COGS', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input' },
   { key: 'cogsPricedUsd', label: 'Priced from the cost sheet', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', memoOf: 'cogsUsd', hideWhenZero: true },
   { key: 'cogsEstimatedUsd', label: 'Estimated — no cost on file for these SKUs', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', memoOf: 'cogsUsd', hideWhenZero: true },
   { key: 'freightUsd', label: 'India → USA Air Freight', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input' },
@@ -125,12 +125,12 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
 
 
   {
-    key: 'allocatedOverheadsUsd', label: 'Less: Allocated company overheads', section: 'ALLOCATED COMPANY OVERHEADS',
+    key: 'allocatedOverheadsUsd', label: 'Less: Allocated Fixed Expenses', section: 'FIXED EXPENSES',
     kind: 'input',
     note: "this channel's share of the company's own fixed costs — entered on Fixed Expenses, split by sales contribution",
   },
-  { key: 'cm3', label: 'NET PROFIT (CM3)', section: 'ALLOCATED COMPANY OVERHEADS', kind: 'subtotal' },
-  { key: 'cm3Pct', label: 'Net Profit %', section: 'ALLOCATED COMPANY OVERHEADS', kind: 'percent' },
+  { key: 'cm3', label: 'NET PROFIT (CM3)', section: 'FIXED EXPENSES', kind: 'subtotal' },
+  { key: 'cm3Pct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
 ]
 
 /**

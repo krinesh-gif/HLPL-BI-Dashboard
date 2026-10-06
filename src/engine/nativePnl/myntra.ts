@@ -78,9 +78,9 @@ export const MYNTRA_LINE_DEFS: NativeLineDef[] = [
   { key: 'netMarginPct', label: 'Net Margin (% of Net Sales)', section: 'SETTLEMENT', kind: 'percent' },
 
   { key: 'netRevenueExGst', label: 'NET REVENUE (ex-GST)', section: 'YOUR MARGIN', kind: 'subtotal', note: '⭐ denominator for every %' },
-  { key: 'cogsPriced', label: 'Less: COGS — priced SKUs', section: 'YOUR MARGIN', kind: 'input' },
-  { key: 'cogsUnpriced', label: 'Less: COGS — unpriced SKUs (est.)', section: 'YOUR MARGIN', kind: 'input', note: '⚠ estimate — goes to zero once every SKU is priced' },
-  { key: 'totalCogs', label: 'Total COGS', section: 'YOUR MARGIN', kind: 'subtotal' },
+  { key: 'cogsPriced', label: 'COGS — priced SKUs', section: 'YOUR MARGIN', kind: 'input' },
+  { key: 'cogsUnpriced', label: 'COGS — unpriced SKUs (est.)', section: 'YOUR MARGIN', kind: 'input', note: '⚠ estimate — goes to zero once every SKU is priced' },
+  { key: 'totalCogs', label: 'Less: COGS', section: 'YOUR MARGIN', kind: 'subtotal' },
   { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'YOUR MARGIN', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'YOUR MARGIN', kind: 'percent' },
   { key: 'cm2', label: 'CHANNEL MARGIN (CM2)', section: 'YOUR MARGIN', kind: 'subtotal', note: 'Earnings on Platform, less GST and what the goods cost' },
@@ -88,7 +88,7 @@ export const MYNTRA_LINE_DEFS: NativeLineDef[] = [
   { key: 'myntraAds', label: 'Less: Myntra Ads', section: 'YOUR MARGIN', kind: 'input', fee: 'advertising', note: 'Manual entry — the P&L report carries no advertising' },
   { key: 'cm3', label: 'CONTRIBUTION MARGIN (CM3)', section: 'YOUR MARGIN', kind: 'subtotal', note: '⭐ the number to manage the business on' },
   { key: 'cm3Pct', label: 'CM3 %', section: 'YOUR MARGIN', kind: 'percent' },
-  { key: 'otherCosts', label: 'Less: Other Costs (allocated fixed expenses)', section: 'YOUR MARGIN', kind: 'input' },
+  { key: 'otherCosts', label: 'Less: Allocated Fixed Expenses', section: 'YOUR MARGIN', kind: 'input' },
   { key: 'cm4', label: 'NET PROFIT (CM4)', section: 'YOUR MARGIN', kind: 'subtotal' },
   { key: 'cm4Pct', label: 'Net Profit %', section: 'YOUR MARGIN', kind: 'percent' },
 ]
