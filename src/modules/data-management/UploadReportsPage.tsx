@@ -15,6 +15,7 @@ import { detectMyntraPnlWorkbook, normalizeMyntraPnlWorkbook } from '@/data/norm
 import {
   detectNykaaCartRuleSheet, detectNykaaComboSheet, detectNykaaSalesSheet, normalizeNykaaWorkbook,
 } from '@/data/normalize/nykaaSalesWorkbook'
+import { normalizeBlinkitPayoutZip } from '@/data/normalize/blinkitPayout'
 import { detectNykaaMarketingInvoice, parseNykaaMarketingInvoice } from '@/data/normalize/nykaaMarketingInvoice'
 import { detectNykaaDiscountDebitNote, parseNykaaDiscountDebitNote } from '@/data/normalize/nykaaDiscountDebitNote'
 import { detectAmazonSettlementReport, normalizeAmazonSettlement } from '@/data/normalize/amazonSellerSettlement'
@@ -24,7 +25,7 @@ import { useDataStore, type ImportOutcome } from '@/store/dataStore'
 import { monthLabel } from '@/lib/format'
 import { useFilterStore } from '@/store/filterStore'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
-import type { AdsRecord, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraPnlFacts, NykaaPnlFacts } from '@/data/models'
+import type { AdsRecord, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts } from '@/data/models'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
 
@@ -44,8 +45,10 @@ type ReportKind =
   | 'meesho_order_payments'
   | 'meesho_settlement_json'
   | 'amazon_ads_sponsored_products'
+  | 'blinkit_payout_archive'
 
 const REPORT_LABELS: Record<ReportKind, string> = {
+  blinkit_payout_archive: 'Blinkit — Monthly Payout Sheet (zip)',
   amazon_seller_central: 'Amazon India — Seller Central Order Report',
   amazon_vendor_central_sales: 'Amazon India — Vendor Central Sales by ASIN (Monthly)',
   flipkart_sku_pnl: 'Flipkart — SKU-Level P&L Report',
@@ -63,6 +66,7 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   amazon_ads_sponsored_products: 'Amazon Ads — Sponsored Products Campaign Report',
 }
 const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
+  blinkit_payout_archive: 'blinkit',
   amazon_seller_central: 'amazon_in_seller',
   amazon_vendor_central_sales: 'amazon_in_vendor',
   flipkart_sku_pnl: 'flipkart',
@@ -96,6 +100,7 @@ interface PreviewState {
   amazonUsaFacts?: AmazonUsaPnlFacts
   myntraFacts?: MyntraPnlFacts
   nykaaFacts?: NykaaPnlFacts
+  blinkitFacts?: BlinkitPnlFacts
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
   /** A debit note edits one month's stored facts rather than importing rows. */
   nykaaDebitNote?: { month: string; patch: Partial<NykaaPnlFacts> }
@@ -427,6 +432,18 @@ export function UploadReportsPage() {
         }
       }
 
+      // Blinkit publishes a month as a zip of six workbooks and that zip is
+      // what gets downloaded, so it is taken whole rather than asking for the
+      // workbooks to be extracted and uploaded one by one every month.
+      if (lowerName.endsWith('.zip')) {
+        const r = await normalizeBlinkitPayoutZip(await file.arrayBuffer(), importId, file.name)
+        return { id, fileName: file.name, status: 'ready', preview: await buildPreview({
+          fileName: file.name, reportKind: 'blinkit_payout_archive', totalRows: r.totalRows,
+          validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings,
+          blinkitFacts: r.facts,
+        }) }
+      }
+
       const parsed = await parseSpreadsheetFile(file)
       let kind: ReportKind | null = null
       if (detectAmazonSellerCentralReport(parsed.headers)) kind = 'amazon_seller_central'
@@ -546,6 +563,7 @@ export function UploadReportsPage() {
         amazonUsaFacts: preview.amazonUsaFacts,
         myntraFacts: preview.myntraFacts,
         nykaaFacts: preview.nykaaFacts,
+        blinkitFacts: preview.blinkitFacts,
         amazonInSellerFacts: preview.amazonInSellerFacts,
         meeshoFactsByMonth: preview.meeshoFactsByMonth,
         // The events themselves, which the preview has built all along and
@@ -635,7 +653,7 @@ export function UploadReportsPage() {
             // without its extension here is unreachable: the picker greys the
             // file out and the person cannot select it at all, which is exactly
             // what happened to Amazon India's settlement .txt.
-            accept=".csv,.tsv,.txt,.xlsx,.xls,.json,.pdf"
+            accept=".csv,.tsv,.txt,.xlsx,.xls,.json,.pdf,.zip"
             disabled={busy}
             onChange={(e) => {
               const files = Array.from(e.target.files ?? [])

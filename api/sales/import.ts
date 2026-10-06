@@ -247,5 +247,5 @@ export async function DELETE(request: Request): Promise<Response> {
  * become an arbitrary table name. */
 const FACT_TABLE_NAMES = new Set([
   'flipkart_facts', 'amazon_usa_facts', 'myntra_facts', 'nykaa_facts',
-  'amazon_in_seller_facts', 'meesho_facts',
+  'amazon_in_seller_facts', 'meesho_facts', 'blinkit_facts',
 ])

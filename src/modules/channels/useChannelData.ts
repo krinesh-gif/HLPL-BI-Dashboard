@@ -32,7 +32,7 @@ const TREND_MONTHS = 6
  * the P&L lives in one place so a channel's numbers cannot be defined twice.
  */
 export function useChannelData(channel: BusinessChannelId, source?: SalesSourceId) {
-  const { salesRecords, skuMaster, mappings, comboComponents, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, fxRates } = useDataStore()
+  const { salesRecords, skuMaster, mappings, comboComponents, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts, fxRates } = useDataStore()
   const { month, monthChosenByUser, amazonUsaCurrency } = useFilterStore()
   const defaultMonthTo = useFilterStore((s) => s.defaultMonthTo)
   const fallbackMonthTo = useFilterStore((s) => s.fallbackMonthTo)
@@ -54,14 +54,15 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
 
     const settlementMonths: Record<BusinessChannelId, { month: string }[]> = {
       flipkart: flipkartFacts, amazon_us: amazonUsaFacts, meesho: meeshoFacts,
-      myntra: myntraFacts ?? [], nykaa: nykaaFacts ?? [], amazon_in: [], purplle: [],
+      myntra: myntraFacts ?? [], nykaa: nykaaFacts ?? [], blinkit: blinkitFacts ?? [],
+      amazon_in: [], purplle: [],
     }
     // Narrowing to one report inside a channel rules the settlement months
     // out: a settlement covers the whole channel, not one of its reports.
     if (!source) months.push(...settlementMonths[channel].map((f) => f.month))
 
     return new Set(months.filter(Boolean))
-  }, [salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, channel, source])
+  }, [salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts, channel, source])
 
   const latestMonthForChannel = useMemo(
     () => (monthsWithData.size === 0 ? null : [...monthsWithData].reduce((a, b) => (a > b ? a : b))),
@@ -96,7 +97,7 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
   return useMemo(() => {
     const previousMonth = addMonths(month, -1)
     const rate = displayCurrency === 'USD' ? 1 : fxRateValue(month, fxRates)
-    const channelFacts = { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts }
+    const channelFacts = { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts }
 
     const inScope = (r: { channel: SalesSourceId }) =>
       source ? r.channel === source : channelOfSource(r.channel) === channel
@@ -172,5 +173,5 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
       topSkus: [...skuRows].sort((a, b) => b.netSales - a.netSales).slice(0, 5),
       bottomSkus: [...skuRows].sort((a, b) => a.netSales - b.netSales).slice(0, 5),
     }
-  }, [salesRecords, skuMaster, mappings, comboComponents, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, fxRates, channel, source, month, displayCurrency])
+  }, [salesRecords, skuMaster, mappings, comboComponents, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts, fxRates, channel, source, month, displayCurrency])
 }

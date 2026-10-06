@@ -30,6 +30,7 @@ export type SalesSourceId =
   | 'myntra'
   | 'nykaa'
   | 'purplle'
+  | 'blinkit'
 
 /** What management sees. */
 export type BusinessChannelId =
@@ -40,6 +41,7 @@ export type BusinessChannelId =
   | 'myntra'
   | 'nykaa'
   | 'purplle'
+  | 'blinkit'
 
 /**
  * Retained as the name for a stored row's key, because that is what every
@@ -72,6 +74,7 @@ export const BUSINESS_CHANNELS: BusinessChannelDef[] = [
   { id: 'myntra', label: 'Myntra', currency: 'INR' },
   { id: 'nykaa', label: 'Nykaa', currency: 'INR' },
   { id: 'purplle', label: 'Purplle', currency: 'INR' },
+  { id: 'blinkit', label: 'Blinkit', currency: 'INR' },
 ]
 
 /** Every report the system accepts, and which channel it belongs to. */
@@ -84,6 +87,7 @@ export const SALES_SOURCES: SalesSourceDef[] = [
   { id: 'myntra', channel: 'myntra', label: 'Myntra', currency: 'INR', sellerType: 'marketplace' },
   { id: 'nykaa', channel: 'nykaa', label: 'Nykaa', currency: 'INR', sellerType: 'marketplace' },
   { id: 'purplle', channel: 'purplle', label: 'Purplle', currency: 'INR', sellerType: 'marketplace' },
+  { id: 'blinkit', channel: 'blinkit', label: 'Blinkit', currency: 'INR', sellerType: 'marketplace' },
 ]
 
 export const BUSINESS_CHANNEL_MAP: Record<BusinessChannelId, BusinessChannelDef> = Object.fromEntries(
@@ -143,4 +147,8 @@ export const DEFAULT_ALLOCATION_WEIGHTS: Record<BusinessChannelId, number> = {
   myntra: 0.03,
   nykaa: 0.01,
   purplle: 0.01,
+  // Zero rather than a share of its own. These weights are only reached when
+  // a month has no sales anywhere, and giving a channel that has barely
+  // started trading a standing slice of overhead would be inventing a cost.
+  blinkit: 0,
 }

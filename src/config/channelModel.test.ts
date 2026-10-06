@@ -41,7 +41,7 @@ describe('the management channel list', () => {
   it('has Amazon India once, and no Seller or Vendor entry', () => {
     const labels = BUSINESS_CHANNELS.map((c) => c.label)
     expect(labels).toEqual([
-      'Amazon India', 'Amazon USA', 'Flipkart', 'Meesho', 'Myntra', 'Nykaa', 'Purplle',
+      'Amazon India', 'Amazon USA', 'Flipkart', 'Meesho', 'Myntra', 'Nykaa', 'Purplle', 'Blinkit',
     ])
     expect(labels.some((l) => /seller|vendor/i.test(l))).toBe(false)
   })

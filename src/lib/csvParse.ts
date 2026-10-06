@@ -46,8 +46,18 @@ export type RawSheet = (string | number)[][]
  * express as a single flat header row the way `parseSpreadsheetFile` assumes.
  */
 export async function readWorkbookSheetsRaw(file: File): Promise<Record<string, RawSheet>> {
-  const buffer = await file.arrayBuffer()
-  const workbook = XLSX.read(buffer, { type: 'array' })
+  return workbookSheetsFromBytes(await file.arrayBuffer())
+}
+
+/**
+ * The same, for a workbook that did not arrive as a file of its own.
+ *
+ * Blinkit's month is six workbooks inside one zip, so they reach the parser as
+ * byte ranges rather than as `File`s and there is nothing to call
+ * `arrayBuffer()` on.
+ */
+export function workbookSheetsFromBytes(bytes: ArrayBuffer | Uint8Array): Record<string, RawSheet> {
+  const workbook = XLSX.read(bytes, { type: 'array' })
   const result: Record<string, RawSheet> = {}
   for (const sheetName of workbook.SheetNames) {
     result[sheetName] = XLSX.utils.sheet_to_json<(string | number)[]>(workbook.Sheets[sheetName], { header: 1, defval: '' })

@@ -588,3 +588,95 @@ export interface ImportRecord {
   duplicateOfImportId?: string
   warnings: string[]
 }
+
+// ---------------------------------------------------------------------------
+// Blinkit
+// ---------------------------------------------------------------------------
+/**
+ * One Blinkit payout cycle, as Blinkit's own Payout Breakup states it.
+ *
+ * Blinkit publishes the month as a folder of workbooks, and one of them — the
+ * Payout Breakup — is the statement everything else explains. Its lettered
+ * rows run A, B1–B5, C1–C4, D1–D5, E and then the net payout, and they add up
+ * exactly: for August 2026, 6,430 less 128.60, 23.15, 1,500, 270, 5.45, 3,126
+ * and 562.68 is the 814.12 Blinkit paid. The facts below are those rows, so
+ * the statement this app draws can be checked line by line against the file it
+ * came from.
+ *
+ * Every charge is held as a positive magnitude, as the other channels' facts
+ * are, and the statement applies the signs. Storing Blinkit's own negatives
+ * would mean a reader could never tell a charge that fell from a sign error.
+ *
+ * GST is kept on its own field beside each charge rather than folded in. It is
+ * recoverable as input credit, so a statement that buries it reports a cost
+ * the business does not ultimately bear.
+ */
+export interface BlinkitPnlFacts {
+  schemaVersion: 1
+  month: string // yyyy-mm
+
+  /** A — what customers paid, inclusive of GST. The top line, and what every
+   * charge below is taken out of. */
+  customerPayable: number
+  /** The GST inside `customerPayable`. Collected for the government, so it was
+   * never revenue. */
+  outputGstOnSales: number
+  /** Σ MRP of the same lines. The gap to `customerPayable` is what Blinkit
+   * discounted, which is a real cost of selling even though nobody invoices
+   * it. */
+  mrpValue: number
+  unitsSold: number
+  /** Order lines on the file, not distinct orders: Blinkit bills a line per
+   * item, and counting them as orders would understate average order value. */
+  orderLines: number
+
+  /** B1–B5, the charges Blinkit raises against an order. */
+  commission: number
+  commissionGst: number
+  shipping: number
+  shippingGst: number
+  customerReturnCharge: number
+  customerReturnChargeGst: number
+  tcs: number
+  tds: number
+
+  /** C1–C4, the charges for holding and moving stock in Blinkit's warehouses.
+   * Each is net of the reversals and credit notes the file carries against it,
+   * because that is what the Payout Breakup's Net Amount column states. */
+  upfrontStorage: number
+  upfrontStorageGst: number
+  recallCharge: number
+  recallChargeGst: number
+  storageCharge: number
+  storageChargeGst: number
+  courierCharge: number
+  courierChargeGst: number
+
+  /** D1–D5, money coming back. Positive means in our favour. */
+  adsRefund: number
+  adsRefundGst: number
+  lostDamagedCompensation: number
+  tcsReimbursement: number
+  tdsReimbursement: number
+  otherCreditDebitNote: number
+
+  /** E, a deduction with no category of its own. */
+  otherDeductions: number
+
+  /** What the file says Blinkit paid for the cycle. Held so the statement can
+   * be checked against it rather than trusted. */
+  netPayoutPerFile: number
+
+  /**
+   * The landing-price / selling-price adjustments the archive carries.
+   *
+   * A memo, not a line of the statement. These are credit and debit notes
+   * against goods received in earlier months — the August file's run back to
+   * December — and not one rupee of them appears in the Payout Breakup. They
+   * are carried so the figure is visible and can be asked about, never summed
+   * into revenue on an assumption about what they settle.
+   */
+  lpSpAdjustmentInclTax: number
+  lpSpAdjustmentTax: number
+  lpSpAdjustmentLines: number
+}

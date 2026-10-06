@@ -8,6 +8,7 @@ import type {
   FlipkartPnlFacts,
   MeeshoPnlFacts,
   MyntraPnlFacts,
+  BlinkitPnlFacts,
   AmazonInSellerPnlFacts,
   NykaaPnlFacts,
   PnlLineValues,
@@ -27,6 +28,7 @@ import {
 } from './nativePnl/amazonUsa'
 import { applyFlipkartOtherCosts, computeFlipkartPnl, flipkartToCanonicalBuckets, FLIPKART_LINE_DEFS } from './nativePnl/flipkart'
 import { applyMeeshoOtherCosts, computeMeeshoPnl, meeshoToCanonicalBuckets, MEESHO_LINE_DEFS } from './nativePnl/meesho'
+import { blinkitToCanonicalBuckets, computeBlinkitPnl, BLINKIT_LINE_DEFS } from './nativePnl/blinkit'
 import { applyMyntraOtherCosts, computeMyntraPnl, myntraToCanonicalBuckets, MYNTRA_LINE_DEFS } from './nativePnl/myntra'
 import {
   applyNykaaOtherCosts, computeNykaaPnl, nykaaDiscountPerSalesFile, nykaaDiscountRecovered,
@@ -66,6 +68,7 @@ export interface ChannelFactsStore {
   myntraFacts?: MyntraPnlFacts[]
   nykaaFacts?: NykaaPnlFacts[]
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
+  blinkitFacts?: BlinkitPnlFacts[]
 }
 
 /** Sums this channel's allocated share (sales-contribution method) of the
@@ -583,6 +586,47 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
     }
   }
 
+  if (channel === 'blinkit') {
+    const facts = inputs.facts.blinkitFacts?.find((f) => f.month === month)
+    if (facts) {
+      // Blinkit's archive says what Blinkit charged, never what the goods
+      // cost us, so COGS is priced here from the order rows at the month's
+      // effective cost — a corrected cost sheet then restates the month
+      // instead of leaving whatever was frozen at upload time.
+      const recomputed = recomputedCogs(channel, month, inputs)
+      const cogs = recomputed ? recomputed.total : 0
+      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+      const notes: string[] = []
+      if (!recomputed) {
+        notes.push(
+          `No Blinkit order rows are on file for ${month}, so the statement shows no cost of goods. Re-upload the ` +
+          'payout archive — its Order_level_charges workbook is what the cost is priced from.',
+        )
+      }
+      if (recomputed && recomputed.uncostedUnits > 0) {
+        // Blinkit's archive carries only its own item codes, so until those
+        // are linked on SKU Mapping the cost of a Blinkit unit is unknown —
+        // and that has to be said, not estimated past.
+        const shown = recomputed.uncostedSkus.slice(0, 8).join(', ')
+        const rest = recomputed.uncostedSkus.length - 8
+        notes.push(
+          `${recomputed.uncostedSkus.length} Blinkit item code(s) sold in ${month} have no cost on file, covering ` +
+          `${recomputed.uncostedUnits.toLocaleString('en-IN')} unit(s). Blinkit's file carries no seller SKU, so link ` +
+          `${shown}${rest > 0 ? ` and ${rest} more` : ''} on SKU Mapping to price them properly.`,
+        )
+      }
+      return {
+        channel, month,
+        canonical: {
+          channel, month,
+          lines: computeSubtotals(withAllocatedOpex(blinkitToCanonicalBuckets(facts, cogs), inputs, channel, month)),
+        },
+        native: { lineDefs: BLINKIT_LINE_DEFS, values: computeBlinkitPnl(facts, cogs, otherCosts), currency: 'INR' },
+        notes,
+      }
+    }
+  }
+
   if (channel === 'meesho') {
     const basis = inputs.meeshoBasis ?? 'order'
     // A month stored under the older, thinner shape is treated as absent
@@ -644,6 +688,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
  * channel missing from here has no native statement to be missing. */
 const NATIVE_STATEMENT_SOURCE: Partial<Record<BusinessChannelId, string>> = {
   meesho: 'aggregated payment file',
+  blinkit: 'monthly payout archive',
   flipkart: 'SKU-level P&L export',
   myntra: 'P&L report',
   nykaa: 'monthly sales file',
