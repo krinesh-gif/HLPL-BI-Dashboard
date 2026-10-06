@@ -241,6 +241,60 @@ export function latestMonthWithData(dataset: SharedDataset): string | null {
   return months.length === 0 ? null : months.reduce((a, b) => (a > b ? a : b))
 }
 
+type MappingPayload = Omit<MappingTablesState, 'costVersions' | 'fxRates' | 'freightRates' | 'packagingRates' | 'nykaaDiscounts'>
+type CostsPayload = {
+  versions: CostVersion[]
+  fxRates?: FxRate[]
+  freightRates?: FreightRate[]
+  packagingRates?: PackagingRate[]
+  nykaaDiscounts?: NykaaDiscountEntry[]
+  channelLogos?: ChannelLogo[]
+}
+type Bundle = [SharedDataset, MappingPayload, CostsPayload]
+
+const fetchDataset = (): Promise<Bundle> =>
+  Promise.all([
+    api.get<SharedDataset>('/api/state'),
+    api.get<MappingPayload>('/api/sku-map'),
+    api.get<CostsPayload>('/api/cost-versions'),
+  ])
+
+/**
+ * The dataset request, started as this module is evaluated — before React has
+ * mounted and before the session check has come back.
+ *
+ * Loading used to be strictly serial: parse the bundle, ask who is signed in,
+ * wait for the answer, then finally ask for the data. The session is a cookie
+ * the browser sends either way, so the second request never needed to wait for
+ * the first; it just did. This starts it at the earliest moment there is
+ * anything to start, and `loadState` picks it up when it gets there.
+ *
+ * A signed-out visitor spends one 401 on it, which costs a few hundred bytes
+ * and clears itself: a rejected warm start is dropped so that signing in
+ * fetches afresh rather than being handed the failure.
+ */
+let warm: Promise<Bundle> | null = null
+
+function startWarm(): void {
+  const p = fetchDataset()
+  warm = p
+  p.catch(() => {
+    if (warm === p) warm = null
+  })
+}
+
+/** The warm start, once. A later load — after an upload, say — must go to the
+ * network again rather than be handed the copy fetched at startup. */
+function takeWarmStart(): Promise<Bundle> | null {
+  const p = warm
+  warm = null
+  return p
+}
+
+// Only in a browser: the test suite imports this module for its pure helpers,
+// and a relative URL has nothing to resolve against under Node.
+if (typeof window !== 'undefined') startWarm()
+
 export const useDataStore = create<DataState>((set, get) => {
   /** Reloads the whole dataset after a write rather than patching locally, so
    * what's on screen is what the database actually holds — including rows a
@@ -259,11 +313,12 @@ export const useDataStore = create<DataState>((set, get) => {
 
     loadState: async () => {
       try {
-        const [dataset, mapping, costs] = await Promise.all([
-          api.get<SharedDataset>('/api/state'),
-          api.get<Omit<MappingTablesState, 'costVersions' | 'fxRates' | 'freightRates' | 'packagingRates' | 'nykaaDiscounts'>>('/api/sku-map'),
-          api.get<{ versions: CostVersion[]; fxRates?: FxRate[]; freightRates?: FreightRate[]; packagingRates?: PackagingRate[]; nykaaDiscounts?: NykaaDiscountEntry[]; channelLogos?: ChannelLogo[] }>('/api/cost-versions'),
-        ])
+        // Takes the warm start if it is still in flight. The first load used
+        // to wait for the session check to come back before asking for any
+        // data, so the whole dataset round trip began only after an earlier
+        // one had finished — dead time on every single visit.
+        const bundle = takeWarmStart() ?? fetchDataset()
+        const [dataset, mapping, costs] = await bundle
         set({
           ...dataset, ...mapping, costVersions: costs.versions,
           fxRates: costs.fxRates ?? [], freightRates: costs.freightRates ?? [],

@@ -139,8 +139,14 @@ export function orderBasisNetSales(
 
     figure.units += r.quantity
     // An aggregate row is a month's total for one SKU, not an order.
+    //
+    // `orders` is how many order lines the row stands for. The shared dataset
+    // arrives grouped by day, channel, SKU, status and currency — 74,354 lines
+    // come down as 16,300 rows — so counting rows here would have divided the
+    // order count by four and multiplied every average order value by the same.
+    // A row the app normalised itself carries no count and is one order.
     if (r.isAggregate) figure.hasAggregateRows = true
-    else figure.orders += 1
+    else figure.orders += r.orders ?? 1
     figure.returnUnits += r.returnUnits
     figure.rtoUnits += r.rtoUnits
     // An RTO unit was shipped and came back; a cancelled unit never shipped and

@@ -35,9 +35,17 @@ export function toSkuMaster(r: Row): SkuMaster {
   }
 }
 
+/**
+ * One row of the dashboard's sales dataset.
+ *
+ * `orderId`, `importId` and `raw` are deliberately not here. Nothing on any
+ * screen reads them, and at 74,354 rows they were two of the widest columns on
+ * the wire. They are still written on every line and still in the database,
+ * where de-dup, the audit trail and reversing an import need them; they simply
+ * do not travel to the browser.
+ */
 export function toSalesRecord(r: Row): CanonicalSalesRecord {
   return {
-    orderId: str(r.order_id),
     isAggregate: r.is_aggregate === true,
     orderDate: str(r.order_date),
     channel: str(r.channel) as ChannelId,
@@ -58,8 +66,10 @@ export function toSalesRecord(r: Row): CanonicalSalesRecord {
     tax: num(r.tax),
     status: str(r.status) as CanonicalSalesRecord['status'],
     currency: str(r.currency) as CanonicalSalesRecord['currency'],
-    raw: (r.raw as CanonicalSalesRecord['raw']) ?? undefined,
-    importId: str(r.import_id),
+    // How many order lines this row stands for. The dashboard reads rows
+    // grouped by day, channel, SKU, status and currency, so the count has to
+    // travel with them.
+    orders: r.orders === undefined ? 1 : num(r.orders),
   }
 }
 

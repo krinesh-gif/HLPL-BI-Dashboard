@@ -50,10 +50,10 @@ export function useSkuCostValidation(): SkuCostValidation {
       unmappedNetSales += r.netSales
       const existing = unmappedBySku.get(r.sku)
       if (existing) {
-        existing.orders += 1
+        existing.orders += r.orders ?? 1
         existing.netSales += r.netSales
       } else {
-        unmappedBySku.set(r.sku, { sku: r.sku, productName: r.productName, orders: 1, netSales: r.netSales })
+        unmappedBySku.set(r.sku, { sku: r.sku, productName: r.productName, orders: r.orders ?? 1, netSales: r.netSales })
       }
     }
 

@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { useDataStore } from '@/store/dataStore'
@@ -29,7 +30,13 @@ export function AppLayout() {
             </div>
           </div>
         ) : (
-          <Outlet />
+          // Each page is its own chunk, fetched when it is first opened. The
+          // fallback is deliberately plain: these chunks are tens of
+          // kilobytes on an already-open connection, so anything more
+          // elaborate would flash rather than reassure.
+          <Suspense fallback={<div className="p-6 text-sm text-[var(--ink-3)]">Loading…</div>}>
+            <Outlet />
+          </Suspense>
         )}
       </div>
     </div>

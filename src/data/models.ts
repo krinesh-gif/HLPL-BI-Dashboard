@@ -8,7 +8,13 @@ import type { PnlLineKey } from '@/config/pnlStructure'
 // rather than discarded.
 // ---------------------------------------------------------------------------
 export interface CanonicalSalesRecord {
-  orderId: string
+  /**
+   * The marketplace's own order identifier. Set on a freshly normalised row,
+   * where it is what de-duplicates an upload; absent on a grouped row read
+   * back from the shared dataset, which stands for many orders. Nothing on
+   * screen reads it — `orders` carries the count.
+   */
+  orderId?: string
   /** Distinguishes several lines of one order where the marketplace reports
    * them separately — Meesho files a sale and its return under the same
    * sub-order, same SKU and same order date, so without this the two collide
@@ -46,7 +52,22 @@ export interface CanonicalSalesRecord {
    * a month — its SKU count — and an average order value of ₹70.6K.
    */
   isAggregate?: boolean
-  importId: string
+  /**
+   * How many order lines this row stands for.
+   *
+   * Absent on a row the app normalised itself, where it means one. The shared
+   * dataset sends rows already grouped — one per day, channel, SKU, status and
+   * currency — and each carries the number of lines behind it, so the order
+   * count is the sum of these rather than the number of rows. The database
+   * still stores every line; this is only what crosses the wire.
+   */
+  orders?: number
+  /**
+   * Which import batch this row came from. Set on a freshly normalised row,
+   * which is what a write needs; absent on a grouped row read back, which can
+   * span several imports. Nothing on screen reads it.
+   */
+  importId?: string
 }
 
 // ---------------------------------------------------------------------------
