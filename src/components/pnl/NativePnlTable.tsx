@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react'
 import clsx from 'clsx'
 import type { NativeLineDef, NativeLineValues } from '@/engine/nativePnl/types'
 import { formatCurrencyFull, formatPercent } from '@/lib/format'
+import { InfoHint } from '@/components/ui/InfoHint'
 import { amountTone } from './amountTone'
 
 /** Rows of a collapsible group start hidden: the statement reads at a glance,
@@ -133,8 +134,18 @@ export function NativePnlTable({
                             part of {labelByKey.get(def.memoOf) ?? 'the line above'} — not added again
                           </span>
                         )}
+                        {/* Printed beside the label, these doubled the width
+                            of the statement and pushed the figures — which are
+                            what the page is for — off to the right. The icon
+                            says there is something to know; the click is for
+                            when the reader wants to know it. */}
                         {def.note && !def.memoOf && (
-                          <span className="ml-2 text-xs font-normal text-[var(--ink-3)]">{def.note}</span>
+                          <InfoHint
+                            className="ml-1.5"
+                            label={def.label}
+                            text={def.note}
+                            tone={def.note.startsWith('⚠') ? 'warning' : 'info'}
+                          />
                         )}
                       </>
                     )}

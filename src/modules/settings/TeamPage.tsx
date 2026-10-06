@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { InfoHint } from '@/components/ui/InfoHint'
 import { PageShell } from '@/components/layout/PageShell'
 import { api } from '@/lib/apiClient'
 import { useAuthStore } from '@/store/authStore'
@@ -137,13 +138,14 @@ export function TeamPage() {
           <legend className="text-xs font-semibold text-[var(--ink-2)]">Sections they can open</legend>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
             {SECTIONS.map((sec) => (
-              <label key={sec.id} className="flex items-center gap-1.5 text-xs text-[var(--ink)]" title={sec.hint}>
+              <label key={sec.id} className="flex items-center gap-1.5 text-xs text-[var(--ink)]">
                 <input
                   type="checkbox"
                   checked={newSections.includes(sec.id)}
                   onChange={() => setNewSections((v) => toggle(v, sec.id))}
                 />
                 {sec.label}
+                {sec.hint && <InfoHint label={sec.label} text={sec.hint} />}
               </label>
             ))}
           </div>
@@ -177,12 +179,13 @@ export function TeamPage() {
                     <div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                         {SECTIONS.map((sec) => (
-                          <label key={sec.id} className="flex items-center gap-1.5 text-xs text-[var(--ink)]" title={sec.hint}>
+                          <label key={sec.id} className="flex items-center gap-1.5 text-xs text-[var(--ink)]">
                             <input
                               type="checkbox" checked={draft.includes(sec.id)}
                               onChange={() => setDraft((v) => toggle(v, sec.id))}
                             />
                             {sec.label}
+                            {sec.hint && <InfoHint label={sec.label} text={sec.hint} />}
                           </label>
                         ))}
                       </div>

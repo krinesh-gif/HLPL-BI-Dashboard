@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { InfoHint } from '@/components/ui/InfoHint'
 import { PageShell } from '@/components/layout/PageShell'
 import { Card, CardHeader } from '@/components/ui/Surface'
 import { useDataStore } from '@/store/dataStore'
@@ -226,8 +227,11 @@ export function MonthlyInputsPage() {
               <tr>
                 <th className="sticky left-0 z-10 bg-[var(--surface-2)] px-5 py-2.5 text-left">Month</th>
                 {COLUMNS.map((c) => (
-                  <th key={c.key} className="px-3 py-2.5 text-right" title={c.hint}>
-                    {c.label}
+                  <th key={c.key} className="px-3 py-2.5 text-right">
+                    <span className="inline-flex items-center gap-1">
+                      {c.label}
+                      {c.hint && <InfoHint label={c.label} text={c.hint} />}
+                    </span>
                     <span className="block font-normal normal-case text-[var(--ink-3)]">{c.unit}</span>
                   </th>
                 ))}

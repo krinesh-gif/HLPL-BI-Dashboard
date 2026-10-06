@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+import { InfoHint } from './InfoHint'
 import { Children, type ReactNode } from 'react'
 
 export interface KPICardProps {
@@ -51,7 +52,10 @@ function Sparkline({ points, color }: { points: number[]; color: string }) {
 export function KPICard({ label, value, delta, tone = 'neutral', note, spark, accent = 1 }: KPICardProps) {
   const deltaTone = delta && delta.pct !== null ? (delta.pct >= 0 ? 'good' : 'bad') : 'neutral'
   const color = `var(--series-${accent})`
-  const tail = delta || (spark && spark.length > 1) || note
+  // The note moved up beside the label, so it no longer keeps the foot of the
+  // tile alive on its own — a tile with only a note would otherwise render an
+  // empty strip under the figure.
+  const tail = delta || (spark && spark.length > 1)
 
   return (
     // Two anchors, not one. The label and the figure sit hard against the top
@@ -81,8 +85,14 @@ export function KPICard({ label, value, delta, tone = 'neutral', note, spark, ac
       )}
     >
       <div className="min-w-0">
-        <div className="truncate text-[11.5px] font-medium text-[var(--ink-3)] @[220px]:text-[12.5px]" title={label}>
-          {label}
+        <div className="flex min-w-0 items-center gap-1">
+          <span className="truncate text-[11.5px] font-medium text-[var(--ink-3)] @[220px]:text-[12.5px]" title={label}>
+            {label}
+          </span>
+          {/* Where the figure came from, beside the name of the figure. It was
+              two clamped lines at the foot of the tile, which was the tallest
+              thing on a row of eight and still cut the sentence in half. */}
+          {note && <InfoHint label={label} text={note} />}
         </div>
         <div
           className={clsx(
@@ -127,14 +137,6 @@ export function KPICard({ label, value, delta, tone = 'neutral', note, spark, ac
                   <Sparkline points={spark} color={color} />
                 </div>
               )}
-            </div>
-          )}
-          {note && (
-            // Held to two lines with the rest on hover. A provenance note is
-            // worth the room it takes, but not worth a tile twice the height
-            // of the seven beside it.
-            <div className="mt-1.5 line-clamp-2 text-[10.5px] leading-snug text-[var(--ink-3)]" title={note}>
-              {note}
             </div>
           )}
         </div>

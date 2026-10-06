@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react'
 import { Link } from 'react-router-dom'
 import clsx from 'clsx'
 import { PageShell } from '@/components/layout/PageShell'
+import { InfoHint } from '@/components/ui/InfoHint'
 import { ChannelMark } from '@/components/ui/ChannelMark'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { amountTone } from '@/components/pnl/amountTone'
@@ -243,7 +244,7 @@ function Matrix({
     statement.categories.some((id) => feeCategory(id).group === g && isCostOfSelling(id)))
 
   const show = (v: number | null, category: FeeCategoryId) => {
-    if (v === null) return <span className="text-[var(--ink-4)]">—</span>
+    if (v === null) return <span className="text-[var(--ink-3)]">—</span>
     const group = feeCategory(category).group
     // The withheld group is an amount, not a deduction, so it is not coloured
     // as money going out — it comes back when we file.
@@ -298,11 +299,11 @@ function Matrix({
                 </tr>
                 {ids.map((id) => (
                   <tr key={id} className="border-b border-[var(--line)] last:border-0 hover:bg-[var(--surface-hover)]">
-                    <td
-                      className="sticky left-0 z-10 bg-[var(--surface)] px-4 py-2 font-medium text-[var(--ink-2)]"
-                      title={feeCategory(id).hint}
-                    >
-                      {feeCategory(id).label}
+                    <td className="sticky left-0 z-10 bg-[var(--surface)] px-4 py-2 font-medium text-[var(--ink-2)]">
+                      <span className="inline-flex items-center gap-1.5">
+                        {feeCategory(id).label}
+                        <InfoHint label={feeCategory(id).label} text={feeCategory(id).hint} />
+                      </span>
                     </td>
                     {statement.channels.map((s) => (
                       <td key={s.channel} className="px-4 py-2 text-right">{show(cell(s, id), id)}</td>
@@ -373,7 +374,10 @@ function ChannelDetail({ s, open, onToggle }: { s: ChannelFeesStatement; open: b
                 <Fragment key={c.category}>
                   <tr className="border-b border-[var(--line)]">
                     <td className="py-2 pr-4 font-semibold text-[var(--ink)]">
-                      {feeCategory(c.category).label}
+                      <span className="inline-flex items-center gap-1.5">
+                        {feeCategory(c.category).label}
+                        <InfoHint label={feeCategory(c.category).label} text={feeCategory(c.category).hint} />
+                      </span>
                     </td>
                     <td className={clsx(
                       'py-2 pr-4 text-right font-semibold tabular-nums',
