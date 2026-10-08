@@ -1,24 +1,12 @@
-import { createElement, lazy, type ComponentType } from 'react'
 import { createHashRouter, Navigate } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { RouteError } from '@/components/layout/RouteError'
 import { SectionGuard } from '@/components/layout/SectionGuard'
 import { OverviewPage } from '@/modules/overview/OverviewPage'
-
-/**
- * A page, in its own chunk, fetched the first time it is opened.
- *
- * Every screen used to be in the one bundle the browser parsed before it could
- * draw anything — 1.5 MB of it, for a person who was going to look at the
- * Overview. Each page is now its own file, and the shell is a fraction of what
- * it was. `AppLayout` holds the Suspense boundary they resolve into.
- *
- * It returns the element rather than the component so no route needs a
- * PascalCase binding at the top of this file: these are a route table, not a
- * module of components, and naming them as components is what made every one
- * of them a Fast Refresh warning.
- */
-const page = (load: () => Promise<Record<string, unknown>>, name: string) =>
-  createElement(lazy(async () => ({ default: (await load())[name] as ComponentType })))
+// Each page is its own chunk, fetched the first time it is opened, and
+// reloaded once if it has been deployed away under an open tab. `AppLayout`
+// holds the Suspense boundary they resolve into.
+import { page } from './lazyPage'
 
 export const router = createHashRouter([
   {
@@ -30,6 +18,10 @@ export const router = createHashRouter([
         <AppLayout />
       </SectionGuard>
     ),
+    // Anything a page throws on the way to the screen stops here. Without it
+    // the reader gets React Router's own fallback, which prints a stack and a
+    // message addressed to the developer.
+    errorElement: <RouteError />,
     children: [
       { index: true, element: <OverviewPage /> },
       { path: 'mis', element: page(() => import('@/modules/mis/MisPage'), 'MisPage') },
