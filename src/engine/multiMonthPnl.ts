@@ -85,8 +85,8 @@ export const PNL_ROWS: PnlRowDef[] = [
   { key: 'grossProfit', label: 'Gross Profit', kind: 'subtotal', value: grossProfit, total: grossProfit },
   { key: 'grossMarginPct', label: 'Gross Margin %', kind: 'percent', value: marginOf(grossProfit), total: marginOf(grossProfit) },
 
-  { key: 'marketplaceCosts', label: 'Less: Marketplace Costs', kind: 'input', indent: true, value: (l) => sum(l, MARKETPLACE_COST_KEYS), total: (t) => sum(t, MARKETPLACE_COST_KEYS), sign: -1 },
-  { key: 'marketing', label: 'Less: Marketing', kind: 'input', indent: true, value: (l) => sum(l, MARKETING_KEYS), total: (t) => sum(t, MARKETING_KEYS), sign: -1 },
+  { key: 'marketplaceCosts', label: 'Less: Marketplace Fees', kind: 'input', indent: true, value: (l) => sum(l, MARKETPLACE_COST_KEYS), total: (t) => sum(t, MARKETPLACE_COST_KEYS), sign: -1 },
+  { key: 'marketing', label: 'Less: Advertising (MI)', kind: 'input', indent: true, value: (l) => sum(l, MARKETING_KEYS), total: (t) => sum(t, MARKETING_KEYS), sign: -1 },
   { key: 'contribution', label: 'Contribution', kind: 'subtotal', value: contribution, total: contribution },
   { key: 'contributionMarginPct', label: 'Contribution Margin %', kind: 'percent', value: marginOf(contribution), total: marginOf(contribution) },
 

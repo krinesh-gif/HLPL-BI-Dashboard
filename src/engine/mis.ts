@@ -13,7 +13,7 @@ export interface MisRow {
   yoyPct: number | null
 }
 
-/** Sum of specific P&L line keys, used to build composite MIS particulars like "Marketplace Costs". */
+/** Sum of specific P&L line keys, used to build composite MIS particulars like "Marketplace Fees". */
 function sumLines(lines: PnlLineValues, keys: (keyof PnlLineValues)[]): number {
   return keys.reduce((sum, k) => sum + (lines[k] ?? 0), 0)
 }
@@ -38,8 +38,8 @@ const MIS_PARTICULARS: MisParticularDef[] = [
   { label: 'COGS', isPercent: false, value: (l) => l.cogs ?? 0 },
   { label: 'Gross Profit', isPercent: false, value: (l) => l.grossProfit ?? 0 },
   { label: 'Gross Margin %', isPercent: true, value: (l) => l.grossMarginPct ?? 0 },
-  { label: 'Marketplace Costs', isPercent: false, value: (l) => sumLines(l, MARKETPLACE_COST_KEYS) },
-  { label: 'Marketing', isPercent: false, value: (l) => sumLines(l, MARKETING_KEYS) },
+  { label: 'Marketplace Fees', isPercent: false, value: (l) => sumLines(l, MARKETPLACE_COST_KEYS) },
+  { label: 'Advertising (MI)', isPercent: false, value: (l) => sumLines(l, MARKETING_KEYS) },
   { label: 'Contribution', isPercent: false, value: (l) => l.contributionProfit ?? 0 },
   { label: 'Contribution Margin %', isPercent: true, value: (l) => l.contributionMarginPct ?? 0 },
   { label: 'Employee Cost', isPercent: false, value: (l) => l.salaries ?? 0 },
