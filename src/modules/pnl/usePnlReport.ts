@@ -8,10 +8,13 @@ import { buildAllChannelPnlViews, buildChannelPnlView } from '@/engine/channelPn
 import { buildMasterPnl, computeSubtotals } from '@/engine/pnl'
 import { usePnlInputs } from '@/engine/usePnlInputs'
 import {
+  anchorWithinData,
   buildMultiMonthPnl,
   comparePnlMonths,
+  comparisonMonths,
   monthsBetween,
   monthsForQuickPeriod,
+  tradedMonths,
   type QuickPeriod,
 } from '@/engine/multiMonthPnl'
 import type { PnlBasis, PnlLineValues } from '@/data/models'
@@ -46,9 +49,13 @@ export interface PnlReportStart {
 }
 
 export function usePnlReport(start: PnlReportStart = {}) {
-  const { salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, fxRates } = useDataStore()
+  const { salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts, amazonInSellerFacts, fxRates } =
+    useDataStore()
   const { month } = useFilterStore()
   const { forMonth } = usePnlInputs()
+  // Today's month, which is the one month a comparison must not use as its
+  // later column: it is only as much of a month as has happened so far.
+  const currentMonth = toMonthKey(new Date().toISOString().slice(0, 10))
 
   const [view, setView] = useState<PnlView>(start.view ?? 'master')
   // Meesho carries both an order-date and a payment-date statement. Order
@@ -68,14 +75,20 @@ export function usePnlReport(start: PnlReportStart = {}) {
     for (const f of meeshoFacts) set.add(f.month)
     for (const f of myntraFacts) set.add(f.month)
     for (const f of nykaaFacts) set.add(f.month)
+    // Blinkit and Amazon India Seller reach the P&L through `usePnlInputs`
+    // like every other channel, so their months belong in this list too. Left
+    // out, a month that only Blinkit traded in was not offered in From/To and
+    // did not count as a month with data.
+    for (const f of blinkitFacts) set.add(f.month)
+    for (const f of amazonInSellerFacts ?? []) set.add(f.month)
     return [...set].sort()
-  }, [salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts])
+  }, [salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts, amazonInSellerFacts])
 
   return useMemo(() => {
     const months =
       period.mode === 'custom'
         ? monthsBetween(period.from, period.to)
-        : monthsForQuickPeriod(period.quick, month, monthsWithData)
+        : monthsForQuickPeriod(period.quick, anchorWithinData(month, monthsWithData), monthsWithData)
 
     // Amazon USA is the one channel that can be read in either currency. The
     // Master P&L is always rupees — it sums every channel, and a report in two
@@ -100,9 +113,18 @@ export function usePnlReport(start: PnlReportStart = {}) {
 
     const table = buildMultiMonthPnl(months, linesFor, computeSubtotals)
 
+    const at = (key: string, i: number): number => table.rows.find((r) => r.def.key === key)?.values[i] ?? 0
+
+    // The months of the period this view has trading in. Sales rather than any
+    // figure at all: a month carrying only costs is an incomplete month, not
+    // one to report as the latest or to compare against.
+    const traded = tradedMonths(months, (i) => at('grossSales', i) !== 0 || at('netSales', i) !== 0)
+
     // Per-channel Net Sales for the latest month in the period, so the Master
-    // P&L can be broken down into the channels behind it.
-    const latestMonth = months[months.length - 1] ?? month
+    // P&L can be broken down into the channels behind it. The latest month
+    // that traded, not simply the last in the period — on the last of them the
+    // breakdown was a table of zeroes, which renders as no table at all.
+    const latestMonth = traded[traded.length - 1] ?? months[months.length - 1] ?? month
     const channelBreakdown =
       view === 'master'
         ? buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, latestMonth, { ...forMonth(latestMonth), meeshoBasis, amazonUsaCurrency })
@@ -111,18 +133,11 @@ export function usePnlReport(start: PnlReportStart = {}) {
             .sort((a, b) => b.netSales - a.netSales)
         : []
 
-    // The two most recent months in the period, which is what "August vs July"
-    // asks for. Absent when the period is a single month.
-    const comparison =
-      months.length >= 2
-        ? {
-            earlierMonth: months[months.length - 2],
-            laterMonth: months[months.length - 1],
-            rows: comparePnlMonths(months[months.length - 2], months[months.length - 1], linesFor),
-          }
-        : null
+    // The two most recent finished months in the period that traded, which is
+    // what "September vs August" asks for.
+    const pair = comparisonMonths(traded, currentMonth)
+    const comparison = pair && { ...pair, rows: comparePnlMonths(pair.earlierMonth, pair.laterMonth, linesFor) }
 
-    const at = (key: string, i: number): number => table.rows.find((r) => r.def.key === key)?.values[i] ?? 0
     const trend = months.map((m, i) => ({
       month: m,
       netSales: at('netSales', i),
@@ -175,5 +190,5 @@ export function usePnlReport(start: PnlReportStart = {}) {
       trend,
       latestMonth,
     }
-  }, [view, meeshoBasis, amazonUsaCurrency, period, month, monthsWithData, forMonth, fxRates])
+  }, [view, meeshoBasis, amazonUsaCurrency, period, month, currentMonth, monthsWithData, forMonth, fxRates])
 }

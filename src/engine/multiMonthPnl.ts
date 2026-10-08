@@ -255,3 +255,70 @@ export function comparePnlMonths(
     }
   })
 }
+
+// ---------------------------------------------------------------------------
+// Which months a report should actually report on
+// ---------------------------------------------------------------------------
+
+/**
+ * Keeps a period from running past the last month that has numbers in it.
+ *
+ * The quick periods are counted back from an anchor month, and the anchor is
+ * the dashboard's global month — which is set from the newest month present
+ * anywhere in the data, ad spend included. Ad reports are downloaded while the
+ * month is still running, so on 8 October the anchor was October while the
+ * last month with a P&L in it was September. "Last 6 Months" then ended on an
+ * empty column and the comparison underneath read "Oct 2026 vs Sep 2026" with
+ * every line down 100% — which is a statement about which files have been
+ * uploaded, not about the business.
+ *
+ * The anchor is only ever pulled back, never pushed forward: an anchor that is
+ * already inside the data is a month someone chose, and reading an earlier
+ * month is a real choice.
+ */
+export function anchorWithinData(anchorMonth: string, monthsWithData: string[]): string {
+  const last = monthsWithData.reduce<string | null>((latest, m) => (latest === null || m > latest ? m : latest), null)
+  return last !== null && anchorMonth > last ? last : anchorMonth
+}
+
+/**
+ * The months of a period that actually traded, in order.
+ *
+ * The period is the same set of months for every view; the data is not. One
+ * channel's reports can stop a month before another's, so anything that means
+ * "the latest month" or "this month against last" has to mean the latest month
+ * *this view* has figures for. Otherwise opening a channel whose file has not
+ * arrived yet shows it as having collapsed to nothing.
+ */
+export function tradedMonths(months: string[], tradedAt: (index: number) => boolean): string[] {
+  return months.filter((_month, i) => tradedAt(i))
+}
+
+/**
+ * The two months a month-on-month comparison should put side by side, out of
+ * the months of the period that traded.
+ *
+ * Not simply the last two of them. Two different things disqualify the last:
+ *
+ *  - It can be empty, because the period is anchored on the newest month
+ *    present anywhere in the data and ad spend arrives while a month is still
+ *    running. "Oct 2026 vs Sep 2026", every line down 100%, is a statement
+ *    about which files have been uploaded.
+ *  - It can be the month we are in, which is only part of a month. Eight days
+ *    of October against the whole of September shows a collapse that has not
+ *    happened and will not have happened by the 31st.
+ *
+ * So the later column is the most recent month of the period that traded and
+ * has finished, and the earlier column is the one before it that traded. Null
+ * when there are not two such months: a single month has nothing to be
+ * compared with, and comparing it against a part month or an empty one is
+ * worse than showing no comparison at all.
+ */
+export function comparisonMonths(
+  traded: string[],
+  currentMonth: string,
+): { earlierMonth: string; laterMonth: string } | null {
+  const finished = traded.filter((m) => m < currentMonth)
+  if (finished.length < 2) return null
+  return { earlierMonth: finished[finished.length - 2], laterMonth: finished[finished.length - 1] }
+}
