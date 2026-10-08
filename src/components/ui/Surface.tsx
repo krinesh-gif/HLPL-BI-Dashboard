@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 
 /**
  * The card every panel in the app is built on.
@@ -13,15 +13,20 @@ export function Card({
   className,
   padded = true,
   interactive = false,
+  ref,
 }: {
   children: ReactNode
   className?: string
   padded?: boolean
   /** Lifts slightly on hover. For cards that lead somewhere. */
   interactive?: boolean
+  /** For a card something outside it needs to measure or photograph — see
+   * `CopyImageButton`, which turns one into a picture for a chat. */
+  ref?: Ref<HTMLDivElement>
 }) {
   return (
     <div
+      ref={ref}
       className={clsx(
         'rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)]',
         'shadow-[var(--shadow-card)]',

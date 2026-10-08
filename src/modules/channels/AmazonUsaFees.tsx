@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { Card, CardHeader } from '@/components/ui/Surface'
+import { CopyImageButton } from '@/components/ui/CopyImageButton'
 import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
@@ -53,6 +54,7 @@ export function AmazonUsaFees() {
   }, [selectedId, months, amazonUsaFacts])
 
   const [showAllSkus, setShowAllSkus] = useState(false)
+  const historyCard = useRef<HTMLDivElement>(null)
 
   if (months.length === 0) {
     return (
@@ -154,14 +156,24 @@ export function AmazonUsaFees() {
             )}
           </Card>
 
-          <Card>
-            <CardHeader title="Month by month" subtitle="Charges shown as costs, so a rising line is a worsening one." />
+          <Card ref={historyCard}>
+            <CardHeader
+              title="Month by month"
+              subtitle="Charges shown as costs, so a rising line is a worsening one."
+              actions={
+                <CopyImageButton
+                  target={historyCard}
+                  filename={`Amazon USA ${selected.column.header.replace(/ total$/, '')} ${months[0]} to ${months[months.length - 1]}`}
+                />
+              }
+            />
             <div className="mt-2">
               <TrendLineChart
                 data={selected.points.map((p) => ({ month: monthLabel(p.month), amount: toDisplay(p.amount, p.month) }))}
                 xKey="month"
                 series={[{ key: 'amount', label: selected.column.header.replace(/ total$/, '') }]}
                 valueFormatter={(v) => money(v)}
+                showValues
               />
             </div>
           </Card>

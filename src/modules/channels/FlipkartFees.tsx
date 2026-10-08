@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Card, CardHeader } from '@/components/ui/Surface'
+import { CopyImageButton } from '@/components/ui/CopyImageButton'
 import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { useDataStore } from '@/store/dataStore'
 import { productLabelResolver } from '@/data/productLabel'
@@ -30,6 +31,7 @@ export function FlipkartFees() {
   const list = useMemo(() => flipkartFeeSeries(months, flipkartFacts), [months, flipkartFacts])
 
   const [showAllSkus, setShowAllSkus] = useState(false)
+  const detailCard = useRef<HTMLDivElement>(null)
   const label = useMemo(
     () => productLabelResolver({ skuMaster, mappings, comboComponents }),
     [skuMaster, mappings, comboComponents],
@@ -92,10 +94,16 @@ export function FlipkartFees() {
       </Card>
 
       {selected && (
-        <Card>
+        <Card ref={detailCard}>
           <CardHeader
             title={selected.def.label}
             subtitle={`Charged in ${selected.monthsCharged} of ${months.length} month${months.length === 1 ? '' : 's'}`}
+            actions={
+              <CopyImageButton
+                target={detailCard}
+                filename={`Flipkart ${selected.def.label} ${months[0]} to ${months[months.length - 1]}`}
+              />
+            }
           />
 
           <div className="flex flex-wrap gap-x-8 gap-y-2">
@@ -152,6 +160,7 @@ export function FlipkartFees() {
               xKey="month"
               series={[{ key: 'amount', label: selected.def.label }]}
               valueFormatter={(v) => formatCurrencyFull(v)}
+              showValues
             />
           </div>
 
