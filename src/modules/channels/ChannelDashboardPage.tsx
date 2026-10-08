@@ -19,6 +19,7 @@ import { useChannelData } from './useChannelData'
 import { TopProducts } from './TopProducts'
 import { ChannelMark } from '@/components/ui/ChannelMark'
 import { AmazonUsaFees } from './AmazonUsaFees'
+import { BlinkitFees } from './BlinkitFees'
 import { FlipkartFees } from './FlipkartFees'
 
 /**
@@ -248,9 +249,9 @@ export function ChannelDashboardPage() {
         <TopProducts channel={channel} source={source === 'all' ? undefined : source} />
       </section>
 
-      {/* Amazon USA is the one channel whose export itemises every fee it
-          charges, so the breakdown lives here with the channel it is about
-          rather than on a tab of its own. The other channels' reports carry no
+      {/* Three channels publish their charges in enough detail to be read one
+          by one, so each breakdown lives here with the channel it is about
+          rather than on a tab of its own. The others' reports carry no
           equivalent, which is why nothing like it appears for them. */}
       {channel === 'amazon_us' && (
         <section>
@@ -267,6 +268,15 @@ export function ChannelDashboardPage() {
             Fees Flipkart charges
           </h2>
           <FlipkartFees />
+        </section>
+      )}
+
+      {channel === 'blinkit' && (
+        <section>
+          <h2 className="mb-3 text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink)]">
+            Charges Blinkit raises
+          </h2>
+          <BlinkitFees />
         </section>
       )}
 

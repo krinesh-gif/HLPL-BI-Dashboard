@@ -1,4 +1,5 @@
 import type { FlipkartPnlFacts } from '@/data/models'
+import { buildFeeTrend, rankFeeTrends, type FeeTrend, type FeeTrendDef } from './feeTrend'
 
 /**
  * Flipkart's fees, read month by month.
@@ -17,19 +18,9 @@ import type { FlipkartPnlFacts } from '@/data/models'
  * Amounts are positive magnitudes, as the statement stores them: a bigger
  * number is a bigger charge.
  */
-export interface FlipkartFeeDef {
-  /** The key on FlipkartPnlFacts, which is also the statement's line key. */
-  id: keyof FlipkartPnlFacts
-  label: string
-  /**
-   * What someone could actually do about it. A fee with a lever is listed
-   * first — the list is meant to be worked through, and a rate-card fee at the
-   * top of it is just a bigger number nobody can move.
-   */
-  lever?: string
-  /** A credit rather than a charge, so a rise in it is good news. */
-  isCredit?: boolean
-}
+/** The month-on-month arithmetic is the same on every channel and lives in
+ * `feeTrend`; what is Flipkart's own is the list below and the per-SKU split. */
+export type FlipkartFeeDef = FeeTrendDef<FlipkartPnlFacts>
 
 export const FLIPKART_FEE_LINES: FlipkartFeeDef[] = [
   { id: 'storageFee', label: 'Storage Fee', lever: 'Stock ageing in Flipkart’s warehouse — clear it or stop sending it' },
@@ -44,11 +35,6 @@ export const FLIPKART_FEE_LINES: FlipkartFeeDef[] = [
   { id: 'rewardsSpf', label: 'Rewards & SPF', isCredit: true },
 ]
 
-export interface FlipkartFeeMonthPoint {
-  month: string
-  amount: number
-}
-
 export interface FlipkartFeeSkuRow {
   sku: string
   total: number
@@ -58,18 +44,7 @@ export interface FlipkartFeeSkuRow {
   sharePct: number
 }
 
-export interface FlipkartFeeSeries {
-  def: FlipkartFeeDef
-  points: FlipkartFeeMonthPoint[]
-  total: number
-  /** Months in which the fee was charged anything at all. */
-  monthsCharged: number
-  /** The latest month's amount less the one before it. Positive is worse,
-   * except on a credit, where the screen says so. */
-  changeLastMonth: number | null
-  /** The latest month against the average of the months before it. Null until
-   * there is a month to compare against. */
-  vsAveragePct: number | null
+export interface FlipkartFeeSeries extends FeeTrend<FlipkartPnlFacts> {
   /** The products carrying the fee, biggest first. Empty when no month in
    * range was imported with its per-SKU split. */
   skus: FlipkartFeeSkuRow[]
@@ -82,27 +57,12 @@ export interface FlipkartFeeSeries {
   topThreeSharePct: number
 }
 
-const amountOf = (facts: FlipkartPnlFacts | undefined, id: keyof FlipkartPnlFacts): number => {
-  const value = facts?.[id]
-  return typeof value === 'number' ? value : 0
-}
-
 export function buildFlipkartFeeSeries(
   def: FlipkartFeeDef,
   months: string[],
   facts: FlipkartPnlFacts[],
 ): FlipkartFeeSeries {
-  const points = months.map((month) => ({
-    month,
-    amount: amountOf(facts.find((f) => f.month === month), def.id),
-  }))
-
-  const total = points.reduce((sum, p) => sum + p.amount, 0)
-  const last = points[points.length - 1]?.amount ?? 0
-  const previous = points.length >= 2 ? points[points.length - 2].amount : null
-
-  const earlier = points.slice(0, -1)
-  const earlierAverage = earlier.length > 0 ? earlier.reduce((s, p) => s + p.amount, 0) / earlier.length : null
+  const trend = buildFeeTrend(def, months, facts)
 
   // Only months imported with their per-SKU split contribute. A month without
   // one adds nothing here rather than having its total spread across products
@@ -130,26 +90,14 @@ export function buildFlipkartFeeSeries(
     .sort((a, b) => Math.abs(b.total) - Math.abs(a.total))
 
   return {
-    def,
-    points,
-    total,
-    monthsCharged: points.filter((p) => p.amount !== 0).length,
-    changeLastMonth: previous === null ? null : last - previous,
+    ...trend,
     skus,
-    skuCoveragePct: total !== 0 ? (covered / total) * 100 : 0,
+    skuCoveragePct: trend.total !== 0 ? (covered / trend.total) * 100 : 0,
     topThreeSharePct: covered !== 0 ? (skus.slice(0, 3).reduce((s, r) => s + r.total, 0) / covered) * 100 : 0,
-    // Against nothing, a percentage change is not zero — it is unmeasurable,
-    // and printing 0% would read as "no change" rather than "no baseline".
-    vsAveragePct: earlierAverage === null || earlierAverage === 0 ? null : ((last - earlierAverage) / earlierAverage) * 100,
   }
 }
 
 /** Every fee charged something across the period, the ones with a lever first. */
 export function flipkartFeeSeries(months: string[], facts: FlipkartPnlFacts[]): FlipkartFeeSeries[] {
-  return FLIPKART_FEE_LINES.map((def) => buildFlipkartFeeSeries(def, months, facts))
-    .filter((s) => s.monthsCharged > 0)
-    .sort((a, b) => {
-      if (Boolean(a.def.lever) !== Boolean(b.def.lever)) return a.def.lever ? -1 : 1
-      return Math.abs(b.total) - Math.abs(a.total)
-    })
+  return rankFeeTrends(FLIPKART_FEE_LINES.map((def) => buildFlipkartFeeSeries(def, months, facts)))
 }
