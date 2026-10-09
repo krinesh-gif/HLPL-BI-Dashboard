@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
-import { fxRateForMonth, lineValuesToUsd, monthsMissingFxRate, type FxRate } from './fxRates'
+import { fxRateForMonth, lineValuesToUsd, monthsMissingFxRate, pairOf, type FxRate } from './fxRates'
 
 /**
  * The rate scales an entire channel, so where it comes from has to be visible.
@@ -84,5 +84,47 @@ describe('restating P&L lines into dollars', () => {
 
   it('drops nothing and invents nothing', () => {
     expect(Object.keys(lineValuesToUsd(inr, 88.1)).sort()).toEqual(Object.keys(inr).sort())
+  })
+})
+
+describe('a second currency', () => {
+  // Amazon UAE settles in dirhams. The rates share one table, so the risk is
+  // one currency's month answering for the other's.
+  const RATES: FxRate[] = [
+    { month: '2026-09', rate: 88.4 },
+    { month: '2026-09', pair: 'AEDINR', rate: 24.07 },
+    { month: '2026-08', pair: 'USDINR', rate: 87.9 },
+  ]
+
+  it('keeps each currency to its own rate', () => {
+    expect(fxRateForMonth('2026-09', RATES).rate).toBe(88.4)
+    expect(fxRateForMonth('2026-09', RATES, 'AEDINR').rate).toBe(24.07)
+  })
+
+  it('reads a row with no pair as the dollar, which is what it was', () => {
+    // Every rate stored before the dirham existed here is a dollar rate, and
+    // defaulting rather than backfilling keeps those rows meaning what they
+    // meant. Read as dirhams they would restate Amazon USA by 3.7 times.
+    expect(pairOf({ month: '2026-09', rate: 88.4 })).toBe('USDINR')
+    expect(fxRateForMonth('2026-09', [{ month: '2026-09', rate: 88.4 }], 'AEDINR').entered).toBe(false)
+  })
+
+  it('does not let one currency borrow the other’s month', () => {
+    // August has a dollar rate and no dirham rate. The dirham must fall back
+    // and say so, not quietly use 87.9 and overstate the month fourfold.
+    const aed = fxRateForMonth('2026-08', RATES, 'AEDINR')
+    expect(aed.entered).toBe(false)
+    expect(aed.rate).toBeCloseTo(NATIVE_PNL_ASSUMPTIONS.aedToInrRate, 6)
+  })
+
+  it('names the months missing a rate for the currency being asked about', () => {
+    expect(monthsMissingFxRate(['2026-08', '2026-09'], RATES)).toEqual([])
+    expect(monthsMissingFxRate(['2026-08', '2026-09'], RATES, 'AEDINR')).toEqual(['2026-08'])
+  })
+
+  it('falls back near the peg, so an unentered month is not wild', () => {
+    // 3.6725 dirhams to the dollar. Not a market quote — a standing figure the
+    // screen says out loud it is using until a real one is entered.
+    expect(NATIVE_PNL_ASSUMPTIONS.aedToInrRate * 3.6725).toBeCloseTo(NATIVE_PNL_ASSUMPTIONS.usdToInrRate, 6)
   })
 })

@@ -7,6 +7,11 @@ export const NATIVE_PNL_ASSUMPTIONS = {
    * Flipkart model's "COGS — unpriced SKUs (est.)" fallback bucket. */
   unpricedSkuCogsPct: 25,
   usdToInrRate: 95.2,
+  /** The dirham is pegged at 3.6725 to the dollar, so this follows the dollar
+   * default rather than being a second guess at the market. Like the dollar
+   * rate it is only ever the fallback for a month nobody has entered, and the
+   * screen says when it is being used. */
+  aedToInrRate: 95.2 / 3.6725,
   indiaUsaFreightPerUnitInr: 110.12,
 }
 

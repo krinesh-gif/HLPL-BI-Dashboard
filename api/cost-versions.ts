@@ -81,6 +81,8 @@ function isFixedExpenseArray(v: unknown): v is FixedExpenseInput[] {
 
 interface FxRateInput {
   month: string
+  /** Absent means USDINR, which is every rate stored before the dirham. */
+  pair?: 'USDINR' | 'AEDINR'
   rate: number
   note?: string
 }
@@ -155,6 +157,9 @@ function isFxRateArray(v: unknown): v is FxRateInput[] {
       // A zero or negative rate would be divided by somewhere downstream.
       return (
         isNonEmptyString(c.month) && MONTH_PATTERN.test(c.month) &&
+        // An unrecognised pair would be written to a table keyed on it and
+        // then never read back by anything.
+        (c.pair === undefined || c.pair === 'USDINR' || c.pair === 'AEDINR') &&
         typeof c.rate === 'number' && Number.isFinite(c.rate) && c.rate > 0
       )
     })
@@ -205,7 +210,7 @@ export async function GET(request: Request): Promise<Response> {
   `) as Row[]
 
   const fxRows = (await sql`
-    SELECT month, rate, note, updated_at FROM fx_rates WHERE pair = 'USDINR' ORDER BY month DESC
+    SELECT month, pair, rate, note, updated_at FROM fx_rates ORDER BY pair, month DESC
   `) as Row[]
 
   const nykaaDiscountRows = (await sql`
@@ -252,6 +257,7 @@ export async function GET(request: Request): Promise<Response> {
     })),
     fxRates: fxRows.map((r) => ({
       month: String(r.month),
+      pair: String(r.pair) === 'AEDINR' ? 'AEDINR' : 'USDINR',
       rate: Number(r.rate),
       note: r.note ? String(r.note) : undefined,
       updatedAt: r.updated_at ? new Date(String(r.updated_at)).toISOString() : undefined,
@@ -423,13 +429,16 @@ export async function POST(request: Request): Promise<Response> {
     if (body.fxRates.length === 0) return json({ saved: 0 })
     await sql.query(
       `INSERT INTO fx_rates (month, pair, rate, note, updated_by, updated_at)
-       SELECT u.month, 'USDINR', u.rate, u.note, $4::text, now()
-       FROM UNNEST($1::text[], $2::float8[], $3::text[]) AS u(month, rate, note)
+       SELECT u.month, u.pair, u.rate, u.note, $5::text, now()
+       FROM UNNEST($1::text[], $2::text[], $3::float8[], $4::text[]) AS u(month, pair, rate, note)
        ON CONFLICT (month, pair) DO UPDATE SET
          rate = EXCLUDED.rate, note = EXCLUDED.note,
          updated_by = EXCLUDED.updated_by, updated_at = now()`,
       [
         body.fxRates.map((r) => r.month),
+        // Absent means the dollar, which is what every rate stored before the
+        // dirham existed here is.
+        body.fxRates.map((r) => r.pair ?? 'USDINR'),
         body.fxRates.map((r) => r.rate),
         body.fxRates.map((r) => r.note ?? null),
         auth.user.id,
@@ -533,7 +542,10 @@ export async function DELETE(request: Request): Promise<Response> {
 
   const fxMonth = url.searchParams.get('fxMonth')
   if (isNonEmptyString(fxMonth)) {
-    await sql`DELETE FROM fx_rates WHERE month = ${fxMonth} AND pair = 'USDINR'`
+    // Without a pair this clears the dollar rate, which is what it has always
+    // meant and what an older client still asks for.
+    const fxPair = url.searchParams.get('fxPair') === 'AEDINR' ? 'AEDINR' : 'USDINR'
+    await sql`DELETE FROM fx_rates WHERE month = ${fxMonth} AND pair = ${fxPair}`
     return json({ ok: true })
   }
 

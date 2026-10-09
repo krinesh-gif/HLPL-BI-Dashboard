@@ -73,8 +73,19 @@ export function MonthlyInputsPage() {
       hint: 'Amazon USA is settled in dollars; this is the rate its month is brought to rupees at.',
       entered: (m) => (fxRateForMonth(m, fxRates).entered ? fxRateForMonth(m, fxRates).rate : undefined),
       fallback: () => NATIVE_PNL_ASSUMPTIONS.usdToInrRate,
-      save: (m, v) => saveFxRate({ month: m, rate: v }),
-      clear: (m) => removeFxRate(m),
+      save: (m, v) => saveFxRate({ month: m, pair: 'USDINR', rate: v }),
+      clear: (m) => removeFxRate(m, 'USDINR'),
+    },
+    {
+      key: 'fxAed', label: 'AED → INR', unit: '₹', step: '0.01',
+      // Entered rather than derived from the dollar rate. The dirham is
+      // pegged at 3.6725 to the dollar, but what a bank pays on a dirham
+      // remittance is not the peg, and the P&L should use what was realised.
+      hint: 'Amazon UAE is settled in dirhams; this is the rate its month is brought to rupees at.',
+      entered: (m) => (fxRateForMonth(m, fxRates, 'AEDINR').entered ? fxRateForMonth(m, fxRates, 'AEDINR').rate : undefined),
+      fallback: () => NATIVE_PNL_ASSUMPTIONS.aedToInrRate,
+      save: (m, v) => saveFxRate({ month: m, pair: 'AEDINR', rate: v }),
+      clear: (m) => removeFxRate(m, 'AEDINR'),
     },
     {
       key: 'usaFreight', label: 'India → USA freight', unit: '₹/unit', step: '0.01',

@@ -7,7 +7,7 @@ import type { SkuMapWorkbookResult } from '@/data/normalize/skuMapWorkbook'
 import type { CostVersion } from '@/data/costVersions'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
-import type { FxRate } from '@/data/fxRates'
+import type { FxPair, FxRate } from '@/data/fxRates'
 import type { FreightLane, FreightRate } from '@/data/freightRates'
 import type { PackagingRate } from '@/data/packagingRates'
 import type { NykaaDiscountEntry } from '@/data/nykaaDiscounts'
@@ -179,7 +179,9 @@ interface DataState extends SharedDataset, MappingTablesState {
   saveFxRate: (rate: FxRate) => Promise<void>
   saveFreightRate: (rate: FreightRate) => Promise<void>
   savePackagingRate: (rate: PackagingRate) => Promise<void>
-  removeFxRate: (month: string) => Promise<void>
+  /** The pair defaults to the dollar, which is what every caller meant before
+   * the dirham existed. */
+  removeFxRate: (month: string, pair?: FxPair) => Promise<void>
   removeFreightRate: (month: string, lane?: FreightLane) => Promise<void>
   removePackagingRate: (month: string) => Promise<void>
   /** Records what Nykaa confirmed it is charging back for a month, which
@@ -486,7 +488,9 @@ export const useDataStore = create<DataState>((set, get) => {
       `/api/cost-versions?nykaaDiscountMonth=${encodeURIComponent(month)}`,
     )),
 
-    removeFxRate: (month) => writeThen(() => api.delete(`/api/cost-versions?fxMonth=${encodeURIComponent(month)}`)),
+    removeFxRate: (month, pair = 'USDINR') => writeThen(() => api.delete(
+      `/api/cost-versions?fxMonth=${encodeURIComponent(month)}&fxPair=${encodeURIComponent(pair)}`,
+    )),
     removeFreightRate: (month, lane = 'india_usa') => writeThen(() => api.delete(
       `/api/cost-versions?freightMonth=${encodeURIComponent(month)}&freightLane=${encodeURIComponent(lane)}`,
     )),
