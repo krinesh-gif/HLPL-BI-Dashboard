@@ -68,7 +68,7 @@ function amazonInputs(records: CanonicalSalesRecord[], fxRate: number): ChannelP
     salesRecords: records, skuMaster, fixedExpenses: [], marketing: {},
     facts: { flipkartFacts: [], amazonUsaFacts: [facts], meeshoFacts: [] },
     cogs: { costIndex: buildCostIndex([], skuMaster), mappings: [], comboComponents: [] },
-    fxRate, amazonUsaCurrency: 'USD',
+    fxRate: { USD: fxRate, AED: fxRate / 3.6725 }, amazonUsaCurrency: 'USD',
   }
 }
 

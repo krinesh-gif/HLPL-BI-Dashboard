@@ -70,7 +70,7 @@ export interface FeeCategoryTotal {
 export interface ChannelFeesStatement {
   channel: BusinessChannelId
   month: string
-  currency: 'INR' | 'USD'
+  currency: 'INR' | 'USD' | 'AED'
   /** What the charges are levied against, and what to call it on screen. */
   basis: number
   basisLabel: string
@@ -136,7 +136,7 @@ const LEVERS = new Map(AMAZON_USA_FEE_COLUMNS.filter((c) => c.lever).map((c) => 
 function assemble(
   channel: BusinessChannelId,
   month: string,
-  currency: 'INR' | 'USD',
+  currency: 'INR' | 'USD' | 'AED',
   basis: number,
   basisLabel: string,
   byCategory: Map<FeeCategoryId, FeeDetailLine[]>,

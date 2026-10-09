@@ -1,6 +1,6 @@
 import type { BusinessChannelId } from '@/config/channels'
 import { channelOfSource } from '@/config/channels'
-import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
+import { DEFAULT_FX_INR, inrPerUnit, type FxRatesInr } from '@/data/fxRates'
 import { toMonthKey } from '@/lib/format'
 import type { CanonicalSalesRecord } from '@/data/models'
 import {
@@ -82,8 +82,8 @@ const TOLERANCE_PCT = 0.5
 /** How many days at the end of a month are treated as likely to settle late. */
 const SETTLEMENT_LAG_DAYS = 7
 
-function inr(r: CanonicalSalesRecord, fxRate: number): number {
-  return r.netSales * (r.currency === 'USD' ? fxRate : 1)
+function inr(r: CanonicalSalesRecord, fxRate: FxRatesInr): number {
+  return r.netSales * inrPerUnit(r.currency, fxRate)
 }
 
 export function reconcileChannelMonth(
@@ -91,7 +91,7 @@ export function reconcileChannelMonth(
   channel: BusinessChannelId,
   month: string,
   facts: ChannelFacts,
-  fxRate: number = NATIVE_PNL_ASSUMPTIONS.usdToInrRate,
+  fxRate: FxRatesInr = DEFAULT_FX_INR,
 ): ChannelReconciliation {
   const monthRecords = records.filter((r) => channelOfSource(r.channel) === channel && toMonthKey(r.orderDate) === month)
   const orderBasis = orderBasisNetSales(monthRecords, fxRate)
@@ -249,7 +249,7 @@ export function reconcileAllChannels(
   channels: BusinessChannelId[],
   month: string,
   facts: ChannelFacts,
-  fxRate: number = NATIVE_PNL_ASSUMPTIONS.usdToInrRate,
+  fxRate: FxRatesInr = DEFAULT_FX_INR,
 ): ChannelReconciliation[] {
   return channels.map((c) => reconcileChannelMonth(records, c, month, facts, fxRate))
 }

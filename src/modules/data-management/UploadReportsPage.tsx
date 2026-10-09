@@ -6,6 +6,7 @@ import { detectAmazonSellerCentralReport, normalizeAmazonSellerCentralRows } fro
 import { detectFlipkartSkuPnlReport, normalizeFlipkartSkuPnl } from '@/data/normalize/flipkartSkuPnl'
 import { detectFlipkartWorkbook, normalizeFlipkartWorkbook } from '@/data/normalize/flipkartWorkbook'
 import { detectAmazonUsaProductProfitabilityReport, normalizeAmazonUsaProductProfitability } from '@/data/normalize/amazonUsaProductProfitability'
+import { detectAmazonUaeProductProfitability, normalizeAmazonUaeProductProfitability } from '@/data/normalize/amazonUaeProductProfitability'
 import { detectMeeshoOrderSummaryReport, normalizeMeeshoOrderSummary } from '@/data/normalize/meeshoOrderSummary'
 import { detectMeeshoOrderPaymentsSheet, normalizeMeeshoOrderPayments } from '@/data/normalize/meeshoOrderPayments'
 import { detectSkuMapWorkbook, normalizeSkuMapWorkbook } from '@/data/normalize/skuMapWorkbook'
@@ -25,7 +26,7 @@ import { useDataStore, type ImportOutcome } from '@/store/dataStore'
 import { monthLabel } from '@/lib/format'
 import { useFilterStore } from '@/store/filterStore'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
-import type { AdsRecord, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts } from '@/data/models'
+import type { AdsRecord, AmazonAePnlFacts, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts } from '@/data/models'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
 
@@ -35,6 +36,7 @@ type ReportKind =
   | 'flipkart_sku_pnl'
   | 'flipkart_workbook'
   | 'amazon_usa_product_profitability'
+  | 'amazon_uae_product_profitability'
   | 'myntra_pnl_workbook'
   | 'nykaa_sales'
   | 'nykaa_companion'
@@ -54,6 +56,7 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   flipkart_sku_pnl: 'Flipkart — SKU-Level P&L Report',
   flipkart_workbook: 'Flipkart — Full P&L Workbook (Overall Summary + Orders P&L)',
   amazon_usa_product_profitability: 'Amazon USA — Product Profitability Report',
+  amazon_uae_product_profitability: 'Amazon UAE — Product Profitability Report',
   myntra_pnl_workbook: 'Myntra — P&L Report (PnL_Summary + SKU_Detail)',
   nykaa_sales: 'Nykaa — Monthly Sales Data (B2B, margin on MRP)',
   nykaa_companion: 'Nykaa — Cart Rule / Combo file',
@@ -72,6 +75,7 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   flipkart_sku_pnl: 'flipkart',
   flipkart_workbook: 'flipkart',
   amazon_usa_product_profitability: 'amazon_us',
+  amazon_uae_product_profitability: 'amazon_ae',
   myntra_pnl_workbook: 'myntra',
   nykaa_sales: 'nykaa',
   nykaa_companion: 'nykaa',
@@ -98,6 +102,7 @@ interface PreviewState {
   isLikelyReupload: boolean
   flipkartFacts?: FlipkartPnlFacts
   amazonUsaFacts?: AmazonUsaPnlFacts
+  amazonAeFacts?: AmazonAePnlFacts
   myntraFacts?: MyntraPnlFacts
   nykaaFacts?: NykaaPnlFacts
   blinkitFacts?: BlinkitPnlFacts
@@ -217,6 +222,10 @@ export function UploadReportsPage() {
     if (kind === 'amazon_usa_product_profitability') {
       const r = normalizeAmazonUsaProductProfitability(parsed.headers, parsed.rows, skuMaster, importId)
       return buildPreview({ ...base, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings, amazonUsaFacts: r.facts })
+    }
+    if (kind === 'amazon_uae_product_profitability') {
+      const r = normalizeAmazonUaeProductProfitability(parsed.headers, parsed.rows, skuMaster, importId)
+      return buildPreview({ ...base, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings, amazonAeFacts: r.facts })
     }
     if (kind === 'meesho_order_summary') {
       const r = normalizeMeeshoOrderSummary(parsed.rows, skuMaster, importId)
@@ -448,6 +457,16 @@ export function UploadReportsPage() {
       let kind: ReportKind | null = null
       if (detectAmazonSellerCentralReport(parsed.headers)) kind = 'amazon_seller_central'
       else if (detectFlipkartSkuPnlReport(parsed.headers)) kind = 'flipkart_sku_pnl'
+      // The UAE marketplace exports the same report as the USA one and the
+      // download is named with a random string, so only what is inside tells
+      // them apart: the store column says AE and prices in AED.
+      //
+      // Checked first because the USA detector matches on header names alone.
+      // September's UAE export happens to slip past it — Amazon sent that one
+      // with its headings unresolved — but a UAE download with its headings
+      // intact would match it exactly, and a UAE month read as Amazon USA
+      // would have its dirhams counted as dollars.
+      else if (detectAmazonUaeProductProfitability(parsed.headers, parsed.rows)) kind = 'amazon_uae_product_profitability'
       else if (detectAmazonUsaProductProfitabilityReport(parsed.headers)) kind = 'amazon_usa_product_profitability'
       else if (detectMeeshoOrderSummaryReport(parsed.headers)) kind = 'meesho_order_summary'
       else if (detectAmazonAdsSponsoredProductsReport(parsed.headers)) kind = 'amazon_ads_sponsored_products'
@@ -561,6 +580,7 @@ export function UploadReportsPage() {
         adsRecords: preview.adsRecords,
         flipkartFacts: preview.flipkartFacts,
         amazonUsaFacts: preview.amazonUsaFacts,
+        amazonAeFacts: preview.amazonAeFacts,
         myntraFacts: preview.myntraFacts,
         nykaaFacts: preview.nykaaFacts,
         blinkitFacts: preview.blinkitFacts,

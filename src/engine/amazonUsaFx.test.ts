@@ -45,7 +45,7 @@ function inputs(fxRate: number, currency: 'USD' | 'INR' = 'USD'): ChannelPnlView
     fixedExpenses: [],
     marketing: {},
     facts: { flipkartFacts: [], amazonUsaFacts: [facts()], meeshoFacts: [] },
-    fxRate,
+    fxRate: { USD: fxRate, AED: fxRate / 3.6725 },
     amazonUsaCurrency: currency,
   }
 }

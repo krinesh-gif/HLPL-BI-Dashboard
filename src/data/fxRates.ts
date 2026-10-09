@@ -102,3 +102,42 @@ export function lineValuesToUsd<K extends string>(
   }
   return out
 }
+
+// ---------------------------------------------------------------------------
+// Converting a record
+// ---------------------------------------------------------------------------
+
+/**
+ * Rupees per one unit of each currency the company is paid in.
+ *
+ * The engines that sum order rows used to take a single `fxRate: number`,
+ * which could only ever mean dollars. A second foreign channel makes that
+ * ambiguous in the worst way: a dirham row would have been multiplied by the
+ * dollar rate, or by nothing at all, and either is a wrong figure that looks
+ * right. Passing the set rather than a number makes the question "which
+ * currency" unavoidable at the call site.
+ */
+export interface FxRatesInr {
+  USD: number
+  AED: number
+}
+
+/** The standing rates, for a caller with no month in hand. Always a fallback,
+ * never a quote — the same figures Monthly Inputs shows as the default. */
+export const DEFAULT_FX_INR: FxRatesInr = {
+  USD: NATIVE_PNL_ASSUMPTIONS.usdToInrRate,
+  AED: NATIVE_PNL_ASSUMPTIONS.aedToInrRate,
+}
+
+/** Every rate a month converts at, from what has been entered. */
+export function fxRatesForMonth(month: string, rates: FxRate[]): FxRatesInr {
+  return {
+    USD: fxRateValue(month, rates, 'USDINR'),
+    AED: fxRateValue(month, rates, 'AEDINR'),
+  }
+}
+
+/** Rupees per one unit of a record's currency. Rupee rows convert at 1. */
+export function inrPerUnit(currency: 'INR' | 'USD' | 'AED', fx: FxRatesInr): number {
+  return currency === 'INR' ? 1 : fx[currency]
+}

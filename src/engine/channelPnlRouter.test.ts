@@ -162,7 +162,7 @@ describe('a channel share of the company fixed expenses', () => {
 
   const build = (channel: 'amazon_us' | 'flipkart', expenses = fixedExpenses) =>
     buildChannelPnlView(channel, '2026-08', {
-      salesRecords, skuMaster, fixedExpenses: expenses, marketing: {}, fxRate,
+      salesRecords, skuMaster, fixedExpenses: expenses, marketing: {}, fxRate: { USD: fxRate, AED: fxRate / 3.6725 },
       facts: { flipkartFacts: [flipkartAugust], amazonUsaFacts: [amazonUsa], meeshoFacts: [] },
     })
 
@@ -199,7 +199,7 @@ describe('a channel share of the company fixed expenses', () => {
   it('splits by each channel share of sales, not evenly', () => {
     const lopsided = [inr('amazon_us', 150000), inr('flipkart', 50000)]
     const v = buildChannelPnlView('amazon_us', '2026-08', {
-      salesRecords: lopsided, skuMaster, fixedExpenses, marketing: {}, fxRate,
+      salesRecords: lopsided, skuMaster, fixedExpenses, marketing: {}, fxRate: { USD: fxRate, AED: fxRate / 3.6725 },
       facts: { flipkartFacts: [flipkartAugust], amazonUsaFacts: [amazonUsa], meeshoFacts: [] },
     })
     expect(v.canonical.lines.salaries).toBeCloseTo(60000 * 0.75, 6)

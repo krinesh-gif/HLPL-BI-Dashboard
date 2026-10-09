@@ -23,7 +23,7 @@ export function NativePnlTable({
 }: {
   lineDefs: NativeLineDef[]
   values: NativeLineValues
-  currency?: 'INR' | 'USD'
+  currency?: 'INR' | 'USD' | 'AED'
   /** Called with the new positive magnitude when a "Manual entry" row is edited. */
   onEditManualEntry?: (key: string, value: number) => void
 }) {

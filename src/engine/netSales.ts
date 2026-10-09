@@ -1,6 +1,6 @@
 import type { BusinessChannelId, SalesSourceId } from '@/config/channels'
 import { BUSINESS_CHANNEL_IDS, channelOfSource, channelLabel, sourcesOfChannel } from '@/config/channels'
-import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
+import { DEFAULT_FX_INR, inrPerUnit, type FxRatesInr } from '@/data/fxRates'
 import { toMonthKey } from '@/lib/format'
 import { nykaaRevenue } from './nativePnl/nykaa'
 import type {
@@ -104,9 +104,17 @@ export function countsAsRevenue(record: CanonicalSalesRecord): boolean {
   return record.status !== 'cancelled'
 }
 
-/** Rupee value of one record's fields, converting Amazon USA's USD rows. */
-function fx(record: CanonicalSalesRecord, fxRate: number): number {
-  return record.currency === 'USD' ? fxRate : 1
+/**
+ * Rupees per one unit of a record's currency.
+ *
+ * This took a single number and read it as the dollar rate, which was fine
+ * while Amazon USA was the only channel not paid in rupees. Amazon UAE makes
+ * that ambiguous in the worst way — a dirham row multiplied by the dollar
+ * rate, or by nothing, is a wrong figure that looks right — so the whole set
+ * is passed and the currency picks from it.
+ */
+function fx(record: CanonicalSalesRecord, rates: FxRatesInr): number {
+  return inrPerUnit(record.currency, rates)
 }
 
 // ---------------------------------------------------------------------------
@@ -120,7 +128,7 @@ function fx(record: CanonicalSalesRecord, fxRate: number): number {
  */
 export function orderBasisNetSales(
   records: CanonicalSalesRecord[],
-  fxRate: number = NATIVE_PNL_ASSUMPTIONS.usdToInrRate,
+  fxRate: FxRatesInr = DEFAULT_FX_INR,
 ): NetSalesFigure {
   const figure: NetSalesFigure = { ...EMPTY_FIGURE, sourceLabel: 'Order reports' }
 
@@ -189,7 +197,7 @@ export function settlementBasisNetSales(
   channel: BusinessChannelId,
   month: string,
   facts: ChannelFacts,
-  fxRate: number = NATIVE_PNL_ASSUMPTIONS.usdToInrRate,
+  fxRate: FxRatesInr = DEFAULT_FX_INR,
   meeshoBasis: PnlBasis = 'order',
 ): NetSalesFigure | null {
   if (channel === 'meesho') {
@@ -283,9 +291,9 @@ export function settlementBasisNetSales(
     if (!f) return null
     return {
       ...EMPTY_FIGURE,
-      grossSales: f.grossSalesUsd * fxRate,
-      returnsValue: (f.grossSalesUsd - f.netSalesUsd) * fxRate,
-      netSales: f.netSalesUsd * fxRate,
+      grossSales: f.grossSalesUsd * fxRate.USD,
+      returnsValue: (f.grossSalesUsd - f.netSalesUsd) * fxRate.USD,
+      netSales: f.netSalesUsd * fxRate.USD,
       basis: 'settlement',
       sourceLabel: 'Amazon USA profitability report',
     }
@@ -304,7 +312,7 @@ export interface NetSalesScope {
   channel: BusinessChannelId
   month: string
   facts: ChannelFacts
-  fxRate?: number
+  fxRate?: FxRatesInr
   /** Which calendar Meesho's months are cut on. Ignored by other channels. */
   meeshoBasis?: PnlBasis
   /**
@@ -330,7 +338,7 @@ export interface NetSalesScope {
  * month, because settlement reports carry no unit counts.
  */
 export function netSalesForChannelMonth(scope: NetSalesScope): NetSalesFigure {
-  const fxRate = scope.fxRate ?? NATIVE_PNL_ASSUMPTIONS.usdToInrRate
+  const fxRate = scope.fxRate ?? DEFAULT_FX_INR
   const monthRecords = scope.records.filter(
     (r) =>
       toMonthKey(r.orderDate) === scope.month &&
@@ -396,7 +404,7 @@ export function netSalesForMonth(
   month: string,
   facts: ChannelFacts,
   channels: BusinessChannelId[] = BUSINESS_CHANNEL_IDS,
-  fxRate: number = NATIVE_PNL_ASSUMPTIONS.usdToInrRate,
+  fxRate: FxRatesInr = DEFAULT_FX_INR,
 ): NetSalesFigure {
   return channels
     .map((channel) => netSalesForChannelMonth({ records, channel, month, facts, fxRate }))
@@ -446,7 +454,7 @@ export function netSalesBySource(
   records: CanonicalSalesRecord[],
   channel: BusinessChannelId,
   month: string,
-  fxRate: number = NATIVE_PNL_ASSUMPTIONS.usdToInrRate,
+  fxRate: FxRatesInr = DEFAULT_FX_INR,
 ): { source: SalesSourceId; label: string; figure: NetSalesFigure }[] {
   return sourcesOfChannel(channel).map((source) => ({
     source: source.id,

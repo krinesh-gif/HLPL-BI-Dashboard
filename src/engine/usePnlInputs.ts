@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useDataStore } from '@/store/dataStore'
 import { buildCostIndex } from '@/data/costVersions'
-import { fxRateValue } from '@/data/fxRates'
+import { fxRatesForMonth } from '@/data/fxRates'
 import { freightRateValue } from '@/data/freightRates'
 import { packagingRateValue } from '@/data/packagingRates'
 import { nykaaDiscountForMonth } from '@/data/nykaaDiscounts'
@@ -53,7 +53,7 @@ export function usePnlInputs(): {
       forMonth: (month: string) => ({
         ...inputs,
         marketing: marketingFromAds(adsRecords, month, manualAdSpend),
-        fxRate: fxRateValue(month, fxRates),
+        fxRate: fxRatesForMonth(month, fxRates),
         freightPerUnitInr: freightRateValue(month, freightRates, 'india_usa'),
         nykaaFreightPerUnitInr: freightRateValue(month, freightRates, 'nykaa_inbound'),
         packagingPerShipmentInr: packagingRateValue(month, packagingRates),

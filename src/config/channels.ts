@@ -25,6 +25,7 @@ export type SalesSourceId =
   | 'amazon_in_seller'
   | 'amazon_in_vendor'
   | 'amazon_us'
+  | 'amazon_ae'
   | 'flipkart'
   | 'meesho'
   | 'myntra'
@@ -36,6 +37,7 @@ export type SalesSourceId =
 export type BusinessChannelId =
   | 'amazon_in'
   | 'amazon_us'
+  | 'amazon_ae'
   | 'flipkart'
   | 'meesho'
   | 'myntra'
@@ -55,20 +57,25 @@ export interface SalesSourceDef {
   channel: BusinessChannelId
   /** How this source is named when drilling into its channel. */
   label: string
-  currency: 'INR' | 'USD'
+  currency: ChannelCurrency
   sellerType: 'seller_central' | 'vendor_central' | 'marketplace'
 }
+
+/** What a channel is paid in. Anything other than rupees needs a monthly rate
+ * on Monthly Inputs before its figures can join the Master P&L. */
+export type ChannelCurrency = 'INR' | 'USD' | 'AED'
 
 export interface BusinessChannelDef {
   id: BusinessChannelId
   label: string
-  currency: 'INR' | 'USD'
+  currency: ChannelCurrency
 }
 
 /** The management-level channel list. Adding a marketplace starts here. */
 export const BUSINESS_CHANNELS: BusinessChannelDef[] = [
   { id: 'amazon_in', label: 'Amazon India', currency: 'INR' },
   { id: 'amazon_us', label: 'Amazon USA', currency: 'USD' },
+  { id: 'amazon_ae', label: 'Amazon UAE', currency: 'AED' },
   { id: 'flipkart', label: 'Flipkart', currency: 'INR' },
   { id: 'meesho', label: 'Meesho', currency: 'INR' },
   { id: 'myntra', label: 'Myntra', currency: 'INR' },
@@ -82,6 +89,7 @@ export const SALES_SOURCES: SalesSourceDef[] = [
   { id: 'amazon_in_seller', channel: 'amazon_in', label: 'Seller Central', currency: 'INR', sellerType: 'seller_central' },
   { id: 'amazon_in_vendor', channel: 'amazon_in', label: 'Vendor Central', currency: 'INR', sellerType: 'vendor_central' },
   { id: 'amazon_us', channel: 'amazon_us', label: 'Amazon USA', currency: 'USD', sellerType: 'seller_central' },
+  { id: 'amazon_ae', channel: 'amazon_ae', label: 'Amazon UAE', currency: 'AED', sellerType: 'seller_central' },
   { id: 'flipkart', channel: 'flipkart', label: 'Flipkart', currency: 'INR', sellerType: 'marketplace' },
   { id: 'meesho', channel: 'meesho', label: 'Meesho', currency: 'INR', sellerType: 'marketplace' },
   { id: 'myntra', channel: 'myntra', label: 'Myntra', currency: 'INR', sellerType: 'marketplace' },
@@ -142,6 +150,11 @@ export const CHANNELS = SALES_SOURCES
 export const DEFAULT_ALLOCATION_WEIGHTS: Record<BusinessChannelId, number> = {
   amazon_in: 0.5,
   amazon_us: 0.1,
+  // Zero rather than a share of its own, for the same reason as Blinkit:
+  // these weights are only reached in a month with no sales anywhere, and a
+  // channel that has barely started trading should not carry a standing
+  // slice of head office.
+  amazon_ae: 0,
   flipkart: 0.2,
   meesho: 0.15,
   myntra: 0.03,

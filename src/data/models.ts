@@ -38,7 +38,7 @@ export interface CanonicalSalesRecord {
   marketplaceFee: number
   tax: number
   status: 'completed' | 'returned' | 'rto' | 'cancelled' | 'pending'
-  currency: 'INR' | 'USD'
+  currency: 'INR' | 'USD' | 'AED'
   /** Original uploaded row, untouched, keyed by original header names. */
   raw?: Record<string, string | number>
   /** Which import batch this row came from — used for de-dup and audit trail. */
@@ -410,6 +410,55 @@ export interface AmazonInSellerPnlFacts {
   cogsUnpriced?: number
   /** Advertising, which the settlement report does not carry. */
   ads?: number
+}
+
+/**
+ * Amazon UAE's Product Profitability export, summed for a month.
+ *
+ * The same report as Amazon USA's, and deliberately not the same shape. The
+ * US download resolves every one of its fee columns — referral fee, FBA
+ * fulfilment, storage, aged inventory, advertising — and the UAE download of
+ * September 2026 carries none of them: its headings came out as raw internal
+ * keys (`skucentral-amz-fees-card-sales`), two columns arrived with no
+ * heading at all, and the two named `SC_FBA_SER_per_unit` are empty in every
+ * row.
+ *
+ * So there is no fee breakdown to store, and inventing one by apportioning
+ * Amazon's bottom line across fee names would be writing figures Amazon never
+ * stated. What the export does carry is reliable: units, sales, net sales,
+ * and Amazon's own Net proceeds. Everything Amazon took is therefore one
+ * figure — net sales less net proceeds — named as exactly that.
+ *
+ * When a download arrives with its fee columns intact, they are additive:
+ * `feeTotalsAed` fills in and the statement gains the breakdown without any
+ * of the figures below changing.
+ */
+export interface AmazonAePnlFacts {
+  month: string
+  schemaVersion: 1
+  /** Dirhams, as the export states them. */
+  grossSalesAed: number
+  netSalesAed: number
+  /** Amazon's own bottom line for the month, after everything it charged.
+   * Carried rather than derived, so the statement can be checked against the
+   * export instead of trusted. */
+  netProceedsAed: number
+  unitsSoldQty: number
+  unitsReturnedQty: number
+  netUnitsSoldQty: number
+  /** Rows charged something while selling nothing — storage on stock that sat
+   * there. Counted so the statement can say the month's fees are not only
+   * about what sold. */
+  nonSellingRows: number
+  /** Cost of the goods, in rupees, priced from the Product Master at import.
+   * Recomputed at the month's effective cost when order rows are on file. */
+  cogsSourceInr?: number
+  /**
+   * Fee columns, once a download arrives carrying them, keyed as the Amazon
+   * USA export keys them. Absent is the normal case today and means the
+   * export had none — not that the month was free of fees.
+   */
+  feeTotalsAed?: Record<string, number>
 }
 
 export interface AmazonUsaPnlFacts {

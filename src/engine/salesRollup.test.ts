@@ -90,9 +90,13 @@ const MONTH: CanonicalSalesRecord[] = [
   ...Array.from({ length: 6 }, () => line({ channel: 'amazon_us', marketplace: 'amazon_us', currency: 'USD', grossSales: 12, discount: 1, netSales: 11, shippingCost: 2, marketplaceFee: 1.8, tax: 0 })),
 ]
 
+/** A round dollar rate keeps the assertions readable; the dirham rate is
+ * present only because the engine now asks for every currency it might meet. */
+const RATES = { USD: 88, AED: 88 / 3.6725 }
+
 describe('grouping the sales rows changes no figure', () => {
-  const raw = orderBasisNetSales(MONTH, 88)
-  const rolled = orderBasisNetSales(rollup(MONTH), 88)
+  const raw = orderBasisNetSales(MONTH, RATES)
+  const rolled = orderBasisNetSales(rollup(MONTH), RATES)
 
   it('collapses the rows it is meant to', () => {
     // The whole point: fewer rows across the wire.
@@ -122,15 +126,15 @@ describe('grouping the sales rows changes no figure', () => {
     // A per-SKU monthly aggregate carries no order count, and grouping must
     // not quietly turn its line count into one.
     const withAggregate = [...MONTH, line({ sku: 'AO-BULK', isAggregate: true, quantity: 1200, netSales: 1_400_000 })]
-    const r = orderBasisNetSales(rollup(withAggregate), 88)
+    const r = orderBasisNetSales(rollup(withAggregate), RATES)
     expect(r.hasAggregateRows).toBe(true)
     expect(orderCount(r)).toBeNull()
-    expectSameFigure(r, orderBasisNetSales(withAggregate, 88))
+    expectSameFigure(r, orderBasisNetSales(withAggregate, RATES))
   })
 
   it('counts a row with no count of its own as one order', () => {
     // Rows the app normalises during an upload have never been grouped.
     const fresh = MONTH.map((r) => ({ ...r, orders: undefined }))
-    expect(orderBasisNetSales(fresh, 88).orders).toBe(79)
+    expect(orderBasisNetSales(fresh, RATES).orders).toBe(79)
   })
 })

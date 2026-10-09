@@ -1,13 +1,22 @@
 import { FISCAL_YEAR } from '@/config/thresholds'
 
+/** What a figure is denominated in. Dirhams have no single-character symbol
+ * in common use, so they are written out — "AED 7,250" reads unambiguously
+ * where "د.إ" would not survive a copy into a spreadsheet. */
+export type DisplayCurrency = 'INR' | 'USD' | 'AED'
+
+const SYMBOL: Record<DisplayCurrency, string> = { INR: '₹', USD: '$', AED: 'AED ' }
+
 /** Compact Indian numbering: ₹85.4 L, ₹1.25 Cr. Falls back to full for small values. */
-export function formatCurrencyCompact(value: number, currency: 'INR' | 'USD' = 'INR'): string {
+export function formatCurrencyCompact(value: number, currency: DisplayCurrency = 'INR'): string {
   if (!Number.isFinite(value)) return '—'
-  const symbol = currency === 'INR' ? '₹' : '$'
+  const symbol = SYMBOL[currency]
   const abs = Math.abs(value)
   const sign = value < 0 ? '-' : ''
 
-  if (currency === 'USD') {
+  // Lakhs and crores are how rupees are read here and nowhere else, so every
+  // other currency uses thousands and millions.
+  if (currency !== 'INR') {
     if (abs >= 1_000_000) return `${sign}${symbol}${(abs / 1_000_000).toFixed(2)}M`
     if (abs >= 1_000) return `${sign}${symbol}${(abs / 1_000).toFixed(1)}K`
     return `${sign}${symbol}${abs.toFixed(0)}`
@@ -27,11 +36,14 @@ export function formatCurrencyCompact(value: number, currency: 'INR' | 'USD' = '
  * reconciled against the export line by line and "$11,301" against
  * "$11,300.88" reads as a mismatch when it is only a rounding.
  */
-export function formatCurrencyFull(value: number, currency: 'INR' | 'USD' = 'INR'): string {
+export function formatCurrencyFull(value: number, currency: DisplayCurrency = 'INR'): string {
   if (!Number.isFinite(value)) return '—'
-  if (currency === 'USD') {
-    const cents = Math.round(value * 100) / 100 || 0 // normalize -0 to 0
-    return `$${cents.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  // Both foreign currencies keep their minor units, because both statements
+  // are reconciled against the export line by line and "AED 7,250" against
+  // "AED 7,250.33" reads as a mismatch when it is only a rounding.
+  if (currency !== 'INR') {
+    const minor = Math.round(value * 100) / 100 || 0 // normalize -0 to 0
+    return `${SYMBOL[currency]}${minor.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
   const rounded = Math.round(value) || 0
   return `₹${rounded.toLocaleString('en-IN')}`

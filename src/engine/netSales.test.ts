@@ -82,7 +82,7 @@ describe('the Net Sales definition', () => {
         record({ channel: 'meesho', currency: 'INR', grossSales: 300, netSales: 300 }),
         record({ channel: 'amazon_us', currency: 'USD', grossSales: 10, netSales: 10 }),
       ],
-      FX,
+      { USD: FX, AED: FX / 3.6725 },
     )
     // Without conversion this would read 310 — ten dollars counted as ten rupees.
     expect(f.netSales).toBe(300 + 10 * FX)

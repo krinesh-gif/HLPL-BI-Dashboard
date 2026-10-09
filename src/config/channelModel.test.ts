@@ -41,7 +41,7 @@ describe('the management channel list', () => {
   it('has Amazon India once, and no Seller or Vendor entry', () => {
     const labels = BUSINESS_CHANNELS.map((c) => c.label)
     expect(labels).toEqual([
-      'Amazon India', 'Amazon USA', 'Flipkart', 'Meesho', 'Myntra', 'Nykaa', 'Purplle', 'Blinkit',
+      'Amazon India', 'Amazon USA', 'Amazon UAE', 'Flipkart', 'Meesho', 'Myntra', 'Nykaa', 'Purplle', 'Blinkit',
     ])
     expect(labels.some((l) => /seller|vendor/i.test(l))).toBe(false)
   })
@@ -132,5 +132,24 @@ describe('the drill-down', () => {
     })
     expect(narrowed.basis).toBe('order')
     expect(narrowed.netSales).toBe(500)
+  })
+})
+
+describe('a channel that is not paid in rupees', () => {
+  it('names its currency, so nothing has to infer it from the channel id', () => {
+    const by = (id: string) => BUSINESS_CHANNELS.find((c) => c.id === id)
+    expect(by('amazon_us')?.currency).toBe('USD')
+    expect(by('amazon_ae')?.currency).toBe('AED')
+    // Everything else. A new rupee channel needs no FX plumbing at all.
+    expect(BUSINESS_CHANNELS.filter((c) => c.currency !== 'INR').map((c) => c.id)).toEqual(['amazon_us', 'amazon_ae'])
+  })
+
+  it('keeps the two Amazon export channels apart', () => {
+    // They read the same report from different marketplaces, and the file
+    // names are random strings, so only the store code inside tells them
+    // apart. Sharing a channel would read dirhams as dollars.
+    expect(channelOfSource('amazon_us')).toBe('amazon_us')
+    expect(channelOfSource('amazon_ae')).toBe('amazon_ae')
+    expect(hasMultipleSources('amazon_ae')).toBe(false)
   })
 })

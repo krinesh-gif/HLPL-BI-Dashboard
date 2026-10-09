@@ -17,7 +17,7 @@ import {
 } from '@/engine/netSales'
 import { reconcileChannelMonth } from '@/engine/reconciliation'
 import { productLabelResolver } from '@/data/productLabel'
-import { fxRateValue } from '@/data/fxRates'
+import { fxRatesForMonth, type FxRatesInr } from '@/data/fxRates'
 
 const TREND_MONTHS = 6
 
@@ -32,7 +32,8 @@ const TREND_MONTHS = 6
  * the P&L lives in one place so a channel's numbers cannot be defined twice.
  */
 export function useChannelData(channel: BusinessChannelId, source?: SalesSourceId) {
-  const { salesRecords, skuMaster, mappings, comboComponents, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts, fxRates } = useDataStore()
+  const { salesRecords, skuMaster, mappings, comboComponents, flipkartFacts, amazonUsaFacts, amazonAeFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts, fxRates } =
+    useDataStore()
   const { month, monthChosenByUser, amazonUsaCurrency } = useFilterStore()
   const defaultMonthTo = useFilterStore((s) => s.defaultMonthTo)
   const fallbackMonthTo = useFilterStore((s) => s.fallbackMonthTo)
@@ -55,14 +56,14 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
     const settlementMonths: Record<BusinessChannelId, { month: string }[]> = {
       flipkart: flipkartFacts, amazon_us: amazonUsaFacts, meesho: meeshoFacts,
       myntra: myntraFacts ?? [], nykaa: nykaaFacts ?? [], blinkit: blinkitFacts ?? [],
-      amazon_in: [], purplle: [],
+      amazon_in: [], purplle: [], amazon_ae: amazonAeFacts ?? [],
     }
     // Narrowing to one report inside a channel rules the settlement months
     // out: a settlement covers the whole channel, not one of its reports.
     if (!source) months.push(...settlementMonths[channel].map((f) => f.month))
 
     return new Set(months.filter(Boolean))
-  }, [salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts, channel, source])
+  }, [salesRecords, flipkartFacts, amazonUsaFacts, amazonAeFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts, channel, source])
 
   const latestMonthForChannel = useMemo(
     () => (monthsWithData.size === 0 ? null : [...monthsWithData].reduce((a, b) => (a > b ? a : b))),
@@ -96,8 +97,10 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
 
   return useMemo(() => {
     const previousMonth = addMonths(month, -1)
-    const rate = displayCurrency === 'USD' ? 1 : fxRateValue(month, fxRates)
-    const channelFacts = { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts }
+    // Reading a channel in its own currency means no conversion at all, which
+    // is a rate of 1 for every currency rather than for the dollar alone.
+    const rate: FxRatesInr = displayCurrency === 'USD' ? { USD: 1, AED: 1 } : fxRatesForMonth(month, fxRates)
+    const channelFacts = { flipkartFacts, amazonUsaFacts, amazonAeFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts }
 
     const inScope = (r: { channel: SalesSourceId }) =>
       source ? r.channel === source : channelOfSource(r.channel) === channel
@@ -109,7 +112,7 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
         records: salesRecords, channel, month: m, facts: channelFacts, source,
         // Each month at its own rate, so a closed month keeps the rate it was
         // closed on — the same rule the statements follow.
-        fxRate: displayCurrency === 'USD' ? 1 : fxRateValue(m, fxRates),
+        fxRate: displayCurrency === 'USD' ? { USD: 1, AED: 1 } : fxRatesForMonth(m, fxRates),
       })
 
     const currentFacts = figureFor(month)
@@ -173,5 +176,5 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
       topSkus: [...skuRows].sort((a, b) => b.netSales - a.netSales).slice(0, 5),
       bottomSkus: [...skuRows].sort((a, b) => a.netSales - b.netSales).slice(0, 5),
     }
-  }, [salesRecords, skuMaster, mappings, comboComponents, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts, fxRates, channel, source, month, displayCurrency])
+  }, [salesRecords, skuMaster, mappings, comboComponents, flipkartFacts, amazonUsaFacts, amazonAeFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts, fxRates, channel, source, month, displayCurrency])
 }

@@ -1,6 +1,7 @@
 import type { BusinessChannelId } from '@/config/channels'
 import type { PnlBasis } from '@/data/models'
 import type {
+  AmazonAePnlFacts,
   AmazonUsaPnlFacts,
   CanonicalSalesRecord,
   ChannelPnl,
@@ -15,7 +16,8 @@ import type {
   SkuMaster,
 } from '@/data/models'
 import { channelLabel, channelOfSource } from '@/config/channels'
-import { MEESHO_ASSUMPTIONS, NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
+import { MEESHO_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
+import { DEFAULT_FX_INR, inrPerUnit, type FxRatesInr } from '@/data/fxRates'
 import { formatCurrencyFull, toMonthKey } from '@/lib/format'
 import { allocateFixedExpensesForMonth } from './allocation'
 import {
@@ -29,6 +31,7 @@ import {
 import { applyFlipkartOtherCosts, computeFlipkartPnl, flipkartToCanonicalBuckets, FLIPKART_LINE_DEFS } from './nativePnl/flipkart'
 import { applyMeeshoOtherCosts, computeMeeshoPnl, meeshoToCanonicalBuckets, MEESHO_LINE_DEFS } from './nativePnl/meesho'
 import { blinkitToCanonicalBuckets, computeBlinkitPnl, BLINKIT_LINE_DEFS } from './nativePnl/blinkit'
+import { amazonAeToCanonicalBuckets, computeAmazonAePnl, AMAZON_AE_LINE_DEFS } from './nativePnl/amazonAe'
 import { applyMyntraOtherCosts, computeMyntraPnl, myntraToCanonicalBuckets, MYNTRA_LINE_DEFS } from './nativePnl/myntra'
 import {
   applyNykaaOtherCosts, computeNykaaPnl, nykaaDiscountPerSalesFile, nykaaDiscountRecovered,
@@ -43,7 +46,7 @@ import type { NativeLineDef, NativeLineValues } from './nativePnl/types'
 export interface NativePnlView {
   lineDefs: NativeLineDef[]
   values: NativeLineValues
-  currency: 'INR' | 'USD'
+  currency: 'INR' | 'USD' | 'AED'
 }
 
 export interface ChannelPnlView {
@@ -69,6 +72,7 @@ export interface ChannelFactsStore {
   nykaaFacts?: NykaaPnlFacts[]
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
   blinkitFacts?: BlinkitPnlFacts[]
+  amazonAeFacts?: AmazonAePnlFacts[]
 }
 
 /** Sums this channel's allocated share (sales-contribution method) of the
@@ -116,12 +120,12 @@ function computeAllocatedOtherCosts(
 function uncostedNetSalesInInr(
   records: CanonicalSalesRecord[],
   uncostedSkus: string[],
-  fxRate: number,
+  fxRate: FxRatesInr,
 ): number {
   const uncosted = new Set(uncostedSkus)
   return records.reduce((sum, r) => {
     if (r.status === 'cancelled' || !uncosted.has(r.sku)) return sum
-    return sum + (r.currency === 'USD' ? r.netSales * fxRate : r.netSales)
+    return sum + r.netSales * inrPerUnit(r.currency, fxRate)
   }, 0)
 }
 
@@ -163,7 +167,7 @@ function recomputedCogs(
   )
   if (records.length === 0) return null
 
-  const fxRate = inputs.fxRate ?? NATIVE_PNL_ASSUMPTIONS.usdToInrRate
+  const fxRate = inputs.fxRate ?? DEFAULT_FX_INR
   const result = cogsForRecords(records, inputs.skuMaster, month, inputs.cogs)
   const estimate = estimateUncostedCogs(result, uncostedNetSalesInInr(records, result.uncostedSkus, fxRate))
   return {
@@ -269,9 +273,10 @@ export interface ChannelPnlViewInputs {
   cogs?: CogsInputs
   /** Which calendar Meesho's months are cut on. Defaults to order basis. */
   meeshoBasis?: PnlBasis
-  /** INR per USD for this month. Amazon USA is denominated in dollars, so this
-   * scales the whole channel wherever it rolls into the rupee P&L. */
-  fxRate?: number
+  /** Rupees per unit of each currency the company is paid in, for this month.
+   * Amazon USA is denominated in dollars and Amazon UAE in dirhams, so these
+   * scale those channels wherever they roll into the rupee P&L. */
+  fxRate?: FxRatesInr
   /** Rupees of India→USA freight per unit shipped, for this month. */
   freightPerUnitInr?: number
   /** Rupees a unit from our warehouse to Nykaa's, for the month being read. */
@@ -316,7 +321,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
   if (channel === 'amazon_us') {
     const imported = inputs.facts.amazonUsaFacts.find((f) => f.month === month)
     if (imported) {
-      const fxRate = inputs.fxRate ?? NATIVE_PNL_ASSUMPTIONS.usdToInrRate
+      const fxRate = (inputs.fxRate ?? DEFAULT_FX_INR).USD
       // Rupee costs are converted at this month's rate rather than the one
       // that happened to be configured when the file was uploaded.
       // Freight is priced when the statement is read, at the month's rate, so
@@ -627,6 +632,53 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
     }
   }
 
+  if (channel === 'amazon_ae') {
+    const facts = inputs.facts.amazonAeFacts?.find((f) => f.month === month)
+    if (facts) {
+      const rate = (inputs.fxRate ?? DEFAULT_FX_INR).AED
+      // Amazon does not know what the goods cost us, so COGS is priced from
+      // the order rows at the month's effective cost — a corrected cost sheet
+      // then restates the month instead of leaving whatever was frozen at
+      // upload time. It is a rupee cost; the statement reads in dirhams, so
+      // it is divided at the month's rate rather than at upload day's.
+      const recomputed = recomputedCogs(channel, month, inputs)
+      const cogsInr = recomputed ? recomputed.total : (facts.cogsSourceInr ?? 0)
+      const otherCostsInr = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+
+      const notes: string[] = []
+      // Said on the statement, not only at upload: anyone reading the P&L in
+      // three months' time has to know why there is one fee line and not ten.
+      notes.push(
+        'Amazon exported this month without its fee columns, so what Amazon took is one figure — net sales less ' +
+        'the Net proceeds Amazon states — and not a breakdown. A download carrying the fee columns will split it ' +
+        'without changing any of these totals.',
+      )
+      if (recomputed && recomputed.uncostedUnits > 0) {
+        const shown = recomputed.uncostedSkus.slice(0, 8).join(', ')
+        const rest = recomputed.uncostedSkus.length - 8
+        notes.push(
+          `${recomputed.uncostedSkus.length} MSKU(s) sold in ${month} have no cost on file, covering ` +
+          `${recomputed.uncostedUnits.toLocaleString('en-IN')} unit(s). Add ` +
+          `${shown}${rest > 0 ? ` and ${rest} more` : ''} to the Product Master to price them properly.`,
+        )
+      }
+
+      return {
+        channel, month,
+        canonical: {
+          channel, month,
+          lines: computeSubtotals(withAllocatedOpex(amazonAeToCanonicalBuckets(facts, rate, cogsInr), inputs, channel, month)),
+        },
+        native: {
+          lineDefs: AMAZON_AE_LINE_DEFS,
+          values: computeAmazonAePnl(facts, rate !== 0 ? cogsInr / rate : 0, rate !== 0 ? otherCostsInr / rate : 0),
+          currency: 'AED',
+        },
+        notes,
+      }
+    }
+  }
+
   if (channel === 'meesho') {
     const basis = inputs.meeshoBasis ?? 'order'
     // A month stored under the older, thinner shape is treated as absent
@@ -693,6 +745,7 @@ const NATIVE_STATEMENT_SOURCE: Partial<Record<BusinessChannelId, string>> = {
   myntra: 'P&L report',
   nykaa: 'monthly sales file',
   amazon_us: 'Product Profitability export',
+  amazon_ae: 'Product Profitability export',
   amazon_in: 'settlement report',
 }
 
