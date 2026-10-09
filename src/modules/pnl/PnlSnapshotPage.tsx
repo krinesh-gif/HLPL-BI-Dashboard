@@ -1,6 +1,6 @@
 import { useSearchParams, Link } from 'react-router-dom'
 import { channelLabel, type BusinessChannelId } from '@/config/channels'
-import { formatCurrencyFull, formatPercent, monthLabel } from '@/lib/format'
+import { formatCurrencyFull, formatPercent, monthLabel, currencyName } from '@/lib/format'
 import { usePnlReport } from './usePnlReport'
 import { pnlSnapshotStart } from './pnlSnapshotStart'
 
@@ -46,7 +46,7 @@ export function PnlSnapshotPage() {
             <div className="font-semibold text-[var(--ink-2)]">Aravi Organic</div>
             <div>Hivefy Lifestyle Pvt Ltd</div>
             <div className="mt-1">
-              Taken on {takenOn} · {r.displayCurrency === 'USD' ? 'US dollars' : 'Indian rupees'}
+              Taken on {takenOn} · {currencyName(r.displayCurrency)}
               {r.view === 'meesho' && ` · ${r.meeshoBasis === 'settlement' ? 'payment' : 'order'} date basis`}
             </div>
           </div>

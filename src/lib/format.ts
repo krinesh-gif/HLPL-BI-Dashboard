@@ -7,6 +7,19 @@ export type DisplayCurrency = 'INR' | 'USD' | 'AED'
 
 const SYMBOL: Record<DisplayCurrency, string> = { INR: '₹', USD: '$', AED: 'AED ' }
 
+/** What a currency is called in a sentence. Written out once, because a
+ * screen that names it itself names it wrongly the day a third one appears —
+ * both snapshot pages described dirhams as rupees. */
+const CURRENCY_NAME: Record<DisplayCurrency, string> = {
+  INR: 'Indian rupees',
+  USD: 'US dollars',
+  AED: 'UAE dirhams',
+}
+
+export function currencyName(currency: DisplayCurrency): string {
+  return CURRENCY_NAME[currency]
+}
+
 /** Compact Indian numbering: ₹85.4 L, ₹1.25 Cr. Falls back to full for small values. */
 export function formatCurrencyCompact(value: number, currency: DisplayCurrency = 'INR'): string {
   if (!Number.isFinite(value)) return '—'

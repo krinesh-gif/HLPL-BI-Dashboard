@@ -4,7 +4,7 @@ import { useFilterStore } from '@/store/filterStore'
 import { ChannelMark } from '@/components/ui/ChannelMark'
 import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { BUSINESS_CHANNEL_MAP, type BusinessChannelId } from '@/config/channels'
-import { formatCurrencyCompact, formatCurrencyFull, formatNumber, formatPercent, monthLabel } from '@/lib/format'
+import { formatCurrencyCompact, formatCurrencyFull, formatNumber, formatPercent, monthLabel, currencyName } from '@/lib/format'
 import { useChannelData } from './useChannelData'
 
 /**
@@ -161,7 +161,7 @@ export function ChannelSnapshotPage() {
             read without any of the dashboard around it, so the report behind
             it travels with it. */}
         <footer className="mt-5 border-t border-[var(--line)] pt-3 text-[11px] leading-snug text-[var(--ink-3)]">
-          Built from {d.sourceLabel}. Figures are {d.displayCurrency === 'USD' ? 'in US dollars' : 'in rupees'} and
+          Built from {d.sourceLabel}. Figures are in {currencyName(d.displayCurrency)} and
           cover orders placed in {monthLabel(month)}.
         </footer>
       </div>

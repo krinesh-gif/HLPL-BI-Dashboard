@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useDataStore } from '@/store/dataStore'
-import { fxRateForMonth, fxRateValue, lineValuesToUsd } from '@/data/fxRates'
+import { fxRateForMonth, lineValuesFromInr } from '@/data/fxRates'
 import { useFilterStore } from '@/store/filterStore'
 import {
   BUSINESS_CHANNEL_IDS, displayCurrencyFor, isForeignChannel, nativeCurrencyOf,
@@ -113,7 +113,11 @@ export function usePnlReport(start: PnlReportStart = {}) {
       // Master P&L. Reading Amazon USA in dollars divides them back out at the
       // same month's rate, so the round trip is exact and the margins — being
       // ratios — do not move at all.
-      return displayCurrency === 'USD' ? lineValuesToUsd(lines, fxRateValue(m, fxRates)) : lines
+      // Out of rupees at whichever currency is being read, not at the dollar
+      // alone: this checked for 'USD' exactly, so Amazon UAE fell through it
+      // and printed rupees under a dirham symbol.
+      if (displayCurrency === 'INR') return lines
+      return lineValuesFromInr(lines, fxRateForMonth(m, fxRates, displayCurrency === 'AED' ? 'AEDINR' : 'USDINR').rate)
     }
 
     const table = buildMultiMonthPnl(months, linesFor, computeSubtotals)

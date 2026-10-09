@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
-import { fxRateForMonth, lineValuesToUsd, monthsMissingFxRate, pairOf, type FxRate } from './fxRates'
+import { fxRateForMonth, lineValuesFromInr, lineValuesToUsd, monthsMissingFxRate, pairOf, type FxRate } from './fxRates'
+import { currencyName } from '@/lib/format'
 
 /**
  * The rate scales an entire channel, so where it comes from has to be visible.
@@ -126,5 +127,45 @@ describe('a second currency', () => {
     // 3.6725 dirhams to the dollar. Not a market quote — a standing figure the
     // screen says out loud it is using until a real one is entered.
     expect(NATIVE_PNL_ASSUMPTIONS.aedToInrRate * 3.6725).toBeCloseTo(NATIVE_PNL_ASSUMPTIONS.usdToInrRate, 6)
+  })
+})
+
+describe('restating a statement out of rupees', () => {
+  // The bug this exists for: the P&L converted only when the display currency
+  // was exactly 'USD', so Amazon UAE fell through and printed rupees under a
+  // dirham symbol. Both views of the toggle showed AED 194,451.41 and
+  // ₹1,94,451 — the same figure twice.
+  const LINES = { grossSales: 194_451.41, netSales: 174_515, grossMarginPct: 58.3 }
+
+  it('actually divides, for every currency and not just the dollar', () => {
+    const aed = lineValuesFromInr(LINES, 25.922)
+    expect(aed.grossSales).toBeCloseTo(7501.4, 1)
+    expect(aed.grossSales).not.toBeCloseTo(LINES.grossSales, 0)
+
+    const usd = lineValuesFromInr(LINES, 88)
+    expect(usd.grossSales).toBeCloseTo(2209.68, 2)
+  })
+
+  it('leaves a margin alone, because a ratio is the same in any currency', () => {
+    // Dividing it too would turn 58.3% into 2.2% the moment the reader
+    // switched currency, which is how a toggle becomes a wrong-decision
+    // machine.
+    expect(lineValuesFromInr(LINES, 25.922).grossMarginPct).toBe(58.3)
+    expect(lineValuesFromInr(LINES, 88).grossMarginPct).toBe(58.3)
+  })
+
+  it('refuses a rate that would destroy the figures', () => {
+    // A zero or negative rate divides to infinity or flips every sign. The
+    // rupees are wrong in the wrong currency, which is better than that.
+    expect(lineValuesFromInr(LINES, 0)).toEqual(LINES)
+    expect(lineValuesFromInr(LINES, -5)).toEqual(LINES)
+  })
+
+  it('names each currency the same way everywhere', () => {
+    // Both snapshot pages described dirhams as rupees, each having decided
+    // for itself that anything not a dollar was a rupee.
+    expect(currencyName('INR')).toBe('Indian rupees')
+    expect(currencyName('USD')).toBe('US dollars')
+    expect(currencyName('AED')).toBe('UAE dirhams')
   })
 })

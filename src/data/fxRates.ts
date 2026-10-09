@@ -83,14 +83,19 @@ export function monthsMissingFxRate(months: string[], rates: FxRate[], pair: FxP
 }
 
 /**
- * Restates a set of P&L line values from rupees into dollars.
+ * Restates a set of P&L line values out of rupees, at that currency's rate.
  *
  * Percentage lines are left alone: a margin is a ratio, so it is the same
  * number in either currency. Dividing them too would produce a "69.4%" that
  * silently became "0.8%" the moment the reader switched currency, which is
  * how a currency toggle turns into a wrong-decision machine.
+ *
+ * It was `lineValuesToUsd`, and the one caller asked for it only when the
+ * display currency was exactly 'USD'. Amazon UAE fell through that check and
+ * its P&L printed rupees under a dirham symbol — the same figure in both
+ * views of the toggle, which is how it was spotted.
  */
-export function lineValuesToUsd<K extends string>(
+export function lineValuesFromInr<K extends string>(
   values: Partial<Record<K, number>>,
   rate: number,
 ): Partial<Record<K, number>> {
@@ -141,3 +146,6 @@ export function fxRatesForMonth(month: string, rates: FxRate[]): FxRatesInr {
 export function inrPerUnit(currency: 'INR' | 'USD' | 'AED', fx: FxRatesInr): number {
   return currency === 'INR' ? 1 : fx[currency]
 }
+
+/** `lineValuesFromInr` under its old name, for the tests that still use it. */
+export const lineValuesToUsd = lineValuesFromInr

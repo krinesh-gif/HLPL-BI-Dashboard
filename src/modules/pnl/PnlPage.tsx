@@ -3,7 +3,7 @@ import { PageShell } from '@/components/layout/PageShell'
 import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { ComparisonBarChart } from '@/components/charts/ComparisonBarChart'
 import { BUSINESS_CHANNELS, channelLabel } from '@/config/channels'
-import { formatCurrencyCompact, formatCurrencyFull, formatPercent, monthLabel } from '@/lib/format'
+import { formatCurrencyCompact, formatCurrencyFull, formatPercent, monthLabel, currencyName } from '@/lib/format'
 import { exportRowsToCsv } from '@/lib/exportCsv'
 import { QUICK_PERIODS, type QuickPeriod } from '@/engine/multiMonthPnl'
 import { NativePnlTable } from '@/components/pnl/NativePnlTable'
@@ -271,7 +271,7 @@ export function PnlPage() {
       {r.isForeign && (
         <p className="rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--ink-2)]">
           {r.currencyView === 'native' ? (
-            <><strong>Shown in {r.nativeCurrency === 'USD' ? 'US dollars' : 'dirhams'}</strong>, the currency the
+            <><strong>Shown in {currencyName(r.nativeCurrency)}</strong>, the currency the
             marketplace actually charges and pays in — so no exchange rate stands between the report and this
             statement.</>
           ) : (
