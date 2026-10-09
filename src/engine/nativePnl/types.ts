@@ -6,7 +6,13 @@ export interface NativeLineDef {
   key: string
   label: string
   section: string
-  kind: 'input' | 'subtotal' | 'percent'
+  /**
+   * `'count'` is a tally rather than money — units sold, rows charged. It
+   * exists because a statement that prints "AED 241.00" against 241 units
+   * reads as money, and on a foreign channel it would also be converted at
+   * the month's rate.
+   */
+  kind: 'input' | 'subtotal' | 'percent' | 'count'
   note?: string
   /** Rows sharing a group collapse together behind the group's head row. */
   group?: string

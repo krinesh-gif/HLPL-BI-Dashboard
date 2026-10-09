@@ -13,8 +13,10 @@ import {
   sourcesOfChannel,
   type BusinessChannelId,
   type SalesSourceId,
+  isForeignChannel,
+  nativeCurrencyOf,
 } from '@/config/channels'
-import { formatCurrencyCompact, formatCurrencyFull, formatNumber, formatPercent } from '@/lib/format'
+import { formatCurrencyCompact, formatCurrencyFull, formatNumber, formatPercent, type DisplayCurrency } from '@/lib/format'
 import { useChannelData } from './useChannelData'
 import { TopProducts } from './TopProducts'
 import { ChannelMark } from '@/components/ui/ChannelMark'
@@ -34,8 +36,8 @@ export function ChannelDashboardPage() {
   const { channelId } = useParams<{ channelId: string }>()
   const channel = channelId as BusinessChannelId
   const channelDef = BUSINESS_CHANNEL_MAP[channel]
-  const amazonUsaCurrency = useFilterStore((s) => s.amazonUsaCurrency)
-  const setAmazonUsaCurrency = useFilterStore((s) => s.setAmazonUsaCurrency)
+  const channelCurrencyView = useFilterStore((s) => s.channelCurrencyView)
+  const setChannelCurrencyView = useFilterStore((s) => s.setChannelCurrencyView)
 
   // Amazon India is fed by two reports. Management sees the consolidated
   // channel by default and can narrow to either source when they want to know
@@ -90,11 +92,17 @@ export function ChannelDashboardPage() {
       // a switch with one position.
       headerActions={
         <>
-          {channel === 'amazon_us' && (
+          {/* Offered on whichever channel is not paid in rupees, named from
+              the registry — so a channel added later gets it without this
+              file learning anything about it. */}
+          {isForeignChannel(channel) && (
             <SegmentedControl
-              value={amazonUsaCurrency}
-              options={[{ value: 'USD', label: 'USD' }, { value: 'INR', label: 'INR' }]}
-              onChange={setAmazonUsaCurrency}
+              value={channelCurrencyView}
+              options={[
+                { value: 'native', label: nativeCurrencyOf(channel) },
+                { value: 'INR', label: 'INR' },
+              ]}
+              onChange={setChannelCurrencyView}
               size="sm"
             />
           )}
@@ -289,7 +297,7 @@ export function ChannelDashboardPage() {
 }
 
 /** The two trend lines, each on its own scale and its own colour. */
-const trendSeries = (currency: 'INR' | 'USD'): SeriesDef[] => [
+const trendSeries = (currency: DisplayCurrency): SeriesDef[] => [
   { key: 'netSales', label: 'Net Sales', axis: 'left', color: 'var(--series-1)', valueFormatter: (v: number) => formatCurrencyCompact(v, currency) },
   { key: 'units', label: 'Units', axis: 'right', color: 'var(--series-2)', valueFormatter: (v: number) => formatNumber(v) },
 ]

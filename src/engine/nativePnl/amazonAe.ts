@@ -45,10 +45,10 @@ export const AMAZON_AE_LINE_DEFS: NativeLineDef[] = [
   { key: 'ebitda', label: 'EBITDA', section: 'PROFIT', kind: 'subtotal' },
   { key: 'ebitdaPct', label: 'EBITDA %', section: 'PROFIT', kind: 'percent' },
 
-  { key: 'unitsSold', label: 'Units sold', section: 'UNITS', kind: 'input' },
-  { key: 'unitsReturned', label: 'Units returned', section: 'UNITS', kind: 'input', hideWhenZero: true },
-  { key: 'netUnits', label: 'Net units sold', section: 'UNITS', kind: 'subtotal' },
-  { key: 'nonSellingRows', label: 'SKUs charged without selling', section: 'UNITS', kind: 'input', hideWhenZero: true,
+  { key: 'unitsSold', label: 'Units sold', section: 'UNITS', kind: 'count' },
+  { key: 'unitsReturned', label: 'Units returned', section: 'UNITS', kind: 'count', hideWhenZero: true },
+  { key: 'netUnits', label: 'Net units sold', section: 'UNITS', kind: 'count' },
+  { key: 'nonSellingRows', label: 'SKUs charged without selling', section: 'UNITS', kind: 'count', hideWhenZero: true,
     note: 'Stock that sat in the warehouse and was charged for it — storage accrues whether or not anything sells. Their charges are in the month; they have no sales line of their own.' },
 ]
 
@@ -131,4 +131,26 @@ export function amazonAeToCanonicalBuckets(
     performanceMarketing: 0,
     otherMarketing: 0,
   }
+}
+
+/** The money lines, for restating the statement in rupees. Listed rather than
+ * inferred: a percentage is a ratio and does not move, and a unit count is
+ * not money — converting 241 units at the month's rate would report 5,801. */
+const MONEY_LINES = [
+  'grossSales', 'returns', 'netSales', 'amazonFees', 'netProceeds',
+  'cogs', 'grossProfit', 'overheads', 'ebitda',
+]
+
+/**
+ * The same statement read in rupees.
+ *
+ * Converted from the dirham figures rather than recomputed, so the two
+ * readings of a month are the same statement at one rate and cannot drift
+ * apart. The margins are unchanged, because a ratio is the same number in
+ * any currency.
+ */
+export function amazonAeValuesInInr(values: NativeLineValues, rateInrPerAed: number): NativeLineValues {
+  const out: NativeLineValues = { ...values }
+  for (const key of MONEY_LINES) out[key] = (values[key] ?? 0) * rateInrPerAed
+  return out
 }

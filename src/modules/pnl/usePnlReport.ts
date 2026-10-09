@@ -2,7 +2,10 @@ import { useMemo, useState } from 'react'
 import { useDataStore } from '@/store/dataStore'
 import { fxRateForMonth, fxRateValue, lineValuesToUsd } from '@/data/fxRates'
 import { useFilterStore } from '@/store/filterStore'
-import { BUSINESS_CHANNEL_IDS, type BusinessChannelId } from '@/config/channels'
+import {
+  BUSINESS_CHANNEL_IDS, displayCurrencyFor, isForeignChannel, nativeCurrencyOf,
+  type BusinessChannelId, type ChannelCurrency, type ChannelCurrencyView,
+} from '@/config/channels'
 import { toMonthKey } from '@/lib/format'
 import { buildAllChannelPnlViews, buildChannelPnlView } from '@/engine/channelPnlRouter'
 import { buildMasterPnl, computeSubtotals } from '@/engine/pnl'
@@ -45,7 +48,7 @@ export interface PnlReportStart {
   view?: PnlView
   period?: PnlPeriod
   meeshoBasis?: PnlBasis
-  amazonUsaCurrency?: 'USD' | 'INR'
+  currencyView?: ChannelCurrencyView
 }
 
 export function usePnlReport(start: PnlReportStart = {}) {
@@ -61,10 +64,11 @@ export function usePnlReport(start: PnlReportStart = {}) {
   // Meesho carries both an order-date and a payment-date statement. Order
   // basis is the default: it is what a month's trading is judged on.
   const [meeshoBasis, setMeeshoBasis] = useState<PnlBasis>(start.meeshoBasis ?? 'order')
-  // Amazon USA earns and is charged in dollars, so its own statement reads
-  // naturally in dollars. Rupees is the second view, for reading it beside the
-  // other channels. The Master P&L is always rupees — one report, one currency.
-  const [amazonUsaCurrency, setAmazonUsaCurrency] = useState<'USD' | 'INR'>(start.amazonUsaCurrency ?? 'USD')
+  // A channel that earns and is charged in dollars or dirhams reads naturally
+  // in that currency, so its own statement opens there. Rupees is the second
+  // view, for reading it beside the other channels. The Master P&L is always
+  // rupees — one report, one currency.
+  const [currencyView, setCurrencyView] = useState<ChannelCurrencyView>(start.currencyView ?? 'native')
   const [period, setPeriod] = useState<PnlPeriod>(start.period ?? { mode: 'quick', quick: '6m', from: month, to: month })
 
   const monthsWithData = useMemo(() => {
@@ -93,12 +97,13 @@ export function usePnlReport(start: PnlReportStart = {}) {
     // Amazon USA is the one channel that can be read in either currency. The
     // Master P&L is always rupees — it sums every channel, and a report in two
     // currencies at once is not a report.
-    const displayCurrency: 'INR' | 'USD' =
-      view === 'amazon_us' && amazonUsaCurrency === 'USD' ? 'USD' : 'INR'
+    // Driven by the registry, so a foreign channel added later is offered the
+    // same choice without this file knowing it exists.
+    const displayCurrency: ChannelCurrency = view === 'master' ? 'INR' : displayCurrencyFor(view, currencyView)
 
     /** One month's P&L lines for the selected view, in `displayCurrency`. */
     const linesFor = (m: string): PnlLineValues => {
-      const inputs = { ...forMonth(m), meeshoBasis, amazonUsaCurrency }
+      const inputs = { ...forMonth(m), meeshoBasis, currencyView }
       if (view === 'master') {
         const views = buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, m, inputs)
         return buildMasterPnl(views.map((v) => v.canonical), m).lines
@@ -127,7 +132,7 @@ export function usePnlReport(start: PnlReportStart = {}) {
     const latestMonth = traded[traded.length - 1] ?? months[months.length - 1] ?? month
     const channelBreakdown =
       view === 'master'
-        ? buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, latestMonth, { ...forMonth(latestMonth), meeshoBasis, amazonUsaCurrency })
+        ? buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, latestMonth, { ...forMonth(latestMonth), meeshoBasis, currencyView })
             .map((v) => ({ channel: v.channel, netSales: v.canonical.lines.netSales ?? 0 }))
             .filter((c) => c.netSales !== 0)
             .sort((a, b) => b.netSales - a.netSales)
@@ -156,6 +161,7 @@ export function usePnlReport(start: PnlReportStart = {}) {
     let native: ReturnType<typeof buildChannelPnlView>['native']
     let nativeNotes: string[] = []
     let nativeMonth = latestMonth
+    const nativeCurrency: ChannelCurrency = view === 'master' ? 'INR' : nativeCurrencyOf(view)
     // Why there is no statement, when there is none. The note used to ride
     // along with the statement, so the one case it was written for — a channel
     // with no settlement events stored at all — was the one case it never
@@ -163,23 +169,29 @@ export function usePnlReport(start: PnlReportStart = {}) {
     let missingStatementNote: string | null = null
     if (view !== 'master') {
       for (let i = months.length - 1; i >= 0; i--) {
-        const built = buildChannelPnlView(view, months[i], { ...forMonth(months[i]), meeshoBasis, amazonUsaCurrency })
+        const built = buildChannelPnlView(view, months[i], { ...forMonth(months[i]), meeshoBasis, currencyView })
         if (built.native) { native = built.native; nativeNotes = built.notes; nativeMonth = months[i]; break }
       }
       if (!native) {
-        const built = buildChannelPnlView(view, latestMonth, { ...forMonth(latestMonth), meeshoBasis, amazonUsaCurrency })
+        const built = buildChannelPnlView(view, latestMonth, { ...forMonth(latestMonth), meeshoBasis, currencyView })
         missingStatementNote = built.notes[0] ?? null
       }
     }
+
+    const nativeRate = fxRateForMonth(nativeMonth, fxRates, nativeCurrency === 'AED' ? 'AEDINR' : 'USDINR')
 
     return {
       view, setView,
       missingStatementNote,
       meeshoBasis, setMeeshoBasis,
-      amazonUsaCurrency, setAmazonUsaCurrency,
+      currencyView, setCurrencyView,
       displayCurrency,
-      fxRateLabel: `₹${fxRateForMonth(nativeMonth, fxRates).rate.toFixed(2)} per $1`,
-      fxRateEntered: fxRateForMonth(nativeMonth, fxRates).entered,
+      // Named for whichever currency this view is settled in, so Amazon UAE
+      // does not report its dirham rate as dollars.
+      nativeCurrency,
+      isForeign: view !== 'master' && isForeignChannel(view),
+      fxRateLabel: `₹${nativeRate.rate.toFixed(2)} per 1 ${nativeCurrency}`,
+      fxRateEntered: nativeRate.entered,
       native, nativeMonth, nativeNotes,
       period, setPeriod,
       months,
@@ -190,5 +202,5 @@ export function usePnlReport(start: PnlReportStart = {}) {
       trend,
       latestMonth,
     }
-  }, [view, meeshoBasis, amazonUsaCurrency, period, month, currentMonth, monthsWithData, forMonth, fxRates])
+  }, [view, meeshoBasis, currencyView, period, month, currentMonth, monthsWithData, forMonth, fxRates])
 }

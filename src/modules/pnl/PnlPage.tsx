@@ -82,21 +82,23 @@ export function PnlPage() {
           </select>
         </label>
 
-        {r.view === 'amazon_us' && (
+        {/* Offered on any channel not paid in rupees, labelled from the
+            registry — Amazon USA reads $ USD, Amazon UAE AED. */}
+        {r.isForeign && (
           <div className="flex flex-col gap-1">
             <span className="text-xs font-medium text-[var(--ink-3)]">Currency</span>
             <div className="flex rounded-full border border-[var(--line)] bg-[var(--surface-2)] p-0.5">
               {([
-                { key: 'USD', label: '$ USD' },
+                { key: 'native', label: r.nativeCurrency === 'USD' ? '$ USD' : r.nativeCurrency },
                 { key: 'INR', label: '₹ INR' },
               ] as const).map((c) => (
                 <button
                   key={c.key}
                   type="button"
-                  onClick={() => r.setAmazonUsaCurrency(c.key)}
-                  aria-pressed={r.amazonUsaCurrency === c.key}
+                  onClick={() => r.setCurrencyView(c.key)}
+                  aria-pressed={r.currencyView === c.key}
                   className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                    r.amazonUsaCurrency === c.key
+                    r.currencyView === c.key
                       ? 'bg-[var(--accent)] text-[var(--accent-ink)]'
                       : 'text-[var(--ink-3)] hover:text-[var(--ink)]'
                   }`}
@@ -266,18 +268,19 @@ export function PnlPage() {
         margins is not the margin of the period.
       </p>
 
-      {r.view === 'amazon_us' && (
+      {r.isForeign && (
         <p className="rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--ink-2)]">
-          {r.amazonUsaCurrency === 'USD' ? (
-            <><strong>Shown in US dollars</strong>, the currency Amazon actually charges and pays in — so no exchange rate
-            stands between the report and this statement.</>
+          {r.currencyView === 'native' ? (
+            <><strong>Shown in {r.nativeCurrency === 'USD' ? 'US dollars' : 'dirhams'}</strong>, the currency the
+            marketplace actually charges and pays in — so no exchange rate stands between the report and this
+            statement.</>
           ) : (
             <><strong>Shown in rupees</strong>, converted at {r.fxRateLabel}. Margin percentages are ratios and read the
             same in either currency.</>
           )}{' '}
           {r.fxRateEntered
             ? 'That is the rate entered for this month.'
-            : 'No rate has been entered for this month, so the default assumption is being used — set it on Settings ▸ Exchange Rates.'}
+            : 'No rate has been entered for this month, so the default assumption is being used — set it on Settings ▸ Monthly Inputs.'}
           {' '}The Master P&L is always in rupees, whichever view is selected here.
         </p>
       )}

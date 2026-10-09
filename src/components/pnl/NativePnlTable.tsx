@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react'
 import clsx from 'clsx'
 import type { NativeLineDef, NativeLineValues } from '@/engine/nativePnl/types'
-import { formatCurrencyFull, formatPercent } from '@/lib/format'
+import { formatCurrencyFull, formatNumber, formatPercent } from '@/lib/format'
 import { InfoHint } from '@/components/ui/InfoHint'
 import { amountTone } from './amountTone'
 
@@ -171,6 +171,8 @@ export function NativePnlTable({
                       />
                     ) : def.kind === 'percent' ? (
                       formatPercent(value)
+                    ) : def.kind === 'count' ? (
+                      formatNumber(value)
                     ) : (
                       formatCurrencyFull(value, currency)
                     )}

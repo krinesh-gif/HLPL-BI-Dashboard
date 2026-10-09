@@ -15,7 +15,7 @@ import type {
   PnlLineValues,
   SkuMaster,
 } from '@/data/models'
-import { channelLabel, channelOfSource } from '@/config/channels'
+import { channelLabel, channelOfSource, type ChannelCurrencyView } from '@/config/channels'
 import { MEESHO_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { DEFAULT_FX_INR, inrPerUnit, type FxRatesInr } from '@/data/fxRates'
 import { formatCurrencyFull, toMonthKey } from '@/lib/format'
@@ -31,7 +31,7 @@ import {
 import { applyFlipkartOtherCosts, computeFlipkartPnl, flipkartToCanonicalBuckets, FLIPKART_LINE_DEFS } from './nativePnl/flipkart'
 import { applyMeeshoOtherCosts, computeMeeshoPnl, meeshoToCanonicalBuckets, MEESHO_LINE_DEFS } from './nativePnl/meesho'
 import { blinkitToCanonicalBuckets, computeBlinkitPnl, BLINKIT_LINE_DEFS } from './nativePnl/blinkit'
-import { amazonAeToCanonicalBuckets, computeAmazonAePnl, AMAZON_AE_LINE_DEFS } from './nativePnl/amazonAe'
+import { amazonAeToCanonicalBuckets, amazonAeValuesInInr, computeAmazonAePnl, AMAZON_AE_LINE_DEFS } from './nativePnl/amazonAe'
 import { applyMyntraOtherCosts, computeMyntraPnl, myntraToCanonicalBuckets, MYNTRA_LINE_DEFS } from './nativePnl/myntra'
 import {
   applyNykaaOtherCosts, computeNykaaPnl, nykaaDiscountPerSalesFile, nykaaDiscountRecovered,
@@ -287,9 +287,10 @@ export interface ChannelPnlViewInputs {
   /** What Nykaa confirmed it is charging back as discount for this month.
    * Undefined means nothing has been confirmed and the sales file stands. */
   confirmedNykaaDiscount?: number
-  /** Which currency to render Amazon USA's own statement in. The canonical
-   * roll-up is always rupees regardless — the Master P&L has one currency. */
-  amazonUsaCurrency?: 'USD' | 'INR'
+  /** Whether a channel's own statement is rendered in its own currency or in
+   * rupees. The canonical roll-up is always rupees regardless — the Master
+   * P&L has one currency. */
+  currencyView?: ChannelCurrencyView
 }
 
 /**
@@ -348,7 +349,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       // already carried and this one did not.
       const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
       const usd = applyAmazonUsaOtherCosts(computeAmazonUsaPnl(facts), otherCosts, fxRate, facts.netSalesUsd)
-      const showInr = inputs.amazonUsaCurrency === 'INR'
+      const showInr = inputs.currencyView === 'INR'
       const canonicalLines = computeSubtotals(withAllocatedOpex(amazonUsaToCanonicalBuckets(facts, fxRate), inputs, channel, month))
       // A month imported before the fee columns were kept one-for-one has no
       // column-level figures to show. Saying so is the only honest option:
@@ -669,11 +670,15 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
           channel, month,
           lines: computeSubtotals(withAllocatedOpex(amazonAeToCanonicalBuckets(facts, rate, cogsInr), inputs, channel, month)),
         },
-        native: {
-          lineDefs: AMAZON_AE_LINE_DEFS,
-          values: computeAmazonAePnl(facts, rate !== 0 ? cogsInr / rate : 0, rate !== 0 ? otherCostsInr / rate : 0),
-          currency: 'AED',
-        },
+        native: (() => {
+          const aed = computeAmazonAePnl(facts, rate !== 0 ? cogsInr / rate : 0, rate !== 0 ? otherCostsInr / rate : 0)
+          const showInr = inputs.currencyView === 'INR'
+          return {
+            lineDefs: AMAZON_AE_LINE_DEFS,
+            values: showInr ? amazonAeValuesInInr(aed, rate) : aed,
+            currency: showInr ? ('INR' as const) : ('AED' as const),
+          }
+        })(),
         notes,
       }
     }

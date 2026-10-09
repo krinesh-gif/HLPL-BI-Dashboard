@@ -39,6 +39,8 @@ function facts(over: Partial<AmazonUsaPnlFacts> = {}): AmazonUsaPnlFacts {
 }
 
 function inputs(fxRate: number, currency: 'USD' | 'INR' = 'USD'): ChannelPnlViewInputs {
+  // The toggle is now "the marketplace's own currency, or rupees" rather than
+  // a currency code, so a channel added later needs no second copy of it.
   return {
     salesRecords: [] as CanonicalSalesRecord[],
     skuMaster,
@@ -46,7 +48,7 @@ function inputs(fxRate: number, currency: 'USD' | 'INR' = 'USD'): ChannelPnlView
     marketing: {},
     facts: { flipkartFacts: [], amazonUsaFacts: [facts()], meeshoFacts: [] },
     fxRate: { USD: fxRate, AED: fxRate / 3.6725 },
-    amazonUsaCurrency: currency,
+    currencyView: currency === 'INR' ? 'INR' : 'native',
   }
 }
 

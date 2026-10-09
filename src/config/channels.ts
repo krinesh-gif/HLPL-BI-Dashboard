@@ -165,3 +165,36 @@ export const DEFAULT_ALLOCATION_WEIGHTS: Record<BusinessChannelId, number> = {
   // started trading a standing slice of overhead would be inventing a cost.
   blinkit: 0,
 }
+
+// ---------------------------------------------------------------------------
+// Reading a channel that is not paid in rupees
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether a channel's own screens are read in its own currency or in rupees.
+ *
+ * One setting rather than one per channel. It used to be `amazonUsaCurrency`,
+ * holding 'USD' or 'INR', which worked while Amazon USA was the only channel
+ * not paid in rupees and could not answer the question for Amazon UAE without
+ * a second copy of itself. What the reader is actually choosing is a way of
+ * reading — the marketplace's own figures, or the ones that roll into the
+ * Master P&L — and which currency that means is the registry's business.
+ */
+export type ChannelCurrencyView = 'native' | 'INR'
+
+/** What a channel's own statement is denominated in. */
+export function nativeCurrencyOf(channel: BusinessChannelId): ChannelCurrency {
+  return BUSINESS_CHANNEL_MAP[channel]?.currency ?? 'INR'
+}
+
+/** True for a channel whose figures need converting before they can join the
+ * Master P&L — the only channels the currency toggle means anything for. */
+export function isForeignChannel(channel: BusinessChannelId): boolean {
+  return nativeCurrencyOf(channel) !== 'INR'
+}
+
+/** The currency a channel's own screens read in, given the toggle. Rupee
+ * channels ignore it: there is nothing to convert. */
+export function displayCurrencyFor(channel: BusinessChannelId, view: ChannelCurrencyView): ChannelCurrency {
+  return view === 'native' ? nativeCurrencyOf(channel) : 'INR'
+}

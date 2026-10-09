@@ -9,7 +9,7 @@ describe('what a snapshot link asks for', () => {
       view: 'meesho',
       period: { mode: 'custom', quick: '6m', from: '2026-03', to: '2026-08' },
       meeshoBasis: 'settlement',
-      amazonUsaCurrency: 'INR',
+      currencyView: 'INR',
     })
   })
 
@@ -31,11 +31,19 @@ describe('what a snapshot link asks for', () => {
     expect(start('from=2026-08&to=2026-03').period).toBeUndefined()
   })
 
-  it('defaults the basis to order date and Amazon USA to dollars', () => {
-    // Order basis is what a month's trading is judged on, and Amazon USA's own
+  it('defaults the basis to order date and a channel to its own currency', () => {
+    // Order basis is what a month's trading is judged on, and a channel's own
     // statement reads in the currency it is settled in.
-    expect(start('')).toMatchObject({ meeshoBasis: 'order', amazonUsaCurrency: 'USD' })
-    expect(start('basis=nonsense&cur=nonsense')).toMatchObject({ meeshoBasis: 'order', amazonUsaCurrency: 'USD' })
+    expect(start('')).toMatchObject({ meeshoBasis: 'order', currencyView: 'native' })
+    expect(start('basis=nonsense&cur=nonsense')).toMatchObject({ meeshoBasis: 'order', currencyView: 'native' })
+  })
+
+  it('still understands a link made before the toggle was generalised', () => {
+    // `cur` held a currency code, and links already sent out still carry one.
+    // cur=USD meant "Amazon USA's own currency" on every link ever made, and
+    // has to keep meaning it rather than silently flipping to rupees.
+    expect(start('view=amazon_us&cur=USD')).toMatchObject({ currencyView: 'native' })
+    expect(start('view=amazon_us&cur=INR')).toMatchObject({ currencyView: 'INR' })
   })
 
   it('accepts a single-month period', () => {

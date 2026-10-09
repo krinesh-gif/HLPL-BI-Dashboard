@@ -1,3 +1,4 @@
+import { displayCurrencyFor } from '@/config/channels'
 import { useMemo, useRef, useState } from 'react'
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { Card, CardHeader } from '@/components/ui/Surface'
@@ -27,7 +28,7 @@ import { formatCurrencyFull, formatPercent, monthLabel } from '@/lib/format'
  */
 export function AmazonUsaFees() {
   const { amazonUsaFacts, fxRates } = useDataStore()
-  const amazonUsaCurrency = useFilterStore((s) => s.amazonUsaCurrency)
+  const currency = displayCurrencyFor('amazon_us', useFilterStore((s) => s.channelCurrencyView))
 
   /**
    * Amazon states these fees in dollars. Read in rupees, each month is
@@ -36,8 +37,8 @@ export function AmazonUsaFees() {
    * flattening them to a single rate would restate a closed month.
    */
   const toDisplay = (amount: number, month: string): number =>
-    amazonUsaCurrency === 'USD' ? amount : amount * fxRateValue(month, fxRates)
-  const money = (v: number) => formatCurrencyFull(v, amazonUsaCurrency)
+    currency === 'USD' ? amount : amount * fxRateValue(month, fxRates)
+  const money = (v: number) => formatCurrencyFull(v, currency)
   const [params, setParams] = useSearchParams()
 
   const months = useMemo(

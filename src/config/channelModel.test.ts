@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BUSINESS_CHANNEL_IDS,
-  BUSINESS_CHANNELS,
-  channelOfSource,
-  hasMultipleSources,
-  SALES_SOURCES,
-  sourcesOfChannel,
+  BUSINESS_CHANNELS, BUSINESS_CHANNEL_IDS, SALES_SOURCES, channelOfSource, displayCurrencyFor, hasMultipleSources, isForeignChannel, nativeCurrencyOf, sourcesOfChannel,
 } from './channels'
 import type { CanonicalSalesRecord } from '@/data/models'
 import { netSalesBySource, netSalesForChannelMonth, netSalesForMonth } from '@/engine/netSales'
@@ -151,5 +146,34 @@ describe('a channel that is not paid in rupees', () => {
     expect(channelOfSource('amazon_us')).toBe('amazon_us')
     expect(channelOfSource('amazon_ae')).toBe('amazon_ae')
     expect(hasMultipleSources('amazon_ae')).toBe(false)
+  })
+})
+
+describe('reading a channel in its own currency', () => {
+  it('offers the toggle to exactly the channels it means something for', () => {
+    // A rupee channel has nothing to convert, so showing it a currency switch
+    // would be a control that does nothing.
+    expect(BUSINESS_CHANNELS.filter((c) => isForeignChannel(c.id)).map((c) => c.id)).toEqual(['amazon_us', 'amazon_ae'])
+    expect(isForeignChannel('flipkart')).toBe(false)
+    expect(isForeignChannel('blinkit')).toBe(false)
+  })
+
+  it('names each channel’s own currency, rather than assuming dollars', () => {
+    // The toggle used to be `amazonUsaCurrency: 'USD' | 'INR'`. Read for
+    // Amazon UAE it would have labelled dirhams as dollars and converted at
+    // 3.7 times the right rate.
+    expect(nativeCurrencyOf('amazon_us')).toBe('USD')
+    expect(nativeCurrencyOf('amazon_ae')).toBe('AED')
+    expect(nativeCurrencyOf('flipkart')).toBe('INR')
+  })
+
+  it('resolves the toggle to a currency per channel', () => {
+    expect(displayCurrencyFor('amazon_us', 'native')).toBe('USD')
+    expect(displayCurrencyFor('amazon_ae', 'native')).toBe('AED')
+    expect(displayCurrencyFor('amazon_us', 'INR')).toBe('INR')
+    expect(displayCurrencyFor('amazon_ae', 'INR')).toBe('INR')
+    // A rupee channel reads in rupees either way.
+    expect(displayCurrencyFor('flipkart', 'native')).toBe('INR')
+    expect(displayCurrencyFor('flipkart', 'INR')).toBe('INR')
   })
 })

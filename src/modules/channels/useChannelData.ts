@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
 import type { BusinessChannelId, SalesSourceId } from '@/config/channels'
-import { channelOfSource, hasMultipleSources } from '@/config/channels'
+import { channelOfSource, displayCurrencyFor, hasMultipleSources } from '@/config/channels'
 import { addMonths, monthLabel } from '@/lib/format'
 import { groupBySku, growthPct } from '@/engine/sales'
 import {
@@ -34,7 +34,7 @@ const TREND_MONTHS = 6
 export function useChannelData(channel: BusinessChannelId, source?: SalesSourceId) {
   const { salesRecords, skuMaster, mappings, comboComponents, flipkartFacts, amazonUsaFacts, amazonAeFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts, fxRates } =
     useDataStore()
-  const { month, monthChosenByUser, amazonUsaCurrency } = useFilterStore()
+  const { month, monthChosenByUser, channelCurrencyView } = useFilterStore()
   const defaultMonthTo = useFilterStore((s) => s.defaultMonthTo)
   const fallbackMonthTo = useFilterStore((s) => s.fallbackMonthTo)
 
@@ -93,13 +93,14 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
    * are the export's own and the round trip that a convert-and-divide-back
    * would make is avoided entirely.
    */
-  const displayCurrency: 'INR' | 'USD' = channel === 'amazon_us' && amazonUsaCurrency === 'USD' ? 'USD' : 'INR'
+  // Named by the registry, so a channel added later needs nothing here.
+  const displayCurrency = displayCurrencyFor(channel, channelCurrencyView)
 
   return useMemo(() => {
     const previousMonth = addMonths(month, -1)
     // Reading a channel in its own currency means no conversion at all, which
     // is a rate of 1 for every currency rather than for the dollar alone.
-    const rate: FxRatesInr = displayCurrency === 'USD' ? { USD: 1, AED: 1 } : fxRatesForMonth(month, fxRates)
+    const rate: FxRatesInr = displayCurrency !== 'INR' ? { USD: 1, AED: 1 } : fxRatesForMonth(month, fxRates)
     const channelFacts = { flipkartFacts, amazonUsaFacts, amazonAeFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts }
 
     const inScope = (r: { channel: SalesSourceId }) =>
@@ -112,7 +113,7 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
         records: salesRecords, channel, month: m, facts: channelFacts, source,
         // Each month at its own rate, so a closed month keeps the rate it was
         // closed on — the same rule the statements follow.
-        fxRate: displayCurrency === 'USD' ? { USD: 1, AED: 1 } : fxRatesForMonth(m, fxRates),
+        fxRate: displayCurrency !== 'INR' ? { USD: 1, AED: 1 } : fxRatesForMonth(m, fxRates),
       })
 
     const currentFacts = figureFor(month)

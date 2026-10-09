@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ChannelId } from '@/config/channels'
+import type { ChannelCurrencyView, ChannelId } from '@/config/channels'
 import { toMonthKey } from '@/lib/format'
 
 export interface GlobalFilters {
@@ -8,17 +8,18 @@ export interface GlobalFilters {
   category: string | 'all'
   sku: string | 'all'
   /**
-   * Which currency Amazon USA is read in.
+   * Whether a channel that is not paid in rupees is read in its own currency
+   * or in rupees.
    *
    * Shared rather than held by each screen, because it was held by each screen
    * and they disagreed: the channel dashboard converted its figures to rupees
    * while the fee breakdown underneath it stayed in dollars, so one page
    * showed the same month in two currencies with nothing saying which was
-   * which. It is the only channel this applies to — every other one is
+   * which. It applies to Amazon USA and Amazon UAE — every other channel is
    * denominated in rupees already, and the Master P&L is always rupees because
    * a report in two currencies at once is not a report.
    */
-  amazonUsaCurrency: 'USD' | 'INR'
+  channelCurrencyView: ChannelCurrencyView
 }
 
 interface FilterState extends GlobalFilters {
@@ -29,7 +30,7 @@ interface FilterState extends GlobalFilters {
   setChannel: (channel: ChannelId | 'all') => void
   setCategory: (category: string) => void
   setSku: (sku: string) => void
-  setAmazonUsaCurrency: (currency: 'USD' | 'INR') => void
+  setChannelCurrencyView: (view: ChannelCurrencyView) => void
   /** Points the dashboard at the most recent month that actually has data.
    * Without this the app opens on the current calendar month and every page
    * looks empty whenever the latest upload covers an earlier period. */
@@ -52,9 +53,10 @@ const DEFAULTS: GlobalFilters = {
   channel: 'all',
   category: 'all',
   sku: 'all',
-  // Dollars by default: it is what Amazon settles in and what its own reports
-  // state, so the page opens on the figures the source document shows.
-  amazonUsaCurrency: 'USD',
+  // The marketplace's own currency by default: it is what the channel settles
+  // in and what its own reports state, so the page opens on the figures the
+  // source document shows.
+  channelCurrencyView: 'native',
 }
 
 export const useFilterStore = create<FilterState>((set) => ({
@@ -64,7 +66,7 @@ export const useFilterStore = create<FilterState>((set) => ({
   setChannel: (channel) => set({ channel }),
   setCategory: (category) => set({ category }),
   setSku: (sku) => set({ sku }),
-  setAmazonUsaCurrency: (amazonUsaCurrency) => set({ amazonUsaCurrency }),
+  setChannelCurrencyView: (channelCurrencyView) => set({ channelCurrencyView }),
   defaultMonthTo: (month) =>
     set((state) => (state.monthChosenByUser || !month ? {} : { month })),
   fallbackMonthTo: (month) => set((state) => (month && month !== state.month ? { month } : {})),

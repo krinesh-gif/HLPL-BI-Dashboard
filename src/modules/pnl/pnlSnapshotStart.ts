@@ -15,7 +15,7 @@ const MONTH = /^\d{4}-\d{2}$/
  * channel that does not exist, and a malformed month is dropped so the period
  * falls back to the default rather than producing an empty statement.
  */
-export function pnlSnapshotStart(params: URLSearchParams): Required<Pick<PnlReportStart, 'view' | 'meeshoBasis' | 'amazonUsaCurrency'>> & { period?: PnlPeriod } {
+export function pnlSnapshotStart(params: URLSearchParams): Required<Pick<PnlReportStart, 'view' | 'meeshoBasis' | 'currencyView'>> & { period?: PnlPeriod } {
   const viewParam = params.get('view')
   const from = params.get('from')
   const to = params.get('to')
@@ -27,7 +27,10 @@ export function pnlSnapshotStart(params: URLSearchParams): Required<Pick<PnlRepo
         : undefined,
     // The screen calls it "Payment date"; the value behind it is 'settlement'.
     meeshoBasis: params.get('basis') === 'settlement' ? 'settlement' : 'order',
-    amazonUsaCurrency: params.get('cur') === 'INR' ? 'INR' : 'USD',
+    // `cur` used to hold a currency code, and links already sent out still
+    // carry one. Anything that is not INR means the marketplace's own
+    // currency, which is what cur=USD meant on every link ever made.
+    currencyView: params.get('cur') === 'INR' ? 'INR' : 'native',
   }
 }
 

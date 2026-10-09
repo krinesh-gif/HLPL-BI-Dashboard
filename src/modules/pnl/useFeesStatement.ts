@@ -42,7 +42,7 @@ export function useFeesStatement() {
   return useMemo(() => {
     const active = selectedMonth ?? month
     const viewsFor = (m: string) =>
-      buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, m, { ...forMonth(m), amazonUsaCurrency: 'INR' })
+      buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, m, { ...forMonth(m), currencyView: 'INR' })
 
     const statement = buildFeesStatement(viewsFor(active), active)
 
