@@ -13,7 +13,7 @@ import type { BusinessChannelId } from './channels'
  */
 export type AdsChannelId = Extract<
   BusinessChannelId,
-  'amazon_in' | 'amazon_us' | 'flipkart' | 'myntra' | 'nykaa'
+  'amazon_in' | 'amazon_us' | 'flipkart' | 'myntra' | 'nykaa' | 'blinkit'
 >
 
 export interface AdsChannelDef {
@@ -27,6 +27,15 @@ export interface AdsChannelDef {
   usesMonthlyInvoice: boolean
   /** What the manual figure is called on that platform's invoice. */
   invoiceLabel?: string
+  /**
+   * Metrics this platform's own report does not publish.
+   *
+   * Summing a column that is not in the file gives zero, and zero clicks
+   * beside 29 impressions reads as a campaign nobody touched rather than a
+   * number the platform never measured. Blinkit's report carries impressions,
+   * spend and attributed sales, and neither clicks nor orders.
+   */
+  reportOmits?: ('clicks' | 'adOrders')[]
 }
 
 export const ADS_CHANNELS: AdsChannelDef[] = [
@@ -35,6 +44,7 @@ export const ADS_CHANNELS: AdsChannelDef[] = [
   { id: 'flipkart', label: 'Flipkart', usesMonthlyInvoice: false },
   { id: 'myntra', label: 'Myntra', usesMonthlyInvoice: false },
   { id: 'nykaa', label: 'Nykaa', usesMonthlyInvoice: true, invoiceLabel: 'MI value' },
+  { id: 'blinkit', label: 'Blinkit', usesMonthlyInvoice: false, reportOmits: ['clicks', 'adOrders'] },
 ]
 
 export const ADS_CHANNEL_IDS: AdsChannelId[] = ADS_CHANNELS.map((c) => c.id)

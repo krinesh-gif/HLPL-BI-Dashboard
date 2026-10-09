@@ -1,5 +1,5 @@
 import type { AdsChannelId } from '@/config/adsChannels'
-import { adsChannelLabel, ADS_CHANNEL_IDS } from '@/config/adsChannels'
+import { adsChannelLabel, ADS_CHANNEL_IDS, ADS_CHANNEL_MAP } from '@/config/adsChannels'
 import { channelOfSource } from '@/config/channels'
 import type { AdsRecord, ManualAdSpend } from '@/data/models'
 import { toMonthKey } from '@/lib/format'
@@ -62,13 +62,17 @@ export function adsSpendFor(
 
   if (reported.length > 0) {
     const sum = (pick: (r: AdsRecord) => number) => reported.reduce((s, r) => s + pick(r), 0)
+    // A metric the platform does not publish is null, not zero. Blinkit's
+    // report carries no clicks column, and "0 clicks" beside 29 impressions
+    // reads as a campaign nobody touched rather than one nobody counted.
+    const omitted = new Set(ADS_CHANNEL_MAP[channel]?.reportOmits ?? [])
     return {
       channel, month,
       spend: sum((r) => r.spend),
       adSales: sum((r) => r.adSales),
-      adOrders: sum((r) => r.adOrders),
+      adOrders: omitted.has('adOrders') ? null : sum((r) => r.adOrders),
       impressions: sum((r) => r.impressions),
-      clicks: sum((r) => r.clicks),
+      clicks: omitted.has('clicks') ? null : sum((r) => r.clicks),
       source: 'report',
       sourceLabel: 'Ads report',
     }

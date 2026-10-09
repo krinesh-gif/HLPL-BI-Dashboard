@@ -63,6 +63,7 @@ export const NAVIGATION: NavSection[] = [
       { label: 'Flipkart', path: '/marketing/ads/flipkart' },
       { label: 'Myntra', path: '/marketing/ads/myntra' },
       { label: 'Nykaa', path: '/marketing/ads/nykaa' },
+      { label: 'Blinkit', path: '/marketing/ads/blinkit' },
     ],
   },
   {

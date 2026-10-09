@@ -11,6 +11,7 @@ import { detectMeeshoOrderSummaryReport, normalizeMeeshoOrderSummary } from '@/d
 import { detectMeeshoOrderPaymentsSheet, normalizeMeeshoOrderPayments } from '@/data/normalize/meeshoOrderPayments'
 import { detectSkuMapWorkbook, normalizeSkuMapWorkbook } from '@/data/normalize/skuMapWorkbook'
 import { detectAmazonAdsSponsoredProductsReport, normalizeAmazonAdsSponsoredProductsReport } from '@/data/normalize/amazonAdsSponsoredProducts'
+import { detectBlinkitAdsReport, normalizeBlinkitAdsReport } from '@/data/normalize/blinkitAdsReport'
 import { detectAmazonVendorCentralSalesReport, normalizeAmazonVendorCentralSales } from '@/data/normalize/amazonVendorCentralSales'
 import { detectMyntraPnlWorkbook, normalizeMyntraPnlWorkbook } from '@/data/normalize/myntraPnlWorkbook'
 import {
@@ -47,6 +48,7 @@ type ReportKind =
   | 'meesho_order_payments'
   | 'meesho_settlement_json'
   | 'amazon_ads_sponsored_products'
+  | 'blinkit_ads'
   | 'blinkit_payout_archive'
 
 const REPORT_LABELS: Record<ReportKind, string> = {
@@ -57,6 +59,7 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   flipkart_workbook: 'Flipkart — Full P&L Workbook (Overall Summary + Orders P&L)',
   amazon_usa_product_profitability: 'Amazon USA — Product Profitability Report',
   amazon_uae_product_profitability: 'Amazon UAE — Product Profitability Report',
+  blinkit_ads: 'Blinkit — Campaign Report',
   myntra_pnl_workbook: 'Myntra — P&L Report (PnL_Summary + SKU_Detail)',
   nykaa_sales: 'Nykaa — Monthly Sales Data (B2B, margin on MRP)',
   nykaa_companion: 'Nykaa — Cart Rule / Combo file',
@@ -76,6 +79,7 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   flipkart_workbook: 'flipkart',
   amazon_usa_product_profitability: 'amazon_us',
   amazon_uae_product_profitability: 'amazon_ae',
+  blinkit_ads: 'blinkit',
   myntra_pnl_workbook: 'myntra',
   nykaa_sales: 'nykaa',
   nykaa_companion: 'nykaa',
@@ -230,6 +234,10 @@ export function UploadReportsPage() {
     if (kind === 'meesho_order_summary') {
       const r = normalizeMeeshoOrderSummary(parsed.rows, skuMaster, importId)
       return buildPreview({ ...base, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
+    }
+    if (kind === 'blinkit_ads') {
+      const r = normalizeBlinkitAdsReport(parsed.rows, importId)
+      return buildPreview({ ...base, totalRows: r.totalRows, validRecords: [], adsRecords: r.adsRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
     }
     const r = normalizeAmazonAdsSponsoredProductsReport(parsed.rows, importId)
     return buildPreview({ ...base, totalRows: r.totalRows, validRecords: [], adsRecords: r.adsRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
@@ -470,6 +478,7 @@ export function UploadReportsPage() {
       else if (detectAmazonUsaProductProfitabilityReport(parsed.headers)) kind = 'amazon_usa_product_profitability'
       else if (detectMeeshoOrderSummaryReport(parsed.headers)) kind = 'meesho_order_summary'
       else if (detectAmazonAdsSponsoredProductsReport(parsed.headers)) kind = 'amazon_ads_sponsored_products'
+      else if (detectBlinkitAdsReport(parsed.headers)) kind = 'blinkit_ads'
 
       if (!kind) return fail('This file did not match any supported report format.')
 

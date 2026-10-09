@@ -20,7 +20,7 @@ describe('the ads channel list', () => {
   it('has its own channels, not the sales list', () => {
     // Meesho and Purplle sell without an ads report; listing them would put
     // permanently empty pages in the navigation.
-    expect(ADS_CHANNEL_IDS).toEqual(['amazon_in', 'amazon_us', 'flipkart', 'myntra', 'nykaa'])
+    expect(ADS_CHANNEL_IDS).toEqual(['amazon_in', 'amazon_us', 'flipkart', 'myntra', 'nykaa', 'blinkit'])
   })
 
   it('treats Amazon India as one ads channel', () => {
@@ -145,5 +145,34 @@ describe('reaching the P&L', () => {
       report({ channel: 'amazon_in_vendor', spend: 2000 }),
     ], '2026-08')
     expect(marketing.amazon_in?.ads).toBe(5000)
+  })
+})
+
+describe('a metric the platform does not publish', () => {
+  // Blinkit's campaign report carries impressions, spend and attributed
+  // sales. It has no clicks column and no orders column, and summing a
+  // column that is not in the file gives zero — "0 clicks" beside 29
+  // impressions reads as a campaign nobody touched.
+  const BLINKIT = [
+    { date: '2026-05-01', channel: 'blinkit', campaign: 'Rosemary-KT', impressions: 20, clicks: 0, spend: 8.1, adSales: 0, adOrders: 0, importId: 'i' },
+    { date: '2026-05-29', channel: 'blinkit', campaign: 'Tinted Lipbalm -KT', impressions: 9, clicks: 0, spend: 4, adSales: 0, adOrders: 0, importId: 'i' },
+  ] as AdsRecord[]
+
+  it('reports it as unmeasured, not as nothing', () => {
+    const f = adsSpendFor('blinkit', '2026-05', BLINKIT, [])
+    expect(f.spend).toBeCloseTo(12.1, 2)
+    expect(f.impressions).toBe(29)
+    expect(f.clicks).toBeNull()
+    expect(f.adOrders).toBeNull()
+    expect(f.source).toBe('report')
+  })
+
+  it('still counts the metrics a platform that does publish them reports', () => {
+    const amazon = [
+      { date: '2026-05-01', channel: 'amazon_us', campaign: 'C', impressions: 100, clicks: 7, spend: 50, adSales: 200, adOrders: 3, importId: 'i' },
+    ] as AdsRecord[]
+    const f = adsSpendFor('amazon_us', '2026-05', amazon, [])
+    expect(f.clicks).toBe(7)
+    expect(f.adOrders).toBe(3)
   })
 })

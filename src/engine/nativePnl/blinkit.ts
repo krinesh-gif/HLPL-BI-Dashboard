@@ -65,6 +65,8 @@ export const BLINKIT_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm3', label: 'CONTRIBUTION MARGIN 3 (after adjustments)', section: 'ADJUSTMENTS', kind: 'subtotal' },
   { key: 'cm3Pct', label: 'CM3 %', section: 'ADJUSTMENTS', kind: 'percent' },
 
+  { key: 'adsSpend', label: 'Less: Advertising', section: 'PROFIT', kind: 'input', fee: 'advertising', hideWhenZero: true,
+    note: 'From Blinkit’s own campaign report — the Estimated Budget Consumed column, summed over the month. Billed separately from the payout, so it is not in the ladder above.' },
   { key: 'cogs', label: 'Less: COGS', section: 'PROFIT', kind: 'input',
     note: 'From the cost sheet, for the units Blinkit sold' },
   { key: 'grossProfit', label: 'Gross Profit (after COGS)', section: 'PROFIT', kind: 'subtotal' },
@@ -99,7 +101,14 @@ const pct = (part: number, whole: number): number => (whole === 0 ? 0 : (part / 
  * they are passed in and default to nil, which reports a gross profit that is
  * plainly missing its cost rather than one that looks complete and is wrong.
  */
-export function computeBlinkitPnl(facts: BlinkitPnlFacts, cogs = 0, overheads = 0): NativeLineValues {
+/**
+ * `adsSpend` comes from the campaign report, not the payout archive: Blinkit
+ * bills advertising separately, at a fifteen-day lag, and the payout sheet's
+ * own "Ads Budget Spend" row has been nil on every archive so far. If that
+ * row ever carries an amount it is reported as a charge with no home rather
+ * than quietly added here, so the two sources cannot double-count.
+ */
+export function computeBlinkitPnl(facts: BlinkitPnlFacts, cogs = 0, overheads = 0, adsSpend = 0): NativeLineValues {
   const netRevenue = facts.customerPayable - facts.outputGstOnSales
   const blinkitDiscount = Math.max(0, facts.mrpValue - facts.customerPayable)
 
@@ -117,7 +126,9 @@ export function computeBlinkitPnl(facts: BlinkitPnlFacts, cogs = 0, overheads = 
   const cm3 = cm2 + netAdjustments
 
   const grossProfit = cm3 - cogs
-  const ebitda = grossProfit - overheads
+  // Advertising sits below gross profit and above the allocated overhead, the
+  // same place it sits in the canonical buckets, so the two agree on EBITDA.
+  const ebitda = grossProfit - adsSpend - overheads
 
   // What actually moves: every charge's GST and the tax withheld at source.
   // Recoverable or creditable, so none of it is in the ladder above, but all
@@ -135,6 +146,7 @@ export function computeBlinkitPnl(facts: BlinkitPnlFacts, cogs = 0, overheads = 
     - facts.otherDeductions
 
   return {
+    adsSpend: -adsSpend,
     mrpValue: facts.mrpValue,
     blinkitDiscount: -blinkitDiscount,
     customerPayable: facts.customerPayable,
@@ -189,7 +201,7 @@ export function computeBlinkitPnl(facts: BlinkitPnlFacts, cogs = 0, overheads = 
  * commission and not shipping, so it goes to fulfilment, which is where a cost
  * of holding stock belongs.
  */
-export function blinkitToCanonicalBuckets(facts: BlinkitPnlFacts, cogs = 0): PnlLineValues {
+export function blinkitToCanonicalBuckets(facts: BlinkitPnlFacts, cogs = 0, adsSpend = 0): PnlLineValues {
   return {
     grossSales: facts.customerPayable,
     discounts: 0,
@@ -206,7 +218,9 @@ export function blinkitToCanonicalBuckets(facts: BlinkitPnlFacts, cogs = 0): Pnl
     // refund is money back, so it reduces the cost rather than adding to it.
     otherMarketplaceCharges:
       facts.otherDeductions - facts.adsRefund - facts.lostDamagedCompensation - facts.otherCreditDebitNote,
-    ads: 0,
+    // Billed separately from the payout and read from the campaign report,
+    // the same figure the Ads screens show. One figure, one source.
+    ads: adsSpend,
     performanceMarketing: 0,
     otherMarketing: 0,
   }

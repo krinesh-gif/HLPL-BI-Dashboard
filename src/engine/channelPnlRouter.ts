@@ -602,6 +602,9 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       const recomputed = recomputedCogs(channel, month, inputs)
       const cogs = recomputed ? recomputed.total : 0
       const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+      // Advertising is billed separately from the payout, so it comes from
+      // where the Ads screens keep it. One figure, one source.
+      const adSpend = inputs.marketing[channel]?.ads ?? 0
       const notes: string[] = []
       if (!recomputed) {
         notes.push(
@@ -625,9 +628,9 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
         channel, month,
         canonical: {
           channel, month,
-          lines: computeSubtotals(withAllocatedOpex(blinkitToCanonicalBuckets(facts, cogs), inputs, channel, month)),
+          lines: computeSubtotals(withAllocatedOpex(blinkitToCanonicalBuckets(facts, cogs, adSpend), inputs, channel, month)),
         },
-        native: { lineDefs: BLINKIT_LINE_DEFS, values: computeBlinkitPnl(facts, cogs, otherCosts), currency: 'INR' },
+        native: { lineDefs: BLINKIT_LINE_DEFS, values: computeBlinkitPnl(facts, cogs, otherCosts, adSpend), currency: 'INR' },
         notes,
       }
     }
