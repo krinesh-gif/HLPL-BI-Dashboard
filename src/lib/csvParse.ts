@@ -23,8 +23,26 @@ export async function parseXlsxFile(file: File): Promise<ParsedFile> {
   const buffer = await file.arrayBuffer()
   const workbook = XLSX.read(buffer, { type: 'array' })
   const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-  const rows = XLSX.utils.sheet_to_json<Record<string, string>>(firstSheet, { defval: '' })
-  const headers = rows.length > 0 ? Object.keys(rows[0]) : []
+  // `sheet_to_json` hands back each cell in its own type, so a numeric column
+  // arrives as numbers however this is annotated. Every normalizer reads a
+  // cell as text — trimming it, stripping a currency symbol — and a number
+  // has no `.replace`, which is what "e.replace is not a function" was: a
+  // Blinkit ads report whose columns are almost all numeric.
+  const parsed = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, { defval: '' })
+  const rows: Record<string, string>[] = parsed.map((row) =>
+    Object.fromEntries(Object.entries(row).map(([k, v]) => [k, v === null || v === undefined ? '' : String(v)])),
+  )
+
+  // Keys as `sheet_to_json` made them where there are rows — it renames a
+  // repeated heading, and the header list has to match what a row is keyed
+  // by. Only where the sheet has none does the header row itself stand in,
+  // so a report with its columns and no data is still recognised as the
+  // report it is rather than as nothing at all.
+  const headerRow = XLSX.utils.sheet_to_json<unknown[]>(firstSheet, { header: 1, blankrows: false })[0] ?? []
+  const headers = rows.length > 0
+    ? Object.keys(rows[0])
+    : headerRow.map((h) => (h === null || h === undefined ? '' : String(h))).filter((h) => h !== '')
+
   return { headers, rows }
 }
 

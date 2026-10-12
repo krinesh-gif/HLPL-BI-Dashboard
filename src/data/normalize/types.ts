@@ -34,7 +34,16 @@ export function getField(row: Record<string, string>, candidates: string[]): str
   const normalizedCandidates = candidates.map(normalizeHeaderKey)
   for (const candidate of normalizedCandidates) {
     const match = keys.find((k) => normalizeHeaderKey(k) === candidate)
-    if (match !== undefined && row[match] !== '') return row[match]
+    if (match === undefined) continue
+    // Coerced rather than returned as-is. The row is typed as text and a
+    // spreadsheet reader does not have to honour that — a numeric cell
+    // arrives as a number, and every caller here goes on to trim it or strip
+    // a symbol from it. Making the type true once is cheaper than every
+    // normalizer defending itself.
+    const value = row[match]
+    if (value === null || value === undefined) continue
+    const text = typeof value === 'string' ? value : String(value)
+    if (text !== '') return text
   }
   return undefined
 }

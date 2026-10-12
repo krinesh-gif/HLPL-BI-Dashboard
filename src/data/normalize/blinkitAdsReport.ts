@@ -43,9 +43,9 @@ export function detectBlinkitAdsReport(headers: string[]): boolean {
   )
 }
 
-function num(raw: string | undefined): number {
-  if (!raw) return 0
-  const n = Number(raw.replace(/[₹,\s]/g, ''))
+function num(raw: unknown): number {
+  if (raw === null || raw === undefined || raw === '') return 0
+  const n = Number(String(raw).replace(/[₹,\s]/g, ''))
   return Number.isFinite(n) ? n : 0
 }
 
@@ -57,8 +57,8 @@ function num(raw: string | undefined): number {
  * be 5 January and a month's spend would land in the wrong one, so anything
  * that is not unambiguously a date is rejected rather than guessed at.
  */
-export function blinkitAdsDate(raw: string | undefined): string | null {
-  const text = (raw ?? '').trim()
+export function blinkitAdsDate(raw: unknown): string | null {
+  const text = raw === null || raw === undefined ? '' : String(raw).trim()
   const dmy = /^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(text)
   if (dmy) {
     const [, d, m, y] = dmy
