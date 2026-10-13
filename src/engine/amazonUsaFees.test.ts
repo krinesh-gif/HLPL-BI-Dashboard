@@ -1,21 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { amazonUsaFeeSeries, buildSeries } from './amazonUsaFees'
 import { AMAZON_USA_FEE_COLUMNS } from '@/data/amazonUsa/feeColumns'
-import type { AmazonUsaPnlFacts } from '@/data/models'
+import type { FeeFactsMonth } from './amazonUsaFees'
 
 const column = (id: string) => AMAZON_USA_FEE_COLUMNS.find((c) => c.id === id)!
 
-function month(m: string, totals: Record<string, number>, bySku?: Record<string, Record<string, number>>): AmazonUsaPnlFacts {
-  return {
-    month: m, schemaVersion: 2, grossSalesUsd: 0, netSalesUsd: 0,
-    feeTotalsUsd: totals, unmappedFeeTotalsUsd: {}, nestedFeeIds: [], feeBySkuUsd: bySku,
-    sheetCogsUsd: 0, sheetMiscCostUsd: 0, sheetNetProceedsUsd: 0,
-    referralFeeUsd: 0, fbaFulfilmentFeeUsd: 0, storageAgedDisposalUsd: 0, couponDealFeesUsd: 0,
-    refundAdminFeeUsd: 0, fbaReimbursementsUsd: 0, otherAmazonFeesUsd: 0, sponsoredProductsUsd: 0,
-    cogsUsd: 0, freightUsd: 0, sponsoredBrandsUsd: 0, sponsoredDisplayDspUsd: 0, offAmazonAdsUsd: 0,
-    exportDocsUsd: 0, usImportDutyUsd: 0,
-  }
-}
+const month = (
+  m: string,
+  totals: Record<string, number>,
+  bySku?: Record<string, Record<string, number>>,
+): FeeFactsMonth => ({ month: m, feeTotals: totals, feeBySku: bySku })
 
 const months = ['2026-05', '2026-06', '2026-07']
 const facts = [

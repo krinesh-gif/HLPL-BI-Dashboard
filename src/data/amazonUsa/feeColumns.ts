@@ -29,6 +29,15 @@ export interface AmazonUsaFeeColumn {
   id: string
   /** The exact header text, matched case-insensitively after trimming. */
   header: string
+  /**
+   * Other headings Amazon has used for this same fee.
+   *
+   * The Indian marketplace exports the identical report with British
+   * spellings — "Base fulfilment fee total" for "Base fulfillment fee total" —
+   * and a heading that does not match is a fee nobody recognises rather than
+   * the fee it plainly is.
+   */
+  aliases?: string[]
   /** Where the line sits on the statement. */
   group: 'marketplace' | 'advertising'
   /** Set when another column already includes this one. Such a line is shown
@@ -65,7 +74,7 @@ export interface AmazonUsaFeeColumn {
 export const AMAZON_USA_FEE_COLUMNS: AmazonUsaFeeColumn[] = [
   { id: 'agedInventorySurcharge', header: 'Aged inventory surcharge total', group: 'marketplace', bucket: 'otherMarketplaceCharges', fee: 'storage',
     lever: 'Charged on stock held past 180 days. Mark down, bundle or remove the aged units before the next assessment.' },
-  { id: 'baseFulfillmentFee', header: 'Base fulfillment fee total', group: 'marketplace', componentOf: 'fbaFulfillmentFees', bucket: 'fulfilment', fee: 'fulfilment' },
+  { id: 'baseFulfillmentFee', header: 'Base fulfillment fee total', aliases: ['Base fulfilment fee total'], group: 'marketplace', componentOf: 'fbaFulfillmentFees', bucket: 'fulfilment', fee: 'fulfilment' },
   { id: 'baseMonthlyStorageFee', header: 'Base monthly storage fee total', group: 'marketplace', bucket: 'otherMarketplaceCharges', fee: 'storage',
     lever: 'Charged per cubic foot held. Cut cover on slow movers and clear dead stock.' },
   { id: 'couponParticipationFee', header: 'Coupon participation fee total', group: 'marketplace', bucket: 'otherMarketplaceCharges', fee: 'otherFees',
@@ -79,8 +88,18 @@ export const AMAZON_USA_FEE_COLUMNS: AmazonUsaFeeColumn[] = [
   { id: 'fbaInventoryReimbursement', header: 'FBA Inventory Reimbursement total', group: 'marketplace', bucket: 'otherMarketplaceCharges', fee: 'otherFees' },
   { id: 'fbaDisposalOrderFee', header: 'FBA disposal order fee total', group: 'marketplace', bucket: 'otherMarketplaceCharges', fee: 'storage',
     lever: 'Charged to destroy or return units. Usually the tail of an aged-inventory problem rather than a problem of its own.' },
-  { id: 'fbaFulfillmentFees', header: 'FBA fulfillment fees total', group: 'marketplace', bucket: 'fulfilment', fee: 'fulfilment',
+  { id: 'fbaFulfillmentFees', header: 'FBA fulfillment fees total', aliases: ['FBA fulfilment fees total'], group: 'marketplace', bucket: 'fulfilment', fee: 'fulfilment',
     lever: 'Set by unit size and weight band. Reducing pack dimensions moves a SKU into a cheaper band.' },
+  // Charged by the Indian marketplace and not seen in a US export yet. They
+  // are fees of the same report and belong in the same catalogue: a column
+  // left out of it is counted as unnamed, which is a worse answer than the
+  // name Amazon gave it.
+  { id: 'fbaWeightHandlingFee', header: 'FBA Weight Handling Fee total', group: 'marketplace', bucket: 'fulfilment', fee: 'fulfilment',
+    lever: 'Charged by the weight and size of the despatched pack. Lighter or smaller packaging moves a SKU into a cheaper band.' },
+  { id: 'fbaRemovalOrderFee', header: 'FBA removal order fee total', group: 'marketplace', bucket: 'otherMarketplaceCharges', fee: 'storage',
+    lever: 'Charged to send units back out of the warehouse. Usually the tail of an aged-inventory problem rather than one of its own.' },
+  { id: 'manufacturerFulfilledPostageFee', header: 'Manufacturer-Fulfilled Postage Fee total', group: 'marketplace', bucket: 'shipping', fee: 'shipping',
+    lever: 'Postage on the orders despatched by us rather than from Amazon’s warehouse. It follows the courier rate and the pack weight.' },
   { id: 'fbaInboundPlacementFee', header: 'FBA inbound placement service fee total', group: 'marketplace', bucket: 'fulfilment', fee: 'fulfilment',
     lever: 'Charged when a shipment is split across centres. Sending to the centres Amazon asks for reduces or removes it.' },
   { id: 'fuelLogisticsSurcharge', header: 'Fuel and Logistics-related surcharge total', group: 'marketplace', componentOf: 'fbaFulfillmentFees', bucket: 'fulfilment', fee: 'fulfilment' },
@@ -116,7 +135,9 @@ export const AMAZON_USA_FEE_COLUMNS_IN_ORDER: AmazonUsaFeeColumn[] = AMAZON_USA_
  * another one, so counting it too would double-charge the month. */
 export const AMAZON_USA_COUNTED_FEE_COLUMNS = AMAZON_USA_FEE_COLUMNS.filter((c) => !c.componentOf)
 
-const BY_HEADER = new Map(AMAZON_USA_FEE_COLUMNS.map((c) => [c.header.trim().toLowerCase(), c]))
+const BY_HEADER = new Map(
+  AMAZON_USA_FEE_COLUMNS.flatMap((c) => [c.header, ...(c.aliases ?? [])].map((h) => [h.trim().toLowerCase(), c] as const)),
+)
 
 /** The fee column a header names, or undefined for one this build has never
  * seen — those are kept and shown rather than folded into a catch-all, so a

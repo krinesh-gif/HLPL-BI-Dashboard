@@ -14,6 +14,8 @@
  * never happened. The header names alone cannot tell them apart, so this is
  * the only thing that can.
  */
+import { AMAZON_USA_FEE_COLUMNS, feeColumnForHeader } from '@/data/amazonUsa/feeColumns'
+
 const COLUMNS = {
   store: ['amazon store', 'sc_fba_calc_label_country'],
   currency: ['currency code', 'sc_fba_ser_currency_code'],
@@ -104,4 +106,79 @@ export function amazonPpIsStore(
   const storesAgree = stores.length === 0 || (stores.length === 1 && stores[0] === store)
   const currenciesAgree = currencies.length === 0 || (currencies.length === 1 && currencies[0] === currency)
   return storesAgree && currenciesAgree
+}
+
+/** A cell as a number. An empty or unparsable cell is zero, which is what an
+ * unfilled fee column means in this export. */
+export function amazonPpNum(row: Record<string, string>, key: string | null | undefined): number {
+  if (key === null || key === undefined) return 0
+  const n = Number(row[key])
+  return Number.isFinite(n) ? n : 0
+}
+
+/**
+ * Every "… total" column of one export, matched to the fee it names.
+ *
+ * A column this build has never seen is kept under its own header rather than
+ * swept into a catch-all, so a fee Amazon introduces is visible in the month
+ * it appears instead of being quietly absorbed into another line. April's
+ * Indian export arrived with one fee block unnamed — three columns headed only
+ * " per unit", " quantity" and " total", carrying ₹12,431.30 — and that is
+ * exactly the case this keeps honest.
+ */
+export function amazonPpFeeColumns(headers: string[]): {
+  feeColumns: { header: string; id: string }[]
+  unmappedColumns: string[]
+} {
+  const feeColumns: { header: string; id: string }[] = []
+  const unmappedColumns: string[] = []
+  for (const h of headers) {
+    const lower = h.trim().toLowerCase()
+    if (!lower.endsWith('total')) continue
+    if (lower === 'net proceeds total') continue // Amazon's own result, not a fee
+    const col = feeColumnForHeader(h)
+    if (col) feeColumns.push({ header: h, id: col.id })
+    else unmappedColumns.push(h)
+  }
+  return { feeColumns, unmappedColumns }
+}
+
+/**
+ * Which fee columns this file proves are contained inside another one.
+ *
+ * Whether a column is already part of another is a property of the file, not
+ * a rule this code gets to assume: each candidate is tested row by row against
+ * the export just uploaded, and one that does not prove itself contained
+ * stands on its own and is counted.
+ *
+ * Only the sibling columns the file actually has are summed. Amazon adds fee
+ * columns over time — the US exports here carry 63, 66, 72 and 78 of them —
+ * so requiring every sibling this build knows about made the test bail on any
+ * month predating the newest fee. Bailing meant nothing was marked contained,
+ * so the base fulfilment fee was charged on its own line *and* inside FBA
+ * fulfilment fees: March's marketplace charges came out at $9,295.33 against
+ * a true $5,493.04, and the same figure appeared twice on the statement.
+ */
+export function amazonPpNestedFeeIds(
+  rows: Record<string, string>[],
+  feeColumns: { header: string; id: string }[],
+): string[] {
+  const nested: string[] = []
+  for (const c of AMAZON_USA_FEE_COLUMNS) {
+    if (!c.componentOf) continue
+    const parentCol = feeColumns.find((f) => f.id === c.componentOf)
+    if (!parentCol) continue
+    const partCols = AMAZON_USA_FEE_COLUMNS
+      .filter((x) => x.componentOf === c.componentOf)
+      .map((pt) => feeColumns.find((f) => f.id === pt.id))
+      .filter((f) => f !== undefined)
+    if (partCols.length === 0) continue
+    const holds = rows.every((row) => {
+      const parent = amazonPpNum(row, parentCol.header)
+      const sum = partCols.reduce((t, f) => t + amazonPpNum(row, f.header), 0)
+      return Math.abs(parent - sum) < 0.01
+    })
+    if (holds) nested.push(c.id)
+  }
+  return nested
 }

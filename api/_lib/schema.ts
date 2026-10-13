@@ -232,6 +232,20 @@ BEGIN
     data  JSONB NOT NULL
   );
 
+  -- Amazon India's fees traced to the SKUs carrying them, read from the
+  -- Product Profitability export.
+  --
+  -- Its own table, deliberately apart from amazon_in_seller_facts. That row is
+  -- the statement, built from the settlement report; this is a second reading
+  -- of the same month from a different file, and it answers only "which
+  -- products carry which fee". Sharing a row would let either upload overwrite
+  -- the other's work, and would put a per-SKU estimate inside the record the
+  -- P&L reads.
+  CREATE TABLE IF NOT EXISTS amazon_in_sku_fee_facts (
+    month TEXT PRIMARY KEY,
+    data  JSONB NOT NULL
+  );
+
   -- Meesho alone carries two statements per month: the same orders bucketed by
   -- order date and by payment date. Keying on month alone made the second one
   -- written overwrite the first, so only one basis ever survived and the

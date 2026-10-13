@@ -227,7 +227,10 @@ describe('amazonUsaToCanonicalBuckets', () => {
       + (b.otherMarketplaceCharges ?? 0) + (b.ads ?? 0)
     const countedTotal = AMAZON_USA_FEE_COLUMNS
       .filter((c) => !JULY_NESTED.includes(c.id))
-      .reduce((s, c) => s + JULY_FEES[c.id], 0)
+      // A fee July was not charged contributes nothing. The catalogue covers
+      // every marketplace that sends this report, so it holds columns a US
+      // month has no entry for at all.
+      .reduce((s, c) => s + (JULY_FEES[c.id] ?? 0), 0)
     // Misc cost rides in otherMarketplaceCharges; it is zero in July.
     expect(everyBucket).toBeCloseTo(countedTotal * 90, 2)
   })

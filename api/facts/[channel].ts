@@ -23,6 +23,9 @@ const FACT_TABLES: Record<string, FactTable> = {
   'amazon-in-seller': { table: 'amazon_in_seller_facts', byBasis: false },
   blinkit: { table: 'blinkit_facts', byBasis: false },
   'amazon-uae': { table: 'amazon_ae_facts', byBasis: false },
+  // Not a channel: Amazon India's fees per SKU, which sit beside that
+  // channel's statement rather than inside it.
+  'amazon-in-sku-fees': { table: 'amazon_in_sku_fee_facts', byBasis: false },
   meesho: { table: 'meesho_facts', byBasis: true },
 }
 

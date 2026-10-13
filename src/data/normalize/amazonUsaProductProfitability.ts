@@ -1,11 +1,11 @@
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import type { AmazonUsaPnlFacts, CanonicalSalesRecord, SkuMaster } from '@/data/models'
-import { AMAZON_USA_FEE_COLUMNS, feeColumnForHeader } from '@/data/amazonUsa/feeColumns'
+import { AMAZON_USA_FEE_COLUMNS } from '@/data/amazonUsa/feeColumns'
 import { getField, headersPresent, type NormalizeResult } from './types'
 import { normalizeCategory } from '@/data/categories'
 import { toIsoDate } from '@/lib/format'
 import { parseReportDate } from '@/lib/reportDate'
-import { amazonPpIsStore } from './amazonProductProfitability'
+import { amazonPpFeeColumns, amazonPpIsStore, amazonPpNestedFeeIds } from './amazonProductProfitability'
 
 // Column names as they appear in Seller Central ▸ Reports ▸ Business Reports ▸
 // Product Profitability. Amazon changes both the number and the order of the
@@ -70,20 +70,9 @@ export function normalizeAmazonUsaProductProfitability(
   let unknownSkuCount = 0
   let detectedMonth = ''
 
-  // Match every "... total" column to the fee it names, once, from the header
-  // list. A column this build has never seen is kept under its own header
-  // rather than swept into a catch-all — a fee Amazon introduces is visible in
-  // the month it appears instead of being quietly absorbed into another line.
-  const feeColumns: { header: string; id: string }[] = []
-  const unmappedColumns: string[] = []
-  for (const h of headers) {
-    const lower = h.trim().toLowerCase()
-    if (!lower.endsWith('total')) continue
-    if (lower === 'net proceeds total') continue // Amazon's own result, not a fee
-    const col = feeColumnForHeader(h)
-    if (col) feeColumns.push({ header: h, id: col.id })
-    else unmappedColumns.push(h)
-  }
+  // Every "... total" column, matched to the fee it names. Shared with the
+  // Indian export, which is the same report with the same fee blocks.
+  const { feeColumns, unmappedColumns } = amazonPpFeeColumns(headers)
 
   // Resolve each simple column name once, rather than re-scanning `headers` per row.
   const resolve = (candidates: string[], fallback: string) =>
@@ -210,36 +199,9 @@ export function normalizeAmazonUsaProductProfitability(
 
   facts.month = detectedMonth
 
-  // Whether a fee column is already contained in another one is a property of
-  // the file, not a rule this code gets to assume. Each candidate is tested
-  // row by row against the file just uploaded: a column that does not prove
-  // itself contained stands on its own and is counted, so the dashboard's
-  // total is the sheet's total whatever shape Amazon ships next month.
-  const nested: string[] = []
-  for (const c of AMAZON_USA_FEE_COLUMNS) {
-    if (!c.componentOf) continue
-    const parentCol = feeColumns.find((f) => f.id === c.componentOf)
-    if (!parentCol) continue
-    // Only the sibling columns this file actually has. Amazon adds fee columns
-    // over time — the exports here carry 63, 66, 72 and 78 of them — so
-    // requiring every sibling this build knows about made the test bail on any
-    // month predating the newest fee. Bailing meant nothing was marked
-    // contained, so the base fulfilment fee was charged on its own line *and*
-    // inside FBA fulfilment fees: March's marketplace charges came out at
-    // $9,295.33 against a true $5,493.04, and the same figure appeared twice
-    // on the statement.
-    const partCols = AMAZON_USA_FEE_COLUMNS
-      .filter((x) => x.componentOf === c.componentOf)
-      .map((pt) => feeColumns.find((f) => f.id === pt.id))
-      .filter((f) => f !== undefined)
-    if (partCols.length === 0) continue
-    const holds = rows.every((row) => {
-      const parent = num(row, parentCol.header)
-      const sum = partCols.reduce((t, f) => t + num(row, f.header), 0)
-      return Math.abs(parent - sum) < 0.01
-    })
-    if (holds) nested.push(c.id)
-  }
+  // Which columns this file proves are contained in another, tested row by
+  // row against the file just uploaded rather than assumed.
+  const nested = amazonPpNestedFeeIds(rows, feeColumns)
   facts.nestedFeeIds = nested
 
   const warnings: string[] = []

@@ -1,5 +1,4 @@
 import { AMAZON_USA_FEE_COLUMNS, type AmazonUsaFeeColumn } from '@/data/amazonUsa/feeColumns'
-import type { AmazonUsaPnlFacts } from '@/data/models'
 
 /**
  * Amazon's fees, read month by month and traced to the products carrying them.
@@ -40,13 +39,68 @@ export interface FeeSeries {
   topThreeSharePct: number
 }
 
-const factsFor = (month: string, facts: AmazonUsaPnlFacts[]): AmazonUsaPnlFacts | undefined =>
+/**
+ * One month of fees, in whatever currency the marketplace charged them.
+ *
+ * Deliberately not a facts type. The US export's figures live on
+ * `AmazonUsaPnlFacts` and India's on `AmazonInSkuFeeFacts`, and the questions
+ * here — is it getting worse, which SKUs carry it — are the same questions of
+ * either. The caller maps its own facts onto this; nothing below knows which
+ * marketplace it is reading.
+ */
+export interface FeeFactsMonth {
+  month: string
+  /**
+   * Required, though a facts record's own field is optional, so that passing
+   * a facts record straight in does not compile. Both facts types have a
+   * `month` and currency-suffixed fee fields; with this optional too, either
+   * one satisfied this interface structurally and every fee read as undefined
+   * — nine tests' worth of zeroes that `tsc` was happy with. The caller has
+   * to say which field it means.
+   */
+  feeTotals: Record<string, number>
+  feeBySku?: Record<string, Record<string, number>>
+}
+
+const factsFor = (month: string, facts: FeeFactsMonth[]): FeeFactsMonth | undefined =>
   facts.find((f) => f.month === month)
+
+/**
+ * A fee column Amazon exported without a heading this build recognises.
+ *
+ * April's Indian export carried ₹12,431.30 in three columns headed only
+ * " per unit", " quantity" and " total" — Amazon simply left the fee's name
+ * out. It is the second largest charge of the month, so leaving it off the
+ * screen would be the biggest omission on it. It appears under the heading it
+ * arrived with, described as unnamed, and claims nothing about what it is.
+ */
+export function unnamedFeeColumn(header: string): AmazonUsaFeeColumn {
+  const trimmed = header.trim()
+  return {
+    id: header,
+    header: trimmed === 'total' || trimmed === '' ? 'Fee column Amazon left unnamed' : trimmed,
+    group: 'marketplace',
+    bucket: 'otherMarketplaceCharges',
+    fee: 'otherFees',
+  }
+}
+
+/** The unnamed columns of every month on file, as columns to read like any
+ * other. Keyed by the header, which is all Amazon gave them. */
+export function unnamedFeeColumnsOf(unmapped: Record<string, number>[]): AmazonUsaFeeColumn[] {
+  const headers = new Set<string>()
+  for (const month of unmapped) for (const [h, amount] of Object.entries(month)) if (amount !== 0) headers.add(h)
+  return [...headers].sort().map(unnamedFeeColumn)
+}
 
 /** Every fee that was charged something across the period, worst first, with
  * the ones you can do something about ahead of the ones you cannot. */
-export function amazonUsaFeeSeries(months: string[], facts: AmazonUsaPnlFacts[]): FeeSeries[] {
-  const series = AMAZON_USA_FEE_COLUMNS.map((column) => buildSeries(column, months, facts))
+export function amazonUsaFeeSeries(
+  months: string[],
+  facts: FeeFactsMonth[],
+  extraColumns: AmazonUsaFeeColumn[] = [],
+): FeeSeries[] {
+  const series = [...AMAZON_USA_FEE_COLUMNS, ...extraColumns].map((column) => buildSeries(column, months, facts))
   return series
     .filter((s) => s.monthsCharged > 0)
     .sort((a, b) => {
@@ -58,10 +112,10 @@ export function amazonUsaFeeSeries(months: string[], facts: AmazonUsaPnlFacts[])
     })
 }
 
-export function buildSeries(column: AmazonUsaFeeColumn, months: string[], facts: AmazonUsaPnlFacts[]): FeeSeries {
+export function buildSeries(column: AmazonUsaFeeColumn, months: string[], facts: FeeFactsMonth[]): FeeSeries {
   const points = months.map((month) => ({
     month,
-    amount: factsFor(month, facts)?.feeTotalsUsd?.[column.id] ?? 0,
+    amount: factsFor(month, facts)?.feeTotals?.[column.id] ?? 0,
   }))
   const total = points.reduce((sum, p) => sum + p.amount, 0)
 
@@ -70,7 +124,7 @@ export function buildSeries(column: AmazonUsaFeeColumn, months: string[], facts:
   // spread across SKUs by guesswork.
   const bySku = new Map<string, number[]>()
   months.forEach((month, i) => {
-    const detail = factsFor(month, facts)?.feeBySkuUsd
+    const detail = factsFor(month, facts)?.feeBySku
     if (!detail) return
     for (const [sku, fees] of Object.entries(detail)) {
       const amount = fees[column.id]

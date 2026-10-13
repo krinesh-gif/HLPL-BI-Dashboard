@@ -7,7 +7,7 @@ import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
 import { fxRateValue } from '@/data/fxRates'
-import { amazonUsaFeeSeries, buildSeries } from '@/engine/amazonUsaFees'
+import { amazonUsaFeeSeries, buildSeries, unnamedFeeColumnsOf, type FeeFactsMonth } from '@/engine/amazonUsaFees'
 import { AMAZON_USA_FEE_COLUMNS } from '@/data/amazonUsa/feeColumns'
 import { formatCurrencyFull, formatPercent, monthLabel } from '@/lib/format'
 
@@ -26,33 +26,61 @@ import { formatCurrencyFull, formatPercent, monthLabel } from '@/lib/format'
  * a list meant to be worked through just makes the list start with a number
  * nobody can move.
  */
-export function AmazonUsaFees() {
-  const { amazonUsaFacts, fxRates } = useDataStore()
-  const currency = displayCurrencyFor('amazon_us', useFilterStore((s) => s.channelCurrencyView))
+/**
+ * Two marketplaces send this report, so this screen reads either.
+ *
+ * `amazon_us` is the channel's statement broken down; `amazon_in_seller` is
+ * fees only — India's statement comes from the settlement report and nothing
+ * here feeds it. The questions are the same of both: is this fee getting
+ * worse, and which SKUs carry it.
+ */
+export function AmazonUsaFees({ channel = 'amazon_us' }: { channel?: 'amazon_us' | 'amazon_in_seller' } = {}) {
+  const { amazonUsaFacts, amazonInSkuFeeFacts, fxRates } = useDataStore()
+  const usaView = useFilterStore((s) => s.channelCurrencyView)
+  // India's charges are rupees already and have no second reading.
+  const currency = channel === 'amazon_us' ? displayCurrencyFor('amazon_us', usaView) : 'INR'
+
+  const rows: FeeFactsMonth[] = useMemo(
+    () =>
+      channel === 'amazon_us'
+        ? amazonUsaFacts.map((f) => ({ month: f.month, feeTotals: f.feeTotalsUsd ?? {}, feeBySku: f.feeBySkuUsd }))
+        : (amazonInSkuFeeFacts ?? []).map((f) => ({
+            month: f.month,
+            // Named and unnamed together: the unnamed block is April's second
+            // largest charge, and a screen that left it out would be missing
+            // more than any other line on it.
+            feeTotals: { ...f.feeTotalsInr, ...f.unmappedFeeTotalsInr },
+            feeBySku: f.feeBySkuInr,
+          })),
+    [channel, amazonUsaFacts, amazonInSkuFeeFacts],
+  )
+  const extraColumns = useMemo(
+    () => (channel === 'amazon_us'
+      ? unnamedFeeColumnsOf(amazonUsaFacts.map((f) => f.unmappedFeeTotalsUsd ?? {}))
+      : unnamedFeeColumnsOf((amazonInSkuFeeFacts ?? []).map((f) => f.unmappedFeeTotalsInr))),
+    [channel, amazonUsaFacts, amazonInSkuFeeFacts],
+  )
 
   /**
-   * Amazon states these fees in dollars. Read in rupees, each month is
+   * Amazon states the US fees in dollars. Read in rupees, each month is
    * converted at its own rate rather than the period at one — a fee charged in
    * April and a fee charged in August were paid at different rates, and
    * flattening them to a single rate would restate a closed month.
    */
   const toDisplay = (amount: number, month: string): number =>
-    currency === 'USD' ? amount : amount * fxRateValue(month, fxRates)
+    channel === 'amazon_in_seller' || currency === 'USD' ? amount : amount * fxRateValue(month, fxRates)
   const money = (v: number) => formatCurrencyFull(v, currency)
   const [params, setParams] = useSearchParams()
 
-  const months = useMemo(
-    () => [...new Set(amazonUsaFacts.map((f) => f.month))].sort(),
-    [amazonUsaFacts],
-  )
-  const list = useMemo(() => amazonUsaFeeSeries(months, amazonUsaFacts), [months, amazonUsaFacts])
+  const months = useMemo(() => [...new Set(rows.map((f) => f.month))].sort(), [rows])
+  const list = useMemo(() => amazonUsaFeeSeries(months, rows, extraColumns), [months, rows, extraColumns])
 
   const requested = params.get('fee')
   const selectedId = list.some((s) => s.column.id === requested) ? requested! : list[0]?.column.id
   const selected = useMemo(() => {
-    const column = AMAZON_USA_FEE_COLUMNS.find((c) => c.id === selectedId)
-    return column ? buildSeries(column, months, amazonUsaFacts) : null
-  }, [selectedId, months, amazonUsaFacts])
+    const column = [...AMAZON_USA_FEE_COLUMNS, ...extraColumns].find((c) => c.id === selectedId)
+    return column ? buildSeries(column, months, rows) : null
+  }, [selectedId, months, rows, extraColumns])
 
   const [showAllSkus, setShowAllSkus] = useState(false)
   const historyCard = useRef<HTMLDivElement>(null)
@@ -61,8 +89,8 @@ export function AmazonUsaFees() {
     return (
       <Card>
         <p className="text-sm text-[var(--ink-3)]">
-          No Amazon USA months on file yet. Upload a Product Profitability export and every fee it charges will be
-          broken out here.
+          No {channel === 'amazon_us' ? 'Amazon USA' : 'Amazon India'} months on file yet. Upload a Product
+          Profitability export and every fee it charges will be broken out here.
         </p>
       </Card>
     )
@@ -164,7 +192,7 @@ export function AmazonUsaFees() {
               actions={
                 <CopyImageButton
                   target={historyCard}
-                  filename={`Amazon USA ${selected.column.header.replace(/ total$/, '')} ${months[0]} to ${months[months.length - 1]}`}
+                  filename={`${channel === 'amazon_us' ? 'Amazon USA' : 'Amazon India'} ${selected.column.header.replace(/ total$/, '')} ${months[0]} to ${months[months.length - 1]}`}
                 />
               }
             />

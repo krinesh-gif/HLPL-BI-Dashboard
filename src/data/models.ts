@@ -386,6 +386,58 @@ export interface NykaaPnlFacts {
 }
 
 /**
+ * Amazon India's fees, traced to the SKUs carrying them.
+ *
+ * Deliberately not part of `AmazonInSellerPnlFacts`, and deliberately not a
+ * P&L. Amazon India's statement is built from the settlement report, which
+ * states what Amazon actually charged and settled; this comes from the
+ * Product Profitability export, which states the same month per SKU. Two
+ * sources for one month is one too many for a statement, so this one answers
+ * the question the statement cannot — which products carry which fee — and
+ * contributes nothing to any total.
+ *
+ * It carries no sales either: Amazon India's revenue comes from the All
+ * Orders report, and a second set of sales rows for the same month would
+ * count April twice.
+ *
+ * Everything is in rupees, as the export states it.
+ */
+export interface AmazonInSkuFeeFacts {
+  month: string
+  schemaVersion: 1
+  /** Every "... total" fee column, summed over the month and keyed by
+   * `AMAZON_USA_FEE_COLUMNS[].id`. The export's own sign: a charge positive,
+   * a credit negative. */
+  feeTotalsInr: Record<string, number>
+  /** Columns this build does not recognise, keyed by the header as exported.
+   * Amazon sent April's with one fee block unnamed — three columns headed
+   * only " per unit", " quantity" and " total" — and ₹12,431.30 of real
+   * charges in it. Kept under the heading it arrived with rather than
+   * dropped, or given a name nobody can check. */
+  unmappedFeeTotalsInr: Record<string, number>
+  /** sku → fee id → amount, for the fees that SKU was actually charged. */
+  feeBySkuInr: Record<string, Record<string, number>>
+  /** Fee ids this month's file proved to sit inside another column, checked
+   * row by row rather than assumed. */
+  nestedFeeIds: string[]
+  unitsSoldQty: number
+  unitsReturnedQty: number
+  netUnitsSoldQty: number
+  grossSalesInr: number
+  netSalesInr: number
+  /** Amazon's own "Net proceeds total" column, summed. What the fees are
+   * reconciled against rather than assumed to agree with. */
+  sheetNetProceedsInr: number
+  /** The export's own per-unit seller costs × net units sold, which Amazon
+   * subtracts in its Net proceeds. Zero in a file that leaves them blank. */
+  sheetCogsInr: number
+  sheetMiscCostInr: number
+  /** Rows charged a fee without selling anything — stock sitting in the
+   * warehouse, or a removal order. */
+  nonSellingChargedRows: number
+}
+
+/**
  * Amazon India Seller Central, as its settlement report states it.
  *
  * Every (amount-type, amount-description) pair the file carries is kept under

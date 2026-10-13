@@ -10,6 +10,9 @@ import {
 } from '@/data/normalize/amazonUsaProductProfitability'
 import { amazonPpStores, isAmazonProductProfitabilityExport } from '@/data/normalize/amazonProductProfitability'
 import {
+  AMAZON_IN_STORE, detectAmazonIndiaProductProfitability, normalizeAmazonIndiaProductProfitability,
+} from '@/data/normalize/amazonIndiaProductProfitability'
+import {
   AMAZON_AE_STORE, detectAmazonUaeProductProfitability, normalizeAmazonUaeProductProfitability,
 } from '@/data/normalize/amazonUaeProductProfitability'
 import { detectMeeshoOrderSummaryReport, normalizeMeeshoOrderSummary } from '@/data/normalize/meeshoOrderSummary'
@@ -32,7 +35,7 @@ import { useDataStore, type ImportOutcome } from '@/store/dataStore'
 import { monthLabel } from '@/lib/format'
 import { useFilterStore } from '@/store/filterStore'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
-import type { AdsRecord, AmazonAePnlFacts, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts } from '@/data/models'
+import type { AdsRecord, AmazonAePnlFacts, AmazonInSkuFeeFacts, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts } from '@/data/models'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
 
@@ -43,6 +46,7 @@ type ReportKind =
   | 'flipkart_workbook'
   | 'amazon_usa_product_profitability'
   | 'amazon_uae_product_profitability'
+  | 'amazon_in_sku_fees'
   | 'myntra_pnl_workbook'
   | 'nykaa_sales'
   | 'nykaa_companion'
@@ -64,6 +68,7 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   flipkart_workbook: 'Flipkart — Full P&L Workbook (Overall Summary + Orders P&L)',
   amazon_usa_product_profitability: 'Amazon USA — Product Profitability Report',
   amazon_uae_product_profitability: 'Amazon UAE — Product Profitability Report',
+  amazon_in_sku_fees: 'Amazon India — Product Profitability Report (fees per SKU)',
   blinkit_ads: 'Blinkit — Campaign Report',
   myntra_pnl_workbook: 'Myntra — P&L Report (PnL_Summary + SKU_Detail)',
   nykaa_sales: 'Nykaa — Monthly Sales Data (B2B, margin on MRP)',
@@ -84,6 +89,7 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   flipkart_workbook: 'flipkart',
   amazon_usa_product_profitability: 'amazon_us',
   amazon_uae_product_profitability: 'amazon_ae',
+  amazon_in_sku_fees: 'amazon_in_seller',
   blinkit_ads: 'blinkit',
   myntra_pnl_workbook: 'myntra',
   nykaa_sales: 'nykaa',
@@ -112,6 +118,7 @@ interface PreviewState {
   flipkartFacts?: FlipkartPnlFacts
   amazonUsaFacts?: AmazonUsaPnlFacts
   amazonAeFacts?: AmazonAePnlFacts
+  amazonInSkuFeeFacts?: AmazonInSkuFeeFacts
   myntraFacts?: MyntraPnlFacts
   nykaaFacts?: NykaaPnlFacts
   blinkitFacts?: BlinkitPnlFacts
@@ -235,6 +242,13 @@ export function UploadReportsPage() {
     if (kind === 'amazon_uae_product_profitability') {
       const r = normalizeAmazonUaeProductProfitability(parsed.headers, parsed.rows, skuMaster, importId)
       return buildPreview({ ...base, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings, amazonAeFacts: r.facts })
+    }
+    if (kind === 'amazon_in_sku_fees') {
+      const r = normalizeAmazonIndiaProductProfitability(parsed.headers, parsed.rows)
+      return buildPreview({
+        ...base, totalRows: r.totalRows, validRecords: [], invalidCount: r.invalidRows.length,
+        warnings: r.warnings, amazonInSkuFeeFacts: r.facts,
+      })
     }
     if (kind === 'meesho_order_summary') {
       const r = normalizeMeeshoOrderSummary(parsed.rows, skuMaster, importId)
@@ -476,21 +490,20 @@ export function UploadReportsPage() {
       // the US branch, where its rupees would have been counted as dollars.
       if (isAmazonProductProfitabilityExport(parsed.headers)) {
         const { stores, currencies } = amazonPpStores(parsed.headers, parsed.rows)
-        const known = new Set([AMAZON_US_STORE, AMAZON_AE_STORE])
-        const foreign = stores.filter((s) => !known.has(s))
         if (stores.length > 1) {
           return fail(
             `This Product Profitability export covers more than one Amazon store (${stores.join(', ')}). Each store ` +
             'is a separate channel priced in its own currency, so download them one marketplace at a time.',
           )
         }
-        if (foreign.length > 0) {
+        const read = new Set([AMAZON_US_STORE, AMAZON_AE_STORE, AMAZON_IN_STORE])
+        const unread = stores.filter((s) => !read.has(s))
+        if (unread.length > 0) {
           const money = currencies.length > 0 ? ` priced in ${currencies.join(', ')}` : ''
           return fail(
-            `This is Amazon's Product Profitability export for the ${foreign.join(', ')} store${money}. This report is ` +
-            `read for Amazon USA (${AMAZON_US_STORE}) and Amazon UAE (${AMAZON_AE_STORE}) only. Amazon India's P&L is ` +
-            'built from the settlement report — Seller Central ▸ Payments ▸ Reports Repository, the flat file (V2) — ' +
-            'which states the fees Amazon actually charged rather than a per-SKU estimate of them.',
+            `This is Amazon's Product Profitability export for the ${unread.join(', ')} store${money}, which is not a ` +
+            `channel on this dashboard. It is read for Amazon USA (${AMAZON_US_STORE}), Amazon UAE ` +
+            `(${AMAZON_AE_STORE}) and Amazon India (${AMAZON_IN_STORE}).`,
           )
         }
       }
@@ -502,6 +515,11 @@ export function UploadReportsPage() {
       // order of these two no longer decides which channel a month lands in.
       else if (detectAmazonUaeProductProfitability(parsed.headers, parsed.rows)) kind = 'amazon_uae_product_profitability'
       else if (detectAmazonUsaProductProfitabilityReport(parsed.headers, parsed.rows)) kind = 'amazon_usa_product_profitability'
+      // India's copy of the same report is read for its per-SKU fees only.
+      // The channel's sales come from the All Orders report and its statement
+      // from the settlement report, and a second source for either would
+      // count the month twice.
+      else if (detectAmazonIndiaProductProfitability(parsed.headers, parsed.rows)) kind = 'amazon_in_sku_fees'
       else if (detectMeeshoOrderSummaryReport(parsed.headers)) kind = 'meesho_order_summary'
       else if (detectAmazonAdsSponsoredProductsReport(parsed.headers)) kind = 'amazon_ads_sponsored_products'
       else if (detectBlinkitAdsReport(parsed.headers)) kind = 'blinkit_ads'
@@ -616,6 +634,7 @@ export function UploadReportsPage() {
         flipkartFacts: preview.flipkartFacts,
         amazonUsaFacts: preview.amazonUsaFacts,
         amazonAeFacts: preview.amazonAeFacts,
+        amazonInSkuFeeFacts: preview.amazonInSkuFeeFacts,
         myntraFacts: preview.myntraFacts,
         nykaaFacts: preview.nykaaFacts,
         blinkitFacts: preview.blinkitFacts,
