@@ -5,6 +5,7 @@ import { getField, headersPresent, type NormalizeResult } from './types'
 import { normalizeCategory } from '@/data/categories'
 import { toIsoDate } from '@/lib/format'
 import { parseReportDate } from '@/lib/reportDate'
+import { amazonPpIsStore } from './amazonProductProfitability'
 
 // Column names as they appear in Seller Central ▸ Reports ▸ Business Reports ▸
 // Product Profitability. Amazon changes both the number and the order of the
@@ -25,8 +26,26 @@ const COLUMNS = {
   netProceeds: ['net proceeds total'],
 }
 
-export function detectAmazonUsaProductProfitabilityReport(headers: string[]): boolean {
-  return headersPresent(headers, COLUMNS.msku) && headersPresent(headers, COLUMNS.netSales) && headersPresent(headers, COLUMNS.unitsSold)
+/**
+ * True when this is the Product Profitability export **for the US store**.
+ *
+ * The header names are the same in every marketplace, so matching on them
+ * alone claimed any store's export for Amazon USA. An Indian export reached
+ * this detector as a US one and its rupees would have been read as dollars —
+ * ₹1.82 lakh of April net sales booked as $182,052, about ₹1.6 crore, in a
+ * channel it has nothing to do with. The rows are what tell the stores apart.
+ */
+/** The store code and currency the US marketplace exports. */
+export const AMAZON_US_STORE = 'US'
+export const AMAZON_US_CURRENCY = 'USD'
+
+export function detectAmazonUsaProductProfitabilityReport(
+  headers: string[],
+  rows: Record<string, string>[],
+): boolean {
+  if (!headersPresent(headers, COLUMNS.msku) || !headersPresent(headers, COLUMNS.netSales)) return false
+  if (!headersPresent(headers, COLUMNS.unitsSold)) return false
+  return amazonPpIsStore(headers, rows, AMAZON_US_STORE, AMAZON_US_CURRENCY)
 }
 
 function num(row: Record<string, string>, key: string): number {

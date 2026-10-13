@@ -3,6 +3,7 @@ import { normalizeCategory } from '@/data/categories'
 import { toIsoDate } from '@/lib/format'
 import { parseReportDate } from '@/lib/reportDate'
 import type { NormalizeResult } from './types'
+import { amazonPpStores, isAmazonProductProfitabilityExport } from './amazonProductProfitability'
 
 /**
  * Amazon UAE's Product Profitability export.
@@ -73,25 +74,15 @@ function num(row: Record<string, string>, key: string | null): number {
  * its dirhams would be read as dollars.
  */
 export function detectAmazonUaeProductProfitability(headers: string[], rows: Record<string, string>[]): boolean {
-  const storeCol = columnKey(headers, COLUMNS.store)
-  const currencyCol = columnKey(headers, COLUMNS.currency)
-  if (!columnKey(headers, COLUMNS.msku) || !columnKey(headers, COLUMNS.netSales)) return false
-  return rows.some(
-    (r) => value(r, storeCol).toUpperCase() === AMAZON_AE_STORE || value(r, currencyCol).toUpperCase() === AMAZON_AE_CURRENCY,
-  )
+  if (!isAmazonProductProfitabilityExport(headers)) return false
+  const { stores, currencies } = amazonPpStores(headers, rows)
+  return stores.includes(AMAZON_AE_STORE) || currencies.includes(AMAZON_AE_CURRENCY)
 }
 
-/** The store and currency a Product Profitability file is for, so the upload
- * screen can say which marketplace it read rather than guessing at one. */
-export function amazonStoreOf(headers: string[], rows: Record<string, string>[]): { store: string; currency: string } {
-  const storeCol = columnKey(headers, COLUMNS.store)
-  const currencyCol = columnKey(headers, COLUMNS.currency)
-  const first = rows.find((r) => value(r, storeCol) !== '' || value(r, currencyCol) !== '')
-  return {
-    store: value(first ?? {}, storeCol).toUpperCase(),
-    currency: value(first ?? {}, currencyCol).toUpperCase(),
-  }
-}
+/** Which marketplace a Product Profitability file is for. Lives beside the
+ * other stores' readings now that three marketplaces send this report; still
+ * exported from here, because this is where it was needed first. */
+export { amazonStoreOf } from './amazonProductProfitability'
 
 export interface AmazonUaeNormalizeResult extends NormalizeResult {
   facts: AmazonAePnlFacts

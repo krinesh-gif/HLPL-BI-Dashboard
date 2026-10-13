@@ -25,6 +25,13 @@ const WELL_FORMED = [
   'AE,09/01/2026,09/30/2026,B01,AO/X,AED,10,1,9,500,450,300',
 ].join('\n')
 
+/** The same report from the Indian marketplace, which is read from the
+ * settlement report instead and must never read as either of these. */
+const IN_FILE = [
+  'Amazon store,Start date,End date,ASIN,MSKU,Currency code,Units sold,Units returned,Net units sold,Sales,Net sales,Net proceeds total',
+  'IN,04/01/2026,04/30/2026,B01,AO/X,INR,10,1,9,500,450,300',
+].join('\n')
+
 /** The same report from the US marketplace. It must never read as UAE. */
 const US_FILE = [
   'Amazon store,Start date,End date,ASIN,MSKU,Currency code,Units sold,Units returned,Net units sold,Sales,Net sales,Net proceeds total',
@@ -48,12 +55,24 @@ describe('telling the UAE export from the USA one', () => {
     expect(detectAmazonUaeProductProfitability(us.headers, us.rows)).toBe(false)
   })
 
-  it('is checked before the USA detector, which matches a tidy UAE file too', () => {
-    // This is why the order on the upload screen matters. A UAE export with
-    // its headings intact satisfies the USA detector exactly, and a UAE month
-    // filed under Amazon USA would have its dirhams counted as dollars.
+  it('is not claimed by the USA detector either, so neither order can mis-file it', () => {
+    // It used to be: the USA detector matched on header names alone, which
+    // every marketplace's export shares, so the upload screen had to check
+    // UAE first or a UAE month would land in Amazon USA with its dirhams
+    // counted as dollars. Both now read the store out of the rows.
     const ae = parse(WELL_FORMED)
-    expect(detectAmazonUsaProductProfitabilityReport(ae.headers)).toBe(true)
+    expect(detectAmazonUsaProductProfitabilityReport(ae.headers, ae.rows)).toBe(false)
+    const us = parse(US_FILE)
+    expect(detectAmazonUsaProductProfitabilityReport(us.headers, us.rows)).toBe(true)
+  })
+
+  it('refuses an Indian export, which belongs to neither channel', () => {
+    // Amazon India sends this same report, in rupees. Read as the US one it
+    // would have booked ₹1.82 lakh of April net sales as $182,052.
+    const india = parse(IN_FILE)
+    expect(amazonStoreOf(india.headers, india.rows)).toEqual({ store: 'IN', currency: 'INR' })
+    expect(detectAmazonUaeProductProfitability(india.headers, india.rows)).toBe(false)
+    expect(detectAmazonUsaProductProfitabilityReport(india.headers, india.rows)).toBe(false)
   })
 
   it('reads a tidy export and a mangled one the same way', () => {

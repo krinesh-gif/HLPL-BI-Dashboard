@@ -5,8 +5,13 @@ import { parseSpreadsheetFile, readCsvRaw, readTsvRecords, readWorkbookSheetsRaw
 import { detectAmazonSellerCentralReport, normalizeAmazonSellerCentralRows } from '@/data/normalize/amazonSellerCentral'
 import { detectFlipkartSkuPnlReport, normalizeFlipkartSkuPnl } from '@/data/normalize/flipkartSkuPnl'
 import { detectFlipkartWorkbook, normalizeFlipkartWorkbook } from '@/data/normalize/flipkartWorkbook'
-import { detectAmazonUsaProductProfitabilityReport, normalizeAmazonUsaProductProfitability } from '@/data/normalize/amazonUsaProductProfitability'
-import { detectAmazonUaeProductProfitability, normalizeAmazonUaeProductProfitability } from '@/data/normalize/amazonUaeProductProfitability'
+import {
+  AMAZON_US_STORE, detectAmazonUsaProductProfitabilityReport, normalizeAmazonUsaProductProfitability,
+} from '@/data/normalize/amazonUsaProductProfitability'
+import { amazonPpStores, isAmazonProductProfitabilityExport } from '@/data/normalize/amazonProductProfitability'
+import {
+  AMAZON_AE_STORE, detectAmazonUaeProductProfitability, normalizeAmazonUaeProductProfitability,
+} from '@/data/normalize/amazonUaeProductProfitability'
 import { detectMeeshoOrderSummaryReport, normalizeMeeshoOrderSummary } from '@/data/normalize/meeshoOrderSummary'
 import { detectMeeshoOrderPaymentsSheet, normalizeMeeshoOrderPayments } from '@/data/normalize/meeshoOrderPayments'
 import { detectSkuMapWorkbook, normalizeSkuMapWorkbook } from '@/data/normalize/skuMapWorkbook'
@@ -462,20 +467,41 @@ export function UploadReportsPage() {
       }
 
       const parsed = await parseSpreadsheetFile(file)
+
+      // Product Profitability is one report with one set of column names in
+      // every marketplace, and the download is named with a random string, so
+      // only the rows say which store it is for. A store this dashboard does
+      // not read as a channel of its own is named and refused here, because
+      // the alternative is what used to happen: Amazon India's export reached
+      // the US branch, where its rupees would have been counted as dollars.
+      if (isAmazonProductProfitabilityExport(parsed.headers)) {
+        const { stores, currencies } = amazonPpStores(parsed.headers, parsed.rows)
+        const known = new Set([AMAZON_US_STORE, AMAZON_AE_STORE])
+        const foreign = stores.filter((s) => !known.has(s))
+        if (stores.length > 1) {
+          return fail(
+            `This Product Profitability export covers more than one Amazon store (${stores.join(', ')}). Each store ` +
+            'is a separate channel priced in its own currency, so download them one marketplace at a time.',
+          )
+        }
+        if (foreign.length > 0) {
+          const money = currencies.length > 0 ? ` priced in ${currencies.join(', ')}` : ''
+          return fail(
+            `This is Amazon's Product Profitability export for the ${foreign.join(', ')} store${money}. This report is ` +
+            `read for Amazon USA (${AMAZON_US_STORE}) and Amazon UAE (${AMAZON_AE_STORE}) only. Amazon India's P&L is ` +
+            'built from the settlement report — Seller Central ▸ Payments ▸ Reports Repository, the flat file (V2) — ' +
+            'which states the fees Amazon actually charged rather than a per-SKU estimate of them.',
+          )
+        }
+      }
+
       let kind: ReportKind | null = null
       if (detectAmazonSellerCentralReport(parsed.headers)) kind = 'amazon_seller_central'
       else if (detectFlipkartSkuPnlReport(parsed.headers)) kind = 'flipkart_sku_pnl'
-      // The UAE marketplace exports the same report as the USA one and the
-      // download is named with a random string, so only what is inside tells
-      // them apart: the store column says AE and prices in AED.
-      //
-      // Checked first because the USA detector matches on header names alone.
-      // September's UAE export happens to slip past it — Amazon sent that one
-      // with its headings unresolved — but a UAE download with its headings
-      // intact would match it exactly, and a UAE month read as Amazon USA
-      // would have its dirhams counted as dollars.
+      // Both marketplaces' exports now claim only their own store, so the
+      // order of these two no longer decides which channel a month lands in.
       else if (detectAmazonUaeProductProfitability(parsed.headers, parsed.rows)) kind = 'amazon_uae_product_profitability'
-      else if (detectAmazonUsaProductProfitabilityReport(parsed.headers)) kind = 'amazon_usa_product_profitability'
+      else if (detectAmazonUsaProductProfitabilityReport(parsed.headers, parsed.rows)) kind = 'amazon_usa_product_profitability'
       else if (detectMeeshoOrderSummaryReport(parsed.headers)) kind = 'meesho_order_summary'
       else if (detectAmazonAdsSponsoredProductsReport(parsed.headers)) kind = 'amazon_ads_sponsored_products'
       else if (detectBlinkitAdsReport(parsed.headers)) kind = 'blinkit_ads'

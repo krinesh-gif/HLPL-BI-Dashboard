@@ -261,10 +261,25 @@ const run = (rows = julyRows, hdrs = headers) =>
 
 describe('detectAmazonUsaProductProfitabilityReport', () => {
   it('recognises the real header set', () => {
-    expect(detectAmazonUsaProductProfitabilityReport(headers)).toBe(true)
+    expect(detectAmazonUsaProductProfitabilityReport(headers, julyRows)).toBe(true)
   })
   it('rejects an unrelated header set', () => {
-    expect(detectAmazonUsaProductProfitabilityReport(['Campaign', 'Ad Spend'])).toBe(false)
+    expect(detectAmazonUsaProductProfitabilityReport(['Campaign', 'Ad Spend'], [])).toBe(false)
+  })
+
+  it('refuses the same report from another marketplace', () => {
+    // The columns are identical in every marketplace, so the rows are the
+    // only thing that separates them. An Indian export read here would have
+    // its rupees counted as dollars.
+    const indian = julyRows.map((r) => ({ ...r, 'Amazon store': 'IN', 'Currency code': 'INR' }))
+    expect(detectAmazonUsaProductProfitabilityReport(headers, indian)).toBe(false)
+    const uae = julyRows.map((r) => ({ ...r, 'Amazon store': 'AE', 'Currency code': 'AED' }))
+    expect(detectAmazonUsaProductProfitabilityReport(headers, uae)).toBe(false)
+  })
+
+  it('still claims an export that names no store, which is how the older ones arrived', () => {
+    const noStore = julyRows.map((r) => ({ ...r, 'Amazon store': '', 'Currency code': '' }))
+    expect(detectAmazonUsaProductProfitabilityReport(headers, noStore)).toBe(true)
   })
 })
 
