@@ -35,8 +35,28 @@ export function recordKey(r: Pick<CanonicalSalesRecord, 'channel' | 'orderId' | 
     : `${r.channel}|${r.orderId}|${r.sku}|${r.orderDate}|`
 }
 
-/** Channel + Campaign + Date + SKU uniquely identifies one ads report row
- * (a campaign report has one row per campaign/SKU per reporting day). */
-export function adsRecordKey(r: Pick<AdsRecord, 'channel' | 'campaign' | 'date' | 'sku'>): string {
-  return `${r.channel}|${r.campaign}|${r.date}|${r.sku ?? ''}`
+/**
+ * What identifies one row of a campaign report.
+ *
+ * Every column that separates one line of a report from another, because a
+ * key that leaves one out does not de-duplicate those rows — it throws them
+ * away. The key was channel, campaign, date and SKU, which holds for a report
+ * with one row per campaign per day, and Blinkit's is not one: it reports a
+ * row per *targeting value*, carries no SKU, and advertises one campaign
+ * against several keywords a day. April's thirteen rows collapsed onto nine
+ * keys, `ON CONFLICT DO NOTHING` dropped the other four, and the month's
+ * advertising read ₹11.20 against the ₹16.80 the file states.
+ *
+ * Adding a field changes every key, so the rows already stored would stop
+ * matching the file they came from and a re-upload would book the month
+ * twice. `SCHEMA_SQL` recomputes the stored keys from the row's own columns
+ * with the same formula; the two have to be changed together.
+ */
+export function adsRecordKey(
+  r: Pick<AdsRecord, 'channel' | 'campaign' | 'date' | 'sku' | 'adGroup' | 'keyword' | 'searchTerm'>,
+): string {
+  return [
+    r.channel, r.campaign, r.date,
+    r.sku ?? '', r.adGroup ?? '', r.keyword ?? '', r.searchTerm ?? '',
+  ].join('|')
 }

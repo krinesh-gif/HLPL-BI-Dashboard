@@ -3,9 +3,11 @@ import { existsSync, readFileSync } from 'node:fs'
 import { workbookSheetsFromBytes } from '@/lib/csvParse'
 import { adsSpendFor } from '@/engine/adsSpend'
 import { marketingFromAds } from '@/engine/marketing'
+import { adsRecordKey } from './dedupKeys'
 import { blinkitAdsDate, detectBlinkitAdsReport, normalizeBlinkitAdsReport } from './blinkitAdsReport'
 
 const REPORT = '/root/.claude/uploads/f24a295e-093a-5385-9288-97acefc06862/2da2ae53-Report_2026-05-01_to_2026-05-31.xls'
+const APRIL_REPORT = '/root/.claude/uploads/f24a295e-093a-5385-9288-97acefc06862/cc50fdff-Report_2026-04-01_to_2026-04-30.xls'
 
 const HEADERS = [
   'Date', 'Campaign ID', 'Campaign Name', 'Targeting Type', 'Targeting Value', 'Match Type',
@@ -112,6 +114,13 @@ describe.skipIf(!existsSync(REPORT))('the owner’s May 2026 Blinkit campaign re
     expect(result.adsRecords.reduce((s, r) => s + r.impressions, 0)).toBe(29)
   })
 
+  it('stores all twelve rows, which needs the keyword in their identity', () => {
+    // May had the same defect: two pairs of rows shared a campaign and a day,
+    // and ₹3.10 of the month was dropped on import as already on file.
+    const { result } = run()
+    expect(new Set(result.adsRecords.map(adsRecordKey)).size).toBe(12)
+  })
+
   it('puts that figure into May’s P&L as Blinkit advertising', () => {
     // The whole point of reading the file. `marketingFromAds` is what the
     // channel router takes its ad spend from, so this is the number that
@@ -131,5 +140,50 @@ describe.skipIf(!existsSync(REPORT))('the owner’s May 2026 Blinkit campaign re
     // Blinkit publishes neither, and nor does this.
     expect(f.clicks).toBeNull()
     expect(f.adOrders).toBeNull()
+  })
+})
+
+/**
+ * The owner's April 2026 report, and the month that showed the defect.
+ *
+ * The P&L read ₹11 of April advertising against the ₹16.80 the file states.
+ * Nothing was wrong with reading the file — the rows were stored under a key
+ * that left the targeting value out, so four of the thirteen rows were taken
+ * for duplicates of rows already stored and dropped on import.
+ */
+describe.skipIf(!existsSync(APRIL_REPORT))('the owner’s April 2026 Blinkit campaign report', () => {
+  const read = () => {
+    const sheet = Object.values(workbookSheetsFromBytes(readFileSync(APRIL_REPORT)))[0]
+    const headers = (sheet[0] ?? []).map((c) => String(c ?? '').trim())
+    const rows = sheet.slice(1)
+      .filter((r) => r.some((c) => String(c ?? '').trim() !== ''))
+      .map((r) => Object.fromEntries(headers.map((h, i) => [h, String(r[i] ?? '').trim()])))
+    return normalizeBlinkitAdsReport(rows, 'test')
+  }
+
+  it('totals column R to ₹16.80 across thirteen rows', () => {
+    const r = read()
+    expect(r.adsRecords).toHaveLength(13)
+    expect(r.totalSpend).toBeCloseTo(16.8, 2)
+    expect(r.months).toEqual(['2026-04'])
+    expect(r.invalidRows).toEqual([])
+  })
+
+  it('stores every one of those rows, rather than nine of them', () => {
+    // The database keeps the first row of each key and ignores the rest
+    // (ON CONFLICT DO NOTHING), so a key that cannot tell two rows apart
+    // silently discards one. Four April rows shared a campaign and a day
+    // with another and differed only by the keyword: ₹5.60 of the month.
+    const r = read()
+    const stored = new Map<string, number>()
+    for (const record of r.adsRecords) {
+      if (!stored.has(adsRecordKey(record))) stored.set(adsRecordKey(record), record.spend)
+    }
+    expect(stored.size).toBe(13)
+    expect([...stored.values()].reduce((s, v) => s + v, 0)).toBeCloseTo(16.8, 2)
+  })
+
+  it('puts the whole ₹16.80 into April’s P&L', () => {
+    expect(marketingFromAds(read().adsRecords, '2026-04', []).blinkit?.ads).toBeCloseTo(16.8, 2)
   })
 })

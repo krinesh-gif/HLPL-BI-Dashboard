@@ -169,6 +169,29 @@ BEGIN
 
   CREATE INDEX IF NOT EXISTS ads_records_date_idx ON ads_records (date);
 
+  -- An ads row's identity gained the three columns that separate one line of a
+  -- campaign report from another: ad group, keyword and search term. Blinkit
+  -- reports a row per targeting value and carries no SKU, so without the
+  -- keyword its rows shared a key and all but the first of each were dropped
+  -- as duplicates — April's advertising stored as 11.20 against the 16.80 its
+  -- report states.
+  --
+  -- The stored keys are recomputed here rather than left on the old formula,
+  -- because a row that no longer matches the file it came from is re-inserted
+  -- on the next upload and the month is counted twice. Every part comes from
+  -- the row's own columns, so this says exactly what adsRecordKey says in
+  -- src/data/normalize/dedupKeys.ts, and the two are changed together.
+  --
+  -- Re-runnable: a key already in this form is excluded by the WHERE, so a
+  -- second run writes nothing. Two rows cannot be given the same key, because
+  -- the three new parts are appended to a key that was already unique.
+  UPDATE ads_records SET dedup_key =
+    channel || '|' || campaign || '|' || ads_records.date || '|' || coalesce(sku, '')
+      || '|' || coalesce(ad_group, '') || '|' || coalesce(keyword, '') || '|' || coalesce(search_term, '')
+  WHERE dedup_key <>
+    channel || '|' || campaign || '|' || ads_records.date || '|' || coalesce(sku, '')
+      || '|' || coalesce(ad_group, '') || '|' || coalesce(keyword, '') || '|' || coalesce(search_term, '');
+
   -- ---------------------------------------------------------------------------
   -- Channel-native P&L facts, stored whole as JSONB per month. The app always
   -- reads/writes a month's facts as one object and never queries into individual
