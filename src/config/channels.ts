@@ -32,6 +32,7 @@ export type SalesSourceId =
   | 'nykaa'
   | 'purplle'
   | 'blinkit'
+  | 'swiggy_instamart'
 
 /** What management sees. */
 export type BusinessChannelId =
@@ -44,6 +45,7 @@ export type BusinessChannelId =
   | 'nykaa'
   | 'purplle'
   | 'blinkit'
+  | 'swiggy_instamart'
 
 /**
  * Retained as the name for a stored row's key, because that is what every
@@ -82,6 +84,7 @@ export const BUSINESS_CHANNELS: BusinessChannelDef[] = [
   { id: 'nykaa', label: 'Nykaa', currency: 'INR' },
   { id: 'purplle', label: 'Purplle', currency: 'INR' },
   { id: 'blinkit', label: 'Blinkit', currency: 'INR' },
+  { id: 'swiggy_instamart', label: 'Swiggy Instamart', currency: 'INR' },
 ]
 
 /** Every report the system accepts, and which channel it belongs to. */
@@ -96,6 +99,7 @@ export const SALES_SOURCES: SalesSourceDef[] = [
   { id: 'nykaa', channel: 'nykaa', label: 'Nykaa', currency: 'INR', sellerType: 'marketplace' },
   { id: 'purplle', channel: 'purplle', label: 'Purplle', currency: 'INR', sellerType: 'marketplace' },
   { id: 'blinkit', channel: 'blinkit', label: 'Blinkit', currency: 'INR', sellerType: 'marketplace' },
+  { id: 'swiggy_instamart', channel: 'swiggy_instamart', label: 'Swiggy Instamart', currency: 'INR', sellerType: 'marketplace' },
 ]
 
 export const BUSINESS_CHANNEL_MAP: Record<BusinessChannelId, BusinessChannelDef> = Object.fromEntries(
@@ -164,6 +168,7 @@ export const DEFAULT_ALLOCATION_WEIGHTS: Record<BusinessChannelId, number> = {
   // a month has no sales anywhere, and giving a channel that has barely
   // started trading a standing slice of overhead would be inventing a cost.
   blinkit: 0,
+  swiggy_instamart: 0,
 }
 
 // ---------------------------------------------------------------------------

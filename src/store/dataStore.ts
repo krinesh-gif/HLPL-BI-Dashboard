@@ -29,6 +29,7 @@ import type {
   AmazonAePnlFacts,
   AmazonInSkuFeeFacts,
   PurpllePnlFacts,
+  SwiggyInstamartPnlFacts,
   AmazonInSellerPnlFacts,
   SkuMaster,
 } from '@/data/models'
@@ -68,6 +69,7 @@ interface SharedDataset {
   /** Purplle's months. Optional so a workspace whose API has not redeployed
    * yet still loads. */
   purplleFacts?: PurpllePnlFacts[]
+  swiggyInstamartFacts?: SwiggyInstamartPnlFacts[]
   /** Optional so a workspace whose API has not redeployed yet still loads:
    * an older /api/state simply does not send this key. */
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
@@ -91,6 +93,7 @@ const EMPTY_DATASET: SharedDataset = {
   amazonAeFacts: [],
   amazonInSkuFeeFacts: [],
   purplleFacts: [],
+  swiggyInstamartFacts: [],
   amazonInSellerFacts: [],
   manualAdSpend: [],
 }
@@ -110,6 +113,7 @@ export interface ReportImport {
   amazonAeFacts?: AmazonAePnlFacts
   amazonInSkuFeeFacts?: AmazonInSkuFeeFacts
   purplleFacts?: PurpllePnlFacts
+  swiggyInstamartFacts?: SwiggyInstamartPnlFacts
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
   meeshoFactsByMonth?: MeeshoPnlFacts[]
   /** The individual events behind those facts. These are what is stored: a
@@ -267,6 +271,7 @@ export function statementMonths(dataset: SharedDataset): string[] {
     ...(dataset.blinkitFacts ?? []).map((f) => f.month),
     ...(dataset.amazonAeFacts ?? []).map((f) => f.month),
     ...(dataset.purplleFacts ?? []).map((f) => f.month),
+    ...(dataset.swiggyInstamartFacts ?? []).map((f) => f.month),
     ...(dataset.amazonInSellerFacts ?? []).map((f) => f.month),
   ].filter(Boolean)
   return [...new Set(months)].sort()
@@ -387,7 +392,7 @@ export const useDataStore = create<DataState>((set, get) => {
      * file (rows, then one facts call per month) downloaded everything three
      * or more times over, and a large file could not get through at all.
      */
-    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, amazonAeFacts, amazonInSkuFeeFacts, purplleFacts, myntraFacts, nykaaFacts, blinkitFacts, amazonInSellerFacts, meeshoFactsByMonth, meeshoTransactions, meeshoAdsRows, meeshoRecoveryRows }) => {
+    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, amazonAeFacts, amazonInSkuFeeFacts, purplleFacts, swiggyInstamartFacts, myntraFacts, nykaaFacts, blinkitFacts, amazonInSellerFacts, meeshoFactsByMonth, meeshoTransactions, meeshoAdsRows, meeshoRecoveryRows }) => {
       const total = salesRecords.length + adsRecords.length
       set({ importProgress: { sent: 0, total } })
       try {
@@ -466,6 +471,10 @@ export const useDataStore = create<DataState>((set, get) => {
         if (amazonAeFacts) {
           await api.post('/api/facts/amazon-uae', { facts: amazonAeFacts, importId })
           monthsUpdated.push(amazonAeFacts.month)
+        }
+        if (swiggyInstamartFacts) {
+          await api.post('/api/facts/swiggy-instamart', { facts: swiggyInstamartFacts, importId })
+          monthsUpdated.push(swiggyInstamartFacts.month)
         }
         if (purplleFacts) {
           await api.post('/api/facts/purplle', { facts: purplleFacts, importId })

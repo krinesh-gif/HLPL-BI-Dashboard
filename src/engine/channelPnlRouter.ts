@@ -2,6 +2,7 @@ import type { BusinessChannelId } from '@/config/channels'
 import type { PnlBasis } from '@/data/models'
 import type {
   PurpllePnlFacts,
+  SwiggyInstamartPnlFacts,
   AmazonAePnlFacts,
   AmazonUsaPnlFacts,
   CanonicalSalesRecord,
@@ -35,6 +36,9 @@ import { blinkitToCanonicalBuckets, computeBlinkitPnl, BLINKIT_LINE_DEFS } from 
 import { amazonAeToCanonicalBuckets, amazonAeValuesInInr, computeAmazonAePnl, AMAZON_AE_LINE_DEFS } from './nativePnl/amazonAe'
 import { applyMyntraOtherCosts, computeMyntraPnl, myntraToCanonicalBuckets, MYNTRA_LINE_DEFS } from './nativePnl/myntra'
 import { computePurpllePnl, purplleToCanonicalBuckets, PURPLLE_LINE_DEFS } from './nativePnl/purplle'
+import {
+  computeSwiggyInstamartPnl, swiggyInstamartToCanonicalBuckets, SWIGGY_LINE_DEFS,
+} from './nativePnl/swiggyInstamart'
 import {
   applyNykaaOtherCosts, computeNykaaPnl, nykaaDiscountPerSalesFile, nykaaDiscountRecovered,
   nykaaDiscountWasDerived, nykaaToCanonicalBuckets, NYKAA_LINE_DEFS,
@@ -76,6 +80,7 @@ export interface ChannelFactsStore {
   blinkitFacts?: BlinkitPnlFacts[]
   amazonAeFacts?: AmazonAePnlFacts[]
   purplleFacts?: PurpllePnlFacts[]
+  swiggyInstamartFacts?: SwiggyInstamartPnlFacts[]
 }
 
 /** Sums this channel's allocated share (sales-contribution method) of the
@@ -735,6 +740,48 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
     }
   }
 
+  if (channel === 'swiggy_instamart') {
+    const facts = inputs.facts.swiggyInstamartFacts?.find((f) => f.month === month)
+    if (facts) {
+      const recomputed = recomputedCogs(channel, month, inputs)
+      const cogs = recomputed ? recomputed.total : facts.cogsSourceInr
+      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+
+      const notes: string[] = [
+        'Swiggy sends a sales report, not a settlement — no commission, fulfilment, payment or return charge, and ' +
+        'no discount off MRP — so this statement runs to gross profit and names what Swiggy took as not supplied.',
+        `GMV is stated at MRP and includes GST, and the report carries no rate. The tax above comes out at ` +
+        `${(facts.outputGstPct * 100).toFixed(0)}%, which is an assumption: every line below NET REVENUE moves if ` +
+        'it is wrong.',
+      ]
+      if (recomputed && recomputed.uncostedUnits > 0) {
+        const shown = recomputed.uncostedSkus.slice(0, 8).join(', ')
+        const rest = recomputed.uncostedSkus.length - 8
+        notes.push(
+          `${recomputed.uncostedSkus.length} Swiggy item code(s) sold in ${month} have no cost on file, covering ` +
+          `${recomputed.uncostedUnits.toLocaleString('en-IN')} unit(s). Link ` +
+          `${shown}${rest > 0 ? ` and ${rest} more` : ''} on Catalogue ▸ SKU Mapping to price them.`,
+        )
+      }
+
+      return {
+        channel, month,
+        canonical: {
+          channel, month,
+          lines: computeSubtotals(
+            withAllocatedOpex(swiggyInstamartToCanonicalBuckets(facts, cogs), inputs, channel, month),
+          ),
+        },
+        native: {
+          lineDefs: SWIGGY_LINE_DEFS,
+          values: computeSwiggyInstamartPnl(facts, cogs, otherCosts),
+          currency: 'INR',
+        },
+        notes,
+      }
+    }
+  }
+
   if (channel === 'meesho') {
     const basis = inputs.meeshoBasis ?? 'order'
     // A month stored under the older, thinner shape is treated as absent
@@ -804,6 +851,7 @@ const NATIVE_STATEMENT_SOURCE: Partial<Record<BusinessChannelId, string>> = {
   amazon_ae: 'Product Profitability export',
   amazon_in: 'settlement report',
   purplle: 'monthly sales file',
+  swiggy_instamart: 'monthly sales report',
 }
 
 export function buildAllChannelPnlViews(channels: BusinessChannelId[], month: string, inputs: ChannelPnlViewInputs): ChannelPnlView[] {

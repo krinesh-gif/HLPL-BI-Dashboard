@@ -24,6 +24,9 @@ import { detectAmazonVendorCentralSalesReport, normalizeAmazonVendorCentralSales
 import { detectMyntraPnlWorkbook, normalizeMyntraPnlWorkbook } from '@/data/normalize/myntraPnlWorkbook'
 import { detectPurplleSalesReport, normalizePurplleSalesReport } from '@/data/normalize/purplleSalesReport'
 import {
+  detectSwiggyInstamartReport, normalizeSwiggyInstamartReport,
+} from '@/data/normalize/swiggyInstamartSalesReport'
+import {
   detectNykaaCartRuleSheet, detectNykaaComboSheet, detectNykaaSalesSheet, normalizeNykaaWorkbook,
 } from '@/data/normalize/nykaaSalesWorkbook'
 import { normalizeBlinkitPayoutZip } from '@/data/normalize/blinkitPayout'
@@ -36,7 +39,7 @@ import { useDataStore, type ImportOutcome } from '@/store/dataStore'
 import { monthLabel } from '@/lib/format'
 import { useFilterStore } from '@/store/filterStore'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
-import type { AdsRecord, AmazonAePnlFacts, AmazonInSkuFeeFacts, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts, PurpllePnlFacts } from '@/data/models'
+import type { AdsRecord, AmazonAePnlFacts, AmazonInSkuFeeFacts, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts, PurpllePnlFacts, SwiggyInstamartPnlFacts } from '@/data/models'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
 
@@ -49,6 +52,7 @@ type ReportKind =
   | 'amazon_uae_product_profitability'
   | 'amazon_in_sku_fees'
   | 'purplle_sales'
+  | 'swiggy_instamart_sales'
   | 'myntra_pnl_workbook'
   | 'nykaa_sales'
   | 'nykaa_companion'
@@ -72,6 +76,7 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   amazon_uae_product_profitability: 'Amazon UAE — Product Profitability Report',
   amazon_in_sku_fees: 'Amazon India — Product Profitability Report (fees per SKU)',
   purplle_sales: 'Purplle — Monthly Sales File',
+  swiggy_instamart_sales: 'Swiggy Instamart — Monthly Sales Report',
   blinkit_ads: 'Blinkit — Campaign Report',
   myntra_pnl_workbook: 'Myntra — P&L Report (PnL_Summary + SKU_Detail)',
   nykaa_sales: 'Nykaa — Monthly Sales Data (B2B, margin on MRP)',
@@ -94,6 +99,7 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   amazon_uae_product_profitability: 'amazon_ae',
   amazon_in_sku_fees: 'amazon_in_seller',
   purplle_sales: 'purplle',
+  swiggy_instamart_sales: 'swiggy_instamart',
   blinkit_ads: 'blinkit',
   myntra_pnl_workbook: 'myntra',
   nykaa_sales: 'nykaa',
@@ -124,6 +130,7 @@ interface PreviewState {
   amazonAeFacts?: AmazonAePnlFacts
   amazonInSkuFeeFacts?: AmazonInSkuFeeFacts
   purplleFacts?: PurpllePnlFacts
+  swiggyInstamartFacts?: SwiggyInstamartPnlFacts
   myntraFacts?: MyntraPnlFacts
   nykaaFacts?: NykaaPnlFacts
   blinkitFacts?: BlinkitPnlFacts
@@ -406,6 +413,16 @@ export function UploadReportsPage() {
             ],
           }) }
         }
+        // Swiggy sends two sheets, each with its column names on a row of
+        // their own, so it is read as a workbook rather than a flat table.
+        if (detectSwiggyInstamartReport(sheets)) {
+          const r = normalizeSwiggyInstamartReport(sheets, skuMaster, mappings, importId)
+          return { id, fileName: file.name, status: 'ready', preview: await buildPreview({
+            fileName: file.name, reportKind: 'swiggy_instamart_sales', totalRows: r.totalRows,
+            validRecords: r.validRecords, invalidCount: r.invalidRows.length,
+            warnings: r.warnings, swiggyInstamartFacts: r.facts,
+          }) }
+        }
         // Purplle's file puts a strip of the sender's own totals above the
         // column names, so it cannot be read as a flat header-first sheet.
         if (detectPurplleSalesReport(firstSheet)) {
@@ -651,6 +668,7 @@ export function UploadReportsPage() {
         amazonAeFacts: preview.amazonAeFacts,
         amazonInSkuFeeFacts: preview.amazonInSkuFeeFacts,
         purplleFacts: preview.purplleFacts,
+        swiggyInstamartFacts: preview.swiggyInstamartFacts,
         myntraFacts: preview.myntraFacts,
         nykaaFacts: preview.nykaaFacts,
         blinkitFacts: preview.blinkitFacts,

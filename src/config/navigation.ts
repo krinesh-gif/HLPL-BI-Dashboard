@@ -41,6 +41,7 @@ export const NAVIGATION: NavSection[] = [
       { label: 'Nykaa', path: '/channels/nykaa' },
       { label: 'Purplle', path: '/channels/purplle' },
       { label: 'Blinkit', path: '/channels/blinkit' },
+      { label: 'Swiggy Instamart', path: '/channels/swiggy_instamart' },
     ],
   },
   {

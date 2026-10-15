@@ -27,7 +27,7 @@ export function usePnlInputs(): {
   const {
     salesRecords, adsRecords, skuMaster, fixedExpenses,
     flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts, blinkitFacts,
-    amazonAeFacts, purplleFacts,
+    amazonAeFacts, purplleFacts, swiggyInstamartFacts,
     costVersions, mappings, comboComponents, manualAdSpend, fxRates, freightRates, packagingRates, nykaaDiscounts,
   } = useDataStore()
 
@@ -42,7 +42,7 @@ export function usePnlInputs(): {
       // Amazon took" line, its units, its warning — never reached the P&L.
       facts: {
         flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts, blinkitFacts,
-        amazonAeFacts, purplleFacts,
+        amazonAeFacts, purplleFacts, swiggyInstamartFacts,
       },
       cogs: {
         // Costs resolve per month, so a closed month keeps the cost it was
@@ -71,7 +71,7 @@ export function usePnlInputs(): {
   }, [
     salesRecords, adsRecords, skuMaster, fixedExpenses,
     flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts, blinkitFacts,
-    amazonAeFacts, purplleFacts,
+    amazonAeFacts, purplleFacts, swiggyInstamartFacts,
     costVersions, mappings, comboComponents, manualAdSpend, fxRates, freightRates, packagingRates, nykaaDiscounts,
   ])
 }

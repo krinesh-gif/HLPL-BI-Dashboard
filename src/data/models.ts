@@ -386,6 +386,54 @@ export interface NykaaPnlFacts {
 }
 
 /**
+ * Swiggy Instamart's month, as its sales report states it.
+ *
+ * Swiggy sends two sheets. `Sales Report` is one row per product per store per
+ * day: the item code, the city, the base MRP, the units and the GMV, which is
+ * base MRP × units on every row of June. `Brand Metrics` is per city per day:
+ * impressions, orders, new-to-brand buyers, and the same GMV again.
+ *
+ * What it does not send is anything Swiggy took, any discount off MRP, and any
+ * GST rate — so `outputGst` is computed at a declared assumption rather than
+ * read, and the statement says so on the line.
+ */
+export interface SwiggyInstamartPnlFacts {
+  month: string
+  schemaVersion: 1
+  /** Σ GMV — at base MRP, and so including GST. */
+  gmv: number
+  /** Σ BASE_MRP × UNITS_SOLD, which June's file reproduces exactly. Kept
+   * separately so a month where the two part company is visible rather than
+   * averaged away. */
+  mrpValue: number
+  /** The tax inside GMV, at the assumed rate. Not read from the file: Swiggy's
+   * report carries no GST column. */
+  outputGst: number
+  /** The rate used, stored with the month so a later change to the assumption
+   * does not silently restate a month that was read at the old one. */
+  outputGstPct: number
+  gmvExGst: number
+  unitsSold: number
+  /** Rows of the sales report — one product, one store, one day. */
+  salesRows: number
+  skusSold: number
+  storesSold: number
+  citiesSold: number
+  /** From `Brand Metrics`, which is reach rather than money. Absent in a file
+   * that does not carry the sheet. */
+  brandImpressions: number
+  brandOrders: number
+  newToBrandBuyers: number
+  /** `Brand Metrics` states GMV as well. Reading both is how the two sheets
+   * can be checked against each other instead of trusted. */
+  brandGmv: number
+  /** COGS priced at upload from the Product Master. */
+  cogsSourceInr: number
+  /** Swiggy item codes with no cost behind them. */
+  unpricedSkus: string[]
+}
+
+/**
  * Purplle's month, as its sales file states it.
  *
  * Everything here comes from the file and nothing is inferred: Purplle sends

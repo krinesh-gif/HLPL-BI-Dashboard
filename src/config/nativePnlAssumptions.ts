@@ -50,6 +50,24 @@ export const MEESHO_ASSUMPTIONS = {
 }
 
 /**
+ * Swiggy Instamart operating assumptions.
+ *
+ * One figure, and it is here rather than in the facts because the report does
+ * not carry it. Swiggy states GMV at base MRP, which includes GST, and says
+ * nothing about the rate. Every line of the statement below NET REVENUE moves
+ * with it, so it is declared in one place, stored with each month as it is
+ * read, and labelled on the statement as assumed rather than read.
+ *
+ * 18% is the rate on the cosmetics this brand sells. Purplle's file, which
+ * does state a rate per line, carries some 5% lines, so a month that is not
+ * all 18% will be overstated on tax and understated on net revenue until
+ * Swiggy sends a rate or this is split per SKU.
+ */
+export const SWIGGY_ASSUMPTIONS = {
+  outputGstPct: 0.18,
+}
+
+/**
  * Nykaa operating assumptions.
  *
  * Nykaa is a B2B channel: Nykaa buys the goods and resells them, and its

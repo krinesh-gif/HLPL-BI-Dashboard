@@ -240,6 +240,13 @@ BEGIN
     data  JSONB NOT NULL
   );
 
+  -- Swiggy Instamart's month, from its sales report. Like Purplle's, a sales
+  -- file and not a settlement, so these facts carry no marketplace charges.
+  CREATE TABLE IF NOT EXISTS swiggy_instamart_facts (
+    month TEXT PRIMARY KEY,
+    data  JSONB NOT NULL
+  );
+
   -- Amazon India's fees traced to the SKUs carrying them, read from the
   -- Product Profitability export.
   --
