@@ -386,6 +386,52 @@ export interface NykaaPnlFacts {
 }
 
 /**
+ * Purplle's month, as its sales file states it.
+ *
+ * Everything here comes from the file and nothing is inferred: Purplle sends
+ * order lines with MRP, the price off, what the shopper paid (`nmv`, which
+ * includes GST) and the GST rate, and states nothing it took. There is no
+ * fee field on this record because there is no fee in the file, and an
+ * invented one would be read as measured.
+ */
+export interface PurpllePnlFacts {
+  month: string
+  schemaVersion: 1
+  /** Σ MRP of the lines that sold. */
+  mrpValue: number
+  /** Σ "Price Off Amt" — the discount against MRP. */
+  priceOff: number
+  /** Σ nmv: what shoppers paid, including GST. MRP less the price off. */
+  nmv: number
+  /** The tax inside nmv, at each line's own rate. */
+  outputGst: number
+  /** nmv less the GST — the basis every other channel's margins are on. */
+  netRevenue: number
+  unitsSold: number
+  orderLines: number
+  orders: number
+  skusSold: number
+  /** The "Marketing" figure written above the table, when there is one. */
+  marketingInr: number
+  /** Whether the file stated it at all, which is different from stating nil. */
+  marketingStated: boolean
+  /** COGS priced at upload from the Product Master. The statement prefers the
+   * cost sheet for the month and falls back to this. */
+  cogsSourceInr: number
+  /** Purplle codes with no cost behind them, so the gap is nameable. */
+  unpricedSkus: string[]
+  /** The file's second discount column and how far it differs from the first.
+   * The sender carries both and their own difference column; April's disagree
+   * by ₹48, which is worth saying rather than quietly picking one. */
+  priceOffAlt: number
+  priceOffDifference: number
+  /** The file's own "Difference" column, summed. April's totals ₹48 while the
+   * two discount columns are ₹46 apart, so the file does not agree with
+   * itself either — worth saying when asking Purplle which figure is right. */
+  priceOffDifferenceStated: number
+}
+
+/**
  * Amazon India's fees, traced to the SKUs carrying them.
  *
  * Deliberately not part of `AmazonInSellerPnlFacts`, and deliberately not a

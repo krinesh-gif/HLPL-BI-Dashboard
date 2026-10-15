@@ -28,6 +28,7 @@ import type {
   BlinkitPnlFacts,
   AmazonAePnlFacts,
   AmazonInSkuFeeFacts,
+  PurpllePnlFacts,
   AmazonInSellerPnlFacts,
   SkuMaster,
 } from '@/data/models'
@@ -64,6 +65,9 @@ interface SharedDataset {
    * Beside that channel's statement, never part of it: no P&L line and no
    * sales read it, and it is not counted in any total. */
   amazonInSkuFeeFacts?: AmazonInSkuFeeFacts[]
+  /** Purplle's months. Optional so a workspace whose API has not redeployed
+   * yet still loads. */
+  purplleFacts?: PurpllePnlFacts[]
   /** Optional so a workspace whose API has not redeployed yet still loads:
    * an older /api/state simply does not send this key. */
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
@@ -86,6 +90,7 @@ const EMPTY_DATASET: SharedDataset = {
   blinkitFacts: [],
   amazonAeFacts: [],
   amazonInSkuFeeFacts: [],
+  purplleFacts: [],
   amazonInSellerFacts: [],
   manualAdSpend: [],
 }
@@ -104,6 +109,7 @@ export interface ReportImport {
   blinkitFacts?: BlinkitPnlFacts
   amazonAeFacts?: AmazonAePnlFacts
   amazonInSkuFeeFacts?: AmazonInSkuFeeFacts
+  purplleFacts?: PurpllePnlFacts
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
   meeshoFactsByMonth?: MeeshoPnlFacts[]
   /** The individual events behind those facts. These are what is stored: a
@@ -235,13 +241,24 @@ function batched<T>(items: T[], size: number): T[][] {
   return batches
 }
 
-/** The newest month present anywhere in the dataset — order rows or any
- * channel's P&L facts — so the dashboard can open on a month that has numbers
- * in it rather than on today's date. */
-export function latestMonthWithData(dataset: SharedDataset): string | null {
+/**
+ * Every month the business traded in: order rows, and every channel's own
+ * statement.
+ *
+ * One list, because the screens that need it kept writing their own and a
+ * channel added later was missed by each of them in turn — the P&L's month
+ * list had no Amazon UAE in it, so a month only that channel traded in was
+ * not offered in From/To. Derived from the dataset here, so adding a channel
+ * is adding one line in one place.
+ *
+ * Advertising months are deliberately not in it. Ad spend lands in a month
+ * before the month has traded, and counting it as a month with data put a
+ * future month in the P&L's comparison: October against September, where
+ * October was four days old.
+ */
+export function statementMonths(dataset: SharedDataset): string[] {
   const months = [
     ...dataset.salesRecords.map((r) => toMonthKey(r.orderDate)),
-    ...dataset.adsRecords.map((r) => toMonthKey(r.date)),
     ...dataset.flipkartFacts.map((f) => f.month),
     ...dataset.amazonUsaFacts.map((f) => f.month),
     ...dataset.meeshoFacts.map((f) => f.month),
@@ -249,7 +266,19 @@ export function latestMonthWithData(dataset: SharedDataset): string | null {
     ...(dataset.nykaaFacts ?? []).map((f) => f.month),
     ...(dataset.blinkitFacts ?? []).map((f) => f.month),
     ...(dataset.amazonAeFacts ?? []).map((f) => f.month),
+    ...(dataset.purplleFacts ?? []).map((f) => f.month),
     ...(dataset.amazonInSellerFacts ?? []).map((f) => f.month),
+  ].filter(Boolean)
+  return [...new Set(months)].sort()
+}
+
+/** The newest month present anywhere in the dataset — order rows, any
+ * channel's P&L facts, or advertising — so the dashboard can open on a month
+ * that has numbers in it rather than on today's date. */
+export function latestMonthWithData(dataset: SharedDataset): string | null {
+  const months = [
+    ...statementMonths(dataset),
+    ...dataset.adsRecords.map((r) => toMonthKey(r.date)),
   ].filter(Boolean)
 
   return months.length === 0 ? null : months.reduce((a, b) => (a > b ? a : b))
@@ -358,7 +387,7 @@ export const useDataStore = create<DataState>((set, get) => {
      * file (rows, then one facts call per month) downloaded everything three
      * or more times over, and a large file could not get through at all.
      */
-    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, amazonAeFacts, amazonInSkuFeeFacts, myntraFacts, nykaaFacts, blinkitFacts, amazonInSellerFacts, meeshoFactsByMonth, meeshoTransactions, meeshoAdsRows, meeshoRecoveryRows }) => {
+    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, amazonAeFacts, amazonInSkuFeeFacts, purplleFacts, myntraFacts, nykaaFacts, blinkitFacts, amazonInSellerFacts, meeshoFactsByMonth, meeshoTransactions, meeshoAdsRows, meeshoRecoveryRows }) => {
       const total = salesRecords.length + adsRecords.length
       set({ importProgress: { sent: 0, total } })
       try {
@@ -437,6 +466,10 @@ export const useDataStore = create<DataState>((set, get) => {
         if (amazonAeFacts) {
           await api.post('/api/facts/amazon-uae', { facts: amazonAeFacts, importId })
           monthsUpdated.push(amazonAeFacts.month)
+        }
+        if (purplleFacts) {
+          await api.post('/api/facts/purplle', { facts: purplleFacts, importId })
+          monthsUpdated.push(purplleFacts.month)
         }
         if (amazonInSkuFeeFacts) {
           await api.post('/api/facts/amazon-in-sku-fees', { facts: amazonInSkuFeeFacts, importId })

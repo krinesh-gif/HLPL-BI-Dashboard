@@ -232,6 +232,14 @@ BEGIN
     data  JSONB NOT NULL
   );
 
+  -- Purplle's month, from the sales file its team sends. A sales file and not
+  -- a settlement, so these facts carry no marketplace charges — see
+  -- PurpllePnlFacts for why there is no field for one.
+  CREATE TABLE IF NOT EXISTS purplle_facts (
+    month TEXT PRIMARY KEY,
+    data  JSONB NOT NULL
+  );
+
   -- Amazon India's fees traced to the SKUs carrying them, read from the
   -- Product Profitability export.
   --

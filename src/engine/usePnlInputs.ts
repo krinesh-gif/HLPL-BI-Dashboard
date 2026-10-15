@@ -27,6 +27,7 @@ export function usePnlInputs(): {
   const {
     salesRecords, adsRecords, skuMaster, fixedExpenses,
     flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts, blinkitFacts,
+    amazonAeFacts, purplleFacts,
     costVersions, mappings, comboComponents, manualAdSpend, fxRates, freightRates, packagingRates, nykaaDiscounts,
   } = useDataStore()
 
@@ -35,7 +36,14 @@ export function usePnlInputs(): {
       salesRecords,
       skuMaster,
       fixedExpenses,
-      facts: { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts, blinkitFacts },
+      // Every channel that has a statement of its own. One missing here does
+      // not fail: the router quietly falls back to the generic order-row
+      // template, which is how Amazon UAE's statement — its single "what
+      // Amazon took" line, its units, its warning — never reached the P&L.
+      facts: {
+        flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts, blinkitFacts,
+        amazonAeFacts, purplleFacts,
+      },
       cogs: {
         // Costs resolve per month, so a closed month keeps the cost it was
         // closed at however many times the cost has changed since.
@@ -63,6 +71,7 @@ export function usePnlInputs(): {
   }, [
     salesRecords, adsRecords, skuMaster, fixedExpenses,
     flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts, blinkitFacts,
+    amazonAeFacts, purplleFacts,
     costVersions, mappings, comboComponents, manualAdSpend, fxRates, freightRates, packagingRates, nykaaDiscounts,
   ])
 }

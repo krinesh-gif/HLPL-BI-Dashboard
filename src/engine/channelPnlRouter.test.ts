@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { BUSINESS_CHANNEL_IDS } from '@/config/channels'
 import { buildChannelPnlView } from './channelPnlRouter'
 import type {
   AmazonUsaPnlFacts, CanonicalSalesRecord, FixedExpenseEntry, FlipkartPnlFacts, NykaaPnlFacts, SkuMaster,
@@ -364,10 +365,22 @@ describe('a month with no settlement report', () => {
     expect(buildChannelPnlView('amazon_us', '2026-08', empty).notes[0]).toContain('Product Profitability export')
   })
 
-  it('stays quiet for a channel that has no statement to be missing', () => {
-    // Purplle is read from order rows by design, so the template is not
-    // standing in for anything and there is nothing to warn about.
-    expect(buildChannelPnlView('purplle', '2026-08', empty).notes).toEqual([])
+  it('never falls back silently: every channel names the report it is missing', () => {
+    // A silent fallback is what hid Amazon UAE reading from order rows for
+    // weeks — the screen showed numbers, and nothing said they were not the
+    // channel's own statement. Purplle was the last channel without one.
+    for (const channel of BUSINESS_CHANNEL_IDS) {
+      const view = buildChannelPnlView(channel, '2026-08', empty)
+      expect(view.native, channel).toBeUndefined()
+      expect(view.notes, channel).toHaveLength(1)
+      expect(view.notes[0], channel).toContain('2026-08')
+    }
+  })
+
+  it('says which report is missing for Purplle, now that it has one', () => {
+    const view = buildChannelPnlView('purplle', '2026-08', empty)
+    expect(view.native).toBeUndefined()
+    expect(view.notes[0]).toContain('monthly sales file')
   })
 
   it('says nothing once the month has its facts', () => {

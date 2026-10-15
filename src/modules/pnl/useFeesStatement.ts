@@ -3,8 +3,8 @@ import { BUSINESS_CHANNEL_IDS } from '@/config/channels'
 import { buildAllChannelPnlViews } from '@/engine/channelPnlRouter'
 import { buildFeesStatement, buildChannelFeesStatement, type ChannelFeesStatement } from '@/engine/feesStatement'
 import { usePnlInputs } from '@/engine/usePnlInputs'
-import { addMonths, toMonthKey } from '@/lib/format'
-import { useDataStore } from '@/store/dataStore'
+import { addMonths } from '@/lib/format'
+import { statementMonths, useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
 
 /** How many months of history the trend reads. */
@@ -24,20 +24,9 @@ export function useFeesStatement() {
   const { forMonth } = usePnlInputs()
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
 
-  const monthsWithData = useMemo(() => {
-    const set = new Set<string>()
-    for (const r of store.salesRecords) set.add(toMonthKey(r.orderDate))
-    for (const list of [
-      store.flipkartFacts, store.amazonUsaFacts, store.meeshoFacts, store.myntraFacts,
-      store.nykaaFacts, store.amazonInSellerFacts, store.blinkitFacts,
-    ]) {
-      for (const f of list ?? []) set.add(f.month)
-    }
-    return [...set].sort()
-  }, [
-    store.salesRecords, store.flipkartFacts, store.amazonUsaFacts, store.meeshoFacts,
-    store.myntraFacts, store.nykaaFacts, store.amazonInSellerFacts, store.blinkitFacts,
-  ])
+  // One list, shared with the P&L: a channel added later was otherwise
+  // missed here as well.
+  const monthsWithData = useMemo(() => statementMonths(store), [store])
 
   return useMemo(() => {
     const active = selectedMonth ?? month

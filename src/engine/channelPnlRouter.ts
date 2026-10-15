@@ -1,6 +1,7 @@
 import type { BusinessChannelId } from '@/config/channels'
 import type { PnlBasis } from '@/data/models'
 import type {
+  PurpllePnlFacts,
   AmazonAePnlFacts,
   AmazonUsaPnlFacts,
   CanonicalSalesRecord,
@@ -33,6 +34,7 @@ import { applyMeeshoOtherCosts, computeMeeshoPnl, meeshoToCanonicalBuckets, MEES
 import { blinkitToCanonicalBuckets, computeBlinkitPnl, BLINKIT_LINE_DEFS } from './nativePnl/blinkit'
 import { amazonAeToCanonicalBuckets, amazonAeValuesInInr, computeAmazonAePnl, AMAZON_AE_LINE_DEFS } from './nativePnl/amazonAe'
 import { applyMyntraOtherCosts, computeMyntraPnl, myntraToCanonicalBuckets, MYNTRA_LINE_DEFS } from './nativePnl/myntra'
+import { computePurpllePnl, purplleToCanonicalBuckets, PURPLLE_LINE_DEFS } from './nativePnl/purplle'
 import {
   applyNykaaOtherCosts, computeNykaaPnl, nykaaDiscountPerSalesFile, nykaaDiscountRecovered,
   nykaaDiscountWasDerived, nykaaToCanonicalBuckets, NYKAA_LINE_DEFS,
@@ -73,6 +75,7 @@ export interface ChannelFactsStore {
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
   blinkitFacts?: BlinkitPnlFacts[]
   amazonAeFacts?: AmazonAePnlFacts[]
+  purplleFacts?: PurpllePnlFacts[]
 }
 
 /** Sums this channel's allocated share (sales-contribution method) of the
@@ -687,6 +690,51 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
     }
   }
 
+  if (channel === 'purplle') {
+    const facts = inputs.facts.purplleFacts?.find((f) => f.month === month)
+    if (facts) {
+      // Purplle does not know what the goods cost, so COGS is priced from the
+      // order rows at the month's effective cost where they exist, and from
+      // what the Product Master held at upload otherwise.
+      const recomputed = recomputedCogs(channel, month, inputs)
+      const cogs = recomputed ? recomputed.total : facts.cogsSourceInr
+      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+
+      // On the statement, not only at upload: whoever reads this in three
+      // months has to know why there is no commission line.
+      const notes: string[] = [
+        'Purplle sends a sales file, not a settlement — it states no commission, logistics, payment or return ' +
+        'charges — so this statement runs to gross profit and names what Purplle took as not supplied. Nothing ' +
+        'above that line changes when the payout statement arrives.',
+      ]
+      if (facts.marketingStated) {
+        notes.push(
+          'Advertising is the "Marketing" figure written above the table in Purplle’s file rather than a column of ' +
+          'it. Worth checking against Purplle’s invoice.',
+        )
+      }
+      if (recomputed && recomputed.uncostedUnits > 0) {
+        const shown = recomputed.uncostedSkus.slice(0, 8).join(', ')
+        const rest = recomputed.uncostedSkus.length - 8
+        notes.push(
+          `${recomputed.uncostedSkus.length} Purplle SKU code(s) sold in ${month} have no cost on file, covering ` +
+          `${recomputed.uncostedUnits.toLocaleString('en-IN')} unit(s). Link ` +
+          `${shown}${rest > 0 ? ` and ${rest} more` : ''} on Catalogue ▸ SKU Mapping to price them.`,
+        )
+      }
+
+      return {
+        channel, month,
+        canonical: {
+          channel, month,
+          lines: computeSubtotals(withAllocatedOpex(purplleToCanonicalBuckets(facts, cogs), inputs, channel, month)),
+        },
+        native: { lineDefs: PURPLLE_LINE_DEFS, values: computePurpllePnl(facts, cogs, otherCosts), currency: 'INR' },
+        notes,
+      }
+    }
+  }
+
   if (channel === 'meesho') {
     const basis = inputs.meeshoBasis ?? 'order'
     // A month stored under the older, thinner shape is treated as absent
@@ -755,6 +803,7 @@ const NATIVE_STATEMENT_SOURCE: Partial<Record<BusinessChannelId, string>> = {
   amazon_us: 'Product Profitability export',
   amazon_ae: 'Product Profitability export',
   amazon_in: 'settlement report',
+  purplle: 'monthly sales file',
 }
 
 export function buildAllChannelPnlViews(channels: BusinessChannelId[], month: string, inputs: ChannelPnlViewInputs): ChannelPnlView[] {

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useDataStore } from '@/store/dataStore'
+import { statementMonths, useDataStore } from '@/store/dataStore'
 import { fxRateForMonth, lineValuesFromInr } from '@/data/fxRates'
 import { useFilterStore } from '@/store/filterStore'
 import {
@@ -52,8 +52,8 @@ export interface PnlReportStart {
 }
 
 export function usePnlReport(start: PnlReportStart = {}) {
-  const { salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts, amazonInSellerFacts, fxRates } =
-    useDataStore()
+  const store = useDataStore()
+  const { fxRates } = store
   const { month } = useFilterStore()
   const { forMonth } = usePnlInputs()
   // Today's month, which is the one month a comparison must not use as its
@@ -71,22 +71,9 @@ export function usePnlReport(start: PnlReportStart = {}) {
   const [currencyView, setCurrencyView] = useState<ChannelCurrencyView>(start.currencyView ?? 'native')
   const [period, setPeriod] = useState<PnlPeriod>(start.period ?? { mode: 'quick', quick: '6m', from: month, to: month })
 
-  const monthsWithData = useMemo(() => {
-    const set = new Set<string>()
-    for (const r of salesRecords) set.add(toMonthKey(r.orderDate))
-    for (const f of flipkartFacts) set.add(f.month)
-    for (const f of amazonUsaFacts) set.add(f.month)
-    for (const f of meeshoFacts) set.add(f.month)
-    for (const f of myntraFacts) set.add(f.month)
-    for (const f of nykaaFacts) set.add(f.month)
-    // Blinkit and Amazon India Seller reach the P&L through `usePnlInputs`
-    // like every other channel, so their months belong in this list too. Left
-    // out, a month that only Blinkit traded in was not offered in From/To and
-    // did not count as a month with data.
-    for (const f of blinkitFacts) set.add(f.month)
-    for (const f of amazonInSellerFacts ?? []) set.add(f.month)
-    return [...set].sort()
-  }, [salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts, amazonInSellerFacts])
+  // Every channel's months, from one list in the store. Each screen used to
+  // keep its own, and each in turn missed a channel added later.
+  const monthsWithData = useMemo(() => statementMonths(store), [store])
 
   return useMemo(() => {
     const months =

@@ -29,7 +29,7 @@ export async function GET(request: Request): Promise<Response> {
   // round trip once rather than on every load.
   await ensureSchema()
 
-  const [skuRows, salesRows, adsRows, importRows, expenseRows, flipkart, amazonUsa, myntra, nykaa, amazonInSeller, blinkit, amazonAe, amazonInSkuFees, meesho, manualAds] =
+  const [skuRows, salesRows, adsRows, importRows, expenseRows, flipkart, amazonUsa, myntra, nykaa, amazonInSeller, blinkit, amazonAe, amazonInSkuFees, purplle, meesho, manualAds] =
     await Promise.all([
       sql`SELECT * FROM sku_master ORDER BY sku`,
       // Grouped, not raw. 74,354 order lines were 42 MB of JSON on every
@@ -69,6 +69,7 @@ export async function GET(request: Request): Promise<Response> {
       sql`SELECT data FROM blinkit_facts ORDER BY month`,
       sql`SELECT data FROM amazon_ae_facts ORDER BY month`,
       sql`SELECT data FROM amazon_in_sku_fee_facts ORDER BY month`,
+      sql`SELECT data FROM purplle_facts ORDER BY month`,
       meeshoFactsFromEvents(),
       sql`SELECT channel, month, amount, file_name, note, entered_at FROM manual_ad_spend ORDER BY month`,
     ])
@@ -92,6 +93,7 @@ export async function GET(request: Request): Promise<Response> {
     blinkitFacts: (blinkit as Row[]).map((r) => r.data),
     amazonAeFacts: (amazonAe as Row[]).map((r) => r.data),
     amazonInSkuFeeFacts: (amazonInSkuFees as Row[]).map((r) => r.data),
+    purplleFacts: (purplle as Row[]).map((r) => r.data),
     // Summed from the stored events, never from a pre-aggregated copy: the
     // same event arrives in several of Meesho's overlapping downloads.
     meeshoFacts: meesho,

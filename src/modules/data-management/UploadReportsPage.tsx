@@ -22,6 +22,7 @@ import { detectAmazonAdsSponsoredProductsReport, normalizeAmazonAdsSponsoredProd
 import { detectBlinkitAdsReport, normalizeBlinkitAdsReport } from '@/data/normalize/blinkitAdsReport'
 import { detectAmazonVendorCentralSalesReport, normalizeAmazonVendorCentralSales } from '@/data/normalize/amazonVendorCentralSales'
 import { detectMyntraPnlWorkbook, normalizeMyntraPnlWorkbook } from '@/data/normalize/myntraPnlWorkbook'
+import { detectPurplleSalesReport, normalizePurplleSalesReport } from '@/data/normalize/purplleSalesReport'
 import {
   detectNykaaCartRuleSheet, detectNykaaComboSheet, detectNykaaSalesSheet, normalizeNykaaWorkbook,
 } from '@/data/normalize/nykaaSalesWorkbook'
@@ -35,7 +36,7 @@ import { useDataStore, type ImportOutcome } from '@/store/dataStore'
 import { monthLabel } from '@/lib/format'
 import { useFilterStore } from '@/store/filterStore'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
-import type { AdsRecord, AmazonAePnlFacts, AmazonInSkuFeeFacts, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts } from '@/data/models'
+import type { AdsRecord, AmazonAePnlFacts, AmazonInSkuFeeFacts, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts, PurpllePnlFacts } from '@/data/models'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
 
@@ -47,6 +48,7 @@ type ReportKind =
   | 'amazon_usa_product_profitability'
   | 'amazon_uae_product_profitability'
   | 'amazon_in_sku_fees'
+  | 'purplle_sales'
   | 'myntra_pnl_workbook'
   | 'nykaa_sales'
   | 'nykaa_companion'
@@ -69,6 +71,7 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   amazon_usa_product_profitability: 'Amazon USA — Product Profitability Report',
   amazon_uae_product_profitability: 'Amazon UAE — Product Profitability Report',
   amazon_in_sku_fees: 'Amazon India — Product Profitability Report (fees per SKU)',
+  purplle_sales: 'Purplle — Monthly Sales File',
   blinkit_ads: 'Blinkit — Campaign Report',
   myntra_pnl_workbook: 'Myntra — P&L Report (PnL_Summary + SKU_Detail)',
   nykaa_sales: 'Nykaa — Monthly Sales Data (B2B, margin on MRP)',
@@ -90,6 +93,7 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   amazon_usa_product_profitability: 'amazon_us',
   amazon_uae_product_profitability: 'amazon_ae',
   amazon_in_sku_fees: 'amazon_in_seller',
+  purplle_sales: 'purplle',
   blinkit_ads: 'blinkit',
   myntra_pnl_workbook: 'myntra',
   nykaa_sales: 'nykaa',
@@ -119,6 +123,7 @@ interface PreviewState {
   amazonUsaFacts?: AmazonUsaPnlFacts
   amazonAeFacts?: AmazonAePnlFacts
   amazonInSkuFeeFacts?: AmazonInSkuFeeFacts
+  purplleFacts?: PurpllePnlFacts
   myntraFacts?: MyntraPnlFacts
   nykaaFacts?: NykaaPnlFacts
   blinkitFacts?: BlinkitPnlFacts
@@ -401,6 +406,16 @@ export function UploadReportsPage() {
             ],
           }) }
         }
+        // Purplle's file puts a strip of the sender's own totals above the
+        // column names, so it cannot be read as a flat header-first sheet.
+        if (detectPurplleSalesReport(firstSheet)) {
+          const r = normalizePurplleSalesReport(firstSheet, skuMaster, mappings, importId)
+          return { id, fileName: file.name, status: 'ready', preview: await buildPreview({
+            fileName: file.name, reportKind: 'purplle_sales', totalRows: r.totalRows,
+            validRecords: r.validRecords, invalidCount: r.invalidRows.length,
+            warnings: r.warnings, purplleFacts: r.facts,
+          }) }
+        }
         if (detectMyntraPnlWorkbook(sheetNames)) {
           const r = normalizeMyntraPnlWorkbook(sheets, skuMaster, mappings, importId)
           // The statement and the per-SKU sheet describe one month. A gap
@@ -635,6 +650,7 @@ export function UploadReportsPage() {
         amazonUsaFacts: preview.amazonUsaFacts,
         amazonAeFacts: preview.amazonAeFacts,
         amazonInSkuFeeFacts: preview.amazonInSkuFeeFacts,
+        purplleFacts: preview.purplleFacts,
         myntraFacts: preview.myntraFacts,
         nykaaFacts: preview.nykaaFacts,
         blinkitFacts: preview.blinkitFacts,
