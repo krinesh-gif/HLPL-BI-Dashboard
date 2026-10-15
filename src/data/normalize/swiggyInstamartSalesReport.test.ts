@@ -75,20 +75,41 @@ describe('reading the month', () => {
   const run = (rows: (string | number | null)[][], master: SkuMaster[] = [], metrics?: (string | number | null)[][]) =>
     normalizeSwiggyInstamartReport(book(rows, metrics), master, [], 'test')
 
-  it('sums GMV and takes the GST out at the declared rate', () => {
-    const r = run([row({ mrp: 118, units: 1 })])
-    expect(r.facts.gmv).toBe(118)
-    expect(r.facts.outputGstPct).toBe(0.18)
-    expect(r.facts.outputGst).toBeCloseTo(18, 6)
-    expect(r.facts.gmvExGst).toBeCloseTo(100, 6)
+  it('takes Swiggy’s 25% off MRP, and the GST off what is left', () => {
+    // 25% inclusive on MRP, so we invoice 75% of GMV; 80537 is an 18% item
+    // on the purchase order.
+    const r = run([row({ item: '80537', mrp: 1000, units: 1 })])
+    expect(r.facts.gmv).toBe(1000)
+    expect(r.facts.marginPct).toBe(0.25)
+    expect(r.facts.marginInr).toBeCloseTo(250, 6)
+    expect(r.facts.invoiceValueInr).toBeCloseTo(750, 6)
+    expect(r.facts.outputGst).toBeCloseTo(750 - 750 / 1.18, 6)
+    expect(r.facts.gmvExGst).toBeCloseTo(750 / 1.18, 6)
   })
 
-  it('stores the rate with the month, so changing the assumption later cannot restate it', () => {
-    expect(run([row()]).facts.outputGstPct).toBe(0.18)
+  it('uses each item’s own GST rate, from the purchase order', () => {
+    // Three of the seven items on the PO are 5%, so one rate for the file
+    // would be wrong on every shampoo and essential-oil line.
+    const r = run([row({ item: '544314', mrp: 1000, units: 1 }), row({ item: '80537', mrp: 1000, units: 1 })])
+    expect(r.facts.outputGst).toBeCloseTo((750 - 750 / 1.05) + (750 - 750 / 1.18), 6)
+    expect(r.facts.gstFallbackSkus).toEqual([])
   })
 
-  it('says on every upload that the rate was assumed, not read', () => {
-    expect(run([row()]).warnings.some((w) => w.includes('assumption and not a figure from the file'))).toBe(true)
+  it('names an item code no purchase order has priced', () => {
+    const r = run([row({ item: '999999' })])
+    expect(r.facts.gstFallbackSkus).toEqual(['999999'])
+    expect(r.warnings.some((w) => w.includes('on no purchase order yet'))).toBe(true)
+  })
+
+  it('charges the marketing contribution inside its window and not outside it', () => {
+    // 10% of MRP sales for the first six months from the first PO, March.
+    const june = run([row({ date: 46174, mrp: 1000, units: 1 })])
+    expect(june.facts.marketingContributionPct).toBe(0.1)
+    expect(june.facts.marketingContributionInr).toBeCloseTo(100, 6)
+    // 1 October 2026 is past the sixth month.
+    const october = run([row({ date: 46296, mrp: 1000, units: 1 })])
+    expect(october.facts.marketingContributionInr).toBe(0)
+    expect(october.warnings.some((w) => w.includes('No marketing contribution'))).toBe(true)
   })
 
   it('counts stores and cities, which is what this channel is read for', () => {
@@ -197,21 +218,36 @@ describe.skipIf(!existsSync(REPORT))('the owner’s June 2026 Swiggy Instamart r
     expect(f.citiesSold).toBe(7)
   })
 
-  it('builds a statement that ties, with the GST flagged as assumed', () => {
+  it('invoices GMV less Swiggy’s 25%, and takes GST off that at each item’s rate', () => {
+    const f = run().result.facts
+    expect(f.marginInr).toBeCloseTo(4983.50, 2)
+    expect(f.invoiceValueInr).toBeCloseTo(14950.50, 2)
+    expect(f.gmv - f.marginInr).toBeCloseTo(f.invoiceValueInr, 6)
+    // Four 18% items and two 5% ones, from the purchase order.
+    expect(f.outputGst).toBeCloseTo(2015.08, 2)
+    expect(f.gmvExGst).toBeCloseTo(12935.42, 2)
+    expect(f.gstFallbackSkus).toEqual([])
+  })
+
+  it('charges June’s marketing contribution, and ties to contribution', () => {
     const f = run().result.facts
     const v = computeSwiggyInstamartPnl(f, 0, 0)
-    expect(v.gmv + v.outputGst).toBeCloseTo(v.netRevenue, 6)
-    expect(v.netRevenue).toBeCloseTo(16893.22, 2)
-    expect(f.outputGst).toBeCloseTo(3040.78, 2)
-    // Not supplied, and not claimed as free.
-    expect(v.swiggyCharges).toBe(0)
+    expect(f.marketingContributionInr).toBeCloseTo(1993.40, 2)
+    expect(v.gmv + v.margin).toBeCloseTo(v.invoiceValue, 6)
+    expect(v.invoiceValue + v.outputGst).toBeCloseTo(v.netRevenue, 6)
+    expect(v.grossProfit + v.marketingContribution).toBeCloseTo(v.contribution, 6)
+    expect(v.contribution).toBeCloseTo(10942.02, 2)
     expect(run().result.warnings.some((w) => w.includes('not a settlement'))).toBe(true)
   })
 
   it('rolls into the Master P&L on the same basis as every other channel', () => {
     const lines = computeSubtotals(swiggyInstamartToCanonicalBuckets(run().result.facts, 0))
     expect(lines.grossSales).toBe(19934)
-    expect(lines.netSales).toBeCloseTo(16893.22, 2)
+    // The trade margin as a deduction from revenue, as Nykaa's and Purplle's.
+    expect(lines.discounts).toBeCloseTo(4983.50, 2)
+    expect(lines.netSales).toBeCloseTo(12935.42, 2)
+    expect(lines.otherMarketing).toBeCloseTo(1993.40, 2)
+    // Never also below gross profit: that would charge the margin twice.
     expect(lines.marketplaceCommission).toBe(0)
     expect(lines.otherMarketplaceCharges).toBe(0)
   })

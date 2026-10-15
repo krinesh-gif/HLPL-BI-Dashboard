@@ -400,18 +400,33 @@ export interface NykaaPnlFacts {
 export interface SwiggyInstamartPnlFacts {
   month: string
   schemaVersion: 1
-  /** Σ GMV — at base MRP, and so including GST. */
+  /** Σ GMV — at base MRP, and so including GST. What Swiggy sold, not what
+   * we invoiced: the trade margin comes off below. */
   gmv: number
   /** Σ BASE_MRP × UNITS_SOLD, which June's file reproduces exactly. Kept
    * separately so a month where the two part company is visible rather than
    * averaged away. */
   mrpValue: number
-  /** The tax inside GMV, at the assumed rate. Not read from the file: Swiggy's
-   * report carries no GST column. */
+  /** Swiggy's trade margin on that GMV, and the terms it was taken from:
+   * 25%, inclusive, on MRP, proved line by line on purchase order
+   * FC5PO365689. Stored with the month so a change of terms cannot restate a
+   * closed one. */
+  marginInr: number
+  marginPct: number
+  /** GMV less that margin: what we invoice Swiggy, GST included. */
+  invoiceValueInr: number
+  /** The tax inside the invoice value, at each item's own rate from the
+   * purchase order. The sales report states no rate. */
   outputGst: number
-  /** The rate used, stored with the month so a later change to the assumption
-   * does not silently restate a month that was read at the old one. */
-  outputGstPct: number
+  /** Item codes no purchase order has named, which fell back to the standing
+   * rate. Named so the gap is nameable rather than silent. */
+  gstFallbackSkus: string[]
+  /** Marketing contribution charged for the month: 10% of MRP sales, for the
+   * first six months from launch. Zero outside that window. */
+  marketingContributionInr: number
+  marketingContributionPct: number
+  /** The invoice value less GST — the basis every other channel's margins
+   * are on. */
   gmvExGst: number
   unitsSold: number
   /** Rows of the sales report — one product, one store, one day. */

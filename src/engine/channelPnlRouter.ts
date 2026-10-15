@@ -748,12 +748,19 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
 
       const notes: string[] = [
-        'Swiggy sends a sales report, not a settlement — no commission, fulfilment, payment or return charge, and ' +
-        'no discount off MRP — so this statement runs to gross profit and names what Swiggy took as not supplied.',
-        `GMV is stated at MRP and includes GST, and the report carries no rate. The tax above comes out at ` +
-        `${(facts.outputGstPct * 100).toFixed(0)}%, which is an assumption: every line below NET REVENUE moves if ` +
-        'it is wrong.',
+        `Swiggy's trade margin of ${(facts.marginPct * 100).toFixed(0)}% inclusive on MRP comes from the agreed ` +
+        'terms and purchase order FC5PO365689, which proves it line by line. It is deducted from revenue rather ' +
+        'than charged below gross profit, because we invoice MRP less the margin and the rest was never ours.',
+        'Beyond that margin the report carries no fulfilment, payment or return charge, and on a return-to-vendor ' +
+        'basis no record of stock sent back. GST comes out at each item’s own rate from that purchase order; the ' +
+        'report itself states none.',
       ]
+      if (facts.marketingContributionInr > 0) {
+        notes.push(
+          `Marketing contribution of ${(facts.marketingContributionPct * 100).toFixed(0)}% of MRP sales applies ` +
+          'for the first six months from launch, taken here from the date of the first purchase order on file.',
+        )
+      }
       if (recomputed && recomputed.uncostedUnits > 0) {
         const shown = recomputed.uncostedSkus.slice(0, 8).join(', ')
         const rest = recomputed.uncostedSkus.length - 8

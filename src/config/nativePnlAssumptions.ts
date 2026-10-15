@@ -79,21 +79,68 @@ export const PURPLLE_ASSUMPTIONS = {
 }
 
 /**
- * Swiggy Instamart operating assumptions.
+ * Swiggy Instamart's terms of trade, from purchase order FC5PO365689 dated
+ * 4 March 2026 and the terms agreed alongside it.
  *
- * One figure, and it is here rather than in the facts because the report does
- * not carry it. Swiggy states GMV at base MRP, which includes GST, and says
- * nothing about the rate. Every line of the statement below NET REVENUE moves
- * with it, so it is declared in one place, stored with each month as it is
- * read, and labelled on the statement as assumed rather than read.
+ * Swiggy (contracting as Scootsy Logistics) is B2B on the same shape as
+ * Purplle: they raise a purchase order, we supply, and the trade margin is
+ * **25%, inclusive, on MRP**. The PO proves it line by line — every one of
+ * its seven items totals exactly 75% of MRP × quantity, GST included, and
+ * each unit cost reproduces as MRP × 0.75 ÷ (1 + its GST rate).
  *
- * 18% is the rate on the cosmetics this brand sells. Purplle's file, which
- * does state a rate per line, carries some 5% lines, so a month that is not
- * all 18% will be overstated on tax and understated on net revenue until
- * Swiggy sends a rate or this is split per SKU.
+ * So the margin is a deduction from revenue, not a charge below gross profit:
+ * we invoice MRP less 25%, and that is the channel's revenue. Nykaa's and
+ * Purplle's margins are modelled the same way, for the same reason.
+ *
+ * Two further terms, neither of them in any file Swiggy sends:
+ *
+ * - **Marketing contribution of 10% of MRP sales** for the first six months
+ *   from launch. Charged on the month's sell-out at MRP, and shown as a
+ *   marketing cost rather than inside the margin, because it ends.
+ * - **Credit period of 40 days from GRN**, which is a cash-flow term and
+ *   changes no figure on the statement. Recorded here so it is not lost.
+ *
+ * The PO is also on a return-to-vendor basis — Swiggy may return anything
+ * unsold, expired, damaged or customer-returned at any time, and we collect
+ * it at our cost within ten days. None of that is in the sales report, so the
+ * statement says it is missing rather than implying there were no returns.
  */
 export const SWIGGY_ASSUMPTIONS = {
-  outputGstPct: 0.18,
+  marginPct: 0.25,
+  marginBase: 'mrp' as const,
+  /** 10% of MRP sales, for the first six months from launch. */
+  marketingContributionPct: 0.1,
+  /**
+   * When the six months start. Taken from the first purchase order on file,
+   * 4 March 2026, because nothing states the launch date itself — worth
+   * confirming, since it decides which month the charge stops in.
+   */
+  marketingContributionFrom: '2026-03',
+  marketingContributionMonths: 6,
+  /** Credit period, in days from GRN. A cash term: nothing on the statement
+   * moves with it, and it is here so the contract is in one place. */
+  creditDays: 40,
+  /**
+   * GST rate per Swiggy item code, from the HSN codes on the same PO. The
+   * sales report carries no rate at all, and the brand's range is not all at
+   * one rate — three of these seven are 5% — so a blanket rate would be wrong
+   * on every essential-oil and shampoo line.
+   *
+   * This belongs on the Product Master the day it gains a GST field; until
+   * then it is here, sourced from a document rather than assumed.
+   */
+  gstByItemCode: {
+    '258149': 0.05, // Rosemary Anti-Hairfall Shampoo 200ml, HSN 33051090
+    '348922': 0.05, // 20% Urea Foot Roll On 50ml, HSN 34011190
+    '370303': 0.18, // Oil-Free Sunscreen Body Lotion SPF 50 200ml, HSN 33049910
+    '544314': 0.05, // Rosemary Essential Oil 15ml, HSN 33011990
+    '588321': 0.18, // Under Arm Roll On 50ml, HSN 33072000
+    '80537': 0.18, // Tinted Beetroot Lip Balm 5g, HSN 33041000
+    '982980': 0.18, // Rosemary Water Hair Spray 100ml, HSN 33041000
+  } as Record<string, number>,
+  /** For an item code no purchase order has named yet. The month says which
+   * codes fell back to it, so it never passes silently. */
+  fallbackGstPct: 0.18,
 }
 
 /**

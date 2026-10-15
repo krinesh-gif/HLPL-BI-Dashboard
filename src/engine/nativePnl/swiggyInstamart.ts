@@ -10,30 +10,44 @@ import type { NativeLineDef, NativeLineValues } from './types'
  * profit and the line where the marketplace's charges belong says they were
  * not supplied.
  *
- * The GST line is the one figure here that is not read from the file. GMV is
- * at MRP and therefore includes tax, and the report carries no rate, so it
- * comes out at the declared assumption — said on the line, because every
- * figure under NET REVENUE moves if the rate is wrong.
+ * What Swiggy takes is the contract, not the report: B2B on the same shape as
+ * Purplle, with a trade margin of 25% inclusive on MRP that purchase order
+ * FC5PO365689 proves line by line. It is deducted from revenue rather than
+ * charged below gross profit, because we invoice MRP less the margin and the
+ * rest was never ours — the treatment Nykaa's margin already gets.
+ *
+ * GST comes out at each item's own rate from that order's HSN codes; the
+ * report states none, and the range is not all at one rate.
+ *
+ * The marketing contribution — 10% of MRP sales for the first six months from
+ * launch — is a cost of the channel that ends, so it sits on its own line
+ * rather than inside the margin.
  *
  * The reach block is not money and is never part of a total. It is on the
  * statement because 73,560 impressions against 59 orders is the question this
  * channel actually raises, and it would be lost on a screen of its own.
  */
 export const SWIGGY_LINE_DEFS: NativeLineDef[] = [
-  { key: 'gmv', label: 'GMV (at MRP, incl. GST)', section: 'REVENUE', kind: 'subtotal',
+  { key: 'gmv', label: 'GMV (at MRP, incl. GST)', section: 'REVENUE', kind: 'input',
     note: 'What the units sold for, from the Sales Report — base MRP × units on every row of the file' },
-  { key: 'outputGst', label: 'Less: Output GST (assumed rate)', section: 'REVENUE', kind: 'input',
-    note: '⚠ Not from the file. Swiggy states GMV at MRP, which includes GST, and gives no rate; this comes out at the rate stored with the month. Every line below moves if it is wrong.' },
+  { key: 'margin', label: 'Less: Swiggy trade margin', section: 'REVENUE', kind: 'input',
+    note: '25%, inclusive, on MRP — the agreed terms, proved line by line on purchase order FC5PO365689, where every item totals exactly 75% of MRP × quantity. Deducted from revenue rather than charged below gross profit, because we invoice MRP less the margin and the rest was never ours.' },
+  { key: 'invoiceValue', label: 'INVOICE VALUE (what we bill Swiggy)', section: 'REVENUE', kind: 'subtotal',
+    note: 'GMV less the margin, GST included — the channel’s revenue' },
+  { key: 'outputGst', label: 'Less: Output GST', section: 'REVENUE', kind: 'input',
+    note: 'At each item’s own rate, from the purchase order’s HSN codes; the sales report states none. Three of the seven items are 5% and the rest 18%.' },
   { key: 'netRevenue', label: 'NET REVENUE (ex-GST)', section: 'REVENUE', kind: 'subtotal' },
 
-  { key: 'swiggyCharges', label: 'Less: What Swiggy took', section: 'WHAT SWIGGY TOOK', kind: 'input',
-    fee: 'otherFees',
-    note: '⚠ Not supplied. The report carries no commission, fulfilment, payment or return charge, and no discount off MRP. This is not a claim that the channel costs nothing — it is a figure nobody has sent.' },
-
-  { key: 'cogs', label: 'Less: COGS', section: 'PROFIT', kind: 'input',
+  { key: 'cogs', label: 'Less: COGS', section: 'COST OF GOODS SOLD', kind: 'input',
     note: 'Priced from the Product Master at the month’s cost, through the SKU mapping for Swiggy’s own item codes' },
-  { key: 'grossProfit', label: 'Gross Profit (after COGS)', section: 'PROFIT', kind: 'subtotal' },
-  { key: 'grossMarginPct', label: 'Gross Margin %', section: 'PROFIT', kind: 'percent' },
+  { key: 'grossProfit', label: 'Gross Profit (after COGS)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'grossMarginPct', label: 'Gross Margin %', section: 'COST OF GOODS SOLD', kind: 'percent' },
+
+  { key: 'marketingContribution', label: 'Less: Marketing contribution', section: 'PROFIT', kind: 'input',
+    fee: 'advertising', hideWhenZero: true,
+    note: '10% of MRP sales, for the first six months from launch. The window is taken from the date of the first purchase order on file, so confirm the launch month — it decides which month this stops in.' },
+  { key: 'contribution', label: 'Contribution (after marketing)', section: 'PROFIT', kind: 'subtotal' },
+  { key: 'contributionPct', label: 'Contribution %', section: 'PROFIT', kind: 'percent' },
   { key: 'overheads', label: 'Less: Allocated Fixed Expenses', section: 'PROFIT', kind: 'input',
     note: 'This channel’s share of the month’s fixed expenses, by its share of sales' },
   { key: 'ebitda', label: 'EBITDA', section: 'PROFIT', kind: 'subtotal' },
@@ -66,18 +80,23 @@ export function computeSwiggyInstamartPnl(
 ): NativeLineValues {
   const netRevenue = facts.gmvExGst
   const grossProfit = netRevenue - cogs
-  const ebitda = grossProfit - overheads
+  const marketing = facts.marketingContributionInr
+  const contribution = grossProfit - marketing
+  const ebitda = contribution - overheads
   const pct = (part: number, whole: number) => (whole !== 0 ? (part / whole) * 100 : 0)
 
   return {
     gmv: facts.gmv,
+    margin: -facts.marginInr,
+    invoiceValue: facts.invoiceValueInr,
     outputGst: -facts.outputGst,
     netRevenue,
-    // Zero because it is unknown, and the line says so in words.
-    swiggyCharges: 0,
     cogs: -cogs,
     grossProfit,
     grossMarginPct: pct(grossProfit, netRevenue),
+    marketingContribution: -marketing,
+    contribution,
+    contributionPct: pct(contribution, netRevenue),
     overheads: -overheads,
     ebitda,
     ebitdaPct: pct(ebitda, netRevenue),
@@ -98,11 +117,11 @@ export function computeSwiggyInstamartPnl(
  * The canonical buckets, so Swiggy Instamart rolls into the Master P&L beside
  * every other channel.
  *
- * GMV is gross sales and the GST goes to `otherRevenueAdj`, which leaves net
- * sales ex-GST — the same basis as every other channel. No discount is
- * claimed, because the report states GMV at MRP and names no discount; every
- * marketplace-charge bucket is zero, which is a statement about the file and
- * not about what Swiggy charges.
+ * GMV is gross sales, the trade margin is a discount and the GST goes to
+ * `otherRevenueAdj`, which leaves net sales at what we invoice, ex-GST — the
+ * same basis as every other channel. Every marketplace-charge bucket is zero:
+ * the margin is already out of revenue above, and counting it twice is the
+ * mistake Nykaa's buckets warn about.
  */
 export function swiggyInstamartToCanonicalBuckets(
   facts: SwiggyInstamartPnlFacts,
@@ -110,7 +129,9 @@ export function swiggyInstamartToCanonicalBuckets(
 ): PnlLineValues {
   return {
     grossSales: facts.gmv,
-    discounts: 0,
+    // Swiggy's trade margin: a deduction from revenue, as Nykaa's and
+    // Purplle's are, because we invoice MRP less the margin.
+    discounts: facts.marginInr,
     returns: 0,
     otherRevenueAdj: facts.outputGst,
     cogs,
@@ -123,6 +144,8 @@ export function swiggyInstamartToCanonicalBuckets(
     otherMarketplaceCharges: 0,
     ads: 0,
     performanceMarketing: 0,
-    otherMarketing: 0,
+    // The marketing contribution: 10% of MRP sales while the launch window
+    // runs. A real cost of the channel, and one that ends.
+    otherMarketing: facts.marketingContributionInr,
   }
 }

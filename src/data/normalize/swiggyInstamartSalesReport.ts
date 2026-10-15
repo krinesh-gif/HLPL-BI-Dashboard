@@ -2,6 +2,7 @@ import type { CanonicalSalesRecord, SkuMaster, SwiggyInstamartPnlFacts } from '@
 import type { SkuMapping } from '@/data/skuMapping'
 import type { RawSheet } from '@/lib/csvParse'
 import { SWIGGY_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
+import { addMonths as addMonthsToKey } from '@/lib/format'
 import { normalizeCategory } from '@/data/categories'
 import type { NormalizeResult } from './types'
 
@@ -144,11 +145,15 @@ export function normalizeSwiggyInstamartReport(
   const stores = new Set<string>()
   const cities = new Set<string>()
   const monthsSeen = new Set<string>()
-  const gstPct = SWIGGY_ASSUMPTIONS.outputGstPct
+  const gstFallback = new Set<string>()
 
   const facts: SwiggyInstamartPnlFacts = {
     month: '', schemaVersion: 1,
-    gmv: 0, mrpValue: 0, outputGst: 0, outputGstPct: gstPct, gmvExGst: 0,
+    gmv: 0, mrpValue: 0,
+    marginInr: 0, marginPct: SWIGGY_ASSUMPTIONS.marginPct, invoiceValueInr: 0,
+    outputGst: 0, gstFallbackSkus: [],
+    marketingContributionInr: 0, marketingContributionPct: 0,
+    gmvExGst: 0,
     unitsSold: 0, salesRows: 0, skusSold: 0, storesSold: 0, citiesSold: 0,
     brandImpressions: 0, brandOrders: 0, newToBrandBuyers: 0, brandGmv: 0,
     cogsSourceInr: 0, unpricedSkus: [],
@@ -174,9 +179,16 @@ export function normalizeSwiggyInstamartReport(
     const units = num(cell(row, 'units'))
     const baseMrp = num(cell(row, 'baseMrp'))
     const gmv = num(cell(row, 'gmv'))
-    // Nothing in the file says what rate applies, so one rate is used for the
-    // channel and stored with the month. Flagged on the statement line.
-    const gst = gmv - gmv / (1 + gstPct)
+    // 25% inclusive on MRP, so we invoice 75% of what Swiggy sold it for.
+    const margin = gmv * facts.marginPct
+    const invoiceValue = gmv - margin
+    // At this item's own rate, from the purchase order. The report states
+    // none, and the range is not all at one rate: three of the seven items
+    // on the PO are 5%, so a blanket rate would be wrong on every one.
+    const itemGstPct = SWIGGY_ASSUMPTIONS.gstByItemCode[itemCode]
+    if (itemGstPct === undefined) gstFallback.add(itemCode)
+    const gstPct = itemGstPct ?? SWIGGY_ASSUMPTIONS.fallbackGstPct
+    const gst = invoiceValue - invoiceValue / (1 + gstPct)
     if (key(cell(row, 'combo')) === 'yes') comboRows++
 
     monthsSeen.add(date.slice(0, 7))
@@ -188,6 +200,8 @@ export function normalizeSwiggyInstamartReport(
 
     facts.gmv += gmv
     facts.mrpValue += baseMrp * units
+    facts.marginInr += margin
+    facts.invoiceValueInr += invoiceValue
     facts.outputGst += gst
     facts.unitsSold += units
     facts.salesRows += 1
@@ -212,11 +226,13 @@ export function normalizeSwiggyInstamartReport(
       productName: product?.productName ?? (variant === '' ? name : `${name} ${variant}`) ?? itemCode,
       category: normalizeCategory(product?.category ?? String(cell(row, 'l3') ?? cell(row, 'l2') ?? '')),
       quantity: units,
-      // At MRP, which is what GMV is stated at, and ex-GST on the net line so
-      // a Swiggy sale means what a sale means on every other channel.
+      // At MRP, which is what GMV is stated at, with Swiggy's trade margin
+      // as the deduction from it — what we never receive. Net sales is what
+      // we invoice, ex-GST, so a Swiggy sale means what a sale means on
+      // every other channel.
       grossSales: gmv,
-      discount: 0,
-      netSales: gmv - gst,
+      discount: margin,
+      netSales: invoiceValue - gst,
       returnUnits: 0,
       rtoUnits: 0,
       shippingCost: 0,
@@ -229,7 +245,8 @@ export function normalizeSwiggyInstamartReport(
     })
   }
 
-  facts.gmvExGst = facts.gmv - facts.outputGst
+  facts.gmvExGst = facts.invoiceValueInr - facts.outputGst
+  facts.gstFallbackSkus = [...gstFallback].sort()
   facts.skusSold = skus.size
   facts.storesSold = stores.size
   facts.citiesSold = cities.size
@@ -256,6 +273,19 @@ export function normalizeSwiggyInstamartReport(
   const months = [...monthsSeen].sort()
   facts.month = months[0] ?? ''
 
+  // 10% of MRP sales, for the first six months from launch. Outside that
+  // window it is nil, and the statement says which it is.
+  const windowEnd = addMonthsToKey(
+    SWIGGY_ASSUMPTIONS.marketingContributionFrom,
+    SWIGGY_ASSUMPTIONS.marketingContributionMonths - 1,
+  )
+  const inWindow =
+    facts.month !== '' &&
+    facts.month >= SWIGGY_ASSUMPTIONS.marketingContributionFrom &&
+    facts.month <= windowEnd
+  facts.marketingContributionPct = inWindow ? SWIGGY_ASSUMPTIONS.marketingContributionPct : 0
+  facts.marketingContributionInr = facts.gmv * facts.marketingContributionPct
+
   if (months.length > 1) {
     warnings.push(
       `These rows cover ${months.length} months (${months.join(', ')}). The statement is monthly, so it is filed ` +
@@ -263,16 +293,39 @@ export function normalizeSwiggyInstamartReport(
     )
   }
   warnings.push(
-    'Swiggy sent a sales report, not a settlement: it carries no commission, fulfilment, payment or return ' +
-    'charges, and no discount off MRP. The statement therefore runs to gross profit and names what Swiggy took as ' +
-    'not supplied. Send the Swiggy payout statement and those lines fill in without changing any of these figures.',
+    'This is a sales report, not a settlement. Beyond the agreed margin it carries no fulfilment, payment or ' +
+    'return charge, and on a return-to-vendor basis no record of stock Swiggy sent back — the purchase order ' +
+    'lets them return anything unsold, expired or damaged at any time, collected at our cost. Send the Swiggy ' +
+    'payout statement and those lines fill in.',
   )
+  const inr = (v: number): string => `₹${v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   warnings.push(
-    `GMV is stated at base MRP and so includes GST, but the report carries no rate. It is taken out at ` +
-    `${(gstPct * 100).toFixed(0)}%, which is an assumption and not a figure from the file — ` +
-    `₹${facts.outputGst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} of this ` +
-    'month. Every line of the statement below NET REVENUE moves if that rate is wrong.',
+    `Swiggy's trade margin of ${(facts.marginPct * 100).toFixed(0)}% inclusive on MRP — ${inr(facts.marginInr)} — ` +
+    'comes from the agreed terms and purchase order FC5PO365689, not from this file. What we invoice is ' +
+    `${inr(facts.invoiceValueInr)} including GST, and GST comes out at each item's own rate from that order.`,
   )
+  if (facts.marketingContributionInr > 0) {
+    warnings.push(
+      `Marketing contribution of ${(facts.marketingContributionPct * 100).toFixed(0)}% of MRP sales — ` +
+      `${inr(facts.marketingContributionInr)} — applies: ${facts.month} is inside the first ` +
+      `${SWIGGY_ASSUMPTIONS.marketingContributionMonths} months from ` +
+      `${SWIGGY_ASSUMPTIONS.marketingContributionFrom}, which is taken from the date of the first purchase order ` +
+      'on file. Confirm the launch month — it decides which month this charge stops in.',
+    )
+  } else {
+    warnings.push(
+      `No marketing contribution: ${facts.month || 'this month'} falls outside the first ` +
+      `${SWIGGY_ASSUMPTIONS.marketingContributionMonths} months from ` +
+      `${SWIGGY_ASSUMPTIONS.marketingContributionFrom}.`,
+    )
+  }
+  if (facts.gstFallbackSkus.length > 0) {
+    warnings.push(
+      `${facts.gstFallbackSkus.length} item code(s) are on no purchase order yet, so their GST came out at the ` +
+      `standing ${(SWIGGY_ASSUMPTIONS.fallbackGstPct * 100).toFixed(0)}%: ${facts.gstFallbackSkus.join(', ')}. ` +
+      'Send a PO carrying them and the rate becomes a read figure rather than a standing one.',
+    )
+  }
   if (facts.brandGmv > 0 && Math.abs(facts.brandGmv - facts.gmv) > 0.5) {
     warnings.push(
       `The two sheets disagree about GMV: Sales Report totals ₹${facts.gmv.toFixed(2)} and Brand Metrics ` +
