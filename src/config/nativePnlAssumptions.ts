@@ -50,6 +50,35 @@ export const MEESHO_ASSUMPTIONS = {
 }
 
 /**
+ * Purplle's terms of trade, from the signed margin sheet.
+ *
+ * Purplle is B2B on a sale-or-return model: they raise a purchase order, we
+ * supply, and the margin sheet sets the Basic Product Margin for Aravi
+ * Organic at **31%, inclusive, on MRP**, taken on invoice. So this is a trade
+ * margin, not a commission on what the shopper paid — we invoice MRP less
+ * 31%, and that is our revenue. Nykaa trades the same way, and its margin is
+ * modelled the same way here: as a deduction from revenue rather than as a
+ * marketplace charge below gross profit, because it was never our money.
+ *
+ * Inclusive means nothing is added for GST: the 31% is the whole of what
+ * Purplle takes.
+ *
+ * Every other line of that sheet is blank — discount, display, distribution
+ * allowance, damage goods, promotion allowance, A&P, new store opening,
+ * registration fee, turnover discount — so nothing else is charged back to
+ * us, and the price off Purplle gives shoppers is Purplle's own. Damage is
+ * "Full Return Accepted" and excess stock is returned to us every 45 days,
+ * which is the sale-or-return side of it and is not in the sales file.
+ *
+ * None of this is in any file Purplle sends, so it lives here, is stored with
+ * each month as it is read, and is labelled on the statement as terms.
+ */
+export const PURPLLE_ASSUMPTIONS = {
+  marginPct: 0.31,
+  marginBase: 'mrp' as 'mrp' | 'nmv',
+}
+
+/**
  * Swiggy Instamart operating assumptions.
  *
  * One figure, and it is here rather than in the facts because the report does

@@ -449,16 +449,31 @@ export interface PurpllePnlFacts {
   mrpValue: number
   /** Σ "Price Off Amt" — the discount against MRP. */
   priceOff: number
-  /** Σ nmv: what shoppers paid, including GST. MRP less the price off. */
+  /** Σ nmv: what shoppers paid, including GST — MRP less the price off.
+   * Purplle's shop floor, not our revenue: the price off comes out of
+   * Purplle's margin, since the margin sheet charges no discount back to us.
+   * Kept because sell-through is the thing this channel is read for. */
   nmv: number
-  /** The tax inside nmv, at each line's own rate. */
+  /** The tax inside the invoice value, at each line's own rate. Our GST is on
+   * what we sell to Purplle for, not on what Purplle sells for. */
   outputGst: number
-  /** nmv less the GST — the basis every other channel's margins are on. */
+  /** The invoice value less that GST — the basis every other channel's
+   * margins are on. */
   netRevenue: number
   unitsSold: number
   orderLines: number
   orders: number
   skusSold: number
+  /** Purplle's Basic Product Margin on the month's sell-out, and the terms it
+   * was taken from: 31%, inclusive, on MRP. Not in any file Purplle sends —
+   * it is the margin sheet — so the rate and its base are stored with the
+   * month, and a later change of terms cannot silently restate a closed one. */
+  marginInr: number
+  marginPct: number
+  marginBase: 'mrp' | 'nmv'
+  /** MRP less that margin: what we invoice Purplle, GST included. This is the
+   * channel's revenue, not the nmv shoppers paid. */
+  invoiceValueInr: number
   /** The "Marketing" figure written above the table, when there is one. */
   marketingInr: number
   /** Whether the file stated it at all, which is different from stating nil. */

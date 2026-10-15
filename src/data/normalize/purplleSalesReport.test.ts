@@ -77,20 +77,32 @@ describe('reading the month', () => {
   const run = (rows: (string | number | null)[][], master: SkuMaster[] = []) =>
     normalizePurplleSalesReport(sheet(rows), master, [], 'test')
 
-  it('takes the GST out at each line’s own rate', () => {
-    // April's file carries 18% lines beside 5% ones. One rate for the file
-    // would be wrong by hundreds of rupees.
-    const r = run([line({ mrp: 118, off: 0, gst: 0.18 }), line({ mrp: 105, off: 0, gst: 0.05 })])
-    expect(r.facts.nmv).toBe(223)
-    expect(r.facts.outputGst).toBeCloseTo(23, 6)
-    expect(r.facts.netRevenue).toBeCloseTo(200, 6)
+  it('takes Purplle’s margin off MRP, and the GST off what is left', () => {
+    // 31% inclusive on MRP, so we invoice 69% of MRP and our GST is on that
+    // — not on the nmv, which is Purplle's realisation and not ours.
+    const r = run([line({ mrp: 1000, off: 0, gst: 0.18 })])
+    expect(r.facts.marginPct).toBe(0.31)
+    expect(r.facts.marginInr).toBeCloseTo(310, 6)
+    expect(r.facts.invoiceValueInr).toBeCloseTo(690, 6)
+    expect(r.facts.outputGst).toBeCloseTo(690 - 690 / 1.18, 6)
+    expect(r.facts.netRevenue).toBeCloseTo(690 / 1.18, 6)
   })
 
-  it('keeps MRP and the price off apart, because the discount is the lever', () => {
+  it('uses each line’s own GST rate', () => {
+    // April's file carries 18% lines beside 5% ones. One rate for the file
+    // would be wrong by hundreds of rupees.
+    const r = run([line({ mrp: 1000, off: 0, gst: 0.18 }), line({ mrp: 1000, off: 0, gst: 0.05 })])
+    expect(r.facts.outputGst).toBeCloseTo((690 - 690 / 1.18) + (690 - 690 / 1.05), 6)
+  })
+
+  it('keeps what shoppers paid as a memo, not as revenue', () => {
+    // The price off comes out of Purplle's own margin — the margin sheet
+    // charges no discount back to us — so it must not reduce our revenue.
     const r = run([line({ mrp: 500, off: 100 }), line({ mrp: 300, off: 50 })])
     expect(r.facts.mrpValue).toBe(800)
     expect(r.facts.priceOff).toBe(150)
     expect(r.facts.nmv).toBe(650)
+    expect(r.facts.invoiceValueInr).toBeCloseTo(800 * 0.69, 6)
   })
 
   it('counts orders and lines separately', () => {
@@ -118,9 +130,11 @@ describe('reading the month', () => {
     expect(r.warnings.some((w) => w.includes('PPLB999'))).toBe(true)
   })
 
-  it('says on every upload that the file carries no marketplace charges', () => {
-    // The one thing a reader must not assume about this channel.
-    expect(run([line()]).warnings.some((w) => w.includes('not a settlement'))).toBe(true)
+  it('says on every upload where the margin came from, and what is still missing', () => {
+    const w = run([line()]).warnings
+    expect(w.some((x) => x.includes('margin sheet and not from this file'))).toBe(true)
+    expect(w.some((x) => x.includes('no logistics, payment or return charge'))).toBe(true)
+    // The margin is a deduction from revenue, never also a fee on the row.
     expect(run([line()]).validRecords.every((r) => r.marketplaceFee === 0)).toBe(true)
   })
 
@@ -136,11 +150,11 @@ describe('reading the month', () => {
     expect(r.warnings.some((w) => w.includes('cover 2 months'))).toBe(true)
   })
 
-  it('states sales rows ex-GST, as every other channel does', () => {
-    const r = run([line({ mrp: 118, off: 0, gst: 0.18 })])
-    expect(r.validRecords[0].netSales).toBeCloseTo(100, 6)
-    expect(r.validRecords[0].grossSales).toBe(118)
-    expect(r.validRecords[0].tax).toBeCloseTo(18, 6)
+  it('states sales rows at MRP less the margin, ex-GST', () => {
+    const r = run([line({ mrp: 1000, off: 0, gst: 0.18 })])
+    expect(r.validRecords[0].grossSales).toBe(1000)
+    expect(r.validRecords[0].discount).toBeCloseTo(310, 6)
+    expect(r.validRecords[0].netSales).toBeCloseTo(690 / 1.18, 6)
     expect(r.validRecords[0].channel).toBe('purplle')
   })
 })
@@ -175,10 +189,14 @@ describe.skipIf(!existsSync(REPORT))('the owner’s April 2026 Purplle file', ()
     expect(f.mrpValue - f.priceOff).toBe(f.nmv)
   })
 
-  it('takes out ₹18,360.19 of GST, from two rates', () => {
+  it('invoices MRP less Purplle’s 31%, and takes GST off that', () => {
     const f = run().result.facts
-    expect(f.outputGst).toBeCloseTo(18360.19, 2)
-    expect(f.netRevenue).toBeCloseTo(107333.81, 2)
+    expect(f.marginInr).toBeCloseTo(53003.49, 2)
+    expect(f.invoiceValueInr).toBeCloseTo(117975.51, 2)
+    expect(f.mrpValue - f.marginInr).toBeCloseTo(f.invoiceValueInr, 6)
+    // Two rates, on the invoice value rather than on what shoppers paid.
+    expect(f.outputGst).toBeCloseTo(17318.19, 2)
+    expect(f.netRevenue).toBeCloseTo(100657.32, 2)
   })
 
   it('counts 527 units across 512 orders and 28 SKUs', () => {
@@ -206,25 +224,34 @@ describe.skipIf(!existsSync(REPORT))('the owner’s April 2026 Purplle file', ()
 
   it('builds a statement that ties from MRP to contribution', () => {
     const v = computePurpllePnl(run().result.facts, 0, 0)
-    expect(v.mrpValue + v.priceOff).toBeCloseTo(v.nmv, 6)
-    expect(v.nmv + v.outputGst).toBeCloseTo(v.netRevenue, 6)
+    expect(v.mrpValue + v.margin).toBeCloseTo(v.invoiceValue, 6)
+    expect(v.invoiceValue + v.outputGst).toBeCloseTo(v.netRevenue, 6)
     expect(v.netRevenue + v.cogs).toBeCloseTo(v.grossProfit, 6)
     expect(v.grossProfit + v.marketing).toBeCloseTo(v.contribution, 6)
-    expect(v.contribution).toBeCloseTo(98784.86, 2)
-    // What Purplle took is zero because it is not in the file, and the line
-    // says so rather than the statement implying the channel is free.
-    expect(v.purplleCharges).toBe(0)
+    expect(v.contribution).toBeCloseTo(92108.37, 2)
+  })
+
+  it('shows what Purplle keeps after the price off it funded', () => {
+    // 31% taken, 26.49% of MRP given away as price off: Purplle is running
+    // this channel on about four and a half points. Worth knowing, and worth
+    // checking that none of that discount is later charged back to us.
+    const v = computePurpllePnl(run().result.facts, 0, 0)
+    expect(v.discountPct).toBeCloseTo(26.49, 2)
+    expect(v.purplleRealisationPct).toBeCloseTo(4.51, 2)
+    expect(v.nmv).toBe(125694)
   })
 
   it('rolls into the Master P&L on the same basis as every other channel', () => {
     const lines = computeSubtotals(purplleToCanonicalBuckets(run().result.facts, 0))
     // Net sales ex-GST, which is what the other channels' net sales mean.
-    expect(lines.netSales).toBeCloseTo(107333.81, 2)
+    expect(lines.netSales).toBeCloseTo(100657.32, 2)
     expect(lines.grossSales).toBe(170979)
-    expect(lines.discounts).toBe(45285)
-    expect(lines.otherRevenueAdj).toBeCloseTo(18360.19, 2)
+    // The trade margin, and not the shopper's price off, which was Purplle's.
+    expect(lines.discounts).toBeCloseTo(53003.49, 2)
+    expect(lines.otherRevenueAdj).toBeCloseTo(17318.19, 2)
     expect(lines.ads).toBeCloseTo(8548.95, 2)
-    // No marketplace charge is claimed, in either direction.
+    // The margin is a deduction from revenue above, so counting it here as
+    // well would charge it twice — the mistake Nykaa's buckets warn about.
     expect(lines.marketplaceCommission).toBe(0)
     expect(lines.otherMarketplaceCharges).toBe(0)
   })

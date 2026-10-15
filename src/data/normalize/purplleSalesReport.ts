@@ -1,6 +1,7 @@
 import type { CanonicalSalesRecord, PurpllePnlFacts, SkuMaster } from '@/data/models'
 import type { SkuMapping } from '@/data/skuMapping'
 import type { RawSheet } from '@/lib/csvParse'
+import { PURPLLE_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { normalizeCategory } from '@/data/categories'
 import type { NormalizeResult } from './types'
 
@@ -169,6 +170,8 @@ export function normalizePurplleSalesReport(
     month: '', schemaVersion: 1,
     mrpValue: 0, priceOff: 0, nmv: 0, outputGst: 0, netRevenue: 0,
     unitsSold: 0, orderLines: 0, orders: 0, skusSold: 0,
+    marginInr: 0, marginPct: PURPLLE_ASSUMPTIONS.marginPct,
+    marginBase: PURPLLE_ASSUMPTIONS.marginBase, invoiceValueInr: 0,
     marketingInr: 0, marketingStated: false,
     cogsSourceInr: 0, unpricedSkus: [],
     priceOffAlt: 0, priceOffDifference: 0, priceOffDifferenceStated: 0,
@@ -200,10 +203,18 @@ export function normalizePurplleSalesReport(
     const priceOff = num(cell(row, 'priceOff'))
     const nmv = num(cell(row, 'nmv'))
     const gstRate = num(cell(row, 'gstRate'))
-    // The tax inside what the shopper paid, at this row's own rate. Taking
-    // one rate for the file would be wrong by ₹369 on April alone, where the
-    // 5% lines sit beside the 18% ones.
-    const gst = gstRate > 0 ? nmv - nmv / (1 + gstRate) : 0
+
+    // What Purplle takes, on the base its margin sheet names: 31% inclusive
+    // on MRP. Inclusive, so nothing is added for GST on top of it.
+    const margin = (facts.marginBase === 'nmv' ? nmv : mrp) * facts.marginPct
+    // What we invoice Purplle, GST included. Our revenue is this and not the
+    // nmv — the price off between them is Purplle's own, since the margin
+    // sheet charges no discount back to us.
+    const invoiceValue = (facts.marginBase === 'nmv' ? nmv : mrp) - margin
+    // The tax inside what we invoice, at this row's own rate. Taking one rate
+    // for the file would be wrong by hundreds on April alone, where the 5%
+    // lines sit beside the 18% ones.
+    const gst = gstRate > 0 ? invoiceValue - invoiceValue / (1 + gstRate) : 0
 
     monthsSeen.add(date.slice(0, 7))
     orders.add(String(cell(row, 'orderId') ?? `${date}-${rowIndex}`))
@@ -212,6 +223,8 @@ export function normalizePurplleSalesReport(
     facts.priceOff += priceOff
     facts.nmv += nmv
     facts.outputGst += gst
+    facts.marginInr += margin
+    facts.invoiceValueInr += invoiceValue
     facts.unitsSold += qty
     facts.orderLines += 1
     facts.priceOffAlt += num(cell(row, 'priceOffAlt'))
@@ -233,17 +246,20 @@ export function normalizePurplleSalesReport(
       productName: product?.productName ?? String(cell(row, 'name') ?? sku),
       category: normalizeCategory(product?.category ?? String(cell(row, 'category') ?? '')),
       quantity: qty,
-      // At MRP, with the price off carried as the discount, because the file
-      // states both and the discount is the lever on this channel.
+      // At MRP, with Purplle's trade margin as the deduction from it. The
+      // margin is what we never receive, so it belongs here rather than
+      // below gross profit — the same treatment Nykaa's margin gets, and for
+      // the same reason.
       grossSales: mrp,
-      discount: priceOff,
-      // Ex-GST, so a Purplle sale means what a sale means everywhere else.
-      netSales: nmv - gst,
+      discount: margin,
+      // What we invoice, ex-GST, so a Purplle sale means what a sale means
+      // everywhere else.
+      netSales: invoiceValue - gst,
       returnUnits: 0,
       rtoUnits: 0,
       shippingCost: 0,
-      // Purplle's file states nothing it took. A zero here is "not supplied",
-      // which the statement says in words rather than implying it is free.
+      // Nothing: what Purplle takes is a trade margin off MRP, already in
+      // `discount` above. Counting it here as well would charge it twice.
       marketplaceFee: 0,
       tax: gst,
       status: 'completed',
@@ -252,7 +268,7 @@ export function normalizePurplleSalesReport(
     })
   }
 
-  facts.netRevenue = facts.nmv - facts.outputGst
+  facts.netRevenue = facts.invoiceValueInr - facts.outputGst
   facts.orders = orders.size
   facts.skusSold = new Set(validRecords.map((r) => r.sku)).size
   facts.priceOffDifference = facts.priceOff - facts.priceOffAlt
@@ -273,10 +289,22 @@ export function normalizePurplleSalesReport(
       `under ${months[0]} and the later rows belong in their own upload.`,
     )
   }
+  const inr = (v: number): string => `₹${v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   warnings.push(
-    'Purplle sent a sales file, not a settlement: it carries no commission, logistics, payment or return charges. ' +
-    'The statement therefore runs to gross profit and names what Purplle took as not supplied. Send the Purplle ' +
-    'payout or settlement statement and those lines fill in without changing any of these figures.',
+    `Purplle's Basic Product Margin of ${(facts.marginPct * 100).toFixed(0)}% ` +
+    `${facts.marginBase === 'mrp' ? 'inclusive on MRP' : 'on nmv'} — ${inr(facts.marginInr)} — comes from the ` +
+    'margin sheet and not from this file, which states nothing Purplle took. What we invoice is ' +
+    `${inr(facts.invoiceValueInr)} including GST.`,
+  )
+  warnings.push(
+    `Shoppers paid ${inr(facts.nmv)} after ${inr(facts.priceOff)} of price off. That price off is Purplle's own — ` +
+    'the margin sheet charges no discount back to us — so it is kept as a memo and not as a cost. It is the ' +
+    'figure to watch for sell-through, not for revenue.',
+  )
+  warnings.push(
+    'The file carries no logistics, payment or return charge, and on a sale-or-return model no record of stock ' +
+    'returned to us against the purchase order — the margin sheet has excess stock coming back every 45 days. ' +
+    'Send the Purplle payout statement and those lines fill in; nothing above them changes when they do.',
   )
   if (marketing !== null) {
     warnings.push(
