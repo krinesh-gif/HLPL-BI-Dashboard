@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import type { RawSheet } from '@/lib/csvParse'
 import { workbookSheetsFromBytes } from '@/lib/csvParse'
 import type { SkuMaster } from '@/data/models'
+import type { SkuMapping } from '@/data/skuMapping'
 import {
   detectSwiggyInstamartReport,
   normalizeSwiggyInstamartReport,
@@ -42,6 +43,13 @@ const book = (rows: (string | number | null)[][], metrics?: (string | number | n
     : {}),
 })
 
+/** A Product Master row carrying a GST rate, which is what decides the tax. */
+const product = (sku: string, gstPct: number): SkuMaster => ({
+  sku, productName: sku, category: 'Skincare', brand: 'Aravi Organic',
+  cogs: 0, mrp: 0, gstPct, launchDate: '2025-04-01', status: 'active',
+  leadTimeDays: 21, safetyStock: 0,
+})
+
 describe('recognising Swiggy’s report', () => {
   it('claims a workbook with the sales sheet in it', () => {
     expect(detectSwiggyInstamartReport(book([row()]))).toBe(true)
@@ -57,7 +65,7 @@ describe('recognising Swiggy’s report', () => {
     // sold, not a file nobody recognises.
     const empty = detectSwiggyInstamartReport(book([]))
     expect(empty).toBe(true)
-    const r = normalizeSwiggyInstamartReport(book([]), [], [], 'test')
+    const r = normalizeSwiggyInstamartReport(book([]), [], [], [], 'test')
     expect(r.totalRows).toBe(0)
     expect(r.facts.gmv).toBe(0)
   })
@@ -73,7 +81,7 @@ describe('recognising Swiggy’s report', () => {
 
 describe('reading the month', () => {
   const run = (rows: (string | number | null)[][], master: SkuMaster[] = [], metrics?: (string | number | null)[][]) =>
-    normalizeSwiggyInstamartReport(book(rows, metrics), master, [], 'test')
+    normalizeSwiggyInstamartReport(book(rows, metrics), master, [], [], 'test')
 
   it('takes Swiggy’s 25% off MRP, and the GST off what is left', () => {
     // 25% inclusive on MRP, so we invoice 75% of GMV; 80537 is an 18% item
@@ -87,18 +95,44 @@ describe('reading the month', () => {
     expect(r.facts.gmvExGst).toBeCloseTo(750 / 1.18, 6)
   })
 
-  it('uses each item’s own GST rate, from the purchase order', () => {
-    // Three of the seven items on the PO are 5%, so one rate for the file
-    // would be wrong on every shampoo and essential-oil line.
-    const r = run([row({ item: '544314', mrp: 1000, units: 1 }), row({ item: '80537', mrp: 1000, units: 1 })])
-    expect(r.facts.outputGst).toBeCloseTo((750 - 750 / 1.05) + (750 - 750 / 1.18), 6)
+  it('takes each item’s GST rate from the Product Master', () => {
+    // The Master decides the rate, not the purchase order: 544314 is 5% on
+    // Swiggy's PO and 18% here, and the statement follows the Master.
+    const master = [product('544314', 18), product('80537', 18)]
+    const r = run([row({ item: '544314', mrp: 1000, units: 1 }), row({ item: '80537', mrp: 1000, units: 1 })], master)
+    expect(r.facts.outputGst).toBeCloseTo(2 * (750 - 750 / 1.18), 6)
     expect(r.facts.gstFallbackSkus).toEqual([])
   })
 
-  it('names an item code no purchase order has priced', () => {
+  it('reaches the Master through the SKU map, and honours a 0% rate', () => {
+    // Swiggy's item code is not an internal SKU, so the rate is found the way
+    // COGS is. 0% is a rate, not a missing one — Purplle's PO carries a
+    // zero-rated line, so this has to be stated rather than treated as blank.
+    const master = [product('AO/Lip/Beetroot/5', 0)]
+    const mappings: SkuMapping[] = [
+      { channelSku: '80537', internalSku: 'AO/Lip/Beetroot/5', kind: 'SINGLE', source: 'manual', verified: true },
+    ]
+    const r = normalizeSwiggyInstamartReport(
+      book([row({ item: '80537', mrp: 1000, units: 1 })]), master, mappings, [], 'test',
+    )
+    expect(r.facts.outputGst).toBe(0)
+    expect(r.facts.gstFallbackSkus).toEqual([])
+  })
+
+  it('falls back to the purchase order’s rate, and names the codes it did that for', () => {
+    // Nothing in the Master, so the rate on Swiggy's own PO stands in: 5% for
+    // the essential oil, 18% for the lip balm. The month says which codes
+    // these were, because the two sources disagree about some of them.
+    const r = run([row({ item: '544314', mrp: 1000, units: 1 }), row({ item: '80537', mrp: 1000, units: 1 })])
+    expect(r.facts.outputGst).toBeCloseTo((750 - 750 / 1.05) + (750 - 750 / 1.18), 6)
+    expect(r.facts.gstFallbackSkus).toEqual(['544314', '80537'])
+    expect(r.warnings.some((w) => w.includes('no GST rate in the Product Master'))).toBe(true)
+  })
+
+  it('falls back to the standing rate for a code no document names either', () => {
     const r = run([row({ item: '999999' })])
     expect(r.facts.gstFallbackSkus).toEqual(['999999'])
-    expect(r.warnings.some((w) => w.includes('on no purchase order yet'))).toBe(true)
+    expect(r.warnings.some((w) => w.includes('no GST rate in the Product Master'))).toBe(true)
   })
 
   it('charges the marketing contribution inside its window and not outside it', () => {
@@ -175,7 +209,7 @@ describe('reading the month', () => {
 describe.skipIf(!existsSync(REPORT))('the owner’s June 2026 Swiggy Instamart report', () => {
   const run = () => {
     const sheets = workbookSheetsFromBytes(readFileSync(REPORT))
-    return { sheets, result: normalizeSwiggyInstamartReport(sheets, [], [], 'test') }
+    return { sheets, result: normalizeSwiggyInstamartReport(sheets, [], [], [], 'test') }
   }
 
   it('is recognised and read without a bad row', () => {
@@ -223,9 +257,25 @@ describe.skipIf(!existsSync(REPORT))('the owner’s June 2026 Swiggy Instamart r
     expect(f.marginInr).toBeCloseTo(4983.50, 2)
     expect(f.invoiceValueInr).toBeCloseTo(14950.50, 2)
     expect(f.gmv - f.marginInr).toBeCloseTo(f.invoiceValueInr, 6)
-    // Four 18% items and two 5% ones, from the purchase order.
+    // Nothing in the Product Master yet, so each item's rate comes from the
+    // purchase order — four 18% items and two 5% ones — and every code is
+    // named as having fallen back.
     expect(f.outputGst).toBeCloseTo(2015.08, 2)
     expect(f.gmvExGst).toBeCloseTo(12935.42, 2)
+    expect(f.gstFallbackSkus).toEqual(['258149', '370303', '544314', '588321', '80537', '982980'])
+  })
+
+  it('restates June’s tax from the Product Master once the rates are entered', () => {
+    // The question the owner put: Nykaa's purchase order prices the same HSN
+    // codes at 18% that Swiggy's prices at 5%. With all six at 18% in the
+    // Master, June's GST rises by ₹265.51 and net revenue falls to
+    // ₹12,669.91 — and nothing falls back.
+    const sheets = workbookSheetsFromBytes(readFileSync(REPORT))
+    const master = ['258149', '370303', '544314', '588321', '80537', '982980'].map((c) => product(c, 18))
+    const f = normalizeSwiggyInstamartReport(sheets, master, [], [], 'test').facts
+    expect(f.invoiceValueInr).toBeCloseTo(14950.50, 2)
+    expect(f.outputGst).toBeCloseTo(2280.58, 2)
+    expect(f.gmvExGst).toBeCloseTo(12669.92, 2)
     expect(f.gstFallbackSkus).toEqual([])
   })
 

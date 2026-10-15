@@ -16,8 +16,10 @@ import type { NativeLineDef, NativeLineValues } from './types'
  * charged below gross profit, because we invoice MRP less the margin and the
  * rest was never ours — the treatment Nykaa's margin already gets.
  *
- * GST comes out at each item's own rate from that order's HSN codes; the
- * report states none, and the range is not all at one rate.
+ * GST comes out at each item's own rate from the Product Master, which is
+ * what decides a rate here: the report states none, the range is not all at
+ * one rate, and Swiggy's and Nykaa's purchase orders state different rates
+ * for the same HSN codes, so no order can be the authority.
  *
  * The marketing contribution — 10% of MRP sales for the first six months from
  * launch — is a cost of the channel that ends, so it sits on its own line
@@ -35,7 +37,7 @@ export const SWIGGY_LINE_DEFS: NativeLineDef[] = [
   { key: 'invoiceValue', label: 'INVOICE VALUE (what we bill Swiggy)', section: 'REVENUE', kind: 'subtotal',
     note: 'GMV less the margin, GST included — the channel’s revenue' },
   { key: 'outputGst', label: 'Less: Output GST', section: 'REVENUE', kind: 'input',
-    note: 'At each item’s own rate, from the purchase order’s HSN codes; the sales report states none. Three of the seven items are 5% and the rest 18%.' },
+    note: 'At each item’s own rate from the Product Master, which is what decides the rate across every channel. The sales report states none; where the Master has none either, the rate on purchase order FC5PO365689 stands in and the upload names those codes.' },
   { key: 'netRevenue', label: 'NET REVENUE (ex-GST)', section: 'REVENUE', kind: 'subtotal' },
 
   { key: 'cogs', label: 'Less: COGS', section: 'COST OF GOODS SOLD', kind: 'input',

@@ -59,6 +59,13 @@ BEGIN
     safety_stock           INTEGER NOT NULL DEFAULT 0
   );
 
+  -- The GST rate a product is sold at, as a percentage. Nullable on purpose:
+  -- NULL is "nobody has said yet" and 0 is "zero-rated", and a statement
+  -- treats those two differently. Added after the table shipped, so it is an
+  -- ALTER rather than a column above; IF NOT EXISTS makes it re-runnable on
+  -- every warm start, as the rest of this file is.
+  ALTER TABLE sku_master ADD COLUMN IF NOT EXISTS gst_pct DOUBLE PRECISION;
+
   -- ---------------------------------------------------------------------------
   -- Effective-dated COGS. A cost belongs to a SKU *in a month*, not to a SKU,
   -- so closing a month freezes the cost that applied to it. Rows are never

@@ -35,6 +35,7 @@ const PATCHABLE: Record<string, string> = {
   brand: 'brand',
   cogs: 'cogs',
   mrp: 'mrp',
+  gstPct: 'gst_pct',
   launchDate: 'launch_date',
   status: 'status',
   leadTimeDays: 'lead_time_days',

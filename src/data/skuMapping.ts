@@ -272,6 +272,47 @@ export function resolveCogs(channelSku: string, tables: MappingTables): CostReso
 }
 
 /**
+ * The GST rate a marketplace code is sold at, followed through the SKU map.
+ *
+ * Returned as a fraction (0.18, 0.05, 0), because that is what a tax
+ * calculation multiplies by; the Product Master holds it as a percentage,
+ * which is how a person writes it.
+ *
+ * Null means the Product Master does not answer for this code — the SKU has
+ * no rate, or the code does not resolve to a product at all. Null is not 0%:
+ * a caller falls back to whatever its own document said and names the codes
+ * it did that for, rather than taxing a sale at nothing.
+ *
+ * A combo answers only when its components agree. A bundle of an 18% item and
+ * a 5% one has no single rate, and splitting the line to find the blend needs
+ * a per-component value this does not have.
+ */
+export function resolveGstPct(channelSku: string, tables: MappingTables): number | null {
+  const rateOf = (sku: string | undefined): number | null => {
+    if (!sku) return null
+    const pct = tables.skuMaster.find((s) => s.sku === sku)?.gstPct
+    return typeof pct === 'number' && Number.isFinite(pct) && pct >= 0 ? pct / 100 : null
+  }
+
+  const direct = rateOf(channelSku)
+  if (direct !== null) return direct
+
+  const mapping = tables.mappings.find((m) => m.channelSku === channelSku)
+  if (!mapping) return null
+
+  if (mapping.kind === 'SINGLE') return rateOf(mapping.internalSku)
+
+  const components = tables.comboComponents.filter(
+    (c) => c.comboSku === mapping.internalSku || c.comboSku === channelSku,
+  )
+  if (components.length === 0) return null
+
+  const rates = components.map((c) => rateOf(c.componentSku))
+  if (rates.some((r) => r === null)) return null
+  return rates.every((r) => r === rates[0]) ? rates[0] : null
+}
+
+/**
  * The category a marketplace code belongs to, followed through the SKU map.
  *
  * A code like `C2/RO/AH/FOOT/50` is not a product; it is a listing that

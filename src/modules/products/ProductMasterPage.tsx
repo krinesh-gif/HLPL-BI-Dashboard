@@ -17,14 +17,29 @@ const EDITABLE_NUMERIC_FIELDS: { key: keyof SkuMaster; label: string }[] = [
 
 export function ProductMasterPage() {
   const { skuMaster, updateSkuMaster } = useDataStore()
-  const { unmappedSkus, unmappedNetSales, totalNetSales, missingCogsSkus } = useSkuCostValidation()
+  const { unmappedSkus, unmappedNetSales, totalNetSales, missingCogsSkus, missingGstSkus } = useSkuCostValidation()
   const missingCogsSet = new Set(missingCogsSkus)
+  const missingGstSet = new Set(missingGstSkus)
   const unmappedSharePct = totalNetSales > 0 ? (unmappedNetSales / totalNetSales) * 100 : 0
 
   return (
     <PageShell title="Product Master" subtitle="Centralized SKU data — COGS here is the single source of truth for every channel's P&L" showFilters={false}>
       <AddProductForm />
       <UncategorizedPanel />
+
+      {missingGstSkus.length > 0 && (
+        <div className="mb-6 rounded-lg border border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] p-4">
+          <h3 className="text-sm font-semibold text-[var(--ink)]">
+            ⚠ {missingGstSkus.length} product{missingGstSkus.length === 1 ? ' has' : 's have'} no GST rate
+          </h3>
+          <p className="mt-1 text-xs text-[var(--ink-2)]">
+            GST comes from here, the way COGS does. Until a product has a rate, its channels fall back to whatever
+            their own file or purchase order said — and those disagree: Nykaa&rsquo;s order prices HSN 33011990 and
+            34011190 at 18% while Swiggy&rsquo;s prices the same two at 5%. Enter the rate in the GST % column below.
+            A zero-rated product is entered as 0, which is an answer; blank is not.
+          </p>
+        </div>
+      )}
 
       {unmappedSkus.length > 0 && (
         <div className="mb-6 rounded-lg border border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] p-4">
@@ -79,6 +94,12 @@ export function ProductMasterPage() {
                   {f.label}
                 </th>
               ))}
+              <th
+                className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]"
+                title="The rate every channel's statement takes its GST from — 18, 5 or 0"
+              >
+                GST %
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -107,6 +128,34 @@ export function ProductMasterPage() {
                       />
                     </td>
                   ))}
+                  <td className="px-3 py-1 text-right">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      defaultValue={typeof sku.gstPct === 'number' ? sku.gstPct : ''}
+                      placeholder="—"
+                      title={
+                        missingGstSet.has(sku.sku)
+                          ? 'No GST rate on file — this product’s channels fall back to whatever their own document said'
+                          : undefined
+                      }
+                      onBlur={(e) => {
+                        // An empty box is left alone rather than written as 0:
+                        // zero-rated and not-yet-entered are different answers.
+                        if (e.target.value.trim() === '') return
+                        const value = Number(e.target.value)
+                        if (Number.isFinite(value) && value >= 0 && value !== sku.gstPct) {
+                          updateSkuMaster(sku.sku, { gstPct: value })
+                        }
+                      }}
+                      className={`w-20 rounded border px-2 py-1 text-right tabular-nums focus:border-[var(--accent)] focus:bg-[var(--surface)] focus:outline-none ${
+                        missingGstSet.has(sku.sku)
+                          ? 'border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-[color-mix(in_oklab,var(--warning)_16%,transparent)] font-semibold text-[var(--ink)]'
+                          : 'border-transparent bg-transparent hover:border-[var(--line-2)]'
+                      }`}
+                    />
+                  </td>
                 </tr>
               )
             })}

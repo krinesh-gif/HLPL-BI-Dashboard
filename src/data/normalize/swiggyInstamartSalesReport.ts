@@ -1,5 +1,6 @@
 import type { CanonicalSalesRecord, SkuMaster, SwiggyInstamartPnlFacts } from '@/data/models'
-import type { SkuMapping } from '@/data/skuMapping'
+import type { ComboComponent, SkuMapping } from '@/data/skuMapping'
+import { resolveGstPct } from '@/data/skuMapping'
 import type { RawSheet } from '@/lib/csvParse'
 import { SWIGGY_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { addMonths as addMonthsToKey } from '@/lib/format'
@@ -22,9 +23,11 @@ import type { NormalizeResult } from './types'
  * fulfilment charge, no payout, no returns column and no discount off MRP, so
  * the statement runs to gross profit and names what Swiggy took as not
  * supplied. There is also **no GST rate**: GMV is at MRP and therefore
- * includes tax, but nothing in the file says how much. It is taken out at a
- * declared assumption, the rate is stored with the month, and the statement
- * says on the line that it was assumed rather than read.
+ * includes tax, but nothing in the file says how much. It comes from the
+ * Product Master, which is the single source of truth for tax across every
+ * channel; where the Master has no rate for an item code yet, the rate on
+ * Swiggy's own purchase order stands in and the month names which codes
+ * those were.
  */
 const SALES_SHEET = ['sales report']
 const METRICS_SHEET = ['brand metrics']
@@ -123,6 +126,7 @@ export function normalizeSwiggyInstamartReport(
   sheets: Record<string, RawSheet>,
   skuMaster: SkuMaster[],
   mappings: SkuMapping[],
+  comboComponents: ComboComponent[],
   importId: string,
 ): SwiggyNormalizeResult {
   const validRecords: CanonicalSalesRecord[] = []
@@ -140,6 +144,9 @@ export function normalizeSwiggyInstamartReport(
 
   const internalBySku = new Map(mappings.map((m) => [m.channelSku, m.internalSku]))
   const master = new Map(skuMaster.map((s) => [s.sku, s]))
+  const mappingTables = { skuMaster, mappings, comboComponents }
+  // One item code appears on hundreds of rows, so each is resolved once.
+  const gstByCode = new Map<string, number | null>()
   const unpriced = new Set<string>()
   const skus = new Set<string>()
   const stores = new Set<string>()
@@ -182,12 +189,18 @@ export function normalizeSwiggyInstamartReport(
     // 25% inclusive on MRP, so we invoice 75% of what Swiggy sold it for.
     const margin = gmv * facts.marginPct
     const invoiceValue = gmv - margin
-    // At this item's own rate, from the purchase order. The report states
-    // none, and the range is not all at one rate: three of the seven items
-    // on the PO are 5%, so a blanket rate would be wrong on every one.
-    const itemGstPct = SWIGGY_ASSUMPTIONS.gstByItemCode[itemCode]
-    if (itemGstPct === undefined) gstFallback.add(itemCode)
-    const gstPct = itemGstPct ?? SWIGGY_ASSUMPTIONS.fallbackGstPct
+    // At this item's own rate from the Product Master, which is where the
+    // company's tax rates live. The report states none, and the range is not
+    // all at one rate, so a blanket rate would be wrong on several items.
+    // Where the Master has no rate yet, Swiggy's own purchase order stands in
+    // and the code is named, so the gap is visible rather than silent.
+    let masterGstPct = gstByCode.get(itemCode)
+    if (masterGstPct === undefined) {
+      masterGstPct = resolveGstPct(itemCode, mappingTables)
+      gstByCode.set(itemCode, masterGstPct)
+    }
+    if (masterGstPct === null) gstFallback.add(itemCode)
+    const gstPct = masterGstPct ?? SWIGGY_ASSUMPTIONS.gstByItemCode[itemCode] ?? SWIGGY_ASSUMPTIONS.fallbackGstPct
     const gst = invoiceValue - invoiceValue / (1 + gstPct)
     if (key(cell(row, 'combo')) === 'yes') comboRows++
 
@@ -302,7 +315,7 @@ export function normalizeSwiggyInstamartReport(
   warnings.push(
     `Swiggy's trade margin of ${(facts.marginPct * 100).toFixed(0)}% inclusive on MRP — ${inr(facts.marginInr)} — ` +
     'comes from the agreed terms and purchase order FC5PO365689, not from this file. What we invoice is ' +
-    `${inr(facts.invoiceValueInr)} including GST, and GST comes out at each item's own rate from that order.`,
+    `${inr(facts.invoiceValueInr)} including GST, and GST comes out at each item's own rate from the Product Master.`,
   )
   if (facts.marketingContributionInr > 0) {
     warnings.push(
@@ -321,9 +334,11 @@ export function normalizeSwiggyInstamartReport(
   }
   if (facts.gstFallbackSkus.length > 0) {
     warnings.push(
-      `${facts.gstFallbackSkus.length} item code(s) are on no purchase order yet, so their GST came out at the ` +
-      `standing ${(SWIGGY_ASSUMPTIONS.fallbackGstPct * 100).toFixed(0)}%: ${facts.gstFallbackSkus.join(', ')}. ` +
-      'Send a PO carrying them and the rate becomes a read figure rather than a standing one.',
+      `${facts.gstFallbackSkus.length} item code(s) have no GST rate in the Product Master, so their tax came ` +
+      `out at the rate on Swiggy's purchase order, or at the standing ` +
+      `${(SWIGGY_ASSUMPTIONS.fallbackGstPct * 100).toFixed(0)}% where that order does not name them: ` +
+      `${facts.gstFallbackSkus.join(', ')}. Enter their rate on Catalogue ▸ Product Master — Nykaa's and ` +
+      "Swiggy's orders state different rates for the same HSN codes, so the Master is the one that decides.",
     )
   }
   if (facts.brandGmv > 0 && Math.abs(facts.brandGmv - facts.gmv) > 0.5) {

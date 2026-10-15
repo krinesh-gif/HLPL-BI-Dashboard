@@ -121,13 +121,14 @@ export const SWIGGY_ASSUMPTIONS = {
    * moves with it, and it is here so the contract is in one place. */
   creditDays: 40,
   /**
-   * GST rate per Swiggy item code, from the HSN codes on the same PO. The
-   * sales report carries no rate at all, and the brand's range is not all at
-   * one rate — three of these seven are 5% — so a blanket rate would be wrong
-   * on every essential-oil and shampoo line.
+   * GST rate per Swiggy item code, from the HSN codes on the same PO.
    *
-   * This belongs on the Product Master the day it gains a GST field; until
-   * then it is here, sourced from a document rather than assumed.
+   * No longer where the rate is decided: the Product Master is, because this
+   * order and Nykaa's order NWT23459 state different rates for the same HSN
+   * codes — 33011990 and 34011190 are 5% here and 18% there — and a rate the
+   * company charges cannot depend on which document was read last. These
+   * stand in only for an item whose Product Master row has no rate yet, and
+   * the month names every code that fell back to one.
    */
   gstByItemCode: {
     '258149': 0.05, // Rosemary Anti-Hairfall Shampoo 200ml, HSN 33051090
@@ -138,8 +139,9 @@ export const SWIGGY_ASSUMPTIONS = {
     '80537': 0.18, // Tinted Beetroot Lip Balm 5g, HSN 33041000
     '982980': 0.18, // Rosemary Water Hair Spray 100ml, HSN 33041000
   } as Record<string, number>,
-  /** For an item code no purchase order has named yet. The month says which
-   * codes fell back to it, so it never passes silently. */
+  /** For an item code neither the Product Master nor a purchase order has
+   * named. The month says which codes fell back to it, so it never passes
+   * silently. */
   fallbackGstPct: 0.18,
 }
 
@@ -164,7 +166,15 @@ export const SWIGGY_ASSUMPTIONS = {
  * facts.
  */
 export const NYKAA_ASSUMPTIONS = {
-  /** Nykaa's margin, as a percentage of MRP. */
+  /**
+   * Nykaa's margin, as a percentage of MRP.
+   *
+   * Flat, by the owner's decision of 15 October 2026. Purchase order
+   * NWT23459 is not quite flat — four of its nine lines price at 38.003% and
+   * five at 37.767%, blending to 37.871%, which is ₹232 in our favour on
+   * ₹1.79 lakh of MRP — but a per-SKU margin is not the agreement, and a
+   * month genuinely traded on other terms overrides this in its own facts.
+   */
   commissionPctOfMrp: 38,
   /** MRP is a tax-inclusive price by law, so what we realise out of it is
    * tax-inclusive too. This strips the tax back out to state revenue. */

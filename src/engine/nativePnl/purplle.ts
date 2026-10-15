@@ -13,8 +13,8 @@ import type { NativeLineDef, NativeLineValues } from './types'
  *
  * The ladder is measured on NET REVENUE, ex-GST, as Blinkit's and Meesho's
  * are, so a Purplle margin means what a Blinkit margin means. The tax comes
- * out at each row's own rate: April's file carries 18% lines and 5% lines,
- * and one rate for the file would be ₹369 wrong.
+ * out at each product's own rate from the Product Master — the range runs at
+ * 18% and at 5%, and one rate for the file would be ₹369 wrong.
  *
  * What Purplle takes is the contract, not the file: B2B on sale or return,
  * a commission on what sells, stored with the month it was read at. The GST
@@ -34,7 +34,7 @@ export const PURPLLE_LINE_DEFS: NativeLineDef[] = [
   { key: 'invoiceValue', label: 'INVOICE VALUE (what we bill Purplle)', section: 'REVENUE', kind: 'subtotal',
     note: 'MRP less the margin, GST included — the channel’s revenue' },
   { key: 'outputGst', label: 'Less: Output GST', section: 'REVENUE', kind: 'input',
-    note: 'On what we invoice, at each line’s own rate; this month carries both 18% and 5% lines' },
+    note: 'On what we invoice, at each product’s own rate from the Product Master, which is what decides the rate across every channel. Where the Master has none yet, the rate stated on Purplle’s file stands in and the upload names those codes.' },
   { key: 'netRevenue', label: 'NET REVENUE (ex-GST)', section: 'REVENUE', kind: 'subtotal' },
 
   { key: 'nmv', label: 'What shoppers paid', section: 'MEMO — PURPLLE’S SHOP FLOOR', kind: 'input',

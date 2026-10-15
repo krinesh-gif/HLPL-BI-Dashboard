@@ -208,7 +208,7 @@ async function findNykaaCompanions(files: File[]): Promise<NykaaCompanions> {
 
 export function UploadReportsPage() {
   const {
-    skuMaster, mappings, importReport, importProgress, importSkuMapWorkbook, saveManualAdSpend,
+    skuMaster, mappings, comboComponents, importReport, importProgress, importSkuMapWorkbook, saveManualAdSpend,
     patchNykaaFacts, nykaaFacts, imports,
   } = useDataStore()
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null)
@@ -416,7 +416,7 @@ export function UploadReportsPage() {
         // Swiggy sends two sheets, each with its column names on a row of
         // their own, so it is read as a workbook rather than a flat table.
         if (detectSwiggyInstamartReport(sheets)) {
-          const r = normalizeSwiggyInstamartReport(sheets, skuMaster, mappings, importId)
+          const r = normalizeSwiggyInstamartReport(sheets, skuMaster, mappings, comboComponents, importId)
           return { id, fileName: file.name, status: 'ready', preview: await buildPreview({
             fileName: file.name, reportKind: 'swiggy_instamart_sales', totalRows: r.totalRows,
             validRecords: r.validRecords, invalidCount: r.invalidRows.length,
@@ -426,7 +426,7 @@ export function UploadReportsPage() {
         // Purplle's file puts a strip of the sender's own totals above the
         // column names, so it cannot be read as a flat header-first sheet.
         if (detectPurplleSalesReport(firstSheet)) {
-          const r = normalizePurplleSalesReport(firstSheet, skuMaster, mappings, importId)
+          const r = normalizePurplleSalesReport(firstSheet, skuMaster, mappings, comboComponents, importId)
           return { id, fileName: file.name, status: 'ready', preview: await buildPreview({
             fileName: file.name, reportKind: 'purplle_sales', totalRows: r.totalRows,
             validRecords: r.validRecords, invalidCount: r.invalidRows.length,

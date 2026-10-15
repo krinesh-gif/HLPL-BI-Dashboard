@@ -81,6 +81,22 @@ export interface SkuMaster {
   brand: string
   cogs: number
   mrp: number
+  /**
+   * The GST rate this product is sold at, as a percentage — 18, 5, or 0.
+   *
+   * The single source of truth for tax, the way `cogs` is for cost. Channels
+   * state rates that disagree with each other: Nykaa's purchase order prices
+   * HSN 33011990 and 34011190 at 18% while Swiggy's prices the same two codes
+   * at 5%. Only one of those can be right, so no document wins by being the
+   * most recent one read — the rate entered here does, and a statement that
+   * had to fall back to a channel's own figure says which SKUs it did that
+   * for.
+   *
+   * Optional because unstated and 0% are different answers: a product with no
+   * rate yet is a question to put to the accounts team, while a genuine 0%
+   * line (Purplle's purchase order carries one, HSN 33012928) is an answer.
+   */
+  gstPct?: number
   launchDate: string
   status: 'active' | 'inactive' | 'discontinued'
   leadTimeDays: number
@@ -416,10 +432,11 @@ export interface SwiggyInstamartPnlFacts {
   /** GMV less that margin: what we invoice Swiggy, GST included. */
   invoiceValueInr: number
   /** The tax inside the invoice value, at each item's own rate from the
-   * purchase order. The sales report states no rate. */
+   * Product Master. The sales report states no rate. */
   outputGst: number
-  /** Item codes no purchase order has named, which fell back to the standing
-   * rate. Named so the gap is nameable rather than silent. */
+  /** Item codes with no GST rate in the Product Master, whose tax fell back
+   * to the rate on Swiggy's purchase order — or to the standing rate where
+   * no order names them. Named so the gap is nameable rather than silent. */
   gstFallbackSkus: string[]
   /** Marketing contribution charged for the month: 10% of MRP sales, for the
    * first six months from launch. Zero outside that window. */
@@ -469,9 +486,19 @@ export interface PurpllePnlFacts {
    * Purplle's margin, since the margin sheet charges no discount back to us.
    * Kept because sell-through is the thing this channel is read for. */
   nmv: number
-  /** The tax inside the invoice value, at each line's own rate. Our GST is on
-   * what we sell to Purplle for, not on what Purplle sells for. */
+  /** The tax inside the invoice value, at each line's own rate from the
+   * Product Master. Our GST is on what we sell to Purplle for, not on what
+   * Purplle sells for. */
   outputGst: number
+  /** Purplle codes with no GST rate in the Product Master, whose tax fell
+   * back to the rate stated on Purplle's own file. Optional: months read
+   * before the Master carried rates have neither array. */
+  gstFallbackSkus?: string[]
+  /** Codes where the Master and Purplle's file state different rates. The
+   * Master decides the statement, and this says where the two disagree —
+   * a difference worth taking up with Purplle, since it is the rate they
+   * are invoicing at. */
+  gstMismatchSkus?: string[]
   /** The invoice value less that GST — the basis every other channel's
    * margins are on. */
   netRevenue: number

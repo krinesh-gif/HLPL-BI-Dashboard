@@ -19,6 +19,13 @@ export interface SkuCostValidation {
   /** Product Master rows with no COGS entered — priced at ₹0, understating
    * COGS for every order of that SKU. */
   missingCogsSkus: string[]
+  /**
+   * Product Master rows with no GST rate entered. The Master is what decides
+   * the rate on every statement, so a blank here sends the channel back to
+   * whatever its own file or purchase order said — and those disagree with
+   * each other. Blank is not 0%: a zero-rated product is entered as 0.
+   */
+  missingGstSkus: string[]
 }
 
 export function useSkuCostValidation(): SkuCostValidation {
@@ -62,6 +69,9 @@ export function useSkuCostValidation(): SkuCostValidation {
       unmappedNetSales,
       totalNetSales,
       missingCogsSkus: skuMaster.filter((s) => !s.cogs || s.cogs <= 0).map((s) => s.sku),
+      missingGstSkus: skuMaster
+        .filter((s) => typeof s.gstPct !== 'number' || !Number.isFinite(s.gstPct))
+        .map((s) => s.sku),
     }
   }, [salesRecords, skuMaster, mappings, comboComponents])
 }

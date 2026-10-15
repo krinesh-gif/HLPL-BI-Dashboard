@@ -1,5 +1,6 @@
 import type { CanonicalSalesRecord, PurpllePnlFacts, SkuMaster } from '@/data/models'
-import type { SkuMapping } from '@/data/skuMapping'
+import type { ComboComponent, SkuMapping } from '@/data/skuMapping'
+import { resolveGstPct } from '@/data/skuMapping'
 import type { RawSheet } from '@/lib/csvParse'
 import { PURPLLE_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { normalizeCategory } from '@/data/categories'
@@ -20,10 +21,13 @@ import type { NormalizeResult } from './types'
  * profit and stops: the line for Purplle's charges is on it, stated as not
  * supplied, rather than left off as though the channel were free.
  *
- * **The money includes GST.** `nmv` is what the shopper paid, and every row
- * carries its own rate — April's file has both 18% and 5% lines. The tax is
- * taken out per row at that row's rate, so net revenue is ex-GST and means
- * the same thing here as on every other channel.
+ * **The money includes GST.** `nmv` is what the shopper paid, and the rate
+ * is per product rather than per file — April's lines run at both 18% and
+ * 5%. The rate comes from the Product Master, which is the single source of
+ * truth for tax; the file states its own rate on every row, and that is used
+ * only where the Master has none, with the codes named either way. Where the
+ * two disagree the Master decides the statement and the difference is
+ * reported, because it is the rate Purplle is invoicing at.
  *
  * **The header is not the first row.** Row 1 holds a strip of totals the
  * sender keeps for their own check, and one of them is labelled Marketing —
@@ -147,6 +151,7 @@ export function normalizePurplleSalesReport(
   sheet: RawSheet,
   skuMaster: SkuMaster[],
   mappings: SkuMapping[],
+  comboComponents: ComboComponent[],
   importId: string,
 ): PurplleNormalizeResult {
   const validRecords: CanonicalSalesRecord[] = []
@@ -163,6 +168,11 @@ export function normalizePurplleSalesReport(
 
   const internalBySku = new Map(mappings.map((m) => [m.channelSku, m.internalSku]))
   const master = new Map(skuMaster.map((s) => [s.sku, s]))
+  const mappingTables = { skuMaster, mappings, comboComponents }
+  // A code repeats on many rows, so its rate is resolved once.
+  const gstByCode = new Map<string, number | null>()
+  const gstFallback = new Set<string>()
+  const gstMismatch = new Set<string>()
   const unpriced = new Set<string>()
   const orders = new Set<string>()
 
@@ -173,6 +183,7 @@ export function normalizePurplleSalesReport(
     marginInr: 0, marginPct: PURPLLE_ASSUMPTIONS.marginPct,
     marginBase: PURPLLE_ASSUMPTIONS.marginBase, invoiceValueInr: 0,
     marketingInr: 0, marketingStated: false,
+    gstFallbackSkus: [], gstMismatchSkus: [],
     cogsSourceInr: 0, unpricedSkus: [],
     priceOffAlt: 0, priceOffDifference: 0, priceOffDifferenceStated: 0,
   }
@@ -202,7 +213,18 @@ export function normalizePurplleSalesReport(
     const mrp = num(cell(row, 'mrp'))
     const priceOff = num(cell(row, 'priceOff'))
     const nmv = num(cell(row, 'nmv'))
-    const gstRate = num(cell(row, 'gstRate'))
+    const statedGstRate = num(cell(row, 'gstRate'))
+    // The Product Master decides the rate; the file's own is the fallback.
+    // They are not always the same figure, and where they differ the
+    // difference is reported rather than averaged away.
+    let masterGstRate = gstByCode.get(sku)
+    if (masterGstRate === undefined) {
+      masterGstRate = resolveGstPct(sku, mappingTables)
+      gstByCode.set(sku, masterGstRate)
+    }
+    if (masterGstRate === null) gstFallback.add(sku)
+    else if (Math.abs(masterGstRate - statedGstRate) > 0.0001) gstMismatch.add(sku)
+    const gstRate = masterGstRate ?? statedGstRate
 
     // What Purplle takes, on the base its margin sheet names: 31% inclusive
     // on MRP. Inclusive, so nothing is added for GST on top of it.
@@ -273,6 +295,8 @@ export function normalizePurplleSalesReport(
   facts.skusSold = new Set(validRecords.map((r) => r.sku)).size
   facts.priceOffDifference = facts.priceOff - facts.priceOffAlt
   facts.unpricedSkus = [...unpriced].sort()
+  facts.gstFallbackSkus = [...gstFallback].sort()
+  facts.gstMismatchSkus = [...gstMismatch].sort()
 
   const months = [...monthsSeen].sort()
   facts.month = months[0] ?? ''
@@ -294,8 +318,29 @@ export function normalizePurplleSalesReport(
     `Purplle's Basic Product Margin of ${(facts.marginPct * 100).toFixed(0)}% ` +
     `${facts.marginBase === 'mrp' ? 'inclusive on MRP' : 'on nmv'} — ${inr(facts.marginInr)} — comes from the ` +
     'margin sheet and not from this file, which states nothing Purplle took. What we invoice is ' +
-    `${inr(facts.invoiceValueInr)} including GST.`,
+    `${inr(facts.invoiceValueInr)} including GST, and the GST inside it — ${inr(facts.outputGst)} — comes out at ` +
+    "each product's own rate from the Product Master.",
   )
+  if ((facts.gstFallbackSkus?.length ?? 0) > 0) {
+    const codes = facts.gstFallbackSkus ?? []
+    const shown = codes.slice(0, 8).join(', ')
+    const rest = codes.length - 8
+    warnings.push(
+      `${codes.length} Purplle code(s) have no GST rate in the Product Master, so their tax came out at the rate ` +
+      `stated on this file: ${shown}${rest > 0 ? ` and ${rest} more` : ''}. Enter their rate on Catalogue ▸ ` +
+      'Product Master, which is what decides the rate once it is there.',
+    )
+  }
+  if ((facts.gstMismatchSkus?.length ?? 0) > 0) {
+    const codes = facts.gstMismatchSkus ?? []
+    const shown = codes.slice(0, 8).join(', ')
+    const rest = codes.length - 8
+    warnings.push(
+      `${codes.length} Purplle code(s) are invoiced on this file at a GST rate that differs from the Product ` +
+      `Master: ${shown}${rest > 0 ? ` and ${rest} more` : ''}. The statement uses the Master. One of the two is ` +
+      'wrong on the invoice, so it is worth raising with Purplle.',
+    )
+  }
   warnings.push(
     `Shoppers paid ${inr(facts.nmv)} after ${inr(facts.priceOff)} of price off. That price off is Purplle's own — ` +
     'the margin sheet charges no discount back to us — so it is kept as a memo and not as a cost. It is the ' +

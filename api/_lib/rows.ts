@@ -28,6 +28,10 @@ export function toSkuMaster(r: Row): SkuMaster {
     brand: str(r.brand),
     cogs: num(r.cogs),
     mrp: num(r.mrp),
+    // Left undefined when the column is NULL rather than defaulted to 0: a
+    // zero-rated product and one nobody has entered a rate for are different
+    // answers, and `num` would turn both into 0.
+    gstPct: r.gst_pct === null || r.gst_pct === undefined ? undefined : num(r.gst_pct),
     launchDate: str(r.launch_date),
     status: str(r.status) as SkuMaster['status'],
     leadTimeDays: num(r.lead_time_days),

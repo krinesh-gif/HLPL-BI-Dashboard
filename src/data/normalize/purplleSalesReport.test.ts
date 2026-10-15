@@ -73,9 +73,16 @@ describe('finding the table inside Purplle’s file', () => {
   })
 })
 
+/** A Product Master row carrying a GST rate, which is what decides the tax. */
+const product = (sku: string, gstPct: number): SkuMaster => ({
+  sku, productName: sku, category: 'Skincare', brand: 'Aravi Organic',
+  cogs: 0, mrp: 0, gstPct, launchDate: '2025-04-01', status: 'active',
+  leadTimeDays: 21, safetyStock: 0,
+})
+
 describe('reading the month', () => {
   const run = (rows: (string | number | null)[][], master: SkuMaster[] = []) =>
-    normalizePurplleSalesReport(sheet(rows), master, [], 'test')
+    normalizePurplleSalesReport(sheet(rows), master, [], [], 'test')
 
   it('takes Purplle’s margin off MRP, and the GST off what is left', () => {
     // 31% inclusive on MRP, so we invoice 69% of MRP and our GST is on that
@@ -88,11 +95,44 @@ describe('reading the month', () => {
     expect(r.facts.netRevenue).toBeCloseTo(690 / 1.18, 6)
   })
 
-  it('uses each line’s own GST rate', () => {
+  it('falls back to each line’s own stated rate, and names those codes', () => {
     // April's file carries 18% lines beside 5% ones. One rate for the file
-    // would be wrong by hundreds of rupees.
-    const r = run([line({ mrp: 1000, off: 0, gst: 0.18 }), line({ mrp: 1000, off: 0, gst: 0.05 })])
+    // would be wrong by hundreds of rupees. Nothing is in the Master here,
+    // so the file's own rate stands in — and the codes are named, because
+    // the Master is what should be deciding this.
+    const r = run([
+      line({ sku: 'A', mrp: 1000, off: 0, gst: 0.18 }),
+      line({ sku: 'B', mrp: 1000, off: 0, gst: 0.05 }),
+    ])
     expect(r.facts.outputGst).toBeCloseTo((690 - 690 / 1.18) + (690 - 690 / 1.05), 6)
+    expect(r.facts.gstFallbackSkus).toEqual(['A', 'B'])
+    expect(r.warnings.some((w) => w.includes('no GST rate in the Product Master'))).toBe(true)
+  })
+
+  it('takes the rate from the Product Master, and reports where the file disagrees', () => {
+    // The Master is the single source of truth for tax. Purplle invoices
+    // this line at 5%; the Master says 18%, so the statement says 18% and
+    // the difference is raised rather than averaged away.
+    const r = run([line({ sku: 'A', mrp: 1000, off: 0, gst: 0.05 })], [product('A', 18)])
+    expect(r.facts.outputGst).toBeCloseTo(690 - 690 / 1.18, 6)
+    expect(r.facts.gstFallbackSkus).toEqual([])
+    expect(r.facts.gstMismatchSkus).toEqual(['A'])
+    expect(r.warnings.some((w) => w.includes('differs from the Product'))).toBe(true)
+  })
+
+  it('agrees quietly when the Master and the file state the same rate', () => {
+    const r = run([line({ sku: 'A', mrp: 1000, off: 0, gst: 0.18 })], [product('A', 18)])
+    expect(r.facts.gstMismatchSkus).toEqual([])
+    expect(r.facts.gstFallbackSkus).toEqual([])
+  })
+
+  it('honours a zero-rated product in the Master', () => {
+    // Purplle's own purchase order carries a 0% line (HSN 33012928), so 0
+    // has to mean 0 rather than "nobody has said".
+    const r = run([line({ sku: 'A', mrp: 1000, off: 0, gst: 0.18 })], [product('A', 0)])
+    expect(r.facts.outputGst).toBe(0)
+    expect(r.facts.netRevenue).toBeCloseTo(690, 6)
+    expect(r.facts.gstFallbackSkus).toEqual([])
   })
 
   it('keeps what shoppers paid as a memo, not as revenue', () => {
@@ -166,7 +206,7 @@ describe('reading the month', () => {
 describe.skipIf(!existsSync(REPORT))('the owner’s April 2026 Purplle file', () => {
   const run = () => {
     const first = Object.values(workbookSheetsFromBytes(readFileSync(REPORT)))[0]
-    return { sheet: first, result: normalizePurplleSalesReport(first, [], [], 'test') }
+    return { sheet: first, result: normalizePurplleSalesReport(first, [], [], [], 'test') }
   }
 
   it('is recognised and read without a bad row', () => {
