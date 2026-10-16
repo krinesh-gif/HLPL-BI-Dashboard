@@ -21,10 +21,12 @@ import type { NativeLineDef, NativeLineValues } from './types'
  * on it sits beside it and is never deducted — it is input tax credit, and
  * charging it to the P&L would understate the channel.
  *
- * Advertising is the "Marketing" figure the sender writes above the table.
- * It is the only cost of selling this file carries, so it is on the statement
- * — flagged, because a number read from a loose cell deserves to be checked
- * against Purplle's invoice.
+ * Advertising is Purplle's marketing charge, and it comes to 5% of the
+ * month's MRP: April writes it once above the table under a "Marketing"
+ * label, June as an unnamed column carrying the same 5% on every row. It is
+ * the only cost of selling this file carries, so it is on the statement —
+ * flagged, because 5% of MRP is on no document Purplle has sent us. The
+ * margin sheet's A&P line is blank.
  */
 export const PURPLLE_LINE_DEFS: NativeLineDef[] = [
   { key: 'mrpValue', label: 'MRP value of what sold', section: 'REVENUE', kind: 'input',
@@ -52,7 +54,7 @@ export const PURPLLE_LINE_DEFS: NativeLineDef[] = [
 
 
   { key: 'marketing', label: 'Less: Advertising (MI)', section: 'PROFIT', kind: 'input', fee: 'advertising',
-    note: 'The "Marketing" figure written above the table in Purplle’s file, not a column of it — check it against Purplle’s invoice' },
+    note: 'Purplle’s marketing charge, which is 5% of the month’s MRP: April writes it once above the table under a "Marketing" label, June as an unnamed column of the same 5% per row. It is not on the margin sheet, where every line but the 31% is blank — so check it against Purplle’s invoice.' },
   { key: 'contribution', label: 'Contribution (after advertising)', section: 'PROFIT', kind: 'subtotal' },
   { key: 'contributionPct', label: 'Contribution %', section: 'PROFIT', kind: 'percent' },
   { key: 'overheads', label: 'Less: Allocated Fixed Expenses', section: 'PROFIT', kind: 'input',

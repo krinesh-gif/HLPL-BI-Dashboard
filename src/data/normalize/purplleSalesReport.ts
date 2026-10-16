@@ -35,12 +35,23 @@ import type { NormalizeResult } from './types'
  * found by its column names, and the marketing figure by its label, rather
  * than by position, because a position is a promise about next month's file
  * that nobody has made.
+ *
+ * **And the shape moves between months.** June's export renames `sku` to
+ * `product_sku`, drops the strip's Marketing label, and leaves two columns
+ * with no name at all: the GST rate, and a figure that is exactly 5% of MRP
+ * on all 317 rows — the same 5% of MRP that April writes once, labelled
+ * Marketing. Neither is read by its position. The rate is found by its
+ * values being GST rates and nothing else; the marketing column by being one
+ * constant percentage of MRP on every row. Both are reported on the upload
+ * with the rule that found them, because a column identified by its contents
+ * deserves a second pair of eyes in a way a labelled one does not.
  */
 const COLUMNS = {
   date: ['dt', 'date', 'order_date'],
   orderId: ['order_id', 'order id'],
   ean: ['ean_code', 'ean'],
-  sku: ['sku', 'sku_code'],
+  /** June's export renames `sku` to `product_sku`. Both are the same code. */
+  sku: ['sku', 'sku_code', 'product_sku'],
   name: ['name', 'product_name'],
   category: ['category_name', 'category'],
   categoryRoot: ['category_root'],
@@ -139,6 +150,84 @@ export function purplleMarketing(sheet: RawSheet, headerRow: number): number | n
   return null
 }
 
+/** Every row below the header that has anything in it. */
+function purplleDataRows(sheet: RawSheet, headerRow: number): unknown[][] {
+  return (sheet.slice(headerRow + 1) as unknown[][]).filter((row) =>
+    row.some((v) => v !== null && v !== undefined && String(v).trim() !== ''),
+  )
+}
+
+/** The widest row in the file, since a header can be shorter than its data. */
+function purplleWidth(sheet: RawSheet, headerRow: number): number {
+  return Math.max(...[sheet[headerRow] ?? [], ...purplleDataRows(sheet, headerRow)].map((r) => (r as unknown[]).length), 0)
+}
+
+/** The GST rates an Indian invoice can carry, as fractions. */
+const GST_RATES = new Set([0, 0.05, 0.12, 0.18, 0.28])
+
+/**
+ * The GST rate column in a file that forgot to name it, as June's does.
+ *
+ * Identified by its values and not by where it sits: every row has to hold a
+ * rate that exists, and at least one has to be above zero, so an empty or
+ * all-zero column cannot pass as a tax rate. Returns -1 when no unnamed
+ * column answers that description, which leaves the rate to the Product
+ * Master — where it belongs.
+ */
+export function purplleUnnamedGstColumn(sheet: RawSheet, headerRow: number): number {
+  const header = (sheet[headerRow] ?? []) as unknown[]
+  const rows = purplleDataRows(sheet, headerRow)
+  if (rows.length === 0) return -1
+  for (let c = 0; c < purplleWidth(sheet, headerRow); c++) {
+    if (key(header[c]) !== '') continue
+    let anyRate = false
+    const everyRow = rows.every((row) => {
+      const v = row[c]
+      if (typeof v !== 'number' || !GST_RATES.has(v)) return false
+      if (v > 0) anyRate = true
+      return true
+    })
+    if (everyRow && anyRate) return c
+  }
+  return -1
+}
+
+/**
+ * The unnamed column that is one constant percentage of MRP on every row.
+ *
+ * June carries the marketing charge this way — ₹5,322.95, which is 5% of its
+ * ₹1,06,459 of MRP to the paisa — where April writes the same 5% once, above
+ * the table, labelled Marketing. The percentage is read from the file rather
+ * than assumed, so a month charged at another rate still reads; what is
+ * fixed is that it must be the same rate on every row, which is what makes
+ * it a charge rather than a coincidence.
+ */
+export function purplleProportionalColumn(
+  sheet: RawSheet,
+  headerRow: number,
+  mrpIndex: number,
+  exclude: number[],
+): { column: number; pctOfMrp: number } | null {
+  if (mrpIndex < 0) return null
+  const header = (sheet[headerRow] ?? []) as unknown[]
+  const rows = purplleDataRows(sheet, headerRow).filter((row) => num(row[mrpIndex]) > 0)
+  if (rows.length === 0) return null
+  for (let c = 0; c < purplleWidth(sheet, headerRow); c++) {
+    if (key(header[c]) !== '' || exclude.includes(c)) continue
+    if (typeof rows[0][c] !== 'number') continue
+    const pct = (rows[0][c] as number) / num(rows[0][mrpIndex])
+    // A rate of nothing is not a charge, and anything above a fifth of MRP
+    // is not a percentage charge either — it is the money column itself.
+    if (!(pct > 0 && pct <= 0.2)) continue
+    const everyRow = rows.every((row) => {
+      const v = row[c]
+      return typeof v === 'number' && Math.abs(v - num(row[mrpIndex]) * pct) <= 0.005
+    })
+    if (everyRow) return { column: c, pctOfMrp: pct }
+  }
+  return null
+}
+
 export interface PurplleNormalizeResult extends NormalizeResult {
   facts: PurpllePnlFacts
   month: string
@@ -166,6 +255,13 @@ export function normalizePurplleSalesReport(
   const cell = (row: unknown[], field: keyof typeof COLUMNS): unknown =>
     at[field] >= 0 ? row[at[field]] : undefined
 
+  // June's export leaves the GST rate column with no name. It is taken only
+  // when a column's values are all real GST rates, and the upload says so —
+  // the alternative is reading a column by its position, which is a promise
+  // about next month's file that nobody has made.
+  const unnamedGstColumn = at.gstRate >= 0 ? -1 : purplleUnnamedGstColumn(sheet, headerRow)
+  if (unnamedGstColumn >= 0) at.gstRate = unnamedGstColumn
+
   const internalBySku = new Map(mappings.map((m) => [m.channelSku, m.internalSku]))
   const master = new Map(skuMaster.map((s) => [s.sku, s]))
   const mappingTables = { skuMaster, mappings, comboComponents }
@@ -173,6 +269,7 @@ export function normalizePurplleSalesReport(
   const gstByCode = new Map<string, number | null>()
   const gstFallback = new Set<string>()
   const gstMismatch = new Set<string>()
+  const gstUntaxed = new Set<string>()
   const unpriced = new Set<string>()
   const orders = new Set<string>()
 
@@ -223,8 +320,11 @@ export function normalizePurplleSalesReport(
       gstByCode.set(sku, masterGstRate)
     }
     if (masterGstRate === null) gstFallback.add(sku)
-    else if (Math.abs(masterGstRate - statedGstRate) > 0.0001) gstMismatch.add(sku)
+    // Only a rate the file actually states can disagree with the Master. A
+    // file that states none is a gap, not a disagreement.
+    else if (statedGstRate > 0 && Math.abs(masterGstRate - statedGstRate) > 0.0001) gstMismatch.add(sku)
     const gstRate = masterGstRate ?? statedGstRate
+    if (gstRate <= 0) gstUntaxed.add(sku)
 
     // What Purplle takes, on the base its margin sheet names: 31% inclusive
     // on MRP. Inclusive, so nothing is added for GST on top of it.
@@ -301,10 +401,22 @@ export function normalizePurplleSalesReport(
   const months = [...monthsSeen].sort()
   facts.month = months[0] ?? ''
 
+  // April writes the marketing charge once above the table, labelled. June
+  // writes the same thing as an unnamed column, one figure per row, and both
+  // come to exactly 5% of that month's MRP.
   const marketing = purplleMarketing(sheet, headerRow)
+  let marketingColumn: { column: number; pctOfMrp: number } | null = null
   if (marketing !== null) {
     facts.marketingInr = marketing
     facts.marketingStated = true
+    if (facts.mrpValue > 0) facts.marketingPctOfMrp = marketing / facts.mrpValue
+  } else {
+    marketingColumn = purplleProportionalColumn(sheet, headerRow, at.mrp, [at.gstRate])
+    if (marketingColumn) {
+      facts.marketingInr = purplleDataRows(sheet, headerRow)
+        .reduce((total, row) => total + num(row[marketingColumn!.column]), 0)
+      facts.marketingPctOfMrp = marketingColumn.pctOfMrp
+    }
   }
 
   if (months.length > 1) {
@@ -321,6 +433,38 @@ export function normalizePurplleSalesReport(
     `${inr(facts.invoiceValueInr)} including GST, and the GST inside it — ${inr(facts.outputGst)} — comes out at ` +
     "each product's own rate from the Product Master.",
   )
+  if (unnamedGstColumn >= 0) {
+    warnings.push(
+      `This file does not name its GST rate column. Column ${unnamedGstColumn + 1} was read as the rate because ` +
+      'every one of its rows holds a real GST rate and some are above zero — it was not taken by its position. ' +
+      'Check it, and enter the rates on Catalogue ▸ Product Master, which is what decides them once they are there.',
+    )
+  }
+  if (gstUntaxed.size > 0) {
+    const codes = [...gstUntaxed].sort()
+    const shown = codes.slice(0, 8).join(', ')
+    const rest = codes.length - 8
+    warnings.push(
+      `${codes.length} Purplle code(s) carry no GST rate at all — not in the Product Master and not in this file — ` +
+      `so their sales are shown with no tax taken out and this month's net revenue is overstated by whatever ` +
+      `their tax is: ${shown}${rest > 0 ? ` and ${rest} more` : ''}. Enter their rate on Catalogue ▸ Product Master.`,
+    )
+  }
+  if (marketingColumn) {
+    warnings.push(
+      `This file carries no "Marketing" label, so the charge was read from unnamed column ` +
+      `${marketingColumn.column + 1}, which is ${(marketingColumn.pctOfMrp * 100).toFixed(2)}% of MRP on every row ` +
+      `and ${inr(facts.marketingInr)} for the month. April's file writes the same 5% of MRP once, above the table, ` +
+      'labelled Marketing — so this reads as the same charge. Confirm it against Purplle’s invoice: 5% of MRP is ' +
+      'not on the margin sheet, where every line but the 31% is blank.',
+    )
+  } else if (facts.marketingStated && facts.marketingPctOfMrp !== undefined) {
+    warnings.push(
+      `The "Marketing" figure above the table — ${inr(facts.marketingInr)} — is exactly ` +
+      `${(facts.marketingPctOfMrp * 100).toFixed(2)}% of this month's MRP, which makes it a calculation rather ` +
+      'than a bill. Check it against Purplle’s invoice; the margin sheet charges no A&P.',
+    )
+  }
   if ((facts.gstFallbackSkus?.length ?? 0) > 0) {
     const codes = facts.gstFallbackSkus ?? []
     const shown = codes.slice(0, 8).join(', ')
@@ -353,12 +497,14 @@ export function normalizePurplleSalesReport(
   )
   if (marketing !== null) {
     warnings.push(
-      `Advertising of ₹${marketing.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ` +
-      'was read from the "Marketing" figure written above the table, not from a column. Check it against Purplle’s ' +
-      'own invoice before relying on it.',
+      `Advertising of ${inr(marketing)} was read from the "Marketing" figure written above the table, not from a ` +
+      'column. Check it against Purplle’s own invoice before relying on it.',
     )
-  } else {
-    warnings.push('No "Marketing" figure was written above the table, so this month carries no Purplle advertising.')
+  } else if (marketingColumn === null) {
+    warnings.push(
+      'This file states no marketing charge — no "Marketing" figure above the table and no column carrying one — ' +
+      'so the month shows no Purplle advertising. April’s charged 5% of MRP, so a nil month is worth a second look.',
+    )
   }
   if (facts.unpricedSkus.length > 0) {
     const shown = facts.unpricedSkus.slice(0, 6).join(', ')
@@ -369,7 +515,9 @@ export function normalizePurplleSalesReport(
       'month properly.',
     )
   }
-  if (Math.abs(facts.priceOffDifference) > 0.005) {
+  // A paisa of rounding between the sender's two discount columns is not a
+  // disagreement worth anyone's attention; June's differ by exactly that.
+  if (Math.abs(facts.priceOffDifference) >= 1) {
     warnings.push(
       `The file's two discount columns disagree by ₹${facts.priceOffDifference.toFixed(2)} — "Price Off Amt" totals ` +
       `₹${facts.priceOff.toFixed(2)} and "Price off Amount" ₹${facts.priceOffAlt.toFixed(2)}. The statement uses ` +

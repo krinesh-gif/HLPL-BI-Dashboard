@@ -516,10 +516,17 @@ export interface PurpllePnlFacts {
   /** MRP less that margin: what we invoice Purplle, GST included. This is the
    * channel's revenue, not the nmv shoppers paid. */
   invoiceValueInr: number
-  /** The "Marketing" figure written above the table, when there is one. */
+  /** The "Marketing" figure written above the table, when there is one —
+   * otherwise the unnamed per-row column that carries the same charge. */
   marketingInr: number
-  /** Whether the file stated it at all, which is different from stating nil. */
+  /** Whether the file labelled it, which is different from stating nil and
+   * different again from leaving the column unnamed. */
   marketingStated: boolean
+  /** What that charge works out at against the month's MRP. April's labelled
+   * figure and June's unnamed column are both exactly 5%, which is what
+   * makes them the same charge written two ways. Optional: months read
+   * before this was noticed do not carry it. */
+  marketingPctOfMrp?: number
   /** COGS priced at upload from the Product Master. The statement prefers the
    * cost sheet for the month and falls back to this. */
   cogsSourceInr: number

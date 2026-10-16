@@ -14,6 +14,35 @@ import { computePurpllePnl, purplleToCanonicalBuckets } from '@/engine/nativePnl
 import { computeSubtotals } from '@/engine/pnl'
 
 const REPORT = '/root/.claude/uploads/f24a295e-093a-5385-9288-97acefc06862/658b78dc-Purplle_-_April.xlsx'
+const JUNE = '/root/.claude/uploads/f24a295e-093a-5385-9288-97acefc06862/ded86016-Purplle_-_June.xlsx'
+
+/**
+ * June's export, in its own shape: `sku` renamed to `product_sku`, no
+ * "Marketing" label above the table, and two columns with no name at all —
+ * the GST rate, and the marketing charge at 5% of MRP per row.
+ */
+const JUNE_HEADER = [
+  'dt', 'order_id', 'product_name', 'product_sku', 'ean_code', 'MPC', 'bh', 'brand_name',
+  'category_name', 'category_root', 'nmv', 'mrp', 'qty', 'Price Off %', 'Price Off Amt',
+  null, null, 'Price off Amount', 'Difference', null,
+]
+
+function juneSheet(rows: (string | number | null)[][]): RawSheet {
+  return [[null, null, null, null], JUNE_HEADER, ...rows] as RawSheet
+}
+
+/** One June order line. `marketing` and `gst` go in the unnamed columns. */
+const juneLine = (over: Partial<Record<string, string | number | null>> = {}): (string | number | null)[] => {
+  const mrp = Number(over.mrp ?? 500)
+  const off = Number(over.off ?? 100)
+  return [
+    over.dt ?? 46174, over.order ?? 2001, 'A product', over.sku ?? 'PPLB001', 8906140850036,
+    8906140850036, 'Aravi Organic', 'Aravi Organic', 'Body Wash', 'bath-and-body',
+    mrp - off, mrp, over.qty ?? 1, off / mrp, off,
+    null, over.marketing === undefined ? mrp * 0.05 : over.marketing, off, 0,
+    over.gst === undefined ? 0.18 : over.gst,
+  ]
+}
 
 const HEADER = [
   'dt', 'order_id', 'ean_code', 'sku', 'name', 'brand_name', 'brand_house', 'category_name',
@@ -196,6 +225,113 @@ describe('reading the month', () => {
     expect(r.validRecords[0].discount).toBeCloseTo(310, 6)
     expect(r.validRecords[0].netSales).toBeCloseTo(690 / 1.18, 6)
     expect(r.validRecords[0].channel).toBe('purplle')
+  })
+})
+
+describe('June’s export, which is not April’s', () => {
+  const run = (rows: (string | number | null)[][], master: SkuMaster[] = []) =>
+    normalizePurplleSalesReport(juneSheet(rows), master, [], [], 'test')
+
+  it('reads product_sku as the SKU, which is what June renamed it to', () => {
+    // Every row of the real file was rejected as "Missing SKU" until this.
+    const r = run([juneLine({ sku: 'PPLB123', mrp: 1000, off: 0 })])
+    expect(r.invalidRows).toEqual([])
+    expect(r.validRecords[0].sku).toBe('PPLB123')
+    expect(r.facts.skusSold).toBe(1)
+  })
+
+  it('finds the GST rate column June forgot to name, by its values', () => {
+    const r = run([juneLine({ mrp: 1000, off: 0, gst: 0.05 })])
+    expect(r.facts.outputGst).toBeCloseTo(690 - 690 / 1.05, 6)
+    expect(r.warnings.some((w) => w.includes('does not name its GST rate column'))).toBe(true)
+  })
+
+  it('will not read an unnamed column of zeroes as a tax rate', () => {
+    // A column of nothing is not a rate, and taxing a month at 0% silently
+    // would overstate its revenue by every rupee of GST in it.
+    const r = run([juneLine({ mrp: 1000, off: 0, gst: 0 })])
+    expect(r.facts.outputGst).toBe(0)
+    expect(r.warnings.some((w) => w.includes('does not name its GST rate column'))).toBe(false)
+    expect(r.warnings.some((w) => w.includes('no GST rate at all'))).toBe(true)
+  })
+
+  it('reads the unnamed 5%-of-MRP column as the marketing charge', () => {
+    // April writes this figure once, labelled. June writes it per row with no
+    // label, and it is the same 5% of MRP.
+    const r = run([juneLine({ mrp: 1000, off: 0 }), juneLine({ mrp: 500, off: 0 })])
+    expect(r.facts.marketingInr).toBeCloseTo(75, 6)
+    expect(r.facts.marketingPctOfMrp).toBeCloseTo(0.05, 10)
+    expect(r.facts.marketingStated).toBe(false)
+    expect(r.warnings.some((w) => w.includes('5.00% of MRP on every row'))).toBe(true)
+  })
+
+  it('leaves an unnamed column alone when it is not a constant share of MRP', () => {
+    // Two rows at different percentages are not one charge, and guessing
+    // which is the rate would be inventing a cost.
+    const r = run([juneLine({ mrp: 1000, off: 0, marketing: 50 }), juneLine({ mrp: 500, off: 0, marketing: 40 })])
+    expect(r.facts.marketingInr).toBe(0)
+    expect(r.facts.marketingPctOfMrp).toBeUndefined()
+    expect(r.warnings.some((w) => w.includes('states no marketing charge'))).toBe(true)
+  })
+
+  it('says when April’s labelled figure is itself 5% of MRP', () => {
+    const r = normalizePurplleSalesReport(
+      sheet([line({ mrp: 1000, off: 0 })], [null, 'Marketing', 50]), [], [], [], 'test',
+    )
+    expect(r.facts.marketingPctOfMrp).toBeCloseTo(0.05, 10)
+    expect(r.warnings.some((w) => w.includes('a calculation rather than a bill'))).toBe(true)
+  })
+})
+
+/**
+ * The owner's own June 2026 file, in the shape Purplle actually sent it.
+ */
+describe.skipIf(!existsSync(JUNE))('the owner’s June 2026 Purplle file', () => {
+  const run = () => {
+    const first = Object.values(workbookSheetsFromBytes(readFileSync(JUNE)))[0]
+    return { sheet: first, result: normalizePurplleSalesReport(first, [], [], [], 'test') }
+  }
+
+  it('is recognised and read without a bad row', () => {
+    const { sheet: s, result } = run()
+    expect(detectPurplleSalesReport(s)).toBe(true)
+    expect(result.totalRows).toBe(317)
+    expect(result.validRecords).toHaveLength(317)
+    expect(result.invalidRows).toEqual([])
+    expect(result.months).toEqual(['2026-06'])
+  })
+
+  it('agrees with the totals the sender wrote above the table', () => {
+    // ₹1,06,459 of MRP, ₹28,016.99 of price off and ₹78,442.01 of nmv are
+    // the sender's own figures in the strip above the header.
+    const f = run().result.facts
+    expect(f.mrpValue).toBe(106459)
+    expect(f.priceOff).toBeCloseTo(28016.99, 2)
+    expect(f.nmv).toBeCloseTo(78442.01, 2)
+    expect(f.mrpValue - f.priceOff).toBeCloseTo(f.nmv, 2)
+  })
+
+  it('invoices MRP less 31%, and takes GST off that at each product’s rate', () => {
+    const f = run().result.facts
+    expect(f.marginInr).toBeCloseTo(33002.29, 2)
+    expect(f.invoiceValueInr).toBeCloseTo(73456.71, 2)
+    expect(f.outputGst).toBeCloseTo(10777.18, 2)
+    expect(f.netRevenue).toBeCloseTo(62679.53, 2)
+  })
+
+  it('charges the ₹5,322.95 of marketing its unnamed column carries', () => {
+    const f = run().result.facts
+    expect(f.marketingInr).toBeCloseTo(5322.95, 2)
+    // Exactly 5% of the month's MRP, which is what April's labelled figure is.
+    expect(f.marketingInr).toBeCloseTo(106459 * 0.05, 2)
+    expect(computePurpllePnl(f, 0, 0).contribution).toBeCloseTo(57356.58, 2)
+  })
+
+  it('counts 330 units across 313 orders and 24 SKUs', () => {
+    const f = run().result.facts
+    expect(f.unitsSold).toBe(330)
+    expect(f.orders).toBe(313)
+    expect(f.skusSold).toBe(24)
   })
 })
 
