@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { PageShell } from '@/components/layout/PageShell'
 import { formatCurrencyFull, formatPercent } from '@/lib/format'
+import { SendReportPanel } from './SendReportPanel'
 import { useMonthlyClose } from './useMonthlyClose'
 import type { CloseItem, RedFlag } from '@/engine/monthlyClose'
 
@@ -89,6 +90,8 @@ export function MonthlyClosePage() {
       showChannelFilter={false}
     >
       <Banner ready={close.ready} blockers={close.blockers.length} warnings={close.warnings.length} month={close.month} />
+
+      <SendReportPanel close={close} />
 
       {close.blockers.length > 0 && (
         <section className={`mb-6 ${CARD}`}>

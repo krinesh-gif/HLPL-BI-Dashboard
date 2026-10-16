@@ -22,8 +22,15 @@ import { describe, expect, it } from 'vitest'
 /** Vercel's Hobby plan allows 12 serverless functions per deployment. */
 const PLAN_LIMIT = 12
 
-/** Leave room for a route or two before the next consolidation is forced. */
-const BUDGET = PLAN_LIMIT - 1
+/**
+ * At the cap, by the owner's decision of 16 October 2026: the twelfth slot
+ * went to `api/report.ts`, which posts the monthly report.
+ *
+ * There is no headroom left. The next route to be added has to be folded
+ * into an existing one — several verbs on one resource is usually a better
+ * shape anyway — or the project moves off the Hobby plan.
+ */
+const BUDGET = PLAN_LIMIT
 
 function routeFiles(dir: string): string[] {
   const found: string[] = []
@@ -45,9 +52,12 @@ describe('serverless function budget', () => {
     expect(routes.length).toBeLessThanOrEqual(BUDGET)
   })
 
-  it('leaves headroom below the hard plan limit', () => {
-    // A count sitting exactly on the limit means the next route added breaks
-    // the deploy, which is the situation this test exists to prevent.
-    expect(routes.length).toBeLessThan(PLAN_LIMIT)
+  it('never exceeds the hard plan limit', () => {
+    // The count now sits exactly on it, which is the owner's decision and
+    // not an accident: the next route added breaks the deploy, and this is
+    // where that is noticed. Folding two routes together is the fix; raising
+    // this number is not.
+    expect(routes.length).toBeLessThanOrEqual(PLAN_LIMIT)
+    expect(routes.length).toBe(12)
   })
 })

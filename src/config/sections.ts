@@ -50,6 +50,9 @@ const PATH_SECTIONS: { prefix: string; section: SectionId }[] = [
   { prefix: '/sales', section: 'sales' },
   { prefix: '/channels', section: 'channels' },
   { prefix: '/pnl', section: 'pnl' },
+  // Monthly Close gates the P&L and sends it, so whoever may read the
+  // statements may close the month.
+  { prefix: '/close', section: 'pnl' },
   { prefix: '/mis', section: 'mis' },
   { prefix: '/insight', section: 'insight' },
   { prefix: '/', section: 'overview' },

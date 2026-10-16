@@ -28,6 +28,8 @@ was told the right thing.
 ## Vercel
 
 Hobby plan, capped at 12 serverless functions. `tests/api/functionBudget.test.ts`
-holds the budget at 11 and currently sits on it, so **no new file may be added
-under `api/`**. A new channel goes through the `FACT_TABLES` map in
-`api/facts/[channel].ts`, which costs no function.
+holds the budget at 12 and currently sits on it, so **no new file may be added
+under `api/`** — the last slot went to `api/report.ts`, which posts the monthly
+report. A new channel goes through the `FACT_TABLES` map in
+`api/facts/[channel].ts`, which costs no function; anything else has to fold
+into a route that already exists.
