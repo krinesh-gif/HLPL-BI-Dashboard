@@ -29,6 +29,7 @@ export const NAVIGATION: NavSection[] = [
   { label: 'Business Insight', path: '/insight' },
   { label: 'Investor MIS', path: '/mis' },
   { label: 'P&L', path: '/pnl' },
+  { label: 'Monthly Close', path: '/close' },
   {
     label: 'Channels',
     children: [

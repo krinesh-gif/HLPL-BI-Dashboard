@@ -5,6 +5,7 @@ import { ActionRequiredList } from '@/components/ui/ActionRequiredList'
 import { Card, CardHeader } from '@/components/ui/Surface'
 import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { formatCurrencyCompact, formatNumber, formatPercent, monthLabel } from '@/lib/format'
+import { CloseReminder } from '@/modules/close/CloseReminder'
 import { useOverviewData } from './useOverviewData'
 
 /** One series colour per section, so the page reads as five groups rather than
@@ -19,6 +20,9 @@ export function OverviewPage() {
 
   return (
     <PageShell title="Executive Overview" subtitle="How is my business performing right now?">
+      {/* Before any figure on this page is read, whether the month behind it
+          is complete. */}
+      <CloseReminder />
       {/* The headline the whole page is about, given room to be the headline —
           with its own trend beside it so the number arrives with its shape. */}
       <Card className="overflow-hidden !p-0">

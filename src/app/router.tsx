@@ -25,6 +25,7 @@ export const router = createHashRouter([
     children: [
       { index: true, element: <OverviewPage /> },
       { path: 'mis', element: page(() => import('@/modules/mis/MisPage'), 'MisPage') },
+      { path: 'close', element: page(() => import('@/modules/close/MonthlyClosePage'), 'MonthlyClosePage') },
       { path: 'pnl', element: page(() => import('@/modules/pnl/PnlPage'), 'PnlPage') },
       { path: 'pnl/reconciliation', element: page(() => import('@/modules/pnl/NetSalesReconciliationPage'), 'NetSalesReconciliationPage') },
       // Under /pnl because it is built from the same channel statements the
