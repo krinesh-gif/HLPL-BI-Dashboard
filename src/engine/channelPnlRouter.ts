@@ -568,12 +568,26 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       // corrected cost sheet restates the month instead of leaving whatever
       // was frozen at upload time.
       const recomputed = recomputedCogs(channel, month, inputs)
-      const facts = recomputed
-        ? { ...imported, cogsPriced: recomputed.priced, cogsUnpriced: recomputed.unpriced }
-        : imported
+      // Myntra's P&L report carries no advertising at all, so the figure comes
+      // from the PLA campaign report, the same way every other channel's does.
+      // A figure already on the facts wins, since that was entered against
+      // this month deliberately.
+      const adSpend = inputs.marketing[channel]?.ads ?? 0
+      const facts = {
+        ...imported,
+        ...(recomputed ? { cogsPriced: recomputed.priced, cogsUnpriced: recomputed.unpriced } : {}),
+        myntraAds: imported.myntraAds || adSpend,
+      }
       const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
       const values = applyMyntraOtherCosts(computeMyntraPnl(facts), otherCosts)
       const notes: string[] = []
+      if (facts.myntraAds === 0) {
+        notes.push(
+          `No Myntra advertising is on file for ${month}, so the statement shows none. Myntra's P&L report ` +
+          'carries no advertising line — upload the PLA campaign report, whose ad_spend column is the only ' +
+          'place this channel\'s spend comes from.',
+        )
+      }
       if (!recomputed) {
         notes.push(
           `No Myntra order rows are on file for ${month}, so the statement shows no cost of goods. Re-upload this ` +

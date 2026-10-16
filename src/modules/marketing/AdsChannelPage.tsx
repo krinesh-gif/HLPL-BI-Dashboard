@@ -11,6 +11,7 @@ import { addMonths, formatCurrencyCompact, formatCurrencyFull, formatNumber, for
 import { adsSpendFor, tacos } from '@/engine/adsSpend'
 import { netSalesForChannelMonth } from '@/engine/netSales'
 import { ManualAdSpendForm } from './ManualAdSpendForm'
+import { MyntraAdsDepth } from './MyntraAdsDepth'
 
 const TREND_MONTHS = 6
 
@@ -114,6 +115,11 @@ export function AdsChannelPage() {
           <TrendLineChart data={trend} xKey="month" series={[{ key: 'roas', label: 'ROAS' }]} valueFormatter={(v) => `${v.toFixed(2)}x`} />
         </div>
       </div>
+
+      {/* Myntra's report carries campaign states, a direct/indirect split and
+          three dayparts that no other platform's does, so it has a section
+          the shared KPIs cannot hold. */}
+      {channel === 'myntra' && <MyntraAdsDepth month={month} />}
 
       {figure.source === 'none' && !def.usesMonthlyInvoice && (
         <EmptyState

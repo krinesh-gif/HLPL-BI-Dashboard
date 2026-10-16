@@ -20,6 +20,7 @@ import { detectMeeshoOrderPaymentsSheet, normalizeMeeshoOrderPayments } from '@/
 import { detectSkuMapWorkbook, normalizeSkuMapWorkbook } from '@/data/normalize/skuMapWorkbook'
 import { detectAmazonAdsSponsoredProductsReport, normalizeAmazonAdsSponsoredProductsReport } from '@/data/normalize/amazonAdsSponsoredProducts'
 import { detectBlinkitAdsReport, normalizeBlinkitAdsReport } from '@/data/normalize/blinkitAdsReport'
+import { detectMyntraAdsReport, normalizeMyntraAdsReport } from '@/data/normalize/myntraAdsReport'
 import { detectAmazonVendorCentralSalesReport, normalizeAmazonVendorCentralSales } from '@/data/normalize/amazonVendorCentralSales'
 import { detectMyntraPnlWorkbook, normalizeMyntraPnlWorkbook } from '@/data/normalize/myntraPnlWorkbook'
 import { detectPurplleSalesReport, normalizePurplleSalesReport } from '@/data/normalize/purplleSalesReport'
@@ -39,7 +40,7 @@ import { useDataStore, type ImportOutcome } from '@/store/dataStore'
 import { monthLabel } from '@/lib/format'
 import { useFilterStore } from '@/store/filterStore'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
-import type { AdsRecord, AmazonAePnlFacts, AmazonInSkuFeeFacts, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts, PurpllePnlFacts, SwiggyInstamartPnlFacts } from '@/data/models'
+import type { AdsRecord, AmazonAePnlFacts, AmazonInSkuFeeFacts, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraAdsFacts, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts, PurpllePnlFacts, SwiggyInstamartPnlFacts } from '@/data/models'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
 
@@ -64,6 +65,7 @@ type ReportKind =
   | 'meesho_settlement_json'
   | 'amazon_ads_sponsored_products'
   | 'blinkit_ads'
+  | 'myntra_ads'
   | 'blinkit_payout_archive'
 
 const REPORT_LABELS: Record<ReportKind, string> = {
@@ -78,6 +80,7 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   purplle_sales: 'Purplle — Monthly Sales File',
   swiggy_instamart_sales: 'Swiggy Instamart — Monthly Sales Report',
   blinkit_ads: 'Blinkit — Campaign Report',
+  myntra_ads: 'Myntra — PLA Campaign Report',
   myntra_pnl_workbook: 'Myntra — P&L Report (PnL_Summary + SKU_Detail)',
   nykaa_sales: 'Nykaa — Monthly Sales Data (B2B, margin on MRP)',
   nykaa_companion: 'Nykaa — Cart Rule / Combo file',
@@ -101,6 +104,7 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   purplle_sales: 'purplle',
   swiggy_instamart_sales: 'swiggy_instamart',
   blinkit_ads: 'blinkit',
+  myntra_ads: 'myntra',
   myntra_pnl_workbook: 'myntra',
   nykaa_sales: 'nykaa',
   nykaa_companion: 'nykaa',
@@ -132,6 +136,9 @@ interface PreviewState {
   purplleFacts?: PurpllePnlFacts
   swiggyInstamartFacts?: SwiggyInstamartPnlFacts
   myntraFacts?: MyntraPnlFacts
+  /** Myntra's advertising month: what its PLA report says beyond the spend,
+   * which goes in as ads records. */
+  myntraAdsFacts?: MyntraAdsFacts
   nykaaFacts?: NykaaPnlFacts
   blinkitFacts?: BlinkitPnlFacts
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
@@ -269,6 +276,16 @@ export function UploadReportsPage() {
     if (kind === 'blinkit_ads') {
       const r = normalizeBlinkitAdsReport(parsed.rows, importId)
       return buildPreview({ ...base, totalRows: r.totalRows, validRecords: [], adsRecords: r.adsRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
+    }
+    if (kind === 'myntra_ads') {
+      // The spend goes in as ads records, like every platform's. The rest of
+      // what Myntra reports — the direct and indirect split, the dayparts,
+      // the campaign states — goes beside them as the month's ads facts.
+      const r = normalizeMyntraAdsReport(parsed.rows, importId)
+      return buildPreview({
+        ...base, totalRows: r.totalRows, validRecords: [], adsRecords: r.adsRecords,
+        invalidCount: r.invalidRows.length, warnings: r.warnings, myntraAdsFacts: r.facts,
+      })
     }
     const r = normalizeAmazonAdsSponsoredProductsReport(parsed.rows, importId)
     return buildPreview({ ...base, totalRows: r.totalRows, validRecords: [], adsRecords: r.adsRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
@@ -555,6 +572,7 @@ export function UploadReportsPage() {
       else if (detectMeeshoOrderSummaryReport(parsed.headers)) kind = 'meesho_order_summary'
       else if (detectAmazonAdsSponsoredProductsReport(parsed.headers)) kind = 'amazon_ads_sponsored_products'
       else if (detectBlinkitAdsReport(parsed.headers)) kind = 'blinkit_ads'
+      else if (detectMyntraAdsReport(parsed.headers)) kind = 'myntra_ads'
 
       if (!kind) return fail('This file did not match any supported report format.')
 
@@ -670,6 +688,7 @@ export function UploadReportsPage() {
         purplleFacts: preview.purplleFacts,
         swiggyInstamartFacts: preview.swiggyInstamartFacts,
         myntraFacts: preview.myntraFacts,
+        myntraAdsFacts: preview.myntraAdsFacts,
         nykaaFacts: preview.nykaaFacts,
         blinkitFacts: preview.blinkitFacts,
         amazonInSellerFacts: preview.amazonInSellerFacts,

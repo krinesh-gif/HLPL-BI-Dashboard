@@ -104,6 +104,71 @@ export interface SkuMaster {
 }
 
 // ---------------------------------------------------------------------------
+// Myntra Ads
+// ---------------------------------------------------------------------------
+/**
+ * A month of Myntra PLA advertising, beyond the spend the P&L charges.
+ *
+ * The spend itself is stored as ads records, like every other platform's, so
+ * the P&L and the ads screens read it the same way. This is what Myntra's
+ * report says that those records have no room for: the direct and indirect
+ * split of what the advertising sold, the three dayparts the platform bids
+ * across, and what state each campaign was in.
+ */
+export interface MyntraAdsCampaign {
+  /** The identity. Two campaigns can share a name; none share an id. */
+  campaignId: string
+  /** For reading. Carries the id too where a name is used twice. */
+  campaignName: string
+  adGroups: number
+  /** The state on the last day it reported: LIVE, ABORTED, CAMPAIGN_EXPIRED
+   * or DAILY_BUDGET_MET. */
+  lastStatus: string
+  /** Days this campaign appears on. */
+  days: number
+  spend: number
+  impressions: number
+  clicks: number
+  /** Units of the advertised product itself. */
+  unitsDirect: number
+  /** Units of anything else of ours the shopper bought after the click. */
+  unitsIndirect: number
+  revenueDirect: number
+  revenueIndirect: number
+}
+
+/** One of the three parts of the day Myntra reports every metric against.
+ * They partition the month rather than adding to it. */
+export interface MyntraAdsDaypart {
+  part: 'base' | 'peak' | 'nonPeak'
+  impressions: number
+  clicks: number
+  spend: number
+  units: number
+  revenue: number
+}
+
+export interface MyntraAdsFacts {
+  month: string
+  schemaVersion: 1
+  spend: number
+  impressions: number
+  clicks: number
+  unitsDirect: number
+  unitsIndirect: number
+  revenueDirect: number
+  revenueIndirect: number
+  campaigns: MyntraAdsCampaign[]
+  dayparts: MyntraAdsDaypart[]
+  /** Campaign-days in each state, so a month on the daily budget is visible. */
+  statusCounts: Record<string, number>
+  /** Days the report covers, which is not the length of the month. */
+  days: number
+  /** Rows read, one per campaign, ad group and day. */
+  rows: number
+}
+
+// ---------------------------------------------------------------------------
 // Amazon Ads
 // ---------------------------------------------------------------------------
 export interface AdsRecord {

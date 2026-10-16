@@ -85,7 +85,7 @@ export const MYNTRA_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm1Pct', label: 'CM1 %', section: 'YOUR MARGIN', kind: 'percent' },
   { key: 'cm2', label: 'CHANNEL MARGIN (CM2)', section: 'YOUR MARGIN', kind: 'subtotal', note: 'Earnings on Platform, less GST and what the goods cost' },
   { key: 'cm2Pct', label: 'CM2 %', section: 'YOUR MARGIN', kind: 'percent' },
-  { key: 'myntraAds', label: 'Less: Myntra Ads', section: 'YOUR MARGIN', kind: 'input', fee: 'advertising', note: 'Manual entry — the P&L report carries no advertising' },
+  { key: 'myntraAds', label: 'Less: Myntra Ads', section: 'YOUR MARGIN', kind: 'input', fee: 'advertising', note: 'From the PLA campaign report\u2019s ad_spend column, summed over the month. Myntra\u2019s P&L report carries no advertising line of its own.' },
   { key: 'cm3', label: 'CONTRIBUTION MARGIN (CM3)', section: 'YOUR MARGIN', kind: 'subtotal', note: '⭐ the number to manage the business on' },
   { key: 'cm3Pct', label: 'CM3 %', section: 'YOUR MARGIN', kind: 'percent' },
   { key: 'otherCosts', label: 'Less: Allocated Fixed Expenses', section: 'YOUR MARGIN', kind: 'input' },

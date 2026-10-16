@@ -247,6 +247,16 @@ BEGIN
     data  JSONB NOT NULL
   );
 
+  -- Myntra's advertising month, beyond the spend itself. The spend is stored
+  -- as ads records like every other platform's; this is what Myntra's report
+  -- says that an ads record has no room for — the direct and indirect split
+  -- of what the advertising sold, the three dayparts it bids across, and what
+  -- state each campaign was in.
+  CREATE TABLE IF NOT EXISTS myntra_ads_facts (
+    month TEXT PRIMARY KEY,
+    data  JSONB NOT NULL
+  );
+
   -- Swiggy Instamart's month, from its sales report. Like Purplle's, a sales
   -- file and not a settlement, so these facts carry no marketplace charges.
   CREATE TABLE IF NOT EXISTS swiggy_instamart_facts (
