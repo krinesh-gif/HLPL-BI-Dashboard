@@ -39,6 +39,7 @@ import { checkForDuplicates } from '@/data/normalize/duplicates'
 import { useDataStore, type ImportOutcome } from '@/store/dataStore'
 import { monthLabel } from '@/lib/format'
 import { useFilterStore } from '@/store/filterStore'
+import { REPORT_SOURCES } from '@/config/reportSources'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
 import type { AdsRecord, AmazonAePnlFacts, AmazonInSkuFeeFacts, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraAdsFacts, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts, PurpllePnlFacts, SwiggyInstamartPnlFacts } from '@/data/models'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
@@ -883,21 +884,52 @@ export function UploadReportsPage() {
 
         <details className="border-t border-[var(--line)] px-5 py-3">
           <summary className="cursor-pointer text-xs font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)]">
-            Which reports can I upload?
+            Which reports can I upload, and where do I get them?
           </summary>
-          <ul className="mt-3 grid gap-x-10 gap-y-2 text-xs leading-relaxed text-[var(--ink-2)] sm:grid-cols-2">
-            <li><strong className="text-[var(--ink)]">Amazon India</strong> — Seller Central order reports, the
-              settlement report (the tab-separated .txt), and the Vendor Central monthly sales export.</li>
-            <li><strong className="text-[var(--ink)]">Amazon USA</strong> — the Product Profitability export.</li>
-            <li><strong className="text-[var(--ink)]">Amazon Ads</strong> — Sponsored Products campaign reports.</li>
-            <li><strong className="text-[var(--ink)]">Flipkart</strong> — SKU-level P&amp;L exports, or the full
-              P&amp;L workbook.</li>
-            <li><strong className="text-[var(--ink)]">Meesho</strong> — Order Summary reports and the aggregated
-              payment file.</li>
-            <li><strong className="text-[var(--ink)]">Myntra</strong> — the P&amp;L report.</li>
-            <li className="sm:col-span-2"><strong className="text-[var(--ink)]">Nykaa</strong> — the three monthly
-              files (Sales, Cart Rule, Combo — drop all three in together), plus the two emailed PDFs: the Marketing
-              Invest invoice and the Financial Debit Note.</li>
+          <p className="mt-3 text-xs leading-relaxed text-[var(--ink-2)]">
+            Every file below is read by the month it is for, so the same file can be uploaded again safely — a row
+            already stored is not stored twice. Drop them all in together; each one is recognised by what is inside
+            it, not by its name.
+          </p>
+          <ul className="mt-3 grid gap-x-10 gap-y-4 text-xs leading-relaxed text-[var(--ink-2)] lg:grid-cols-2">
+            {REPORT_SOURCES.map((source) => (
+              <li key={source.key}>
+                <strong className="text-[var(--ink)]">{source.label}</strong>
+                {source.path !== undefined && (
+                  <div className="mt-0.5 font-mono text-[11px] text-[var(--ink-3)]">{source.path}</div>
+                )}
+                {source.url !== undefined && (
+                  <div className="mt-0.5">
+                    <a
+                      href={source.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="font-mono text-[11px] text-[var(--accent)] hover:underline"
+                    >
+                      {source.url}
+                    </a>
+                  </div>
+                )}
+                {source.settings !== undefined && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {source.settings.map((setting) => (
+                      <span
+                        key={setting}
+                        className="rounded border border-[var(--line-2)] px-1.5 py-0.5 text-[11px] text-[var(--ink-2)]"
+                      >
+                        {setting}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <ul className="mt-1 list-disc pl-4">
+                  {source.files.map((file) => <li key={file}>{file}</li>)}
+                </ul>
+                {source.note !== undefined && (
+                  <p className="mt-1 text-[11px] text-[var(--ink-3)]">{source.note}</p>
+                )}
+              </li>
+            ))}
           </ul>
         </details>
       </section>
