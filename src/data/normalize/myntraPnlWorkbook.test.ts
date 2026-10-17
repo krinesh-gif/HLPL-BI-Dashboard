@@ -257,3 +257,131 @@ describe('recognising the workbook whatever the sheets are called', () => {
     expect(r.facts?.estimatedNetSales).toBe(normalizeMyntraPnlWorkbook(sheets(), [], [], 'test').facts?.estimatedNetSales)
   })
 })
+
+/**
+ * April 2026's export — the shape Myntra used before the one above.
+ *
+ * The fees are a flat list under Total Expenses rather than nested under
+ * Forward and Reverse headings, the additional charges name their own
+ * direction, there is no "Estimated Net Sales After Expenses" line, the
+ * incentive sits inside the forward expense, and Total Expenses is titled
+ * "(Net Commission)".
+ *
+ * The reader was built on the later shape, so every figure below the Reverse
+ * heading came back as zero on a file like this — each fee, the GST, the
+ * rewards, the settlement, the earnings — because the heading latched on and
+ * filed them all as reverse figures. The owner saw a month whose marketplace
+ * fees were blank while the file had them all along, and every month before
+ * the format changed was in the same state.
+ */
+const APRIL_SUMMARY: RawSheet = [
+  ['Report Specifications', '', ''],
+  ['Report Type:', 'Profit & Loss Report', ''],
+  ['Orders Received During:', 'April 2026', ''],
+  ['Seller ID:', '26493', ''],
+  ['PNL Summary', '', ''],
+  ['Item', 'Amount (INR)', 'Units'],
+  ['Gross Sales', 680846, 2733],
+  ['Returns and Cancellations', -150544, -271],
+  ['------------------------------------------------------', '', ''],
+  ['Estimated Net Sales', 530302, 2462],
+  ['Total Expenses (Net Commission)', -148473.7016, ''],
+  ['• Forward Expense', -145826.3697, ''],
+  ['• Reverse Expense', 2647.3319, ''],
+  ['    • Commission Fee', -65451.28, '-'],
+  ['    • Taxes (TCS)', -2283.735, '-'],
+  ['    • Taxes (TDS)', -456.915, '-'],
+  ['    • Logistic Charge', -88178.4397, '-'],
+  ['    • Forward Additional Charges', 0, '-'],
+  ['    • Reverse Additional Charges', 0, '-'],
+  ['    • Product GST', -78883.8, '-'],
+  ['    • SJIT Incentive', 10544, '-'],
+  ['------------------------------------------------------', '', ''],
+  ['Non Order Deductions', '', ''],
+  ['NOD Paid', 0, ''],
+  ['NOD Deducted', 0, ''],
+  ['Rewards & Other Benefits', 19141.003, ''],
+  ['• SJIT Incentive', 10544, ''],
+  ['• Commission Discount', 8597.003, ''],
+  ['• Order SPF', 0, ''],
+  ['------------------------------------------------------', '', ''],
+  ['Bank Settlement (Projected)', 381828.34, ''],
+  ['Bank Settlement (Settled)', 381828.34, ''],
+  ['Bank Settlement (Unsettled)', 0, ''],
+  ['Input Tax Credits', 456.915, ''],
+  ['• GST + TCS', 456.915, ''],
+  ['• TDS', 0, ''],
+  ['Earnings on Platform', 382285.255, ''],
+  ['Net Margin (% of Net Sales)', 0.72, ''],
+]
+
+describe('April 2026, in the earlier shape of the summary sheet', () => {
+  const april = () => normalizeMyntraPnlWorkbook(
+    { PnL_Summary: APRIL_SUMMARY, SKU_Detail: [DETAIL_HEADER, LOTION] as RawSheet },
+    MASTER, MAPPINGS, 'test',
+  )
+
+  it('reads every fee, where the old reader read zero', () => {
+    const f = april().facts!
+    expect(f.month).toBe('2026-04')
+    expect(f.fwdCommissionFee).toBeCloseTo(65451.28, 2)
+    expect(f.fwdTaxesTcs).toBeCloseTo(2283.735, 3)
+    expect(f.fwdTaxesTds).toBeCloseTo(456.915, 3)
+    expect(f.fwdLogisticCharge).toBeCloseTo(88178.4397, 4)
+    expect(f.productGst).toBeCloseTo(78883.8, 2)
+    expect(f.totalExpenses).toBeCloseTo(148473.7016, 4)
+  })
+
+  it('takes the fees as forward charges, which is what they add up to', () => {
+    // Commission, taxes and logistics less the incentive come to the forward
+    // expense Myntra states, to the paisa. They are not reverse recoveries.
+    const f = april().facts!
+    const itemised = f.fwdCommissionFee + f.fwdTaxesTcs + f.fwdTaxesTds + f.fwdLogisticCharge + f.fwdAdditionalCharges
+    expect(itemised - f.sjitIncentive).toBeCloseTo(f.forwardExpense, 2)
+    expect(f.revCommissionRecovery).toBe(0)
+    expect(f.revLogisticCharge).toBe(0)
+  })
+
+  it('reads the lines below the expenses, which the old reader also lost', () => {
+    const f = april().facts!
+    expect(f.sjitIncentive).toBeCloseTo(10544, 2)
+    expect(f.commissionDiscount).toBeCloseTo(8597.003, 3)
+    expect(f.bankSettlementProjected).toBeCloseTo(381828.34, 2)
+    expect(f.earningsOnPlatform).toBeCloseTo(382285.255, 3)
+    expect(f.inputTaxCreditsGstTcs).toBeCloseTo(456.915, 3)
+    expect(f.netMarginPct).toBeCloseTo(0.72, 4)
+  })
+
+  it('stands in for the subtotal the file stopped stating, and says so', () => {
+    const r = april()
+    // Net sales less expenses — the identity July's file states outright.
+    expect(r.facts!.estimatedNetSalesAfterExpenses).toBeCloseTo(530302 - 148473.7016, 2)
+    expect(r.warnings.some((w) => w.includes('does not state "Estimated Net Sales After Expenses"'))).toBe(true)
+  })
+
+  it('reconciles the settlement on this layout’s own terms', () => {
+    const settlement = april().checks.find((c) => c.name.startsWith('Bank Settlement'))
+    expect(settlement?.passed).toBe(true)
+    expect(settlement?.detail).toContain('already inside them')
+  })
+
+  it('still reconciles the later layout the other way', () => {
+    const settlement = normalizeMyntraPnlWorkbook(sheets(), MASTER, MAPPINGS, 'test')
+      .checks.find((c) => c.name.startsWith('Bank Settlement'))
+    expect(settlement?.passed).toBe(true)
+    expect(settlement?.detail).toContain('plus the SJIT incentive')
+  })
+
+  it('reports a label that appears twice with two different figures', () => {
+    // Myntra lists some lines in two places with the same number. Two
+    // different numbers means this reader has misread the sheet.
+    const contradictory = APRIL_SUMMARY.map((row) =>
+      row[0] === '• SJIT Incentive' ? ['• SJIT Incentive', 99999, ''] : row,
+    ) as RawSheet
+    const r = normalizeMyntraPnlWorkbook(
+      { PnL_Summary: contradictory, SKU_Detail: [DETAIL_HEADER, LOTION] as RawSheet },
+      MASTER, MAPPINGS, 'test',
+    )
+    expect(r.warnings.some((w) => w.includes('appears more than once'))).toBe(true)
+  })
+})

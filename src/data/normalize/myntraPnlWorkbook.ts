@@ -30,41 +30,68 @@ import type { NormalizeResult } from './types'
 const SUMMARY_SHEET = 'PnL_Summary'
 const DETAIL_SHEET = 'SKU_Detail'
 
-/** How the summary sheet labels each line. Matched after collapsing the
- * bullet characters and whitespace Myntra indents with. */
+/**
+ * How the summary sheet labels each line, and the other names Myntra has used
+ * for it.
+ *
+ * A list rather than a string because Myntra changed the sheet partway
+ * through the year, and the earlier months still have to be readable.
+ *
+ * The later shape, which this reader was built on, nests the fees under their
+ * own Forward and Reverse headings and names the reverse ones "Commission
+ * Recovery", "TCS Recovery" and so on. The earlier shape — April 2026's file
+ * — lists the same fees flat under Total Expenses, spells out "Forward
+ * Additional Charges" and "Reverse Additional Charges", has no "Estimated Net
+ * Sales After Expenses" line at all, and titles Total Expenses "(Net
+ * Commission)" rather than "(Forward − Reverse)".
+ *
+ * So a line is identified by its own name and nothing else. The reader used
+ * to decide forward-or-reverse from the heading it had last passed, which is
+ * what made the earlier months unreadable: the Reverse heading latched on and
+ * every line after it — each fee, the GST, the rewards, the bank settlement,
+ * the earnings — was filed as a reverse figure and read back as zero. The
+ * fees were in the file the whole time.
+ *
+ * It works because both layouts name their reverse lines explicitly, and the
+ * forward lines are the plain ones. Matched after collapsing the bullets and
+ * indentation Myntra marks its hierarchy with.
+ */
 const SUMMARY_LABELS = {
-  grossSales: 'gross sales',
-  returnsAndCancellations: 'returns and cancellations',
-  estimatedNetSales: 'estimated net sales',
-  totalExpenses: 'total expenses (forward − reverse)',
-  forwardExpense: 'forward expense',
-  fwdCommissionFee: 'commission fee',
-  fwdTaxesTcs: 'taxes (tcs)',
-  fwdTaxesTds: 'taxes (tds)',
-  fwdLogisticCharge: 'logistic charge',
-  fwdAdditionalCharges: 'additional charges',
-  reverseExpense: 'reverse expense',
-  revCommissionRecovery: 'commission recovery',
-  revTcsRecovery: 'tcs recovery',
-  revTdsRecovery: 'tds recovery',
-  revLogisticCharge: 'reverse logistic charge',
-  revAdditionalRecovery: 'additional recovery',
-  estimatedNetSalesAfterExpenses: 'estimated net sales after expenses',
-  productGst: 'product gst',
-  nodPaid: 'nod paid',
-  nodDeducted: 'nod deducted',
-  rewardsAndBenefits: 'rewards & other benefits',
-  sjitIncentive: 'sjit incentive',
-  commissionDiscount: 'commission discount',
-  orderSpf: 'order spf',
-  bankSettlementProjected: 'bank settlement (projected)',
-  bankSettlementSettled: 'bank settlement (settled)',
-  bankSettlementUnsettled: 'bank settlement (unsettled)',
-  inputTaxCredits: 'input tax credits',
-  inputTaxCreditsGstTcs: 'gst + tcs',
-  inputTaxCreditsTds: 'tds',
-  earningsOnPlatform: 'earnings on platform',
-  netMarginPct: 'net margin (% of net sales)',
+  grossSales: ['gross sales'],
+  returnsAndCancellations: ['returns and cancellations'],
+  estimatedNetSales: ['estimated net sales'],
+  /** The qualifier in brackets is Myntra's note on how it arrived at the
+   * figure, not part of the name, and it has changed. Canonicalised on the
+   * prefix in `readSummary`. */
+  totalExpenses: ['total expenses'],
+  forwardExpense: ['forward expense'],
+  fwdCommissionFee: ['commission fee'],
+  fwdTaxesTcs: ['taxes (tcs)'],
+  fwdTaxesTds: ['taxes (tds)'],
+  fwdLogisticCharge: ['logistic charge'],
+  fwdAdditionalCharges: ['additional charges', 'forward additional charges'],
+  reverseExpense: ['reverse expense'],
+  revCommissionRecovery: ['commission recovery'],
+  revTcsRecovery: ['tcs recovery'],
+  revTdsRecovery: ['tds recovery'],
+  revLogisticCharge: ['reverse logistic charge'],
+  revAdditionalRecovery: ['additional recovery', 'reverse additional charges'],
+  estimatedNetSalesAfterExpenses: ['estimated net sales after expenses'],
+  productGst: ['product gst'],
+  nodPaid: ['nod paid'],
+  nodDeducted: ['nod deducted'],
+  rewardsAndBenefits: ['rewards & other benefits'],
+  sjitIncentive: ['sjit incentive'],
+  commissionDiscount: ['commission discount'],
+  orderSpf: ['order spf'],
+  bankSettlementProjected: ['bank settlement (projected)'],
+  bankSettlementSettled: ['bank settlement (settled)'],
+  bankSettlementUnsettled: ['bank settlement (unsettled)'],
+  inputTaxCredits: ['input tax credits'],
+  inputTaxCreditsGstTcs: ['gst + tcs'],
+  inputTaxCreditsTds: ['tds'],
+  earningsOnPlatform: ['earnings on platform'],
+  netMarginPct: ['net margin (% of net sales)'],
 }
 
 const MONTHS = [
@@ -126,19 +153,29 @@ export function detectMyntraPnlWorkbook(sheetNames: string[]): boolean {
 /**
  * The summary sheet as a label → {amount, units} lookup.
  *
- * A label can legitimately repeat — "Commission Fee" appears under both
- * Forward and Reverse in some months — so the reader tracks which block it is
- * in and keys the reverse lines separately.
+ * Flat, keyed by the line's own name. The first occurrence of a label wins
+ * and a later one carrying a different figure is reported rather than
+ * overwriting it: April lists "SJIT Incentive" twice, inside the expenses and
+ * again under Rewards, with the same number both times, and a month where
+ * those two part company is a month this reader has misunderstood.
  */
-function readSummary(sheet: RawSheet): { values: Map<string, number>; units: Map<string, number>; header: Map<string, string> } {
+function readSummary(sheet: RawSheet): {
+  values: Map<string, number>
+  units: Map<string, number>
+  header: Map<string, string>
+  /** Labels that appeared twice with different figures. */
+  conflicting: string[]
+} {
   const values = new Map<string, number>()
   const units = new Map<string, number>()
   const header = new Map<string, string>()
-  let block: 'forward' | 'reverse' | null = null
+  const conflicting: string[] = []
 
   for (const row of sheet) {
     const key = labelKey(row[0])
     if (key === '') continue
+    // The rules of dashes Myntra separates its sections with.
+    if (/^-{3,}$/.test(key)) continue
 
     // "Report Type:", "Orders Received During:", "Seller ID:" — the report's
     // own header, where the month and the seller come from.
@@ -147,22 +184,22 @@ function readSummary(sheet: RawSheet): { values: Map<string, number>; units: Map
       continue
     }
 
-    if (key === SUMMARY_LABELS.forwardExpense) block = 'forward'
-    else if (key === SUMMARY_LABELS.reverseExpense) block = 'reverse'
-    else if (key === SUMMARY_LABELS.estimatedNetSalesAfterExpenses) block = null
+    // "Total Expenses (Forward − Reverse)" in one month's file and "(Net
+    // Commission)" in another's are the same line, and the bracket is
+    // Myntra's working rather than its name.
+    const canonical = key.startsWith('total expenses') ? 'total expenses' : key
 
-    // Inside the reverse block, "Commission Fee" would collide with the
-    // forward one. Myntra names the reverse lines "... Recovery", but the
-    // prefix is added anyway so a renamed future line cannot silently
-    // overwrite its forward twin.
-    const storeKey = block === 'reverse' && key !== SUMMARY_LABELS.reverseExpense ? `reverse:${key}` : key
-    if (!values.has(storeKey)) {
-      values.set(storeKey, num(row[1]))
-      units.set(storeKey, num(row[2]))
+    const existing = values.get(canonical)
+    const amount = num(row[1])
+    if (existing === undefined) {
+      values.set(canonical, amount)
+      units.set(canonical, num(row[2]))
+    } else if (Math.abs(existing - amount) > 0.01) {
+      conflicting.push(canonical)
     }
   }
 
-  return { values, units, header }
+  return { values, units, header, conflicting }
 }
 
 /**
@@ -186,7 +223,15 @@ export function normalizeMyntraPnlWorkbook(
 
   const summarySheet = sheetNamed(sheets, SUMMARY_SHEET) ?? []
   const detailSheet = sheetNamed(sheets, DETAIL_SHEET) ?? []
-  const { values, units, header } = readSummary(summarySheet)
+  const { values, units, header, conflicting } = readSummary(summarySheet)
+
+  if (conflicting.length > 0) {
+    warnings.push(
+      `${conflicting.join(', ')} appears more than once on the PnL_Summary sheet with a different figure each ` +
+      'time. The first was used. Myntra lists some lines twice — the same number in two places — so two ' +
+      'different numbers means this reader has misread the sheet; send the file over.',
+    )
+  }
 
   const month = parseMyntraMonth(header.get('orders received during'))
   const sellerId = header.get('seller id') || undefined
@@ -199,8 +244,21 @@ export function normalizeMyntraPnlWorkbook(
     }
   }
 
-  const v = (label: string): number => values.get(label) ?? 0
-  const rev = (label: string): number => values.get(`reverse:${label}`) ?? 0
+  /** The first of a line's known names that the file actually used. */
+  const v = (labels: string[]): number => {
+    for (const label of labels) {
+      const found = values.get(label)
+      if (found !== undefined) return found
+    }
+    return 0
+  }
+  const unitsOf = (labels: string[]): number => {
+    for (const label of labels) {
+      const found = units.get(label)
+      if (found !== undefined) return found
+    }
+    return 0
+  }
   // Every figure is stored as a positive magnitude; the statement subtracts.
   // `reverseExpense` is the exception — Myntra reports it as a signed net,
   // because its recoveries are credits and its logistics is a charge.
@@ -208,11 +266,11 @@ export function normalizeMyntraPnlWorkbook(
     month,
     sellerId,
     grossSales: v(SUMMARY_LABELS.grossSales),
-    grossSalesUnits: units.get(SUMMARY_LABELS.grossSales) ?? 0,
+    grossSalesUnits: unitsOf(SUMMARY_LABELS.grossSales),
     returnsAndCancellations: Math.abs(v(SUMMARY_LABELS.returnsAndCancellations)),
-    returnsAndCancellationsUnits: Math.abs(units.get(SUMMARY_LABELS.returnsAndCancellations) ?? 0),
+    returnsAndCancellationsUnits: Math.abs(unitsOf(SUMMARY_LABELS.returnsAndCancellations)),
     estimatedNetSales: v(SUMMARY_LABELS.estimatedNetSales),
-    estimatedNetSalesUnits: units.get(SUMMARY_LABELS.estimatedNetSales) ?? 0,
+    estimatedNetSalesUnits: unitsOf(SUMMARY_LABELS.estimatedNetSales),
 
     fwdCommissionFee: Math.abs(v(SUMMARY_LABELS.fwdCommissionFee)),
     fwdTaxesTcs: Math.abs(v(SUMMARY_LABELS.fwdTaxesTcs)),
@@ -221,15 +279,21 @@ export function normalizeMyntraPnlWorkbook(
     fwdAdditionalCharges: Math.abs(v(SUMMARY_LABELS.fwdAdditionalCharges)),
     forwardExpense: Math.abs(v(SUMMARY_LABELS.forwardExpense)),
 
-    revCommissionRecovery: rev(SUMMARY_LABELS.revCommissionRecovery),
-    revTcsRecovery: rev(SUMMARY_LABELS.revTcsRecovery),
-    revTdsRecovery: rev(SUMMARY_LABELS.revTdsRecovery),
-    revLogisticCharge: Math.abs(rev(SUMMARY_LABELS.revLogisticCharge)),
-    revAdditionalRecovery: rev(SUMMARY_LABELS.revAdditionalRecovery),
+    revCommissionRecovery: v(SUMMARY_LABELS.revCommissionRecovery),
+    revTcsRecovery: v(SUMMARY_LABELS.revTcsRecovery),
+    revTdsRecovery: v(SUMMARY_LABELS.revTdsRecovery),
+    revLogisticCharge: Math.abs(v(SUMMARY_LABELS.revLogisticCharge)),
+    revAdditionalRecovery: v(SUMMARY_LABELS.revAdditionalRecovery),
     reverseExpense: v(SUMMARY_LABELS.reverseExpense),
 
     totalExpenses: Math.abs(v(SUMMARY_LABELS.totalExpenses)),
-    estimatedNetSalesAfterExpenses: v(SUMMARY_LABELS.estimatedNetSalesAfterExpenses),
+    // The earlier sheet has no such line. It is net sales less expenses — an
+    // identity the later sheet states to the paisa — so it is derived rather
+    // than shown as nil on the statement, and the upload says it was.
+    estimatedNetSalesAfterExpenses:
+      values.has(SUMMARY_LABELS.estimatedNetSalesAfterExpenses[0])
+        ? v(SUMMARY_LABELS.estimatedNetSalesAfterExpenses)
+        : v(SUMMARY_LABELS.estimatedNetSales) - Math.abs(v(SUMMARY_LABELS.totalExpenses)),
     productGst: Math.abs(v(SUMMARY_LABELS.productGst)),
 
     nodPaid: v(SUMMARY_LABELS.nodPaid),
@@ -359,15 +423,36 @@ export function normalizeMyntraPnlWorkbook(
   check('Product GST', facts.productGst, sum(columns.gst), 1)
   check('Total Expenses', facts.totalExpenses, sum(columns.expenses), 1)
 
-  // The settlement identity that decides whether the Commission Discount is a
-  // memo or a real addition. If Myntra ever starts paying it separately this
-  // check is what will say so, rather than the figure silently drifting.
-  const projected = facts.estimatedNetSalesAfterExpenses + facts.sjitIncentive
+  // What Myntra says it will pay, reconciled against what it says it charged.
+  // The incentive is the moving part: the later sheet adds the SJIT on top of
+  // net sales after expenses, while the earlier one has it already inside the
+  // forward expense, so the settlement is net sales less expenses and nothing
+  // more.
+  // Either is a sound statement; neither holding means this reader has
+  // misread the sheet, which is the whole point of the check.
+  const afterExpenses = facts.estimatedNetSales - facts.totalExpenses
+  const candidates = [
+    { how: 'net sales less expenses, plus the SJIT incentive', value: afterExpenses + facts.sjitIncentive },
+    { how: 'net sales less expenses, the incentive already inside them', value: afterExpenses },
+  ]
+  const held = candidates.find((c) => Math.abs(c.value - facts.bankSettlementProjected) <= 1)
   checks.push({
-    name: 'Bank Settlement (Projected) = Net Sales After Expenses + SJIT',
-    passed: Math.abs(projected - facts.bankSettlementProjected) <= 1,
-    detail: `${projected.toFixed(2)} vs ${facts.bankSettlementProjected.toFixed(2)} — if this fails, the Commission Discount may no longer be inside the Commission Fee`,
+    name: 'Bank Settlement (Projected) reconciles to the statement',
+    passed: held !== undefined,
+    detail: held
+      ? `${facts.bankSettlementProjected.toFixed(2)} — ${held.how}`
+      : `the statement says ${facts.bankSettlementProjected.toFixed(2)}; net sales less expenses is ` +
+        `${afterExpenses.toFixed(2)}, and with the SJIT incentive ${(afterExpenses + facts.sjitIncentive).toFixed(2)}. ` +
+        'Neither matches, so a charge on this sheet is not being read as one.',
   })
+
+  if (!values.has(SUMMARY_LABELS.estimatedNetSalesAfterExpenses[0])) {
+    warnings.push(
+      'This month\'s file does not state "Estimated Net Sales After Expenses" — the sheet gained that line later ' +
+      'in the year — so the statement shows net sales less total expenses in its place, which is the same figure ' +
+      'the later sheet states outright. Every charge above it is read from the file.',
+    )
+  }
 
   const emptySkuRows = detailRows.length - validRecords.length
   if (emptySkuRows > 0) {
