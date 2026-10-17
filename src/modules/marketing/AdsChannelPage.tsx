@@ -41,8 +41,13 @@ export function AdsChannelPage() {
       return {
         month: monthLabel(m),
         spend: f.spend,
-        adSales: f.adSales ?? 0,
-        roas: f.adSales !== null && f.spend > 0 ? f.adSales / f.spend : 0,
+        adSales: f.adSales,
+        // Null, not zero, where it cannot be worked out — a month with no
+        // report, or one entered by hand with no attributed sales behind it.
+        // A nil return and an unmeasured one are different statements, and on
+        // one chart with the spend a false nil drags the whole axis down to
+        // meet it.
+        roas: f.adSales !== null && f.spend > 0 ? f.adSales / f.spend : null,
       }
     })
 
@@ -106,15 +111,27 @@ export function AdsChannelPage() {
 
       {def.usesMonthlyInvoice && <ManualAdSpendForm channel={channel} def={def} month={month} current={figure} />}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
-          <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">Ad spend trend</h3>
-          <TrendLineChart data={trend} xKey="month" series={[{ key: 'spend', label: 'Spend' }]} valueFormatter={(v) => formatCurrencyCompact(v)} />
-        </div>
-        <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
-          <h3 className="mb-2 text-sm font-semibold text-[var(--ink-2)]">ROAS trend</h3>
-          <TrendLineChart data={trend} xKey="month" series={[{ key: 'roas', label: 'ROAS' }]} valueFormatter={(v) => `${v.toFixed(2)}x`} />
-        </div>
+      {/* One chart, because the question is whether the two move together:
+          spending more and earning less per rupee is the thing worth seeing,
+          and it is invisible when the two lines are in separate frames.
+          They have no common scale — rupees against a multiple — so ROAS
+          takes the right-hand axis and is drawn dashed, and the caption says
+          which side each is read on. */}
+      <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
+        <h3 className="text-sm font-semibold text-[var(--ink-2)]">Ad spend and ROAS</h3>
+        <p className="mb-2 text-xs text-[var(--ink-3)]">
+          Spend in rupees on the left, ROAS as a multiple on the right. The two scales are set by their own
+          figures, so where the lines cross means nothing — read each against its own side.
+        </p>
+        <TrendLineChart
+          data={trend}
+          xKey="month"
+          height={300}
+          series={[
+            { key: 'spend', label: 'Ad spend', color: 'var(--series-1)', valueFormatter: (v) => formatCurrencyCompact(v) },
+            { key: 'roas', label: 'ROAS', axis: 'right', dash: true, color: 'var(--series-2)', valueFormatter: (v) => `${v.toFixed(2)}x` },
+          ]}
+        />
       </div>
 
       {/* Myntra's report carries campaign states, a direct/indirect split and

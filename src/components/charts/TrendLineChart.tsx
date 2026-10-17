@@ -14,8 +14,29 @@ export interface SeriesDef {
    * their own magnitude on the same set of months.
    */
   axis?: 'left' | 'right'
+  /**
+   * Draws this series dashed.
+   *
+   * For the series on the right-hand axis, so the two are told apart by the
+   * shape of the line and not only by its colour. Two solid lines on two
+   * scales read as two measurements of one thing, and where they cross looks
+   * like a meeting that is an artefact of the scales.
+   */
+  dash?: boolean
   /** Formats this series' axis and tooltip. Falls back to the chart's. */
   valueFormatter?: (v: number) => string
+}
+
+/**
+ * Whether a series has a figure with no figure either side of it.
+ *
+ * A lone point draws no line segment, so on a chart that shows no dots it
+ * disappears entirely — one month measured out of six reads as six months
+ * with nothing in them. Those series get their points drawn.
+ */
+function hasIsolatedPoint(data: Record<string, string | number | null>[], key: string): boolean {
+  const present = data.map((d) => d[key] !== null && d[key] !== undefined && d[key] !== '')
+  return present.some((p, i) => p && !present[i - 1] && !present[i + 1])
 }
 
 export function TrendLineChart({
@@ -88,6 +109,7 @@ export function TrendLineChart({
         {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12, color: 'var(--ink-2)', paddingTop: 8 }} iconType="plainline" iconSize={14} />}
         {series.map((s, i) => {
           const colour = s.color ?? CHART_COLORS[i % CHART_COLORS.length]
+          const dotted = labelled || hasIsolatedPoint(data, s.key)
           return (
             <Line
               key={s.key}
@@ -97,9 +119,12 @@ export function TrendLineChart({
               name={s.label}
               stroke={colour}
               strokeWidth={2}
+              strokeDasharray={s.dash ? '6 4' : undefined}
               // A labelled point gets a dot, so the figure above it is clearly
               // the figure for that month and not for the space between two.
-              dot={labelled ? { r: 3, strokeWidth: 0, fill: colour } : false}
+              // So does a point with nothing beside it, which would otherwise
+              // not be drawn at all.
+              dot={dotted ? { r: 3, strokeWidth: 0, fill: colour } : false}
               // Big enough to hit comfortably, ringed in the surface so it stays
               // legible where lines cross.
               activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--surface)' }}
