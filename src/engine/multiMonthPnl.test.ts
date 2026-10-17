@@ -8,6 +8,7 @@ import {
   comparisonMonths,
   monthsBetween,
   monthsForQuickPeriod,
+  quickPeriodAnchor,
   PNL_ROWS,
   tradedMonths,
 } from './multiMonthPnl'
@@ -288,5 +289,46 @@ describe('the whole selection, end to end', () => {
 
     expect(months).toEqual(monthsWithData)
     expect(comparisonMonths(traded, '2026-10')).toEqual({ earlierMonth: '2026-08', laterMonth: '2026-09' })
+  })
+})
+
+describe('quickPeriodAnchor', () => {
+  // The owner's own case, on 17 October 2026: a channel had filed something
+  // for October, so "Last 6 Months" ran May to October and ended on a column
+  // holding half a month of one marketplace.
+  const DATA = ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10']
+
+  it('ends on the newest finished month, not on the one still running', () => {
+    expect(quickPeriodAnchor('2026-10', DATA, '2026-10')).toBe('2026-09')
+  })
+
+  it('so last 6 months reads April to September rather than May to October', () => {
+    const months = monthsForQuickPeriod('6m', quickPeriodAnchor('2026-10', DATA, '2026-10'), DATA)
+    expect(months).toEqual(['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09'])
+  })
+
+  it('does the same for every other counted period', () => {
+    const anchor = quickPeriodAnchor('2026-10', DATA, '2026-10')
+    expect(monthsForQuickPeriod('3m', anchor, DATA)).toEqual(['2026-07', '2026-08', '2026-09'])
+    expect(monthsForQuickPeriod('current', anchor, DATA)).toEqual(['2026-09'])
+    expect(monthsForQuickPeriod('previous', anchor, DATA)).toEqual(['2026-08'])
+    // The financial year to date stops at the last finished month too.
+    expect(monthsForQuickPeriod('fy', anchor, DATA)).not.toContain('2026-10')
+  })
+
+  it('leaves an anchor that is already a finished month alone', () => {
+    // Someone reading June is reading June; this is not a correction.
+    expect(quickPeriodAnchor('2026-06', DATA, '2026-10')).toBe('2026-06')
+  })
+
+  it('still pulls an anchor past the end of the data back into it', () => {
+    expect(quickPeriodAnchor('2026-12', ['2026-08', '2026-09'], '2026-12')).toBe('2026-09')
+  })
+
+  it('shows the running month when it is the only month there is', () => {
+    // A business in its first month has nothing else to show, and an empty
+    // screen would be worse than a young one.
+    expect(quickPeriodAnchor('2026-10', ['2026-10'], '2026-10')).toBe('2026-10')
+    expect(quickPeriodAnchor('2026-10', [], '2026-10')).toBe('2026-10')
   })
 })

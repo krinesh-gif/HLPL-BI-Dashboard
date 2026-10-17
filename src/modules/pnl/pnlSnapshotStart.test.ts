@@ -50,3 +50,24 @@ describe('what a snapshot link asks for', () => {
     expect(start('from=2026-08&to=2026-08').period).toMatchObject({ from: '2026-08', to: '2026-08' })
   })
 })
+
+describe('coming back to the P&L', () => {
+  // The P&L screen writes its own selection into the address bar and reads it
+  // back with this, which is what makes Back return to the channel that was
+  // on screen rather than to the Master P&L.
+  it('keeps a named period named, rather than freezing it into dates', () => {
+    const start = pnlSnapshotStart(new URLSearchParams({ view: 'myntra', period: '6m', from: '2026-04', to: '2026-09' }))
+    expect(start.view).toBe('myntra')
+    expect(start.period).toEqual({ mode: 'quick', quick: '6m', from: '2026-04', to: '2026-09' })
+  })
+
+  it('reads a range with no named period as a fixed range', () => {
+    // Every snapshot link sent before this carries from/to and nothing else.
+    expect(pnlSnapshotStart(new URLSearchParams({ from: '2026-04', to: '2026-09' })).period)
+      .toEqual({ mode: 'custom', quick: '6m', from: '2026-04', to: '2026-09' })
+  })
+
+  it('ignores a period nobody has heard of', () => {
+    expect(pnlSnapshotStart(new URLSearchParams({ period: 'last-fortnight' })).period).toBeUndefined()
+  })
+})

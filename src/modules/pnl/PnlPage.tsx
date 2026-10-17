@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { PageShell } from '@/components/layout/PageShell'
 import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { ComparisonBarChart } from '@/components/charts/ComparisonBarChart'
@@ -8,6 +9,7 @@ import { exportRowsToCsv } from '@/lib/exportCsv'
 import { QUICK_PERIODS, type QuickPeriod } from '@/engine/multiMonthPnl'
 import { NativePnlTable } from '@/components/pnl/NativePnlTable'
 import { amountTone } from '@/components/pnl/amountTone'
+import { pnlSnapshotStart } from './pnlSnapshotStart'
 import { usePnlReport, type PnlView } from './usePnlReport'
 
 /**
@@ -18,7 +20,31 @@ import { usePnlReport, type PnlView } from './usePnlReport'
  * be built differently and disagree.
  */
 export function PnlPage() {
-  const r = usePnlReport()
+  // What is on screen lives in the address bar, for one reason: the Snapshot
+  // opens a page of its own, and coming back from it used to land on the
+  // Master P&L however the reader got there — the channel they were reading
+  // was held in this component's state, and the component had been unmounted.
+  // Read once, on mount: after that the controls own the selection and the
+  // URL follows them.
+  const [params, setParams] = useSearchParams()
+  const [start] = useState(() => pnlSnapshotStart(params))
+  const r = usePnlReport(start)
+
+  const search = new URLSearchParams({
+    view: r.view,
+    ...(r.period.mode === 'quick' ? { period: r.period.quick } : {}),
+    from: r.months[0] ?? r.latestMonth,
+    to: r.months[r.months.length - 1] ?? r.latestMonth,
+    basis: r.meeshoBasis,
+    cur: r.displayCurrency,
+  }).toString()
+
+  // Replaced rather than pushed: every change of a dropdown would otherwise
+  // be a history entry, and Back would walk through them one at a time
+  // instead of leaving the page.
+  useEffect(() => {
+    if (search !== params.toString()) setParams(search, { replace: true })
+  }, [search, params, setParams])
 
   const monthOptions = r.monthsWithData.length > 0 ? r.monthsWithData : [r.latestMonth]
 
@@ -50,16 +76,7 @@ export function PnlPage() {
       // the same view, period, basis and currency the reader was looking at.
       headerActions={
         <Link
-          to={{
-            pathname: '/pnl/snapshot',
-            search: new URLSearchParams({
-              view: r.view,
-              from: r.months[0] ?? r.latestMonth,
-              to: r.months[r.months.length - 1] ?? r.latestMonth,
-              basis: r.meeshoBasis,
-              cur: r.displayCurrency,
-            }).toString(),
-          }}
+          to={{ pathname: '/pnl/snapshot', search }}
           className="rounded-[var(--radius-control)] border border-[var(--line-2)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--surface-hover)]"
         >
           Snapshot

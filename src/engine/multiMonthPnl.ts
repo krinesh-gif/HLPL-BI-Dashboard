@@ -155,8 +155,11 @@ export function buildMultiMonthPnl(
 export type QuickPeriod = 'current' | 'previous' | '3m' | '6m' | '12m' | 'fy' | 'all'
 
 export const QUICK_PERIODS: { key: QuickPeriod; label: string }[] = [
-  { key: 'current', label: 'Current Month' },
-  { key: 'previous', label: 'Previous Month' },
+  // Not "Current Month": a quick period ends on the newest finished month, so
+  // on the 17th of October this is September. Calling it the current month
+  // would be the dropdown telling the reader something untrue.
+  { key: 'current', label: 'Latest Month' },
+  { key: 'previous', label: 'Month Before' },
   { key: '3m', label: 'Last 3 Months' },
   { key: '6m', label: 'Last 6 Months' },
   { key: '12m', label: 'Last 12 Months' },
@@ -279,6 +282,39 @@ export function comparePnlMonths(
 export function anchorWithinData(anchorMonth: string, monthsWithData: string[]): string {
   const last = monthsWithData.reduce<string | null>((latest, m) => (latest === null || m > latest ? m : latest), null)
   return last !== null && anchorMonth > last ? last : anchorMonth
+}
+
+/**
+ * Where a quick period should end.
+ *
+ * `anchorWithinData` deals with an anchor past the end of the data. This deals
+ * with the other half of the same problem: a month that has data but is not
+ * over yet.
+ *
+ * A month in progress is not a month. On the 17th it holds whatever has been
+ * uploaded so far — one channel's file, or a few days of orders — and putting
+ * it at the end of "Last 6 Months" ends the table on a column that is a
+ * fraction of the others. Every line reads as a collapse and the comparison
+ * under the table reads as a disaster, when all that happened is that the
+ * month is young.
+ *
+ * So a quick period ends on the newest month that is both in the data and
+ * finished. The running month is still reachable — the custom range and the
+ * global month filter both reach it — but nothing picks it by default.
+ *
+ * The one exception is a business with nothing else: if the running month is
+ * the only month with data, it is what there is to show.
+ */
+export function quickPeriodAnchor(
+  anchorMonth: string,
+  monthsWithData: string[],
+  currentMonth: string,
+): string {
+  const within = anchorWithinData(anchorMonth, monthsWithData)
+  if (within < currentMonth) return within
+  const finished = monthsWithData.filter((m) => m < currentMonth)
+  if (finished.length === 0) return within
+  return finished.reduce((latest, m) => (m > latest ? m : latest))
 }
 
 /**

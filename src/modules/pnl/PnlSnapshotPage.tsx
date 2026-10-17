@@ -1,6 +1,7 @@
 import { useSearchParams, Link } from 'react-router-dom'
 import { channelLabel, type BusinessChannelId } from '@/config/channels'
 import { formatCurrencyFull, formatPercent, monthLabel, currencyName } from '@/lib/format'
+import { amountTone } from '@/components/pnl/amountTone'
 import { usePnlReport } from './usePnlReport'
 import { pnlSnapshotStart } from './pnlSnapshotStart'
 
@@ -22,7 +23,15 @@ export function PnlSnapshotPage() {
   return (
     <div className="pnl-snapshot mx-auto w-full max-w-[1100px] px-6 py-6 print:max-w-none print:p-0">
       <div className="mb-4 flex flex-wrap items-center gap-3 print:hidden">
-        <Link to="/pnl" className="text-sm font-medium text-[var(--accent)] hover:underline">← Back to P&amp;L</Link>
+        {/* Carries the selection back with it. Without the search string this
+            returned to the Master P&L however the reader got here, which is
+            not where they were. */}
+        <Link
+          to={{ pathname: '/pnl', search: params.toString() }}
+          className="text-sm font-medium text-[var(--accent)] hover:underline"
+        >
+          ← Back to P&amp;L
+        </Link>
         <button
           type="button"
           onClick={() => window.print()}
@@ -78,14 +87,26 @@ export function PnlSnapshotPage() {
                   <td className={`py-1 ${row.def.indent ? 'pl-4 text-[var(--ink-3)]' : 'text-[var(--ink)]'}`}>
                     {row.def.label}
                   </td>
-                  {row.values.map((v, i) => (
-                    <td key={i} className={`py-1 pl-3 text-right tabular-nums ${subtotal ? 'text-[var(--ink)]' : 'text-[var(--ink-2)]'}`}>
-                      {percent ? (v === null ? '—' : formatPercent(v)) : money(v === null ? null : v * (row.def.sign ?? 1))}
-                    </td>
-                  ))}
-                  <td className={`py-1 pl-3 text-right tabular-nums ${subtotal ? 'text-[var(--ink)]' : 'text-[var(--ink-2)]'}`}>
-                    {percent ? (row.total === null ? '—' : formatPercent(row.total)) : money(row.total === null ? null : row.total * (row.def.sign ?? 1))}
-                  </td>
+                  {row.values.map((v, i) => {
+                    const shown = v === null ? null : v * (row.def.sign ?? 1)
+                    return (
+                      <td key={i} className={`py-1 pl-3 text-right tabular-nums ${amountTone(shown)}`}>
+                        {percent
+                          ? (shown === null ? '—' : formatPercent(shown))
+                          : shown === 0 ? '—' : money(shown)}
+                      </td>
+                    )
+                  })}
+                  {(() => {
+                    const total = row.total === null ? null : row.total * (row.def.sign ?? 1)
+                    return (
+                      <td className={`py-1 pl-3 text-right font-semibold tabular-nums ${amountTone(total)}`}>
+                        {percent
+                          ? (total === null ? '—' : formatPercent(total))
+                          : total === 0 ? '—' : money(total)}
+                      </td>
+                    )
+                  })()}
                 </tr>
               )
             })}

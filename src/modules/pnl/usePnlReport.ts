@@ -11,7 +11,7 @@ import { buildAllChannelPnlViews, buildChannelPnlView } from '@/engine/channelPn
 import { buildMasterPnl, computeSubtotals } from '@/engine/pnl'
 import { usePnlInputs } from '@/engine/usePnlInputs'
 import {
-  anchorWithinData,
+  quickPeriodAnchor,
   buildMultiMonthPnl,
   comparePnlMonths,
   comparisonMonths,
@@ -79,7 +79,7 @@ export function usePnlReport(start: PnlReportStart = {}) {
     const months =
       period.mode === 'custom'
         ? monthsBetween(period.from, period.to)
-        : monthsForQuickPeriod(period.quick, anchorWithinData(month, monthsWithData), monthsWithData)
+        : monthsForQuickPeriod(period.quick, quickPeriodAnchor(month, monthsWithData, currentMonth), monthsWithData)
 
     // Amazon USA is the one channel that can be read in either currency. The
     // Master P&L is always rupees — it sums every channel, and a report in two
