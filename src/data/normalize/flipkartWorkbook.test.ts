@@ -19,6 +19,9 @@ const overallSummary: RawSheet = [
   ['Seller-Funded Discount', -1000],
   ['Customer Add-Ons Amount', 500],
   ['Accounted Net Sales (Seller Price)', 79500],
+  // Flipkart's own total of the charges itemised below it, which the real
+  // sheet states and the items add up to exactly.
+  ['Total Expenses', -26750],
   ['• Commission Fee', -8000],
   ['• Collection Fee', 0],
   ['• Fixed Fee', -4000],
@@ -130,5 +133,45 @@ describe('normalizeFlipkartWorkbook', () => {
     const indented: RawSheet = overallSummary.map((row) => (row[0] === '• Google Ads' ? ['', '• Google Ads', 0] : row))
     const result = normalizeFlipkartWorkbook({ ...sheets, 'Overall Summary': indented }, skuMaster, 'import-1')
     expect(result.warnings.some((w) => w.includes('has no line named Google Ads'))).toBe(true)
+  })
+})
+
+// Flipkart states the month's charges as a total and then itemises them, so
+// the sheet can check the reader against itself: anything charged on a line it
+// does not know by name shows up as the gap.
+describe('normalizeFlipkartWorkbook, against Flipkart’s own stated Total Expenses', () => {
+  it('reconciles a sheet whose charges it reads in full', () => {
+    const result = normalizeFlipkartWorkbook(sheets, skuMaster, 'import-1')
+    expect(result.warnings.some((w) => w.includes('states Total Expenses'))).toBe(false)
+  })
+
+  it('reports the gap when a charge is on a line it does not recognise', () => {
+    // The same ₹5,000 charge, named something the reader does not look for.
+    const renamed: RawSheet = overallSummary.map((row) => {
+      if (row[0] === '• Google Ads') return ['• Google Ads Fee', -5000]
+      if (row[0] === 'Total Expenses') return ['Total Expenses', -31750]
+      return row
+    })
+    const result = normalizeFlipkartWorkbook({ ...sheets, 'Overall Summary': renamed }, skuMaster, 'import-1')
+    const warning = result.warnings.find((w) => w.includes('states Total Expenses'))
+    expect(warning).toContain('₹31,750.00')
+    expect(warning).toContain('₹26,750.00')
+    expect(warning).toContain('a gap of ₹5,000.00')
+    expect(warning).toContain('this reader does not recognise')
+    expect(result.facts.googleAds).toBe(0)
+  })
+
+  it('says a line is counted twice when the charges overshoot the stated total', () => {
+    const understated: RawSheet = overallSummary.map((row) =>
+      row[0] === 'Total Expenses' ? ['Total Expenses', -20750] : row,
+    )
+    const result = normalizeFlipkartWorkbook({ ...sheets, 'Overall Summary': understated }, skuMaster, 'import-1')
+    expect(result.warnings.find((w) => w.includes('states Total Expenses'))).toContain('counted twice')
+  })
+
+  it('stays quiet on a sheet that states no total at all', () => {
+    const withoutTotal = overallSummary.filter((row) => row[0] !== 'Total Expenses')
+    const result = normalizeFlipkartWorkbook({ ...sheets, 'Overall Summary': withoutTotal }, skuMaster, 'import-1')
+    expect(result.warnings.some((w) => w.includes('states Total Expenses'))).toBe(false)
   })
 })

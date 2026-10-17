@@ -64,6 +64,11 @@ const EXPECTED_SUMMARY_LABELS = [
   'Taxes (GST)', 'Taxes (TCS)', 'Taxes (TDS)', 'Rewards & Other Benefits',
 ]
 
+/** Flipkart's own stated total of the charges itemised below it. */
+const EXPENSE_TOTAL_LABEL = 'Total Expenses'
+
+const inr = (n: number): string => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
 const SUMMARY_SHEET = 'Overall Summary'
 const ORDERS_SHEET = 'Orders P&L'
 
@@ -80,35 +85,71 @@ function extractMonthFromSummary(map: Map<string, number | string>): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-function buildFactsFromOverallSummary(summarySheet: RawSheet): { facts: Omit<FlipkartPnlFacts, 'cogsPriced' | 'cogsUnpriced'>; month: string; missingLabels: string[] } {
+export interface ExpenseReconciliation {
+  /** What Flipkart says the month's charges came to. */
+  stated: number
+  /** What the lines this reader recognises add up to. */
+  read: number
+  gap: number
+}
+
+interface SummaryReadResult {
+  facts: Omit<FlipkartPnlFacts, 'cogsPriced' | 'cogsUnpriced'>
+  month: string
+  missingLabels: string[]
+  /** Null when the sheet does not state a total, so there is nothing to check against. */
+  expenses: ExpenseReconciliation | null
+}
+
+function buildFactsFromOverallSummary(summarySheet: RawSheet): SummaryReadResult {
   const map = parseLabelValueSheet(summarySheet)
   const month = extractMonthFromSummary(map)
 
   const catchallSum = CATCHALL_LABELS.reduce((sum, label) => sum + num(map, label), 0)
 
+  const facts: Omit<FlipkartPnlFacts, 'cogsPriced' | 'cogsUnpriced'> = {
+    month,
+    grossSales: num(map, 'gross sales'),
+    estimatedNetSales: num(map, 'estimated net sales'),
+    commissionFee: Math.abs(num(map, 'commission fee')),
+    collectionFee: Math.abs(num(map, 'collection fee')),
+    fixedFee: Math.abs(num(map, 'fixed fee')),
+    pickPackFee: Math.abs(num(map, 'pick and pack fee')),
+    forwardShippingFee: Math.abs(num(map, 'forward shipping fee')),
+    reverseShippingFee: Math.abs(num(map, 'reverse shipping fee')),
+    storageFee: Math.abs(num(map, 'storage fee')),
+    recallFee: Math.abs(num(map, 'recall fee')),
+    otherMarketplaceFees: -catchallSum,
+    rewardsSpf: num(map, 'rewards & other benefits'),
+    flipkartAds: Math.abs(num(map, 'ads')),
+    googleAds: Math.abs(num(map, 'google ads')),
+    sellerFundedDiscount: Math.abs(num(map, 'seller-funded discount')),
+    customerAddOns: num(map, 'customer add-ons amount'),
+    outputGst: Math.abs(num(map, 'taxes (gst)')) + Math.abs(num(map, 'taxes (tcs)')) + Math.abs(num(map, 'taxes (tds)')),
+  }
+
+  // Flipkart states its own total above the itemised charges, and the items
+  // below add up to it exactly, which makes the sheet check itself: if the
+  // lines this reader recognises fall short of the stated total, the sheet
+  // charges something on a line it does not know by name, and the gap is what
+  // went missing. A label that reads as zero is otherwise indistinguishable
+  // from a month with no such charge.
+  //
+  // Verified on the September'26 report: the recognised lines come to
+  // ₹8,52,546.43 against a stated ₹8,52,546.43.
+  const read =
+    facts.commissionFee + facts.collectionFee + facts.fixedFee + facts.pickPackFee +
+    facts.forwardShippingFee + facts.reverseShippingFee + facts.storageFee + facts.recallFee +
+    facts.otherMarketplaceFees + facts.flipkartAds + facts.googleAds + facts.outputGst
+  const stated = Math.abs(num(map, normalizeLabel(EXPENSE_TOTAL_LABEL)))
+
   return {
     month,
+    facts,
     missingLabels: EXPECTED_SUMMARY_LABELS.filter((label) => !map.has(normalizeLabel(label))),
-    facts: {
-      month,
-      grossSales: num(map, 'gross sales'),
-      estimatedNetSales: num(map, 'estimated net sales'),
-      commissionFee: Math.abs(num(map, 'commission fee')),
-      collectionFee: Math.abs(num(map, 'collection fee')),
-      fixedFee: Math.abs(num(map, 'fixed fee')),
-      pickPackFee: Math.abs(num(map, 'pick and pack fee')),
-      forwardShippingFee: Math.abs(num(map, 'forward shipping fee')),
-      reverseShippingFee: Math.abs(num(map, 'reverse shipping fee')),
-      storageFee: Math.abs(num(map, 'storage fee')),
-      recallFee: Math.abs(num(map, 'recall fee')),
-      otherMarketplaceFees: -catchallSum,
-      rewardsSpf: num(map, 'rewards & other benefits'),
-      flipkartAds: Math.abs(num(map, 'ads')),
-      googleAds: Math.abs(num(map, 'google ads')),
-      sellerFundedDiscount: Math.abs(num(map, 'seller-funded discount')),
-      customerAddOns: num(map, 'customer add-ons amount'),
-      outputGst: Math.abs(num(map, 'taxes (gst)')) + Math.abs(num(map, 'taxes (tcs)')) + Math.abs(num(map, 'taxes (tds)')),
-    },
+    // Absent on a sheet that does not state the line, which is how an earlier
+    // layout of this report would arrive.
+    expenses: map.has(normalizeLabel(EXPENSE_TOTAL_LABEL)) ? { stated, read, gap: stated - read } : null,
   }
 }
 
@@ -136,7 +177,7 @@ export function normalizeFlipkartWorkbook(
   // zeroes rather than an error.
   const summarySheet = sheetNamed(sheets, SUMMARY_SHEET) ?? []
   const ordersSheet = sheetNamed(sheets, ORDERS_SHEET) ?? []
-  const { facts: partialFacts, month, missingLabels } = buildFactsFromOverallSummary(summarySheet)
+  const { facts: partialFacts, month, missingLabels, expenses } = buildFactsFromOverallSummary(summarySheet)
 
   const headers = mergeHeaderRows(ordersSheet[0] ?? [], ordersSheet[1] ?? [])
   const rows = rowsToRecords(headers, ordersSheet, 2)
@@ -210,6 +251,15 @@ export function normalizeFlipkartWorkbook(
     warnings.push(
       `Overall Summary has no line named ${missingLabels.join(', ')}, so ${one ? 'it was' : 'they were'} read as zero. ` +
         `If Flipkart charged for ${one ? 'it' : 'them'} this month, this file names the line something else.`,
+    )
+  }
+  if (expenses !== null && Math.abs(expenses.gap) > 1) {
+    warnings.push(
+      `Overall Summary states Total Expenses of ₹${inr(expenses.stated)}, and the charges read from it come to ` +
+        `₹${inr(expenses.read)} — a gap of ₹${inr(Math.abs(expenses.gap))}. ` +
+        (expenses.gap > 0
+          ? 'That much is charged on a line this reader does not recognise, so the P&L is short of it.'
+          : 'That is more than the sheet says was charged, so a line on it is being counted twice.'),
     )
   }
 
