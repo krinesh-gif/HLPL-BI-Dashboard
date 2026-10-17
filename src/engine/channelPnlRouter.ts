@@ -13,6 +13,7 @@ import type {
   MyntraPnlFacts,
   BlinkitPnlFacts,
   AmazonInSellerPnlFacts,
+  AmazonInVendorFacts,
   NykaaPnlFacts,
   PnlLineValues,
   SkuMaster,
@@ -21,6 +22,8 @@ import { channelLabel, channelOfSource, type ChannelCurrencyView } from '@/confi
 import { MEESHO_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { DEFAULT_FX_INR, inrPerUnit, type FxRatesInr } from '@/data/fxRates'
 import { formatCurrencyFull, toMonthKey } from '@/lib/format'
+import { cogsForMonth } from '@/data/costVersions'
+import { resolveCogs } from '@/data/skuMapping'
 import { allocateFixedExpensesForMonth } from './allocation'
 import {
   buildChannelPnl, cogsForRecords, computeSubtotals, estimateUncostedCogs,
@@ -47,6 +50,10 @@ import {
   AMAZON_IN_SELLER_LINE_DEFS, amazonInSellerToCanonicalBuckets, applyAmazonInSellerOtherCosts,
   computeAmazonInSellerPnl,
 } from './nativePnl/amazonInSeller'
+import {
+  AMAZON_IN_VENDOR_LINE_DEFS, amazonInVendorToCanonicalBuckets, applyAmazonInVendorOtherCosts,
+  computeAmazonInVendorPnl, type VendorCogs,
+} from './nativePnl/amazonInVendor'
 import type { NativeLineDef, NativeLineValues } from './nativePnl/types'
 
 export interface NativePnlView {
@@ -81,6 +88,8 @@ export interface ChannelFactsStore {
   amazonAeFacts?: AmazonAePnlFacts[]
   purplleFacts?: PurpllePnlFacts[]
   swiggyInstamartFacts?: SwiggyInstamartPnlFacts[]
+  /** Amazon India's wholesale half, which has its own statement. */
+  amazonInVendorFacts?: AmazonInVendorFacts[]
 }
 
 /** Sums this channel's allocated share (sales-contribution method) of the
@@ -156,6 +165,75 @@ const UNIT_MATCH_TOLERANCE = 0.02
  * Returns null when there are no order rows to recompute from, in which case
  * the imported figure is the only number available and is kept.
  */
+/**
+ * COGS for a Vendor Central month, priced from the ASINs the NPPM file lists.
+ *
+ * Not from the sales rows, deliberately. The Retail Analytics export that
+ * filled those rows states ordered units at a retail value, and this
+ * statement is about shipped units at an invoice value — pricing one with the
+ * other would cost a month's goods against a different month's demand.
+ *
+ * An ASIN with no cost behind it falls to the same estimate every other
+ * channel uses, so there is one policy for an unpriced line in this build
+ * rather than one per channel.
+ */
+function vendorCogs(facts: AmazonInVendorFacts, month: string, inputs: ChannelPnlViewInputs): VendorCogs {
+  const tables = {
+    skuMaster: inputs.skuMaster,
+    mappings: inputs.cogs?.mappings ?? [],
+    comboComponents: inputs.cogs?.comboComponents ?? [],
+    costFor: (sku: string) => {
+      const index = inputs.cogs?.costIndex
+      if (!index) return undefined
+      // Effective-dated, so a closed month keeps the cost that applied then.
+      return cogsForMonth(sku, month, index) ?? undefined
+    },
+  }
+  let priced = 0
+  let costedUnits = 0
+  let uncostedUnits = 0
+  let uncostedInvoice = 0
+  const uncostedAsins: string[] = []
+  for (const asin of facts.asins) {
+    const resolved = resolveCogs(asin.asin, tables)
+    if (resolved && resolved.cogs > 0) {
+      priced += resolved.cogs * asin.units
+      costedUnits += asin.units
+    } else {
+      uncostedUnits += asin.units
+      uncostedInvoice += asin.invoice
+      uncostedAsins.push(asin.asin)
+    }
+  }
+  const estimate = estimateUncostedCogs(
+    { cogs: priced, costedUnits, uncostedUnits, uncostedSkus: uncostedAsins, uncostedNetSales: uncostedInvoice },
+    uncostedInvoice,
+  )
+  return { priced, unpriced: estimate.amount, uncostedAsins: uncostedAsins.length, uncostedUnits }
+}
+
+/** Two canonical bucket sets added line by line, for a channel built from
+ * more than one statement. */
+function addBuckets(a: PnlLineValues, b: PnlLineValues): PnlLineValues {
+  const out: PnlLineValues = { ...a }
+  for (const [key, value] of Object.entries(b) as [keyof PnlLineValues, number | undefined][]) {
+    if (typeof value !== 'number') continue
+    out[key] = (out[key] ?? 0) + value
+  }
+  return out
+}
+
+/**
+ * The Seller Central month in canonical buckets, with advertising taken out.
+ *
+ * Amazon India has one ad account across both halves and the figure is
+ * charged once, on the wholesale statement. Letting it through here as well
+ * would count the same spend twice in the Master P&L.
+ */
+function sellerBucketsWithoutAds(facts: AmazonInSellerPnlFacts): PnlLineValues {
+  return { ...amazonInSellerToCanonicalBuckets(facts), ads: 0 }
+}
+
 function recomputedCogs(
   channel: BusinessChannelId,
   month: string,
@@ -513,7 +591,77 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
   }
 
   if (channel === 'amazon_in') {
-    const imported = inputs.facts.amazonInSellerFacts?.find((f) => f.month === month)
+    const vendor = inputs.facts.amazonInVendorFacts?.find((f) => f.month === month)
+    const seller = inputs.facts.amazonInSellerFacts?.find((f) => f.month === month)
+
+    // Amazon India is one channel over two businesses, and the wholesale one
+    // is the larger by an order of magnitude. Where its month is on file the
+    // statement shown is its own — a marketplace waterfall has no line for a
+    // trade margin or a contra-COGS claim, and a settlement waterfall has no
+    // line for the other side's referral fees. The Master P&L still gets
+    // both, because the canonical below adds them.
+    if (vendor) {
+      const cogs = vendorCogs(vendor, month, inputs)
+      // One ad account lifts both halves, so the spend is charged once, here.
+      // Allocating it by net revenue is what the rest of this build does with
+      // a shared cost, and today that puts effectively all of it on this side
+      // because the other has no sales on file at all.
+      const adSpend = inputs.marketing[channel]?.ads ?? 0
+      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+      const values = applyAmazonInVendorOtherCosts(
+        computeAmazonInVendorPnl(vendor, cogs, adSpend),
+        otherCosts,
+      )
+
+      const vendorBuckets = amazonInVendorToCanonicalBuckets(vendor, cogs, adSpend)
+      const canonicalLines = computeSubtotals(
+        withAllocatedOpex(
+          seller ? addBuckets(vendorBuckets, sellerBucketsWithoutAds(seller)) : vendorBuckets,
+          inputs, channel, month,
+        ),
+      )
+
+      const notes: string[] = []
+      if (seller) {
+        notes.push(
+          `The statement above is Vendor Central only. Seller Central settled ` +
+          `${formatCurrencyFull(seller.settlementTotal)} in ${month} on ${seller.units} unit(s); that is in the ` +
+          'Master P&L alongside this, but it is a marketplace month with its own fees and it does not belong in a ' +
+          'wholesale waterfall.',
+        )
+      }
+      if (cogs.uncostedAsins > 0) {
+        notes.push(
+          `${cogs.uncostedAsins} ASIN(s) on ${cogs.uncostedUnits} unit(s) have no cost behind them, so their ` +
+          `share of COGS is estimated. Link them on the SKU Mapping screen to price the month outright.`,
+        )
+      }
+      if (!vendor.ixd) {
+        notes.push(
+          `No inward cross-dock file is on file for ${month}, so the statement charges none. It is billed on ` +
+          'units unpacked at the warehouse, which no other file carries — upload that month\u2019s IXD workbook.',
+        )
+      }
+      if (vendor.marginClosedPct > 0 && vendor.marginAchievedPct < vendor.marginClosedPct) {
+        notes.push(
+          `${month} realised ${(vendor.marginAchievedPct * 100).toFixed(2)}% against the ` +
+          `${(vendor.marginClosedPct * 100).toFixed(2)}% contracted, so ` +
+          `${formatCurrencyFull(vendor.ccogsClaimed)} was billed back as contra-COGS` +
+          (vendor.ccogsFinal === undefined
+            ? '. The statement charges the claim, since no settlement is recorded against it.'
+            : `, settled at ${formatCurrencyFull(vendor.ccogsFinal)}, which is what the statement charges.`),
+        )
+      }
+
+      return {
+        channel, month,
+        canonical: { channel, month, lines: canonicalLines },
+        native: { lineDefs: AMAZON_IN_VENDOR_LINE_DEFS, values, currency: 'INR' },
+        notes,
+      }
+    }
+
+    const imported = seller
     if (imported) {
       // The settlement report says what Amazon paid, never what the goods
       // cost. COGS is priced here from the order rows at the month's own

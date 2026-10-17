@@ -53,9 +53,7 @@ export const AMAZON_IN_VENDOR_LINE_DEFS: NativeLineDef[] = [
   { key: 'tradeMargin', label: 'Less: trade margin to RK World', section: 'SALES', kind: 'input' },
   { key: 'marginAchievedPct', label: 'Margin achieved', section: 'SALES', kind: 'percent', note: 'Of the retail value, which is what the contract is on' },
   { key: 'marginClosedPct', label: 'Margin contracted', section: 'SALES', kind: 'percent', note: 'Renegotiated: 31% to June, 32% from August' },
-  { key: 'invoiceValue', label: 'INVOICE VALUE (ex-GST)', section: 'SALES', kind: 'subtotal', note: '⭐ what RK World pays — the channel’s revenue' },
-  { key: 'contraCogs', label: 'Less: contra-COGS margin support', section: 'SALES', kind: 'input', fee: 'otherFees', note: 'The shortfall against the contracted margin, billed back' },
-  { key: 'netRevenue', label: 'NET REVENUE', section: 'SALES', kind: 'subtotal', note: '⭐ denominator for every %' },
+  { key: 'invoiceValue', label: 'NET REVENUE (ex-GST)', section: 'SALES', kind: 'subtotal', note: 'What RK World pays, and the denominator for every %' },
 
   { key: 'cogsPriced', label: 'COGS — priced ASINs', section: 'COST OF GOODS SOLD', kind: 'input' },
   { key: 'cogsUnpriced', label: 'COGS — unpriced ASINs (est.)', section: 'COST OF GOODS SOLD', kind: 'input', note: '⚠ estimate — goes to zero once every ASIN is linked to a SKU' },
@@ -63,7 +61,9 @@ export const AMAZON_IN_VENDOR_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 
+  { key: 'contraCogs', label: 'Less: contra-COGS margin support', section: 'AMAZON CHARGES', kind: 'input', fee: 'otherFees', note: 'The shortfall against the contracted margin, billed back after the invoices' },
   { key: 'ixd', label: 'Less: inward cross-dock (IXD)', section: 'AMAZON CHARGES', kind: 'input', fee: 'fulfilment', note: 'A flat rate on every unit unpacked at the warehouse — not on units sold' },
+  { key: 'totalCharges', label: 'Total Amazon charges', section: 'AMAZON CHARGES', kind: 'subtotal' },
   { key: 'cm2', label: 'CHANNEL MARGIN (CM2)', section: 'AMAZON CHARGES', kind: 'subtotal', note: 'Is this wholesale relationship worth having?' },
   { key: 'cm2Pct', label: 'CM2 %', section: 'AMAZON CHARGES', kind: 'percent' },
 
@@ -108,12 +108,18 @@ export function computeAmazonInVendorPnl(
   cogs: VendorCogs = EMPTY_VENDOR_COGS,
   ads = 0,
 ): NativeLineValues {
+  // Net revenue is the invoice, because that is what was billed. Contra-COGS
+  // and the cross-dock sit below it as charges: both arrive separately from
+  // the invoice and one of them is negotiated after the fact. Keeping them
+  // there rather than in the price is also what makes this statement's CM1
+  // the same figure as the gross profit the Master P&L rolls up.
   const contraCogs = vendorContraCogs(facts)
-  const netRevenue = facts.invoiceValue - contraCogs
+  const netRevenue = facts.invoiceValue
   const totalCogs = cogs.priced + cogs.unpriced
   const cm1 = netRevenue - totalCogs
   const ixd = facts.ixd?.charge ?? 0
-  const cm2 = cm1 - ixd
+  const totalCharges = contraCogs + ixd
+  const cm2 = cm1 - totalCharges
   const cm3 = cm2 - ads
   const pct = (v: number): number => (netRevenue !== 0 ? (v / netRevenue) * 100 : 0)
 
@@ -123,7 +129,6 @@ export function computeAmazonInVendorPnl(
     marginAchievedPct: facts.marginAchievedPct * 100,
     marginClosedPct: facts.marginClosedPct * 100,
     invoiceValue: facts.invoiceValue,
-    contraCogs: less(contraCogs),
     netRevenue,
 
     cogsPriced: less(cogs.priced),
@@ -132,7 +137,9 @@ export function computeAmazonInVendorPnl(
     cm1,
     cm1Pct: pct(cm1),
 
+    contraCogs: less(contraCogs),
     ixd: less(ixd),
+    totalCharges: less(totalCharges),
     cm2,
     cm2Pct: pct(cm2),
 

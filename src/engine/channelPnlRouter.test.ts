@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { BUSINESS_CHANNEL_IDS } from '@/config/channels'
 import { buildChannelPnlView } from './channelPnlRouter'
 import type {
+  AmazonInSellerPnlFacts, AmazonInVendorFacts,
   AmazonUsaPnlFacts, CanonicalSalesRecord, FixedExpenseEntry, FlipkartPnlFacts, NykaaPnlFacts, SkuMaster,
 } from '@/data/models'
 
@@ -390,5 +391,122 @@ describe('a month with no settlement report', () => {
     })
     expect(view.native).toBeDefined()
     expect(view.notes).toEqual([])
+  })
+})
+
+/**
+ * Amazon India over its two businesses.
+ *
+ * Figures are September 2026 as the NPPM file reads: ₹16,82,714.56 of retail
+ * value at 28.729% margin, contracted at 32%, with the ₹55,045.91 shortfall
+ * settled at ₹50,000.
+ */
+describe('buildChannelPnlView, Amazon India over Seller and Vendor Central', () => {
+  const vendorFacts: AmazonInVendorFacts = {
+    month: '2026-09', schemaVersion: 1, periodStart: '2026-09-01', periodEnd: '2026-09-30',
+    netShippedGms: 1682714.5624999923, netPpm: 483422.7459000003,
+    invoiceValue: 1682714.5624999923 - 483422.7459000003,
+    unitsShipped: 7486, marginClosedPct: 0.32, marginAchievedPct: 0.2872874322676473,
+    ccogsClaimed: 55045.914099997244, ccogsDeductions: 5046, ccogsFinal: 50000,
+    asins: [
+      { asin: 'B0CPFP8NNB', title: 'Body lotion', units: 880, gms: 220000, ppm: 49094.87, invoice: 170905.13 },
+      { asin: 'B0UNKNOWN1', title: 'Unlinked', units: 100, gms: 20000, ppm: 5000, invoice: 15000 },
+    ],
+    rows: 5178,
+    ixd: {
+      unitsUnpacked: 3888, ratePerUnit: 2, charge: 7776, valueUnpacked: 702461.66,
+      periodStart: '2026-09-02', periodEnd: '2026-09-21', asins: 19,
+    },
+  }
+  const vendorSkuMaster: SkuMaster[] = [
+    { sku: 'AO/SS/BodyLotion', productName: 'Body lotion', category: 'Skin Care', brand: 'Aravi Organic', cogs: 75.5, mrp: 399, launchDate: '2025-01-01', status: 'active', leadTimeDays: 21, safetyStock: 100 },
+  ]
+  const base = {
+    salesRecords: [], skuMaster: vendorSkuMaster, fixedExpenses: [], marketing: {},
+    cogs: { mappings: [{ channelSku: 'B0CPFP8NNB', internalSku: 'AO/SS/BodyLotion', kind: 'SINGLE' as const, source: 'manual' as const, verified: true }], comboComponents: [] },
+    facts: { flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [], amazonInVendorFacts: [vendorFacts] },
+  }
+
+  it('shows the wholesale statement where the vendor month is on file', () => {
+    const view = buildChannelPnlView('amazon_in', '2026-09', base)
+    expect(view.native?.lineDefs.some((d) => d.key === 'invoiceValue')).toBe(true)
+    expect(view.native?.values.invoiceValue).toBeCloseTo(1199291.82, 2)
+    expect(view.native?.values.netRevenue).toBeCloseTo(1199291.82, 2)
+    expect(view.native?.values.contraCogs).toBe(-50000)
+  })
+
+  it('prices COGS from the ASINs the file lists, and estimates the rest', () => {
+    const view = buildChannelPnlView('amazon_in', '2026-09', base)
+    expect(view.native?.values.cogsPriced).toBeCloseTo(-(880 * 75.5), 2)
+    // The unlinked ASIN is costed at the average of the priced units, which
+    // is the estimate every other channel in this build uses.
+    expect(view.native?.values.cogsUnpriced).toBeCloseTo(-(100 * 75.5), 2)
+  })
+
+  it('charges the cross-dock on units unpacked', () => {
+    const view = buildChannelPnlView('amazon_in', '2026-09', base)
+    expect(view.native?.values.ixd).toBe(-7776)
+    expect(view.native?.values.unitsUnpacked).toBe(3888)
+  })
+
+  it('rolls the trade margin up as a discount, so net sales is the invoice', () => {
+    const view = buildChannelPnlView('amazon_in', '2026-09', base)
+    expect(view.canonical.lines.grossSales).toBeCloseTo(1682714.56, 2)
+    expect(view.canonical.lines.discounts).toBeCloseTo(483422.75, 2)
+    expect(view.canonical.lines.marketplaceCommission).toBe(0)
+    expect(view.canonical.lines.netSales).toBeCloseTo(1199291.82, 2)
+  })
+
+  it('adds the Seller Central month to the roll-up without putting it in the statement', () => {
+    const seller: AmazonInSellerPnlFacts = {
+      month: '2026-09', schemaVersion: 1, settlementIds: ['s1'],
+      amounts: { 'order.itemprice.principal': 6000 }, settlementTotal: 6160.14, orders: 15, units: 15,
+    }
+    const view = buildChannelPnlView('amazon_in', '2026-09', {
+      ...base,
+      facts: { ...base.facts, amazonInSellerFacts: [seller] },
+    })
+    // The statement stays wholesale; the roll-up carries both.
+    expect(view.native?.values.invoiceValue).toBeCloseTo(1199291.82, 2)
+    expect(view.canonical.lines.grossSales).toBeCloseTo(1682714.56 + 6000, 2)
+    expect(view.notes.some((n) => n.includes('Seller Central settled'))).toBe(true)
+  })
+
+  // One ad account lifts both halves, so the spend is charged once.
+  it('charges the channel advertising once across the two halves', () => {
+    const seller: AmazonInSellerPnlFacts = {
+      month: '2026-09', schemaVersion: 1, settlementIds: ['s1'],
+      amounts: { 'order.itemprice.principal': 6000 }, settlementTotal: 6160.14, orders: 15, units: 15, ads: 202718.37,
+    }
+    const view = buildChannelPnlView('amazon_in', '2026-09', {
+      ...base,
+      marketing: { amazon_in: { ads: 202718.37 } },
+      facts: { ...base.facts, amazonInSellerFacts: [seller] },
+    })
+    expect(view.native?.values.ads).toBeCloseTo(-202718.37, 2)
+    expect(view.canonical.lines.ads).toBeCloseTo(202718.37, 2)
+  })
+
+  it('says what the month is missing rather than charging nothing quietly', () => {
+    const noIxd = { ...vendorFacts, ixd: undefined }
+    const view = buildChannelPnlView('amazon_in', '2026-09', {
+      ...base, facts: { ...base.facts, amazonInVendorFacts: [noIxd] },
+    })
+    expect(view.native?.values.ixd).toBe(0)
+    expect(view.notes.some((n) => n.includes('inward cross-dock'))).toBe(true)
+    expect(view.notes.some((n) => n.includes('no cost behind them'))).toBe(true)
+    expect(view.notes.some((n) => n.includes('contra-COGS'))).toBe(true)
+  })
+
+  it('leaves a month with no vendor file on the Seller Central statement', () => {
+    const seller: AmazonInSellerPnlFacts = {
+      month: '2026-08', schemaVersion: 1, settlementIds: ['s1'],
+      amounts: { 'order.itemprice.principal': 6000 }, settlementTotal: 6640.37, orders: 16, units: 16,
+    }
+    const view = buildChannelPnlView('amazon_in', '2026-08', {
+      ...base, facts: { ...base.facts, amazonInSellerFacts: [seller] },
+    })
+    expect(view.native?.lineDefs.some((d) => d.key === 'settlementTotal')).toBe(true)
+    expect(view.native?.values.invoiceValue).toBeUndefined()
   })
 })

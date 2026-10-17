@@ -54,10 +54,12 @@ describe('computeAmazonInVendorPnl', () => {
     expect(v.invoiceValue).toBeCloseTo(1199291.82, 2)
   })
 
-  it('takes the settled margin support off to get net revenue', () => {
+  // Net revenue is the invoice. Margin support is a charge below it, which
+  // is what makes CM1 here the same figure as the Master P&L's gross profit.
+  it('charges the settled margin support below the revenue, not inside it', () => {
     const v = computeAmazonInVendorPnl(MONTHS.september)
+    expect(v.netRevenue).toBeCloseTo(1199291.82, 2)
     expect(v.contraCogs).toBe(-50000)
-    expect(v.netRevenue).toBeCloseTo(1149291.82, 2)
   })
 
   it('shows the achieved margin against the one contracted', () => {
@@ -74,12 +76,13 @@ describe('computeAmazonInVendorPnl', () => {
   it('runs the waterfall down to contribution', () => {
     const v = computeAmazonInVendorPnl(MONTHS.september, COGS, 100000)
     expect(v.totalCogs).toBe(-550000)
-    expect(v.cm1).toBeCloseTo(1149291.82 - 550000, 2)
+    expect(v.cm1).toBeCloseTo(1199291.82 - 550000, 2)
     // Cross-dock is charged on units unpacked, not units sold.
     expect(v.ixd).toBe(-7776)
-    expect(v.cm2).toBeCloseTo(1149291.82 - 550000 - 7776, 2)
+    expect(v.totalCharges).toBe(-(50000 + 7776))
+    expect(v.cm2).toBeCloseTo(1199291.82 - 550000 - 50000 - 7776, 2)
     expect(v.ads).toBe(-100000)
-    expect(v.cm3).toBeCloseTo(1149291.82 - 550000 - 7776 - 100000, 2)
+    expect(v.cm3).toBeCloseTo(1199291.82 - 550000 - 50000 - 7776 - 100000, 2)
     expect(v.cm4).toBe(v.cm3)
   })
 
@@ -94,7 +97,8 @@ describe('computeAmazonInVendorPnl', () => {
     const v = computeAmazonInVendorPnl(MONTHS.april, COGS)
     expect(v.ixd).toBe(0)
     expect(v.unitsUnpacked).toBe(0)
-    expect(v.cm2).toBe(v.cm1)
+    // Still charged the margin support, which is the other half of this line.
+    expect(v.cm2).toBeCloseTo(v.cm1 - 243373.2, 2)
   })
 
   it('carries the units and the price-match shortfall for reading', () => {
@@ -139,9 +143,14 @@ describe('amazonInVendorToCanonicalBuckets', () => {
     expect(b.fulfilment).toBe(7776)
   })
 
-  it('agrees with the native statement on contribution', () => {
+  // The whole point of charging margin support below the revenue: the two
+  // ways of computing the month now agree at the gross line as well as at
+  // the bottom, so the statement and the Master P&L cannot drift.
+  it('agrees with the roll-up at gross profit and at contribution', () => {
     const native = computeAmazonInVendorPnl(MONTHS.september, COGS, 100000)
     const lines = computeSubtotals(amazonInVendorToCanonicalBuckets(MONTHS.september, COGS, 100000))
+    expect(lines.netSales).toBeCloseTo(native.netRevenue, 2)
+    expect(lines.grossProfit).toBeCloseTo(native.cm1, 2)
     expect(lines.contributionProfit).toBeCloseTo(native.cm3, 2)
   })
 
