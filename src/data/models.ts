@@ -169,6 +169,92 @@ export interface MyntraAdsFacts {
 }
 
 // ---------------------------------------------------------------------------
+// Amazon India Vendor Central
+// ---------------------------------------------------------------------------
+
+/** One ASIN's shipments in a Vendor Central month. */
+export interface AmazonInVendorAsin {
+  asin: string
+  title: string
+  /** Units Amazon took delivery of and sold on. */
+  units: number
+  /** Amazon's realised retail value, ex-GST. */
+  gms: number
+  /** Amazon's margin on those shipments, in rupees. */
+  ppm: number
+  /** gms − ppm: what the ASIN invoiced for. */
+  invoice: number
+}
+
+/**
+ * Amazon India Vendor Central for a month, from the NPPM file the vendor
+ * manager shares.
+ *
+ * This half of Amazon India is wholesale, not marketplace: Aravi sells to
+ * RK World Infocom Pvt Ltd, which resells. So the money is not what a shopper
+ * paid less Amazon's fees — it is what RK World paid, which is the retail
+ * value they realised less the margin they are owed on it.
+ *
+ * `netShippedGms` is ex-GST. Established from the files rather than assumed:
+ * the ratio of GMS per unit to the tax-inclusive price never exceeds 1/1.05 in
+ * any month and clusters at 1/1.18 and 1/1.05, which are tax rates, so the
+ * tax is on top of this figure and no output-GST line belongs on the
+ * statement.
+ */
+export interface AmazonInVendorFacts {
+  month: string
+  schemaVersion: 1
+  /** First and last ship day in the file. */
+  periodStart: string
+  periodEnd: string
+  /** Amazon's realised retail value for the month, ex-GST. */
+  netShippedGms: number
+  /** The margin RK World earned on it — their PPM, our trade discount. */
+  netPpm: number
+  /** netShippedGms − netPpm: the month's invoice value, ex-GST. */
+  invoiceValue: number
+  unitsShipped: number
+  /** The margin the contract closed at, as a fraction. It is renegotiated:
+   * June ran at 31%, August and September at 32%. */
+  marginClosedPct: number
+  /** What the month actually achieved, netPpm ÷ netShippedGms. */
+  marginAchievedPct: number
+  /** The shortfall billed back as contra-COGS, as the file states it. */
+  ccogsClaimed: number
+  /** Knocked off the claim in negotiation, where the file records one. */
+  ccogsDeductions?: number
+  /** What the claim settled at, where the file records one. Absent means the
+   * claim stands as billed. */
+  ccogsFinal?: number
+  /** Per-unit price shortfall against the agreed price, where the file
+   * carries the comparison. This is what eroded the margin. */
+  priceMatchShortfall?: number
+  asins: AmazonInVendorAsin[]
+  /** Shipment rows read. */
+  rows: number
+  /** Inward cross-dock, from its own file. Absent until that is uploaded. */
+  ixd?: AmazonInVendorIxd
+}
+
+/**
+ * Amazon's inward cross-dock charge: a flat rate on every unit unpacked at
+ * the fulfilment centre, which is a different count from units shipped —
+ * August took in 3,888 units and shipped 8,367.
+ */
+export interface AmazonInVendorIxd {
+  unitsUnpacked: number
+  /** Rupees per unit, as the file states it rather than as a standing figure. */
+  ratePerUnit: number
+  charge: number
+  /** Value of the goods taken in, which the file states beside the count. */
+  valueUnpacked: number
+  /** Dates the file covers. */
+  periodStart: string
+  periodEnd: string
+  asins: number
+}
+
+// ---------------------------------------------------------------------------
 // Flipkart Ads
 // ---------------------------------------------------------------------------
 

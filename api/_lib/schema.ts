@@ -276,6 +276,16 @@ BEGIN
     data  JSONB NOT NULL
   );
 
+  -- Amazon India's other half. Vendor Central is wholesale to RK World
+  -- Infocom: revenue is the invoice, not a settlement, and the charges are
+  -- contra-COGS and inward cross-dock rather than referral and FBA fees. Its
+  -- own table because it is a statement of its own, beside the Seller Central
+  -- settlement rather than inside it.
+  CREATE TABLE IF NOT EXISTS amazon_in_vendor_facts (
+    month TEXT PRIMARY KEY,
+    data  JSONB NOT NULL
+  );
+
   -- Swiggy Instamart's month, from its sales report. Like Purplle's, a sales
   -- file and not a settlement, so these facts carry no marketplace charges.
   CREATE TABLE IF NOT EXISTS swiggy_instamart_facts (

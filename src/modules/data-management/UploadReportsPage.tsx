@@ -23,6 +23,8 @@ import { detectBlinkitAdsReport, normalizeBlinkitAdsReport } from '@/data/normal
 import { detectMyntraAdsReport, normalizeMyntraAdsReport } from '@/data/normalize/myntraAdsReport'
 import { detectFlipkartAdsReport, normalizeFlipkartAdsReport } from '@/data/normalize/flipkartAdsReport'
 import { detectFlipkartGoogleAdsReport, flipkartGoogleAdsPeriodFromName, flipkartGoogleAdsWholeMonth, normalizeFlipkartGoogleAdsReport } from '@/data/normalize/flipkartGoogleAdsReport'
+import { detectAmazonVendorNppm, normalizeAmazonVendorNppm } from '@/data/normalize/amazonVendorNppm'
+import { detectAmazonVendorIxd, normalizeAmazonVendorIxd } from '@/data/normalize/amazonVendorIxd'
 import { detectAmazonVendorCentralSalesReport, normalizeAmazonVendorCentralSales } from '@/data/normalize/amazonVendorCentralSales'
 import { detectMyntraPnlWorkbook, normalizeMyntraPnlWorkbook } from '@/data/normalize/myntraPnlWorkbook'
 import { detectPurplleSalesReport, normalizePurplleSalesReport } from '@/data/normalize/purplleSalesReport'
@@ -46,7 +48,9 @@ import { sheetNamed } from '@/lib/csvParse'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
 import type { AdsRecord, AmazonAePnlFacts, AmazonInSkuFeeFacts, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraAdsFacts,
   FlipkartAdsFacts,
-  FlipkartGoogleAdsFacts, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts, PurpllePnlFacts, SwiggyInstamartPnlFacts } from '@/data/models'
+  FlipkartGoogleAdsFacts,
+  AmazonInVendorFacts,
+  AmazonInVendorIxd, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts, PurpllePnlFacts, SwiggyInstamartPnlFacts } from '@/data/models'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
 
@@ -74,6 +78,8 @@ type ReportKind =
   | 'myntra_ads'
   | 'flipkart_ads'
   | 'flipkart_google_ads'
+  | 'amazon_in_vendor_nppm'
+  | 'amazon_in_vendor_ixd'
   | 'blinkit_payout_archive'
 
 const REPORT_LABELS: Record<ReportKind, string> = {
@@ -91,6 +97,8 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   myntra_ads: 'Myntra — PLA Campaign Report',
   flipkart_ads: 'Flipkart — PLA Campaign Report (Ads overview)',
   flipkart_google_ads: 'Flipkart — Google Ads product performance',
+  amazon_in_vendor_nppm: 'Amazon India Vendor Central — NPPM monthly sales',
+  amazon_in_vendor_ixd: 'Amazon India Vendor Central — inward cross-dock (IXD)',
   myntra_pnl_workbook: 'Myntra — P&L Report (PnL_Summary + SKU_Detail)',
   nykaa_sales: 'Nykaa — Monthly Sales Data (B2B, margin on MRP)',
   nykaa_companion: 'Nykaa — Cart Rule / Combo file',
@@ -117,6 +125,8 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   myntra_ads: 'myntra',
   flipkart_ads: 'flipkart',
   flipkart_google_ads: 'flipkart',
+  amazon_in_vendor_nppm: 'amazon_in_vendor',
+  amazon_in_vendor_ixd: 'amazon_in_vendor',
   myntra_pnl_workbook: 'myntra',
   nykaa_sales: 'nykaa',
   nykaa_companion: 'nykaa',
@@ -156,6 +166,10 @@ interface PreviewState {
   flipkartAdsFacts?: FlipkartAdsFacts
   /** Flipkart's off-platform advertising month. */
   flipkartGoogleAdsFacts?: FlipkartGoogleAdsFacts
+  /** Amazon India's wholesale half for a month. */
+  amazonInVendorFacts?: AmazonInVendorFacts
+  /** Its inward cross-dock charge, which merges into that month. */
+  amazonInVendorIxd?: { month: string; ixd: AmazonInVendorIxd }
   nykaaFacts?: NykaaPnlFacts
   blinkitFacts?: BlinkitPnlFacts
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
@@ -428,6 +442,30 @@ export function UploadReportsPage() {
         const sheets = await readWorkbookSheetsRaw(file)
         const sheetNames = Object.keys(sheets)
         workbookSheetNames = sheetNames
+
+        // Amazon India's wholesale half arrives as two workbooks a month,
+        // neither of which states a period: the month comes from the ship
+        // days in one and the inbound dates in the other.
+        if (detectAmazonVendorNppm(sheets)) {
+          const r = normalizeAmazonVendorNppm(sheets, importId)
+          if (!r.facts) return fail(r.warnings[0] ?? 'This NPPM file could not be read.')
+          const failed = r.checks.filter((c) => !c.passed).map((c) => `${c.name}: ${c.detail}`)
+          return { id, fileName: file.name, status: 'ready', preview: await buildPreview({
+            fileName: file.name, reportKind: 'amazon_in_vendor_nppm', totalRows: r.totalRows,
+            validRecords: [], invalidCount: r.invalidRows.length, warnings: [...failed, ...r.warnings],
+            amazonInVendorFacts: r.facts,
+          }) }
+        }
+        if (detectAmazonVendorIxd(sheets)) {
+          const r = normalizeAmazonVendorIxd(sheets)
+          if (!r.ixd) return fail(r.warnings[0] ?? 'This IXD file could not be read.')
+          const failed = r.checks.filter((c) => !c.passed).map((c) => `${c.name}: ${c.detail}`)
+          return { id, fileName: file.name, status: 'ready', preview: await buildPreview({
+            fileName: file.name, reportKind: 'amazon_in_vendor_ixd', totalRows: r.totalRows,
+            validRecords: [], invalidCount: r.invalidRows.length, warnings: [...failed, ...r.warnings],
+            amazonInVendorIxd: { month: r.month, ixd: r.ixd },
+          }) }
+        }
 
         if (detectSkuMapWorkbook(sheetNames)) {
           return { id, fileName: file.name, status: 'ready', skuMap: normalizeSkuMapWorkbook(sheets) }
@@ -764,6 +802,8 @@ export function UploadReportsPage() {
         myntraAdsFacts: preview.myntraAdsFacts,
         flipkartAdsFacts: preview.flipkartAdsFacts,
         flipkartGoogleAdsFacts: preview.flipkartGoogleAdsFacts,
+        amazonInVendorFacts: preview.amazonInVendorFacts,
+        amazonInVendorIxd: preview.amazonInVendorIxd,
         nykaaFacts: preview.nykaaFacts,
         blinkitFacts: preview.blinkitFacts,
         amazonInSellerFacts: preview.amazonInSellerFacts,

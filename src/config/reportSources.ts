@@ -50,9 +50,16 @@ export const REPORT_SOURCES: ReportSource[] = [
       'SKU Economics report — the per-SKU fees (the app also calls this Product Profitability; it is the same export)',
       'Settlement report — the tab-separated .txt, which is what the statement is built from',
       'All Orders / order report — the channel’s sales',
-      'Vendor Central: monthly sales by ASIN, for the vendor side',
+      'Vendor Central, from the manager at RK World Infocom by email: the NPPM file — the month’s shipments, '
+        + 'with Net Shipped GMS and Net PPM per ASIN',
+      'Vendor Central: the IXD file — units unpacked at the warehouse, which is what the cross-dock charge is on',
     ],
-    note: 'Same page and the same three settings as the USA and UAE stores, on India’s Seller Central.',
+    note: 'Same page and the same three settings as the USA and UAE stores, on India’s Seller Central. The two '
+      + 'vendor files come by email, both every month, and the NPPM first: the cross-dock charge attaches to the '
+      + 'month that file opens. Neither states a period, so the month is taken from the ship days and the inbound '
+      + 'dates. Vendor Central’s Retail Analytics "sales by ASIN" export is not a substitute for the NPPM file — '
+      + 'it reports what Amazon sold at, not what they paid, so a month imported from it overstates the revenue '
+      + 'by the whole trade margin.',
   },
   {
     key: 'amazon_us',

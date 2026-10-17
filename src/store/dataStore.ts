@@ -26,6 +26,8 @@ import type {
   MyntraAdsFacts,
   FlipkartAdsFacts,
   FlipkartGoogleAdsFacts,
+  AmazonInVendorFacts,
+  AmazonInVendorIxd,
   MyntraPnlFacts,
   NykaaPnlFacts,
   BlinkitPnlFacts,
@@ -84,6 +86,9 @@ interface SharedDataset {
   /** Flipkart's off-platform advertising month, beside the on-platform one.
    * Optional so a workspace whose API has not redeployed yet still loads. */
   flipkartGoogleAdsFacts?: FlipkartGoogleAdsFacts[]
+  /** Amazon India's wholesale half, beside the Seller Central settlement.
+   * Optional so a workspace whose API has not redeployed yet still loads. */
+  amazonInVendorFacts?: AmazonInVendorFacts[]
   /** Optional so a workspace whose API has not redeployed yet still loads:
    * an older /api/state simply does not send this key. */
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
@@ -111,6 +116,7 @@ const EMPTY_DATASET: SharedDataset = {
   myntraAdsFacts: [],
   flipkartAdsFacts: [],
   flipkartGoogleAdsFacts: [],
+  amazonInVendorFacts: [],
   amazonInSellerFacts: [],
   manualAdSpend: [],
 }
@@ -134,6 +140,10 @@ export interface ReportImport {
   myntraAdsFacts?: MyntraAdsFacts
   flipkartAdsFacts?: FlipkartAdsFacts
   flipkartGoogleAdsFacts?: FlipkartGoogleAdsFacts
+  amazonInVendorFacts?: AmazonInVendorFacts
+  /** The inward cross-dock charge, which arrives as its own file and is
+   * merged into the month the NPPM file already opened. */
+  amazonInVendorIxd?: { month: string; ixd: AmazonInVendorIxd }
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
   meeshoFactsByMonth?: MeeshoPnlFacts[]
   /** The individual events behind those facts. These are what is stored: a
@@ -412,7 +422,7 @@ export const useDataStore = create<DataState>((set, get) => {
      * file (rows, then one facts call per month) downloaded everything three
      * or more times over, and a large file could not get through at all.
      */
-    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, amazonAeFacts, amazonInSkuFeeFacts, purplleFacts, swiggyInstamartFacts, myntraAdsFacts, flipkartAdsFacts, flipkartGoogleAdsFacts, myntraFacts, nykaaFacts, blinkitFacts, amazonInSellerFacts, meeshoFactsByMonth, meeshoTransactions, meeshoAdsRows, meeshoRecoveryRows }) => {
+    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, amazonAeFacts, amazonInSkuFeeFacts, purplleFacts, swiggyInstamartFacts, myntraAdsFacts, flipkartAdsFacts, flipkartGoogleAdsFacts, amazonInVendorFacts, amazonInVendorIxd, myntraFacts, nykaaFacts, blinkitFacts, amazonInSellerFacts, meeshoFactsByMonth, meeshoTransactions, meeshoAdsRows, meeshoRecoveryRows }) => {
       const total = salesRecords.length + adsRecords.length
       set({ importProgress: { sent: 0, total } })
       try {
@@ -511,6 +521,27 @@ export const useDataStore = create<DataState>((set, get) => {
         if (flipkartGoogleAdsFacts) {
           await api.post('/api/facts/flipkart-google-ads', { facts: flipkartGoogleAdsFacts, importId })
           monthsUpdated.push(flipkartGoogleAdsFacts.month)
+        }
+        if (amazonInVendorFacts) {
+          await api.post('/api/facts/amazon-in-vendor', { facts: amazonInVendorFacts, importId })
+          monthsUpdated.push(amazonInVendorFacts.month)
+        }
+        if (amazonInVendorIxd) {
+          // A patch, because the charge belongs to a month the NPPM file
+          // opened and arrives in a file of its own. A month with no
+          // statement yet is not patched, and the upload says so rather than
+          // reporting a charge that went nowhere.
+          const { updated } = await api.patch<{ updated: boolean }>('/api/facts/amazon-in-vendor', {
+            month: amazonInVendorIxd.month,
+            patch: { ixd: amazonInVendorIxd.ixd },
+          })
+          if (!updated) {
+            throw new Error(
+              `No Vendor Central statement is stored for ${amazonInVendorIxd.month}, so this cross-dock charge ` +
+              'has nothing to attach to. Upload that month\u2019s NPPM file first, then this one.',
+            )
+          }
+          monthsUpdated.push(amazonInVendorIxd.month)
         }
         if (amazonInSkuFeeFacts) {
           await api.post('/api/facts/amazon-in-sku-fees', { facts: amazonInSkuFeeFacts, importId })

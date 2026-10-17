@@ -32,6 +32,7 @@ const FACT_TABLES: Record<string, FactTable> = {
   // channel's statement rather than inside it.
   'flipkart-ads': { table: 'flipkart_ads_facts', byBasis: false },
   'flipkart-google-ads': { table: 'flipkart_google_ads_facts', byBasis: false },
+  'amazon-in-vendor': { table: 'amazon_in_vendor_facts', byBasis: false },
   // Not a channel: Amazon India's fees per SKU, which sit beside that
   // channel's statement rather than inside it.
   'amazon-in-sku-fees': { table: 'amazon_in_sku_fee_facts', byBasis: false },
