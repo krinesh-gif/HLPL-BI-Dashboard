@@ -22,6 +22,7 @@ import { detectAmazonAdsSponsoredProductsReport, normalizeAmazonAdsSponsoredProd
 import { detectBlinkitAdsReport, normalizeBlinkitAdsReport } from '@/data/normalize/blinkitAdsReport'
 import { detectMyntraAdsReport, normalizeMyntraAdsReport } from '@/data/normalize/myntraAdsReport'
 import { detectFlipkartAdsReport, normalizeFlipkartAdsReport } from '@/data/normalize/flipkartAdsReport'
+import { detectFlipkartGoogleAdsReport, flipkartGoogleAdsPeriodFromName, flipkartGoogleAdsWholeMonth, normalizeFlipkartGoogleAdsReport } from '@/data/normalize/flipkartGoogleAdsReport'
 import { detectAmazonVendorCentralSalesReport, normalizeAmazonVendorCentralSales } from '@/data/normalize/amazonVendorCentralSales'
 import { detectMyntraPnlWorkbook, normalizeMyntraPnlWorkbook } from '@/data/normalize/myntraPnlWorkbook'
 import { detectPurplleSalesReport, normalizePurplleSalesReport } from '@/data/normalize/purplleSalesReport'
@@ -44,7 +45,8 @@ import { REPORT_SOURCES } from '@/config/reportSources'
 import { sheetNamed } from '@/lib/csvParse'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
 import type { AdsRecord, AmazonAePnlFacts, AmazonInSkuFeeFacts, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraAdsFacts,
-  FlipkartAdsFacts, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts, PurpllePnlFacts, SwiggyInstamartPnlFacts } from '@/data/models'
+  FlipkartAdsFacts,
+  FlipkartGoogleAdsFacts, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts, PurpllePnlFacts, SwiggyInstamartPnlFacts } from '@/data/models'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
 
@@ -71,6 +73,7 @@ type ReportKind =
   | 'blinkit_ads'
   | 'myntra_ads'
   | 'flipkart_ads'
+  | 'flipkart_google_ads'
   | 'blinkit_payout_archive'
 
 const REPORT_LABELS: Record<ReportKind, string> = {
@@ -87,6 +90,7 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   blinkit_ads: 'Blinkit — Campaign Report',
   myntra_ads: 'Myntra — PLA Campaign Report',
   flipkart_ads: 'Flipkart — PLA Campaign Report (Ads overview)',
+  flipkart_google_ads: 'Flipkart — Google Ads product performance',
   myntra_pnl_workbook: 'Myntra — P&L Report (PnL_Summary + SKU_Detail)',
   nykaa_sales: 'Nykaa — Monthly Sales Data (B2B, margin on MRP)',
   nykaa_companion: 'Nykaa — Cart Rule / Combo file',
@@ -112,6 +116,7 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   blinkit_ads: 'blinkit',
   myntra_ads: 'myntra',
   flipkart_ads: 'flipkart',
+  flipkart_google_ads: 'flipkart',
   myntra_pnl_workbook: 'myntra',
   nykaa_sales: 'nykaa',
   nykaa_companion: 'nykaa',
@@ -149,6 +154,8 @@ interface PreviewState {
   /** Flipkart's advertising month: the campaign and product detail behind the
    * Ads line its P&L report already states. */
   flipkartAdsFacts?: FlipkartAdsFacts
+  /** Flipkart's off-platform advertising month. */
+  flipkartGoogleAdsFacts?: FlipkartGoogleAdsFacts
   nykaaFacts?: NykaaPnlFacts
   blinkitFacts?: BlinkitPnlFacts
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
@@ -179,9 +186,10 @@ interface QueueItem {
   fileName: string
   status: ItemStatus
   preview?: PreviewState
-  /** Held for a Flipkart SKU P&L, which cannot be normalized until its month
-   * is known, and for nothing else. */
+  /** Held for a report that cannot be normalized until its month is known. */
   parsed?: ParsedFile
+  /** What that report is, so resolving its month reads it as the right one. */
+  kind?: ReportKind
   month?: string
   skuMap?: SkuMapWorkbookResult
   error?: string
@@ -259,6 +267,18 @@ export function UploadReportsPage() {
     if (kind === 'amazon_seller_central') {
       const r = normalizeAmazonSellerCentralRows(parsed.rows, skuMaster, importId)
       return buildPreview({ ...base, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
+    }
+    if (kind === 'flipkart_google_ads') {
+      // The period is in the name of the download. Where the name no longer
+      // carries it, the month the uploader chose is all there is, and the
+      // whole of that month is what the report is taken to cover.
+      const named = flipkartGoogleAdsPeriodFromName(fileName)
+      const period = named ?? flipkartGoogleAdsWholeMonth(month)
+      const r = normalizeFlipkartGoogleAdsReport(parsed.rows, period, importId)
+      return buildPreview({
+        ...base, totalRows: r.totalRows, validRecords: [], adsRecords: r.adsRecords,
+        invalidCount: r.invalidRows.length, warnings: r.warnings, flipkartGoogleAdsFacts: r.facts,
+      })
     }
     if (kind === 'flipkart_sku_pnl') {
       const r = normalizeFlipkartSkuPnl(parsed.rows, skuMaster, month, importId)
@@ -603,6 +623,7 @@ export function UploadReportsPage() {
       else if (detectAmazonAdsSponsoredProductsReport(parsed.headers)) kind = 'amazon_ads_sponsored_products'
       else if (detectBlinkitAdsReport(parsed.headers)) kind = 'blinkit_ads'
       else if (detectMyntraAdsReport(parsed.headers)) kind = 'myntra_ads'
+      else if (detectFlipkartGoogleAdsReport(parsed.headers)) kind = 'flipkart_google_ads'
 
       if (!kind) {
         // "Not recognised" on its own starts a conversation that takes a day.
@@ -626,7 +647,12 @@ export function UploadReportsPage() {
       if (kind === 'flipkart_sku_pnl') {
         // This report is a monthly total per SKU with no date column of its
         // own, so it cannot be normalized until someone says which month it is.
-        return { id, fileName: file.name, status: 'needs-month', parsed, month: filterMonth }
+        return { id, fileName: file.name, status: 'needs-month', parsed, kind, month: filterMonth }
+      }
+      // The same, unless the download still has the name Flipkart gave it,
+      // which carries the period. Nothing inside the file does.
+      if (kind === 'flipkart_google_ads' && !flipkartGoogleAdsPeriodFromName(file.name)) {
+        return { id, fileName: file.name, status: 'needs-month', parsed, kind, month: filterMonth }
       }
       return { id, fileName: file.name, status: 'ready', preview: await previewSimple(kind, file.name, parsed, filterMonth) }
     } catch (e) {
@@ -666,8 +692,8 @@ export function UploadReportsPage() {
 
   async function resolveMonth(item: QueueItem) {
     if (!item.parsed) return
-    const preview = await previewSimple('flipkart_sku_pnl', item.fileName, item.parsed, item.month ?? filterMonth)
-    updateItem(item.id, { status: 'ready', preview, parsed: undefined })
+    const preview = await previewSimple(item.kind ?? 'flipkart_sku_pnl', item.fileName, item.parsed, item.month ?? filterMonth)
+    updateItem(item.id, { status: 'ready', preview, parsed: undefined, kind: undefined })
   }
 
   /** Imports one queued file. Never throws: a file that fails is marked failed
@@ -737,6 +763,7 @@ export function UploadReportsPage() {
         myntraFacts: preview.myntraFacts,
         myntraAdsFacts: preview.myntraAdsFacts,
         flipkartAdsFacts: preview.flipkartAdsFacts,
+        flipkartGoogleAdsFacts: preview.flipkartGoogleAdsFacts,
         nykaaFacts: preview.nykaaFacts,
         blinkitFacts: preview.blinkitFacts,
         amazonInSellerFacts: preview.amazonInSellerFacts,

@@ -233,6 +233,47 @@ export interface FlipkartAdsFacts {
   rows: number
 }
 
+/** One advertised listing in Flipkart's Google Ads report. */
+export interface FlipkartGoogleAdsProduct {
+  /** Flipkart's listing id, which is the identity — the title is not. */
+  productItemId: string
+  productTitle: string
+  /** Titles the same listing also appeared under, where it was renamed during
+   * the period. Absent when it kept one name. */
+  otherTitles?: string[]
+  clicks: number
+  /** Flipkart's name for impressions. */
+  views: number
+  units: number
+  sales: number
+  cost: number
+}
+
+/**
+ * Flipkart's off-platform advertising for a month: the Google placements it
+ * buys for the listings and bills back as `• Google Ads`.
+ *
+ * Beside that billed line, never in place of it. The two do not agree —
+ * September measures ₹22,155.09 against ₹60,692.08 billed — and which is
+ * right is a question about GST and what the export covers.
+ */
+export interface FlipkartGoogleAdsFacts {
+  month: string
+  schemaVersion: 1
+  /** The period, which the file carries only in the name of the download. */
+  periodStart: string
+  periodEnd: string
+  cost: number
+  clicks: number
+  views: number
+  units: number
+  sales: number
+  products: FlipkartGoogleAdsProduct[]
+  rows: number
+  /** Listings the report named more than once, under different titles. */
+  renamedListings: number
+}
+
 // ---------------------------------------------------------------------------
 // Amazon Ads
 // ---------------------------------------------------------------------------

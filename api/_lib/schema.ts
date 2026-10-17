@@ -267,6 +267,15 @@ BEGIN
     data  JSONB NOT NULL
   );
 
+  -- The off-platform half of the same channel's advertising: the Google
+  -- placements Flipkart buys for the listings and bills as "Google Ads". Its
+  -- own table rather than a key inside the row above, because the two reports
+  -- arrive as separate uploads and a write of one must not erase the other.
+  CREATE TABLE IF NOT EXISTS flipkart_google_ads_facts (
+    month TEXT PRIMARY KEY,
+    data  JSONB NOT NULL
+  );
+
   -- Swiggy Instamart's month, from its sales report. Like Purplle's, a sales
   -- file and not a settlement, so these facts carry no marketplace charges.
   CREATE TABLE IF NOT EXISTS swiggy_instamart_facts (
