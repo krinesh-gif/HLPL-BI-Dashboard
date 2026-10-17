@@ -1,5 +1,5 @@
 import type { BlinkitPnlFacts, CanonicalSalesRecord } from '@/data/models'
-import { workbookSheetsFromBytes, type RawSheet } from '@/lib/csvParse'
+import { hasSheets, sheetNamed as sheetInBook, workbookSheetsFromBytes, type RawSheet } from '@/lib/csvParse'
 import { unzip } from '@/lib/unzip'
 import type { NormalizeResult, RowIssue } from './types'
 import type { ReconciliationCheck } from './meeshoOrderPayments'
@@ -243,7 +243,7 @@ const EMPTY_FACTS = (month: string): BlinkitPnlFacts => ({
  * workbooks, was turned away as not being a Blinkit file at all.
  */
 export function detectBlinkitPayoutArchive(sheetNames: string[]): boolean {
-  return sheetNames.includes(PAYOUT_SHEET)
+  return hasSheets(sheetNames, PAYOUT_SHEET)
 }
 
 /**
@@ -271,8 +271,15 @@ export async function normalizeBlinkitPayoutZip(
   // Every workbook, by the sheets inside it rather than by what it is called.
   const books = entries.map((e) => workbookSheetsFromBytes(e.bytes))
   const sheetNames = [...new Set(books.flatMap((b) => Object.keys(b)))]
-  /** The first sheet in the archive with this name, wherever it was filed. */
-  const sheetNamed = (name: string): RawSheet | null => books.find((b) => b[name])?.[name] ?? null
+  /** The first sheet in the archive with this name, wherever it was filed —
+   * and whatever the workbook punctuated it as. */
+  const sheetNamed = (name: string): RawSheet | null => {
+    for (const book of books) {
+      const found = sheetInBook(book, name)
+      if (found !== undefined) return found
+    }
+    return null
+  }
 
   if (!detectBlinkitPayoutArchive(sheetNames)) {
     throw new Error(

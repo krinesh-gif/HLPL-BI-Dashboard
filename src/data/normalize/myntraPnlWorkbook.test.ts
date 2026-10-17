@@ -224,3 +224,36 @@ describe('normalizeMyntraPnlWorkbook', () => {
     expect(r.checks.filter((c) => !c.passed)).toEqual([])
   })
 })
+
+describe('recognising the workbook whatever the sheets are called', () => {
+  // The owner re-uploaded a Myntra P&L that the screen called "not
+  // recognised". The detector matched `PnL_Summary` and `SKU_Detail` as exact
+  // strings, so one renamed or re-saved sheet rejected a whole month — and
+  // the same was true of Flipkart's, Meesho's and Blinkit's workbooks.
+  it('matches the sheets Myntra actually sends', () => {
+    expect(detectMyntraPnlWorkbook(['PnL_Summary', 'Glossary', 'SKU_Detail'])).toBe(true)
+  })
+
+  it('matches them under any punctuation or case', () => {
+    expect(detectMyntraPnlWorkbook(['PnL Summary', 'SKU Detail'])).toBe(true)
+    expect(detectMyntraPnlWorkbook(['pnl_summary', 'sku_detail'])).toBe(true)
+    expect(detectMyntraPnlWorkbook(['PnL_Summary ', ' SKU_Detail'])).toBe(true)
+  })
+
+  it('still refuses a workbook that is missing one of them', () => {
+    expect(detectMyntraPnlWorkbook(['PnL_Summary', 'Glossary'])).toBe(false)
+    expect(detectMyntraPnlWorkbook(['Order Payments', 'Ads Cost'])).toBe(false)
+    expect(detectMyntraPnlWorkbook([])).toBe(false)
+  })
+
+  it('reads a workbook whose sheets are punctuated differently', () => {
+    // Detection passing while the reader looked the sheets up exactly would
+    // be worse than refusing the file: a month of zeroes, silently.
+    const renamed = Object.fromEntries(
+      Object.entries(sheets()).map(([name, sheet]) => [name.replace('_', ' ').toLowerCase(), sheet]),
+    )
+    const r = normalizeMyntraPnlWorkbook(renamed, [], [], 'test')
+    expect(r.facts?.month).toBe(normalizeMyntraPnlWorkbook(sheets(), [], [], 'test').facts?.month)
+    expect(r.facts?.estimatedNetSales).toBe(normalizeMyntraPnlWorkbook(sheets(), [], [], 'test').facts?.estimatedNetSales)
+  })
+})

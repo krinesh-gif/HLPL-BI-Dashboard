@@ -1,6 +1,7 @@
 import type { CanonicalSalesRecord, MyntraPnlFacts, SkuMaster } from '@/data/models'
 import type { SkuMapping } from '@/data/skuMapping'
 import type { RawSheet } from '@/lib/csvParse'
+import { hasSheets, sheetNamed } from '@/lib/csvParse'
 import { normalizeCategory } from '@/data/categories'
 import type { NormalizeResult } from './types'
 
@@ -116,7 +117,10 @@ export function parseMyntraMonth(raw: unknown): string {
 }
 
 export function detectMyntraPnlWorkbook(sheetNames: string[]): boolean {
-  return sheetNames.includes(SUMMARY_SHEET) && sheetNames.includes(DETAIL_SHEET)
+  // Matched on what the names mean rather than on the exact string: the same
+  // export has arrived as `PnL_Summary` and as `PnL Summary`, and rejecting a
+  // month's whole P&L over a space is how "not recognised" keeps happening.
+  return hasSheets(sheetNames, SUMMARY_SHEET, DETAIL_SHEET)
 }
 
 /**
@@ -180,8 +184,8 @@ export function normalizeMyntraPnlWorkbook(
   const warnings: string[] = []
   const checks: MyntraWorkbookResult['checks'] = []
 
-  const summarySheet = sheets[SUMMARY_SHEET] ?? []
-  const detailSheet = sheets[DETAIL_SHEET] ?? []
+  const summarySheet = sheetNamed(sheets, SUMMARY_SHEET) ?? []
+  const detailSheet = sheetNamed(sheets, DETAIL_SHEET) ?? []
   const { values, units, header } = readSummary(summarySheet)
 
   const month = parseMyntraMonth(header.get('orders received during'))

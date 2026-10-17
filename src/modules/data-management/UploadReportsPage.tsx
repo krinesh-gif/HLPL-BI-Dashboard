@@ -40,6 +40,7 @@ import { useDataStore, type ImportOutcome } from '@/store/dataStore'
 import { monthLabel } from '@/lib/format'
 import { useFilterStore } from '@/store/filterStore'
 import { REPORT_SOURCES } from '@/config/reportSources'
+import { sheetNamed } from '@/lib/csvParse'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
 import type { AdsRecord, AmazonAePnlFacts, AmazonInSkuFeeFacts, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraAdsFacts, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts, PurpllePnlFacts, SwiggyInstamartPnlFacts } from '@/data/models'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
@@ -392,9 +393,13 @@ export function UploadReportsPage() {
       }
 
       const importId = uniqueId('import')
+      // Kept for the failure message: a file nobody recognised should say
+      // what it looked like, because the sheet names are the whole diagnosis.
+      let workbookSheetNames: string[] = []
       if (lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls')) {
         const sheets = await readWorkbookSheetsRaw(file)
         const sheetNames = Object.keys(sheets)
+        workbookSheetNames = sheetNames
 
         if (detectSkuMapWorkbook(sheetNames)) {
           return { id, fileName: file.name, status: 'ready', skuMap: normalizeSkuMapWorkbook(sheets) }
@@ -411,6 +416,7 @@ export function UploadReportsPage() {
         // memo figures and are recognised here so they are not reported as
         // unknown files.
         const firstSheet = sheets[sheetNames[0]] ?? []
+
         if (detectNykaaSalesSheet(firstSheet)) {
           const r = normalizeNykaaWorkbook(firstSheet, nykaa?.cartRule, nykaa?.combo, skuMaster, mappings, importId)
           const failed = r.checks.filter((c) => !c.passed).map((c) => `${c.name}: ${c.detail}`)
@@ -463,10 +469,13 @@ export function UploadReportsPage() {
             warnings: [...failed, ...r.warnings], myntraFacts: r.facts ?? undefined,
           }) }
         }
-        if (detectMeeshoOrderPaymentsSheet(sheets['Order Payments'])) {
+        // Looked up by meaning rather than by the exact string: Meesho's
+        // workbook has arrived with its sheets named both ways.
+        const meeshoOrderPayments = sheetNamed(sheets, 'Order Payments')
+        if (detectMeeshoOrderPaymentsSheet(meeshoOrderPayments)) {
           const r = normalizeMeeshoOrderPayments(
-            sheets['Order Payments'], sheets['Ads Cost'], skuMaster, importId, file.name,
-            sheets['Compensation and Recovery'],
+            meeshoOrderPayments ?? [], sheetNamed(sheets, 'Ads Cost'), skuMaster, importId, file.name,
+            sheetNamed(sheets, 'Compensation and Recovery'),
           )
           // Failed post-import assertions go in front of the owner before the
           // figures are relied on, not into a log nobody reads.
@@ -575,7 +584,24 @@ export function UploadReportsPage() {
       else if (detectBlinkitAdsReport(parsed.headers)) kind = 'blinkit_ads'
       else if (detectMyntraAdsReport(parsed.headers)) kind = 'myntra_ads'
 
-      if (!kind) return fail('This file did not match any supported report format.')
+      if (!kind) {
+        // "Not recognised" on its own starts a conversation that takes a day.
+        // What the reader was looking at is the answer most of the time — a
+        // report downloaded from the wrong menu has the wrong sheets, and a
+        // renamed column is a one-line fix once somebody can see its name.
+        const quoted = (names: string[]) => names.filter((n) => String(n).trim() !== '').map((n) => `"${n}"`).join(', ')
+        const shape = workbookSheetNames.length > 0
+          ? `Its sheet${workbookSheetNames.length === 1 ? ' is' : 's are'} ${quoted(workbookSheetNames)}.`
+          : parsed.headers.length > 0
+            ? `Its first columns are ${quoted(parsed.headers.slice(0, 10))}${parsed.headers.length > 10 ? ', …' : ''}.`
+            : 'It has no readable columns at all.'
+        return fail(
+          `This file did not match any supported report format. ${shape} Check it against the list under ` +
+          '"Which reports can I upload, and where do I get them?" below — most often the report came from a ' +
+          'different menu than the one the statement is built from. If it is the right report, send this whole ' +
+          'message on: the names above are what the reader looks for, and a renamed one is a small fix.',
+        )
+      }
 
       if (kind === 'flipkart_sku_pnl') {
         // This report is a monthly total per SKU with no date column of its

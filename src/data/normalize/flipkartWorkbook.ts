@@ -1,4 +1,4 @@
-import { mergeHeaderRows, rowsToRecords, type RawSheet } from '@/lib/csvParse'
+import { hasSheets, mergeHeaderRows, rowsToRecords, sheetNamed, type RawSheet } from '@/lib/csvParse'
 import type { CanonicalSalesRecord, FlipkartPnlFacts, SkuMaster } from '@/data/models'
 import { getField, type NormalizeResult } from './types'
 import { normalizeCategory } from '@/data/categories'
@@ -42,9 +42,11 @@ function num(map: Map<string, number | string>, key: string): number {
   return typeof v === 'number' ? v : Number(v) || 0
 }
 
+const SUMMARY_SHEET = 'Overall Summary'
+const ORDERS_SHEET = 'Orders P&L'
+
 export function detectFlipkartWorkbook(sheetNames: string[]): boolean {
-  const normalized = sheetNames.map((s) => s.trim().toLowerCase())
-  return normalized.includes('overall summary') && normalized.includes('orders p&l')
+  return hasSheets(sheetNames, SUMMARY_SHEET, ORDERS_SHEET)
 }
 
 function extractMonthFromSummary(map: Map<string, number | string>): string {
@@ -105,8 +107,12 @@ export function normalizeFlipkartWorkbook(
   skuMaster: SkuMaster[],
   importId: string,
 ): FlipkartWorkbookNormalizeResult {
-  const summarySheet = sheets['Overall Summary']
-  const ordersSheet = sheets['Orders P&L']
+  // Looked up the same way they are detected. These were matched exactly
+  // while detection was already case-insensitive, so a workbook saved with
+  // lower-case sheet names was recognised and then read as empty — a month of
+  // zeroes rather than an error.
+  const summarySheet = sheetNamed(sheets, SUMMARY_SHEET) ?? []
+  const ordersSheet = sheetNamed(sheets, ORDERS_SHEET) ?? []
   const { facts: partialFacts, month } = buildFactsFromOverallSummary(summarySheet)
 
   const headers = mergeHeaderRows(ordersSheet[0] ?? [], ordersSheet[1] ?? [])

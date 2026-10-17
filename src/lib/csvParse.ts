@@ -84,6 +84,36 @@ export function workbookSheetsFromBytes(bytes: ArrayBuffer | Uint8Array): Record
 }
 
 /**
+ * A sheet name reduced to what it means, for looking one up.
+ *
+ * Marketplace exports do not keep their sheet names stable. The same Myntra
+ * report arrives as `PnL_Summary` one month and could arrive as `PnL Summary`
+ * the next; a hand-saved copy picks up a trailing space. Every one of those is
+ * the same sheet, and a reader that matches the string exactly reports the
+ * whole file as unrecognised over a space.
+ *
+ * So the comparison drops case and everything that is not a letter or a
+ * digit: `PnL_Summary`, `PnL Summary` and `pnl-summary` are one name, and
+ * `Orders P&L` survives its ampersand.
+ */
+export function sheetKey(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+/** The sheet matching any of these names, however it is punctuated. */
+export function sheetNamed(sheets: Record<string, RawSheet>, ...candidates: string[]): RawSheet | undefined {
+  const wanted = candidates.map(sheetKey)
+  const found = Object.keys(sheets).find((name) => wanted.includes(sheetKey(name)))
+  return found === undefined ? undefined : sheets[found]
+}
+
+/** Whether a workbook carries every one of these sheets. */
+export function hasSheets(sheetNames: string[], ...required: string[]): boolean {
+  const present = sheetNames.map(sheetKey)
+  return required.every((name) => present.includes(sheetKey(name)))
+}
+
+/**
  * Merges two stacked header rows into one flat header list: for each column,
  * the lower row's label wins when present (it's the more specific one — a
  * fee breakdown column name), falling back to the upper row's label (a
