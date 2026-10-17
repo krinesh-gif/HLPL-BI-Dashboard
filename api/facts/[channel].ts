@@ -28,6 +28,9 @@ const FACT_TABLES: Record<string, FactTable> = {
   // Not a channel statement: Myntra's advertising month, which sits beside
   // the ads records rather than inside the P&L facts.
   'myntra-ads': { table: 'myntra_ads_facts', byBasis: false },
+  // Nor is this: Flipkart's advertising detail, which sits beside that
+  // channel's statement rather than inside it.
+  'flipkart-ads': { table: 'flipkart_ads_facts', byBasis: false },
   // Not a channel: Amazon India's fees per SKU, which sit beside that
   // channel's statement rather than inside it.
   'amazon-in-sku-fees': { table: 'amazon_in_sku_fee_facts', byBasis: false },

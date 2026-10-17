@@ -169,6 +169,71 @@ export interface MyntraAdsFacts {
 }
 
 // ---------------------------------------------------------------------------
+// Flipkart Ads
+// ---------------------------------------------------------------------------
+
+/** One Flipkart PLA campaign, summed over the report's period. */
+export interface FlipkartAdsCampaign {
+  campaignId: string
+  /** For reading. Carries the id too where a name is used twice. */
+  campaignName: string
+  adGroups: number
+  /** Products advertised under it. */
+  skus: number
+  spend: number
+  views: number
+  clicks: number
+  /** Units of the advertised product itself. */
+  unitsDirect: number
+  /** Units of anything else of ours the shopper bought after the click. */
+  unitsIndirect: number
+  revenue: number
+}
+
+/** One advertised product, summed over the report's period. */
+export interface FlipkartAdsSku {
+  /** Flipkart's own SKU code, as the report writes it. */
+  skuId: string
+  productName: string
+  campaigns: number
+  spend: number
+  views: number
+  clicks: number
+  unitsDirect: number
+  unitsIndirect: number
+  revenue: number
+}
+
+/**
+ * Flipkart's PLA campaign report for a month.
+ *
+ * Unlike Myntra's, this is not where the channel's advertising cost comes
+ * from: Flipkart's own P&L report states `• Ads` and `• Google Ads`, and the
+ * P&L charges those. This file is the detail beside them — which campaign and
+ * which product the money went into — and a second measurement of the spend to
+ * hold the P&L's figure against.
+ */
+export interface FlipkartAdsFacts {
+  month: string
+  schemaVersion: 1
+  /** The period the report itself states, which need not be a whole month. */
+  periodStart: string
+  periodEnd: string
+  spend: number
+  /** Flipkart's name for impressions. */
+  views: number
+  clicks: number
+  unitsDirect: number
+  unitsIndirect: number
+  /** Attributed revenue. The file states one figure, not a direct/indirect split. */
+  revenue: number
+  campaigns: FlipkartAdsCampaign[]
+  skus: FlipkartAdsSku[]
+  /** Rows read, one per campaign, ad group and product. */
+  rows: number
+}
+
+// ---------------------------------------------------------------------------
 // Amazon Ads
 // ---------------------------------------------------------------------------
 export interface AdsRecord {

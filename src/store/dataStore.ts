@@ -24,6 +24,7 @@ import type {
   ManualAdSpend,
   MeeshoPnlFacts,
   MyntraAdsFacts,
+  FlipkartAdsFacts,
   MyntraPnlFacts,
   NykaaPnlFacts,
   BlinkitPnlFacts,
@@ -75,6 +76,10 @@ interface SharedDataset {
    * them: the direct/indirect split, the dayparts and the campaign states.
    * Optional so a workspace whose API has not redeployed yet still loads. */
   myntraAdsFacts?: MyntraAdsFacts[]
+  /** Flipkart's advertising month, beside the ads records rather than inside
+   * them: the spend per campaign and per product. Optional so a workspace
+   * whose API has not redeployed yet still loads. */
+  flipkartAdsFacts?: FlipkartAdsFacts[]
   /** Optional so a workspace whose API has not redeployed yet still loads:
    * an older /api/state simply does not send this key. */
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
@@ -100,6 +105,7 @@ const EMPTY_DATASET: SharedDataset = {
   purplleFacts: [],
   swiggyInstamartFacts: [],
   myntraAdsFacts: [],
+  flipkartAdsFacts: [],
   amazonInSellerFacts: [],
   manualAdSpend: [],
 }
@@ -121,6 +127,7 @@ export interface ReportImport {
   purplleFacts?: PurpllePnlFacts
   swiggyInstamartFacts?: SwiggyInstamartPnlFacts
   myntraAdsFacts?: MyntraAdsFacts
+  flipkartAdsFacts?: FlipkartAdsFacts
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
   meeshoFactsByMonth?: MeeshoPnlFacts[]
   /** The individual events behind those facts. These are what is stored: a
@@ -399,7 +406,7 @@ export const useDataStore = create<DataState>((set, get) => {
      * file (rows, then one facts call per month) downloaded everything three
      * or more times over, and a large file could not get through at all.
      */
-    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, amazonAeFacts, amazonInSkuFeeFacts, purplleFacts, swiggyInstamartFacts, myntraAdsFacts, myntraFacts, nykaaFacts, blinkitFacts, amazonInSellerFacts, meeshoFactsByMonth, meeshoTransactions, meeshoAdsRows, meeshoRecoveryRows }) => {
+    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, amazonAeFacts, amazonInSkuFeeFacts, purplleFacts, swiggyInstamartFacts, myntraAdsFacts, flipkartAdsFacts, myntraFacts, nykaaFacts, blinkitFacts, amazonInSellerFacts, meeshoFactsByMonth, meeshoTransactions, meeshoAdsRows, meeshoRecoveryRows }) => {
       const total = salesRecords.length + adsRecords.length
       set({ importProgress: { sent: 0, total } })
       try {
@@ -490,6 +497,10 @@ export const useDataStore = create<DataState>((set, get) => {
         if (myntraAdsFacts) {
           await api.post('/api/facts/myntra-ads', { facts: myntraAdsFacts, importId })
           monthsUpdated.push(myntraAdsFacts.month)
+        }
+        if (flipkartAdsFacts) {
+          await api.post('/api/facts/flipkart-ads', { facts: flipkartAdsFacts, importId })
+          monthsUpdated.push(flipkartAdsFacts.month)
         }
         if (amazonInSkuFeeFacts) {
           await api.post('/api/facts/amazon-in-sku-fees', { facts: amazonInSkuFeeFacts, importId })

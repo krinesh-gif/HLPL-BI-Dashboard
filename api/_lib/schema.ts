@@ -257,6 +257,16 @@ BEGIN
     data  JSONB NOT NULL
   );
 
+  -- Flipkart's PLA campaign report for a month. Beside the channel's
+  -- statement, not inside it: Flipkart's own P&L states its Ads and Google Ads
+  -- lines and the P&L charges those, so this holds what they cannot — the
+  -- spend per campaign and per product, and a second measurement of the month
+  -- to hold the statement's figure against.
+  CREATE TABLE IF NOT EXISTS flipkart_ads_facts (
+    month TEXT PRIMARY KEY,
+    data  JSONB NOT NULL
+  );
+
   -- Swiggy Instamart's month, from its sales report. Like Purplle's, a sales
   -- file and not a settlement, so these facts carry no marketplace charges.
   CREATE TABLE IF NOT EXISTS swiggy_instamart_facts (

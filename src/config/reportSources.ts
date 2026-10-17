@@ -75,11 +75,16 @@ export const REPORT_SOURCES: ReportSource[] = [
   {
     key: 'flipkart',
     label: 'Flipkart',
-    path: 'Seller panel ▸ Reports ▸ P&L Report',
+    path: 'Seller panel ▸ Reports ▸ P&L Report; the ads file from Ads ▸ Ads overview',
+    settings: ['Export the ads overview one calendar month at a time — every row carries the period, not a date'],
     files: [
       'SKU-level P&L export',
       'Or the full P&L workbook (Overall Summary + Orders P&L), which carries more',
+      'PLA campaign report from the Ads overview section — the campaign and product detail',
     ],
+    note: 'The P&L workbook is the one that matters: it states the month’s Ads and Google Ads charges, and the P&L '
+      + 'charges those. The ads overview export does not change what the month costs — it says which campaign and '
+      + 'which product the money went into, and gives a second measurement to hold the billed figure against.',
   },
   {
     key: 'meesho',

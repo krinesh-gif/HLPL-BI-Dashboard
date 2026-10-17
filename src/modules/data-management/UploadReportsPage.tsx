@@ -21,6 +21,7 @@ import { detectSkuMapWorkbook, normalizeSkuMapWorkbook } from '@/data/normalize/
 import { detectAmazonAdsSponsoredProductsReport, normalizeAmazonAdsSponsoredProductsReport } from '@/data/normalize/amazonAdsSponsoredProducts'
 import { detectBlinkitAdsReport, normalizeBlinkitAdsReport } from '@/data/normalize/blinkitAdsReport'
 import { detectMyntraAdsReport, normalizeMyntraAdsReport } from '@/data/normalize/myntraAdsReport'
+import { detectFlipkartAdsReport, normalizeFlipkartAdsReport } from '@/data/normalize/flipkartAdsReport'
 import { detectAmazonVendorCentralSalesReport, normalizeAmazonVendorCentralSales } from '@/data/normalize/amazonVendorCentralSales'
 import { detectMyntraPnlWorkbook, normalizeMyntraPnlWorkbook } from '@/data/normalize/myntraPnlWorkbook'
 import { detectPurplleSalesReport, normalizePurplleSalesReport } from '@/data/normalize/purplleSalesReport'
@@ -42,7 +43,8 @@ import { useFilterStore } from '@/store/filterStore'
 import { REPORT_SOURCES } from '@/config/reportSources'
 import { sheetNamed } from '@/lib/csvParse'
 import { CHANNEL_MAP, type ChannelId } from '@/config/channels'
-import type { AdsRecord, AmazonAePnlFacts, AmazonInSkuFeeFacts, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraAdsFacts, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts, PurpllePnlFacts, SwiggyInstamartPnlFacts } from '@/data/models'
+import type { AdsRecord, AmazonAePnlFacts, AmazonInSkuFeeFacts, AmazonInSellerPnlFacts, AmazonUsaPnlFacts, CanonicalSalesRecord, FlipkartPnlFacts, ImportRecord, ManualAdSpend, MeeshoPnlFacts, MyntraAdsFacts,
+  FlipkartAdsFacts, MyntraPnlFacts, NykaaPnlFacts, BlinkitPnlFacts, PurpllePnlFacts, SwiggyInstamartPnlFacts } from '@/data/models'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
 
@@ -68,6 +70,7 @@ type ReportKind =
   | 'amazon_ads_sponsored_products'
   | 'blinkit_ads'
   | 'myntra_ads'
+  | 'flipkart_ads'
   | 'blinkit_payout_archive'
 
 const REPORT_LABELS: Record<ReportKind, string> = {
@@ -83,6 +86,7 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   swiggy_instamart_sales: 'Swiggy Instamart — Monthly Sales Report',
   blinkit_ads: 'Blinkit — Campaign Report',
   myntra_ads: 'Myntra — PLA Campaign Report',
+  flipkart_ads: 'Flipkart — PLA Campaign Report (Ads overview)',
   myntra_pnl_workbook: 'Myntra — P&L Report (PnL_Summary + SKU_Detail)',
   nykaa_sales: 'Nykaa — Monthly Sales Data (B2B, margin on MRP)',
   nykaa_companion: 'Nykaa — Cart Rule / Combo file',
@@ -107,6 +111,7 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   swiggy_instamart_sales: 'swiggy_instamart',
   blinkit_ads: 'blinkit',
   myntra_ads: 'myntra',
+  flipkart_ads: 'flipkart',
   myntra_pnl_workbook: 'myntra',
   nykaa_sales: 'nykaa',
   nykaa_companion: 'nykaa',
@@ -141,6 +146,9 @@ interface PreviewState {
   /** Myntra's advertising month: what its PLA report says beyond the spend,
    * which goes in as ads records. */
   myntraAdsFacts?: MyntraAdsFacts
+  /** Flipkart's advertising month: the campaign and product detail behind the
+   * Ads line its P&L report already states. */
+  flipkartAdsFacts?: FlipkartAdsFacts
   nykaaFacts?: NykaaPnlFacts
   blinkitFacts?: BlinkitPnlFacts
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
@@ -518,6 +526,18 @@ export function UploadReportsPage() {
         // report settings above the column names, so parsed with the first
         // line as the header it is neither recognisable nor readable.
         const sheet = await readCsvRaw(file)
+        // Flipkart's ads export is read flat for the same reason: two lines of
+        // period sit above the column names, and every row's date is that
+        // period rather than a column of its own.
+        if (detectFlipkartAdsReport(sheet)) {
+          const r = normalizeFlipkartAdsReport(sheet, importId)
+          if (!r.facts) return fail(r.warnings[0] ?? 'This Flipkart ads report could not be read.')
+          return { id, fileName: file.name, status: 'ready', preview: await buildPreview({
+            fileName: file.name, reportKind: 'flipkart_ads', totalRows: r.totalRows,
+            validRecords: [], adsRecords: r.adsRecords, invalidCount: r.invalidRows.length,
+            warnings: r.warnings, flipkartAdsFacts: r.facts,
+          }) }
+        }
         if (detectAmazonVendorCentralSalesReport(sheet)) {
           const r = normalizeAmazonVendorCentralSales(sheet, skuMaster, mappings, importId)
           return { id, fileName: file.name, status: 'ready', preview: await buildPreview({
@@ -716,6 +736,7 @@ export function UploadReportsPage() {
         swiggyInstamartFacts: preview.swiggyInstamartFacts,
         myntraFacts: preview.myntraFacts,
         myntraAdsFacts: preview.myntraAdsFacts,
+        flipkartAdsFacts: preview.flipkartAdsFacts,
         nykaaFacts: preview.nykaaFacts,
         blinkitFacts: preview.blinkitFacts,
         amazonInSellerFacts: preview.amazonInSellerFacts,

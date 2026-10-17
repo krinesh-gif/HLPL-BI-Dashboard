@@ -12,6 +12,7 @@ import { adsSpendFor, tacos } from '@/engine/adsSpend'
 import { netSalesForChannelMonth } from '@/engine/netSales'
 import { ManualAdSpendForm } from './ManualAdSpendForm'
 import { MyntraAdsDepth } from './MyntraAdsDepth'
+import { FlipkartAdsDepth } from './FlipkartAdsDepth'
 
 const TREND_MONTHS = 6
 
@@ -120,6 +121,11 @@ export function AdsChannelPage() {
           three dayparts that no other platform's does, so it has a section
           the shared KPIs cannot hold. */}
       {channel === 'myntra' && <MyntraAdsDepth month={month} />}
+
+      {/* Flipkart's report is the one that can be held against a figure the
+          channel already bills, and the only one with a per-product split, so
+          it gets its own section too. */}
+      {channel === 'flipkart' && <FlipkartAdsDepth month={month} />}
 
       {figure.source === 'none' && !def.usesMonthlyInvoice && (
         <EmptyState
