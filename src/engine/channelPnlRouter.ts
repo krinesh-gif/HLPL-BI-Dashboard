@@ -544,6 +544,22 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
           'named line — send the settlement file over and the descriptions will be added.',
         )
       }
+      // Amazon India is one channel with two businesses under it, and only
+      // one of them has a statement. A month with a Seller Central settlement
+      // returns here with Vendor Central's shipments nowhere in it, which on
+      // a channel whose wholesale side is the larger of the two understates
+      // the month by most of itself.
+      const vendorSales = inputs.salesRecords
+        .filter((r) => r.channel === 'amazon_in_vendor' && r.orderDate.slice(0, 7) === month)
+        .reduce((sum, r) => sum + r.grossSales, 0)
+      if (vendorSales > 0) {
+        notes.push(
+          `This is the Seller Central settlement only. ${formatCurrencyFull(vendorSales)} of Vendor Central ` +
+          `shipments are on file for ${month} and none of it is below — that is a wholesale business with its ` +
+          'own revenue basis and its own charges, and it has no statement of its own yet. Amazon India is ' +
+          'understated by roughly that much until it gets one.',
+        )
+      }
       if (Math.abs(values.settlementCheck) > 0.05) {
         notes.push(
           `${month}'s statement does not tie to what Amazon deposited: a gap of ` +
