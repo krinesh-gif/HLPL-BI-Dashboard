@@ -92,4 +92,43 @@ describe('normalizeFlipkartWorkbook', () => {
     expect(result.facts.cogsUnpriced).toBeCloseTo(199 * 0.25) // unmatched SKU
     expect(result.warnings.some((w) => w.includes('not found in the Product Master'))).toBe(true)
   })
+
+  it('says nothing about missing lines when the sheet carries them all', () => {
+    const result = normalizeFlipkartWorkbook(sheets, skuMaster, 'import-1')
+    expect(result.warnings.some((w) => w.includes('has no line named'))).toBe(false)
+  })
+
+  // A charge of zero and a charge the reader could not find are the same
+  // number on the P&L and a different question to answer, so the second one
+  // has to say so.
+  it('reports a line the sheet does not carry rather than reading a silent zero', () => {
+    const withoutGoogleAds = overallSummary.filter((row) => row[0] !== '• Google Ads')
+    const result = normalizeFlipkartWorkbook(
+      { ...sheets, 'Overall Summary': withoutGoogleAds },
+      skuMaster,
+      'import-1',
+    )
+    expect(result.facts.googleAds).toBe(0)
+    expect(result.warnings.some((w) => w.includes('has no line named Google Ads'))).toBe(true)
+    // The month it does carry is untouched by the one it does not.
+    expect(result.facts.flipkartAds).toBe(6000)
+  })
+
+  it('names every missing line in one warning', () => {
+    const stripped = overallSummary.filter((row) => row[0] !== '• Google Ads' && row[0] !== '• Storage Fee')
+    const result = normalizeFlipkartWorkbook({ ...sheets, 'Overall Summary': stripped }, skuMaster, 'import-1')
+    const warning = result.warnings.find((w) => w.includes('has no line named'))
+    expect(warning).toContain('Storage Fee')
+    expect(warning).toContain('Google Ads')
+    expect(warning).toContain('they were read as zero')
+  })
+
+  // The sub-bullet case: a label pushed one cell right, which the reader skips
+  // because it looks for the label in the first column. The figure is lost
+  // either way; the point is that it no longer passes for zero.
+  it('reports a line whose label sits in the second column', () => {
+    const indented: RawSheet = overallSummary.map((row) => (row[0] === '• Google Ads' ? ['', '• Google Ads', 0] : row))
+    const result = normalizeFlipkartWorkbook({ ...sheets, 'Overall Summary': indented }, skuMaster, 'import-1')
+    expect(result.warnings.some((w) => w.includes('has no line named Google Ads'))).toBe(true)
+  })
 })

@@ -42,6 +42,28 @@ function num(map: Map<string, number | string>, key: string): number {
   return typeof v === 'number' ? v : Number(v) || 0
 }
 
+/**
+ * The Overall Summary lines this reader looks up by name, written as the sheet
+ * writes them.
+ *
+ * A label the sheet does not carry reads as zero, and a zero on the P&L looks
+ * exactly like a month Flipkart charged nothing for — the same trap that hid
+ * Myntra's fees for every month on its earlier layout. So the sheet is checked
+ * for these names and the ones it does not have are reported, which keeps
+ * "Flipkart billed nothing" apart from "the line was not found under that
+ * name".
+ *
+ * Collection Fee, Forward Shipping Fee and the catch-all charges are left out
+ * on purpose: real months have gone without them, so their absence says
+ * nothing.
+ */
+const EXPECTED_SUMMARY_LABELS = [
+  'Gross Sales', 'Estimated Net Sales', 'Seller-Funded Discount', 'Customer Add-Ons Amount',
+  'Commission Fee', 'Fixed Fee', 'Pick and Pack Fee', 'Reverse Shipping Fee',
+  'Storage Fee', 'Recall Fee', 'Ads', 'Google Ads',
+  'Taxes (GST)', 'Taxes (TCS)', 'Taxes (TDS)', 'Rewards & Other Benefits',
+]
+
 const SUMMARY_SHEET = 'Overall Summary'
 const ORDERS_SHEET = 'Orders P&L'
 
@@ -58,7 +80,7 @@ function extractMonthFromSummary(map: Map<string, number | string>): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-function buildFactsFromOverallSummary(summarySheet: RawSheet): { facts: Omit<FlipkartPnlFacts, 'cogsPriced' | 'cogsUnpriced'>; month: string } {
+function buildFactsFromOverallSummary(summarySheet: RawSheet): { facts: Omit<FlipkartPnlFacts, 'cogsPriced' | 'cogsUnpriced'>; month: string; missingLabels: string[] } {
   const map = parseLabelValueSheet(summarySheet)
   const month = extractMonthFromSummary(map)
 
@@ -66,6 +88,7 @@ function buildFactsFromOverallSummary(summarySheet: RawSheet): { facts: Omit<Fli
 
   return {
     month,
+    missingLabels: EXPECTED_SUMMARY_LABELS.filter((label) => !map.has(normalizeLabel(label))),
     facts: {
       month,
       grossSales: num(map, 'gross sales'),
@@ -113,7 +136,7 @@ export function normalizeFlipkartWorkbook(
   // zeroes rather than an error.
   const summarySheet = sheetNamed(sheets, SUMMARY_SHEET) ?? []
   const ordersSheet = sheetNamed(sheets, ORDERS_SHEET) ?? []
-  const { facts: partialFacts, month } = buildFactsFromOverallSummary(summarySheet)
+  const { facts: partialFacts, month, missingLabels } = buildFactsFromOverallSummary(summarySheet)
 
   const headers = mergeHeaderRows(ordersSheet[0] ?? [], ordersSheet[1] ?? [])
   const rows = rowsToRecords(headers, ordersSheet, 2)
@@ -182,6 +205,13 @@ export function normalizeFlipkartWorkbook(
     warnings.push(`${unknownSkuCount} row(s) reference a SKU not found in the Product Master — COGS for these was estimated at 25% of revenue, not looked up.`)
   }
   if (!month) warnings.push('Could not detect the report month from the "Orders Recieved During" line in Overall Summary.')
+  if (missingLabels.length > 0) {
+    const one = missingLabels.length === 1
+    warnings.push(
+      `Overall Summary has no line named ${missingLabels.join(', ')}, so ${one ? 'it was' : 'they were'} read as zero. ` +
+        `If Flipkart charged for ${one ? 'it' : 'them'} this month, this file names the line something else.`,
+    )
+  }
 
   return {
     validRecords,
