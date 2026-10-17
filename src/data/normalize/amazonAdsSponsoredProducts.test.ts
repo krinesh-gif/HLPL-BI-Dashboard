@@ -73,3 +73,59 @@ describe('normalizeAmazonAdsSponsoredProductsReport', () => {
     expect(result.invalidRows).toHaveLength(1)
   })
 })
+
+/**
+ * The India console's own export of the same report, which differs from the US
+ * one in three ways at once — and each of them alone made the month read as
+ * zero. Figures are a real row from Sponsored_Products_Campaign_report_5.csv,
+ * September 2026.
+ */
+describe('normalizeAmazonAdsSponsoredProductsReport, on the India export', () => {
+  function indiaRow(over: Record<string, string> = {}) {
+    return {
+      'Start Date': 'Sep 01, 2026', 'End Date': 'Sep 30, 2026', 'Portfolio name': 'No Portfolio',
+      'Program Type': 'Sponsored Products', 'Campaign Name': 'All Product Mix-SP-PT-Self',
+      // No Retailer column at all.
+      Country: 'India', Status: 'ENABLED', Currency: 'INR', 'Budget Amount': '₹3025.0',
+      'Targeting Type': 'Manual targeting', 'Bidding strategy': 'Dynamic bids - down only',
+      Impressions: '151275', Clicks: '3374', 'Click-Thru Rate (CTR)': '2.23%',
+      Spend: '₹44348.29', 'Cost Per Click (CPC)': '₹13.1441286',
+      // A 14-day attribution window, not the US file's 7-day.
+      '14 Day Total Orders (#)': '617',
+      'Total Advertising Cost of Sales (ACOS) ': '26.209%',
+      'Total Return on Advertising Spend (ROAS)': '3.82',
+      '14 Day Total Sales ': '₹169210.35',
+      ...over,
+    }
+  }
+
+  it('resolves the channel from Country where the export has no Retailer column', () => {
+    const r = normalizeAmazonAdsSponsoredProductsReport([indiaRow()], 'import-1')
+    expect(r.invalidRows).toHaveLength(0)
+    expect(r.adsRecords[0].channel).toBe('amazon_in_seller')
+  })
+
+  it('reads a rupee figure rather than making it zero', () => {
+    const r = normalizeAmazonAdsSponsoredProductsReport([indiaRow()], 'import-1')
+    expect(r.adsRecords[0].spend).toBeCloseTo(44348.29, 2)
+  })
+
+  it('reads the 14-day attribution columns as well as the 7-day ones', () => {
+    const r = normalizeAmazonAdsSponsoredProductsReport([indiaRow()], 'import-1')
+    expect(r.adsRecords[0].adSales).toBeCloseTo(169210.35, 2)
+    expect(r.adsRecords[0].adOrders).toBe(617)
+  })
+
+  // The expensive direction of the mistake: a rupee figure taken for dollars.
+  it('does not convert a rupee figure at the dollar rate', () => {
+    const r = normalizeAmazonAdsSponsoredProductsReport([indiaRow()], 'import-1')
+    expect(r.adsRecords[0].spend).toBeLessThan(45000)
+  })
+
+  it('still converts a US row, and still refuses a retailer that is not Amazon', () => {
+    const us = normalizeAmazonAdsSponsoredProductsReport([realRow()], 'import-1')
+    expect(us.adsRecords[0].spend).toBeGreaterThan(1596.1)
+    const other = normalizeAmazonAdsSponsoredProductsReport([indiaRow({ Retailer: 'Flipkart' })], 'import-1')
+    expect(other.adsRecords).toHaveLength(0)
+  })
+})
