@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BUSINESS_CHANNEL_IDS } from '@/config/channels'
-import { buildChannelPnlView } from './channelPnlRouter'
+import { buildChannelPnlView, type AmazonInHalf } from './channelPnlRouter'
 import type {
   AmazonInSellerPnlFacts, AmazonInVendorFacts,
   AmazonUsaPnlFacts, CanonicalSalesRecord, FixedExpenseEntry, FlipkartPnlFacts, NykaaPnlFacts, SkuMaster,
@@ -508,5 +508,83 @@ describe('buildChannelPnlView, Amazon India over Seller and Vendor Central', () 
     })
     expect(view.native?.lineDefs.some((d) => d.key === 'settlementTotal')).toBe(true)
     expect(view.native?.values.invoiceValue).toBeUndefined()
+  })
+
+  /**
+   * Reading the two businesses one at a time.
+   *
+   * The property that makes this a view of the channel rather than a second
+   * set of numbers: whichever way it is read, the halves add to the whole. So
+   * the shared ad spend is charged on one side only, and the month's fixed
+   * expenses are divided between them instead of charged twice.
+   */
+  describe('one business at a time', () => {
+    const seller: AmazonInSellerPnlFacts = {
+      month: '2026-09', schemaVersion: 1, settlementIds: ['s1'],
+      amounts: {
+        'order.itemprice.principal': 120000,
+        'order.itemfees.commission': -18000,
+        'order.itemfees.fixed-closing-fee': -2000,
+      },
+      settlementTotal: 100000, orders: 300, units: 300,
+    }
+    const inputs = {
+      ...base,
+      fixedExpenses: [{ month: '2026-09', category: 'rent', amount: 100000 }] as FixedExpenseEntry[],
+      marketing: { amazon_in: { ads: 202718.37 } },
+      facts: { ...base.facts, amazonInSellerFacts: [seller] },
+    }
+    const half = (amazonInHalf: AmazonInHalf) =>
+      buildChannelPnlView('amazon_in', '2026-09', { ...inputs, amazonInHalf })
+
+    it('reports the wholesale business with nothing of the marketplace in it', () => {
+      const v = half('vendor')
+      expect(v.native?.values.invoiceValue).toBeCloseTo(1199291.82, 2)
+      expect(v.canonical.lines.grossSales).toBeCloseTo(1682714.56, 2)
+      expect(v.notes.some((n) => n.includes('Vendor Central on its own'))).toBe(true)
+    })
+
+    it('reports the marketplace business on its own settlement', () => {
+      const v = half('seller')
+      expect(v.native?.lineDefs.some((d) => d.key === 'settlementTotal')).toBe(true)
+      expect(v.native?.values.netSales).toBeCloseTo(120000, 2)
+      expect(v.canonical.lines.grossSales).toBeCloseTo(120000, 2)
+      expect(v.canonical.lines.marketplaceCommission).toBeCloseTo(18000, 2)
+      expect(v.notes.some((n) => n.includes('Seller Central on its own'))).toBe(true)
+    })
+
+    // One AMC account lifts both halves, so the spend belongs to the side
+    // that carries it. Charged on both, the channel would pay for its
+    // advertising twice.
+    it('charges the shared advertising to one side only', () => {
+      expect(half('vendor').canonical.lines.ads).toBeCloseTo(202718.37, 2)
+      expect(half('seller').canonical.lines.ads).toBe(0)
+      expect(half('both').canonical.lines.ads).toBeCloseTo(202718.37, 2)
+    })
+
+    // Rent is allocated to Amazon India, not to a business inside it, so
+    // reading one half shows that half's share of it.
+    it('divides the month’s fixed expenses between the halves', () => {
+      const v = half('vendor').native?.values.otherCosts ?? 0
+      const s = half('seller').native?.values.otherCosts ?? 0
+      const whole = half('both').native?.values.otherCosts ?? 0
+      expect(whole).toBeLessThan(0)
+      expect(v + s).toBeCloseTo(whole, 6)
+      // Wholesale is ten times the marketplace this month, and carries that
+      // much more of the overhead.
+      expect(v).toBeLessThan(s)
+    })
+
+    it('adds up to the channel, line by line', () => {
+      const whole = half('both').canonical.lines
+      const v = half('vendor').canonical.lines
+      const s = half('seller').canonical.lines
+      for (const key of Object.keys(whole) as (keyof typeof whole)[]) {
+        // A margin percentage is a ratio, so it is the one thing two halves
+        // cannot be added together on.
+        if (key.endsWith('Pct')) continue
+        expect((v[key] ?? 0) + (s[key] ?? 0), `${key} does not add up`).toBeCloseTo(whole[key] ?? 0, 6)
+      }
+    })
   })
 })

@@ -57,6 +57,11 @@ export function PnlSnapshotPage() {
             <div className="mt-1">
               Taken on {takenOn} · {currencyName(r.displayCurrency)}
               {r.view === 'meesho' && ` · ${r.meeshoBasis === 'settlement' ? 'payment' : 'order'} date basis`}
+              {/* Which business, where the channel has two. A wholesale half
+                  printed without saying so reads as the whole of Amazon
+                  India, and it is two thirds of it. */}
+              {r.view === 'amazon_in' && r.amazonInHalf !== 'both'
+                && ` · ${r.amazonInHalf === 'vendor' ? 'Vendor Central' : 'Seller Central'} only`}
             </div>
           </div>
         </header>

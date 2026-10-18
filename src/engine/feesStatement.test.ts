@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import type { BusinessChannelId } from '@/config/channels'
-import type { FlipkartPnlFacts, MeeshoPnlFacts, PnlLineValues } from '@/data/models'
+import type {
+  AmazonInSellerPnlFacts, AmazonInVendorFacts, FlipkartPnlFacts, MeeshoPnlFacts, PnlLineValues,
+} from '@/data/models'
 import { normalizeBlinkitPayoutZip } from '@/data/normalize/blinkitPayout'
-import type { ChannelPnlView } from './channelPnlRouter'
+import { buildChannelPnlView, type ChannelPnlView } from './channelPnlRouter'
 import { buildChannelFeesStatement, buildFeesStatement } from './feesStatement'
 import { isCostOfSelling, type FeeCategoryId } from './nativePnl/feeCategories'
 import { computeSubtotals } from './pnl'
@@ -365,6 +367,48 @@ describe('buildChannelFeesStatement, on a channel with more than one statement',
     // ₹57,776 of charges on ₹11,99,291.82 is 4.82%, not 0% of nothing.
     expect(s.totalCostOfSelling).toBeCloseTo(-57776, 2)
     expect(s.takeRatePct).toBeCloseTo((57776 / 1199291.82) * 100, 4)
+  })
+
+  /**
+   * What the Fees page reports once the Amazon India choice is switched.
+   *
+   * The two halves are charged for quite different things — a contra-COGS
+   * claim against the wholesale invoice, referral and closing fees against
+   * marketplace sales — and neither statement carries a line for the other's.
+   * Read as one channel, the marketplace charges were simply absent.
+   */
+  it('costs whichever of the two businesses is being read', () => {
+    const vendorFacts: AmazonInVendorFacts = {
+      month: '2026-09', schemaVersion: 1, periodStart: '2026-09-01', periodEnd: '2026-09-30',
+      netShippedGms: 1682714.56, netPpm: 483422.74, invoiceValue: 1199291.82,
+      unitsShipped: 7486, marginClosedPct: 0.32, marginAchievedPct: 0.2872874,
+      ccogsClaimed: 55045.91, ccogsFinal: 50000, asins: [], rows: 5178,
+    }
+    const sellerFacts: AmazonInSellerPnlFacts = {
+      month: '2026-09', schemaVersion: 1, settlementIds: ['s1'],
+      amounts: { 'order.itemprice.principal': 120000, 'order.itemfees.commission': -18000 },
+      settlementTotal: 102000, orders: 300, units: 300,
+    }
+    const inputs = {
+      salesRecords: [], skuMaster: [], fixedExpenses: [], marketing: {},
+      facts: {
+        flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [],
+        amazonInVendorFacts: [vendorFacts], amazonInSellerFacts: [sellerFacts],
+      },
+    }
+    const feesFor = (amazonInHalf: 'vendor' | 'seller') =>
+      buildChannelFeesStatement(buildChannelPnlView('amazon_in', '2026-09', { ...inputs, amazonInHalf }))
+
+    const wholesale = feesFor('vendor')
+    expect(wholesale.basis).toBeCloseTo(1199291.82, 2)
+    // The margin-support claim, which is the whole of what this half is charged.
+    expect(wholesale.categories.map((c) => c.category)).toContain('otherFees')
+    expect(wholesale.totalCostOfSelling).toBeCloseTo(-50000, 2)
+
+    const marketplace = feesFor('seller')
+    expect(marketplace.basis).toBeCloseTo(120000, 2)
+    expect(marketplace.categories.map((c) => c.category)).toContain('commission')
+    expect(marketplace.takeRatePct).toBeCloseTo(15, 2)
   })
 
   it('still measures the marketplace half against netSales', () => {

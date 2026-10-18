@@ -9,8 +9,18 @@ describe('what a snapshot link asks for', () => {
       view: 'meesho',
       period: { mode: 'custom', quick: '6m', from: '2026-03', to: '2026-08' },
       meeshoBasis: 'settlement',
+      amazonInHalf: 'both',
       currencyView: 'INR',
     })
+  })
+
+  it('carries which of Amazon India\u2019s two businesses it was taken on', () => {
+    expect(start('view=amazon_in&half=vendor')).toMatchObject({ view: 'amazon_in', amazonInHalf: 'vendor' })
+    expect(start('view=amazon_in&half=seller').amazonInHalf).toBe('seller')
+    // Anything else means the channel, which is the Amazon India every other
+    // screen reports.
+    expect(start('view=amazon_in&half=wholesale').amazonInHalf).toBe('both')
+    expect(start('view=amazon_in').amazonInHalf).toBe('both')
   })
 
   it('falls back to the Master P&L for a view that does not exist', () => {

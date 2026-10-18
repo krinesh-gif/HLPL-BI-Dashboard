@@ -36,6 +36,7 @@ export function PnlPage() {
     from: r.months[0] ?? r.latestMonth,
     to: r.months[r.months.length - 1] ?? r.latestMonth,
     basis: r.meeshoBasis,
+    half: r.amazonInHalf,
     cur: r.displayCurrency,
   }).toString()
 
@@ -144,6 +145,35 @@ export function PnlPage() {
                   }`}
                 >
                   {b.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Amazon India is two businesses: we sell wholesale to RK World and
+            we sell on the marketplace. Both is the channel every other screen
+            reports; each half is its own waterfall, on its own revenue basis,
+            because no single statement can be both. */}
+        {r.showAmazonInHalves && (
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-[var(--ink-3)]">Business</span>
+            <div className="flex rounded-md border border-[var(--line-2)] bg-[var(--surface)] p-0.5">
+              {([
+                { key: 'both', label: 'Both' },
+                { key: 'vendor', label: 'Vendor Central' },
+                { key: 'seller', label: 'Seller Central' },
+              ] as const).map((h) => (
+                <button
+                  key={h.key}
+                  type="button"
+                  onClick={() => r.setAmazonInHalf(h.key)}
+                  aria-pressed={r.amazonInHalf === h.key}
+                  className={`rounded px-3 py-1 text-sm font-medium transition ${
+                    r.amazonInHalf === h.key ? 'bg-[var(--accent)] text-[var(--accent-ink)]' : 'text-[var(--ink-2)] hover:bg-[var(--surface-hover)]'
+                  }`}
+                >
+                  {h.label}
                 </button>
               ))}
             </div>

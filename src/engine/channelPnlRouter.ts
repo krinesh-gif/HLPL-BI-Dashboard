@@ -62,6 +62,21 @@ export interface NativePnlView {
   currency: 'INR' | 'USD' | 'AED'
 }
 
+/**
+ * Which of Amazon India's two businesses a view is for.
+ *
+ * `'both'` is the channel — one row in the Master P&L, the Overview and the
+ * MIS, and what every roll-up reads. The other two are one business each, for
+ * the screens that let the owner read them apart: wholesale to RK World and
+ * the marketplace are different businesses on different revenue bases, and a
+ * single waterfall can only be one of them.
+ *
+ * The two halves add to the channel exactly, in every line — that is the
+ * property the tests hold, and the reason the shared ad spend is charged on
+ * one side only and the month's fixed expenses are divided between them.
+ */
+export type AmazonInHalf = 'both' | 'vendor' | 'seller'
+
 export interface ChannelPnlView {
   channel: BusinessChannelId
   month: string
@@ -114,9 +129,21 @@ function withAllocatedOpex(
   inputs: ChannelPnlViewInputs,
   channel: BusinessChannelId,
   month: string,
+  /**
+   * The fraction of the channel's allocation these lines carry. Below 1 only
+   * where one business inside a channel is being read on its own — see
+   * `amazonInHalfShare`.
+   */
+  share = 1,
 ): PnlLineValues {
   const allocation = allocateFixedExpensesForMonth(inputs.salesRecords, inputs.fixedExpenses, month)[channel]
-  return allocation ? { ...lines, ...allocation } : lines
+  if (!allocation) return lines
+  if (share === 1) return { ...lines, ...allocation }
+  const scaled: PnlLineValues = {}
+  for (const [key, value] of Object.entries(allocation) as [keyof PnlLineValues, number | undefined][]) {
+    scaled[key] = (value ?? 0) * share
+  }
+  return { ...lines, ...scaled }
 }
 
 function computeAllocatedOtherCosts(
@@ -124,9 +151,10 @@ function computeAllocatedOtherCosts(
   fixedExpenses: FixedExpenseEntry[],
   channel: BusinessChannelId,
   month: string,
+  share = 1,
 ): number {
   const allocation = allocateFixedExpensesForMonth(allRecords, fixedExpenses, month)[channel] ?? {}
-  return Object.values(allocation).reduce((sum, v) => sum + (v ?? 0), 0)
+  return Object.values(allocation).reduce((sum, v) => sum + (v ?? 0), 0) * share
 }
 
 /** Share of revenue charged as COGS for a SKU with no cost on file. Matches the
@@ -232,6 +260,33 @@ function addBuckets(a: PnlLineValues, b: PnlLineValues): PnlLineValues {
  */
 function sellerBucketsWithoutAds(facts: AmazonInSellerPnlFacts): PnlLineValues {
   return { ...amazonInSellerToCanonicalBuckets(facts), ads: 0 }
+}
+
+/**
+ * The share of Amazon India's allocated fixed expenses one half carries.
+ *
+ * Rent, salaries and software are allocated to the channel, not to a business
+ * inside it, so reading one half on its own has to divide them. Charging each
+ * half the whole channel's overhead would make the two halves add to more
+ * than Amazon India, and the P&L has to hold whichever way it is read.
+ *
+ * Divided on net revenue — the wholesale invoice against the marketplace's
+ * net sales — which is the basis this build shares every other common cost
+ * on. A month with only one half on file has nothing to divide.
+ */
+function amazonInHalfShare(
+  vendor: AmazonInVendorFacts | undefined,
+  seller: AmazonInSellerPnlFacts | undefined,
+  half: AmazonInHalf,
+): number {
+  if (half === 'both' || !vendor || !seller) return 1
+  const vendorNet = vendor.invoiceValue
+  const sellerNet = computeAmazonInSellerPnl(seller).netSales
+  const total = vendorNet + sellerNet
+  // Neither half sold anything, so there is no revenue to divide on. The
+  // overhead stays with the wholesale side rather than being split in two.
+  if (total <= 0) return half === 'vendor' ? 1 : 0
+  return (half === 'vendor' ? vendorNet : sellerNet) / total
 }
 
 function recomputedCogs(
@@ -359,6 +414,9 @@ export interface ChannelPnlViewInputs {
   cogs?: CogsInputs
   /** Which calendar Meesho's months are cut on. Defaults to order basis. */
   meeshoBasis?: PnlBasis
+  /** Which of Amazon India's two businesses to report. Defaults to the whole
+   * channel, so a caller that knows nothing about the split still gets both. */
+  amazonInHalf?: AmazonInHalf
   /** Rupees per unit of each currency the company is paid in, for this month.
    * Amazon USA is denominated in dollars and Amazon UAE in dirhams, so these
    * scale those channels wherever they roll into the rupee P&L. */
@@ -591,8 +649,18 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
   }
 
   if (channel === 'amazon_in') {
-    const vendor = inputs.facts.amazonInVendorFacts?.find((f) => f.month === month)
-    const seller = inputs.facts.amazonInSellerFacts?.find((f) => f.month === month)
+    // Amazon India is two businesses under one name, and which of them is
+    // being read is a question the channel cannot answer for itself. 'both'
+    // is the channel — every roll-up reads that — and the other two are one
+    // business each: the other half is not folded in, the shared ad spend
+    // stays on the side that carries it, and each half takes its own share of
+    // the month's fixed expenses, so the two still add to Amazon India.
+    const half = inputs.amazonInHalf ?? 'both'
+    const vendorMonth = inputs.facts.amazonInVendorFacts?.find((f) => f.month === month)
+    const sellerMonth = inputs.facts.amazonInSellerFacts?.find((f) => f.month === month)
+    const share = amazonInHalfShare(vendorMonth, sellerMonth, half)
+    const vendor = half === 'seller' ? undefined : vendorMonth
+    const seller = half === 'vendor' ? undefined : sellerMonth
 
     // Amazon India is one channel over two businesses, and the wholesale one
     // is the larger by an order of magnitude. Where its month is on file the
@@ -607,7 +675,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       // a shared cost, and today that puts effectively all of it on this side
       // because the other has no sales on file at all.
       const adSpend = inputs.marketing[channel]?.ads ?? 0
-      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month, share)
       const values = applyAmazonInVendorOtherCosts(
         computeAmazonInVendorPnl(vendor, cogs, adSpend),
         otherCosts,
@@ -617,7 +685,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       const canonicalLines = computeSubtotals(
         withAllocatedOpex(
           seller ? addBuckets(vendorBuckets, sellerBucketsWithoutAds(seller)) : vendorBuckets,
-          inputs, channel, month,
+          inputs, channel, month, share,
         ),
       )
 
@@ -627,7 +695,13 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
           `The statement above is Vendor Central only. Seller Central settled ` +
           `${formatCurrencyFull(seller.settlementTotal)} in ${month} on ${seller.units} unit(s); that is in the ` +
           'Master P&L alongside this, but it is a marketplace month with its own fees and it does not belong in a ' +
-          'wholesale waterfall.',
+          'wholesale waterfall — switch to Seller Central to read it on its own.',
+        )
+      } else if (sellerMonth) {
+        notes.push(
+          `Vendor Central on its own. Seller Central settled ${formatCurrencyFull(sellerMonth.settlementTotal)} in ` +
+          `${month} and none of it is below; this half carries ${(share * 100).toFixed(1)}% of the month's fixed ` +
+          'expenses, its share of the two by net revenue, so the halves still add to Amazon India.',
         )
       }
       if (cogs.uncostedAsins > 0) {
@@ -669,14 +743,17 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       const recomputed = recomputedCogs(channel, month, inputs)
       // Sponsored Products is billed separately and never appears in a
       // settlement, so it comes from where the Ads screens keep it. One
-      // figure, one source.
+      // figure, one source — and one side: the month's spend is bought
+      // through a single AMC account that lifts both halves, so where a
+      // Vendor Central month is on file it is charged there and this half
+      // shows none. Otherwise the same rupees would appear twice over.
       const adSpend = inputs.marketing[channel]?.ads ?? 0
       const facts: AmazonInSellerPnlFacts = {
         ...imported,
         ...(recomputed ? { cogsPriced: recomputed.priced, cogsUnpriced: recomputed.unpriced } : {}),
-        ads: imported.ads || adSpend,
+        ads: vendorMonth ? 0 : (imported.ads || adSpend),
       }
-      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month, share)
       const values = applyAmazonInSellerOtherCosts(computeAmazonInSellerPnl(facts), otherCosts)
       const notes: string[] = []
       if (!recomputed) {
@@ -700,7 +777,11 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       const vendorSales = inputs.salesRecords
         .filter((r) => r.channel === 'amazon_in_vendor' && r.orderDate.slice(0, 7) === month)
         .reduce((sum, r) => sum + r.grossSales, 0)
-      if (vendorSales > 0) {
+      // Only where the wholesale half has no statement for the month. Once it
+      // has one this would be saying the opposite of what is true: that the
+      // shipments are nowhere, when they are on their own statement and in
+      // the channel total beside it.
+      if (vendorSales > 0 && !vendorMonth) {
         notes.push(
           `This is the Seller Central settlement only. ${formatCurrencyFull(vendorSales)} of Vendor Central ` +
           `shipments are on file for ${month} and none of it is below — that is a wholesale business with its ` +
@@ -715,9 +796,17 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
           'suspect until that is explained.',
         )
       }
+      if (vendorMonth) {
+        notes.push(
+          `Seller Central on its own. Vendor Central invoiced ${formatCurrencyFull(vendorMonth.invoiceValue)} in ` +
+          `${month} on its own statement, and the channel's advertising is charged there because one AMC account ` +
+          `lifts both halves — so this half shows none. It carries ${(share * 100).toFixed(1)}% of the month's ` +
+          'fixed expenses, its share of the two by net revenue.',
+        )
+      }
       return {
         channel, month,
-        canonical: { channel, month, lines: computeSubtotals(withAllocatedOpex(amazonInSellerToCanonicalBuckets(facts), inputs, channel, month)) },
+        canonical: { channel, month, lines: computeSubtotals(withAllocatedOpex(amazonInSellerToCanonicalBuckets(facts), inputs, channel, month, share)) },
         native: { lineDefs: AMAZON_IN_SELLER_LINE_DEFS, values, currency: 'INR' },
         notes,
       }

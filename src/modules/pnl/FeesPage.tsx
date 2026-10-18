@@ -80,6 +80,22 @@ export function FeesPage() {
               {r.monthOptions.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
             </select>
           </label>
+          {/* Amazon India's two businesses are charged in different ways, so
+              which of them this page is costing is part of the question. */}
+          {r.showAmazonInHalves && (
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-[var(--ink-3)]">Amazon India</span>
+              <select
+                value={r.amazonInHalf}
+                onChange={(e) => r.setAmazonInHalf(e.target.value as typeof r.amazonInHalf)}
+                className="rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-3 py-1.5 text-sm font-medium text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
+              >
+                <option value="both">Both businesses</option>
+                <option value="vendor">Vendor Central</option>
+                <option value="seller">Seller Central</option>
+              </select>
+            </label>
+          )}
           <div className="flex overflow-hidden rounded-[var(--radius-control)] border border-[var(--line-2)]">
             {(['pct', 'inr'] as const).map((u) => (
               <button

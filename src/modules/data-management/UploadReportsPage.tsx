@@ -1179,6 +1179,30 @@ function describeReport(p: PreviewState): string {
 }
 
 /**
+ * The preview fields that hold a month's facts rather than rows to add.
+ *
+ * Most marketplace reports are a month's statement, not a list of orders:
+ * they are stored as that month's facts and add no record at all. Counted as
+ * records they read as "0 of 49 rows" and "0 record(s) added", which is how a
+ * file that imported perfectly comes to look like one that failed.
+ *
+ * `satisfies` keeps the list honest against the preview's own shape.
+ */
+const FACT_FIELDS = [
+  'flipkartFacts', 'amazonUsaFacts', 'amazonAeFacts', 'amazonInSkuFeeFacts', 'purplleFacts',
+  'swiggyInstamartFacts', 'myntraFacts', 'myntraAdsFacts', 'flipkartAdsFacts', 'flipkartGoogleAdsFacts',
+  'amazonInVendorFacts', 'amazonInVendorIxd', 'nykaaFacts', 'blinkitFacts', 'amazonInSellerFacts',
+  'nykaaDebitNote', 'manualAdSpend', 'meeshoFactsByMonth', 'meeshoTransactions',
+] as const satisfies readonly (keyof PreviewState)[]
+
+function carriesFacts(p: PreviewState): boolean {
+  return FACT_FIELDS.some((key) => {
+    const value = p[key]
+    return Array.isArray(value) ? value.length > 0 : value !== undefined
+  })
+}
+
+/**
  * One file in the queue: what it was recognised as, what it will do, and — once
  * it has run — what it did. Each file keeps its own result, so a batch of
  * twelve does not collapse into one line saying "done".
@@ -1231,7 +1255,13 @@ function QueueRow({
             <div className="mt-0.5 text-xs text-[var(--ink-3)]">
               {[
                 months.length > 0 ? [...new Set(months)].sort().map(monthLabel).join(', ') : null,
-                p ? `${validCount.toLocaleString()} of ${p.totalRows.toLocaleString()} rows` : null,
+                p
+                  ? validCount > 0 || !carriesFacts(p)
+                    ? `${validCount.toLocaleString()} of ${p.totalRows.toLocaleString()} rows`
+                    // Read in full and stored as a month, not as rows — so
+                    // this says what happened rather than counting to zero.
+                    : `${p.totalRows.toLocaleString()} row(s) read`
+                  : null,
               ].filter(Boolean).join(' · ')}
             </div>
           )}
@@ -1290,9 +1320,17 @@ function QueueRow({
             <p className="mt-1.5 border-l-2 border-[var(--good)] pl-2 text-xs text-[var(--ink-2)]">
               {item.outcome.mapping
                 ? `${item.outcome.mapping.mappingsSaved.toLocaleString()} mapping(s), ${item.outcome.mapping.recipesSaved.toLocaleString()} recipe(s) saved.`
-                : `${item.outcome.added.toLocaleString()} record(s) added` +
-                  (item.outcome.skippedAsDuplicate > 0 ? `, ${item.outcome.skippedAsDuplicate.toLocaleString()} already on file` : '') +
-                  (item.outcome.monthsUpdated.length > 0 ? ` · P&L updated for ${item.outcome.monthsUpdated.map(monthLabel).join(', ')}` : '')}
+                : p?.reportKind === 'amazon_in_sku_fees'
+                  // The one report that feeds no total anywhere. Saying "P&L
+                  // updated" of it is a claim about numbers it never touched:
+                  // Amazon India's month comes from the settlement report.
+                  ? `Fee detail stored for ${item.outcome.monthsUpdated.map(monthLabel).join(', ')} — no records and ` +
+                    'no P&L line. It is read for which SKUs carry which fee — on the Amazon India channel page, under "Fees Amazon charges, by SKU".'
+                  : (item.outcome.added > 0 || !p || !carriesFacts(p)
+                      ? `${item.outcome.added.toLocaleString()} record(s) added`
+                      : 'Stored as this month\u2019s statement, not as records') +
+                    (item.outcome.skippedAsDuplicate > 0 ? `, ${item.outcome.skippedAsDuplicate.toLocaleString()} already on file` : '') +
+                    (item.outcome.monthsUpdated.length > 0 ? ` · P&L updated for ${item.outcome.monthsUpdated.map(monthLabel).join(', ')}` : '')}
             </p>
           )}
         </div>

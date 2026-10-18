@@ -7,7 +7,7 @@ import {
   type BusinessChannelId, type ChannelCurrency, type ChannelCurrencyView,
 } from '@/config/channels'
 import { toMonthKey } from '@/lib/format'
-import { buildAllChannelPnlViews, buildChannelPnlView } from '@/engine/channelPnlRouter'
+import { buildAllChannelPnlViews, buildChannelPnlView, type AmazonInHalf } from '@/engine/channelPnlRouter'
 import { buildMasterPnl, computeSubtotals } from '@/engine/pnl'
 import { usePnlInputs } from '@/engine/usePnlInputs'
 import {
@@ -48,6 +48,7 @@ export interface PnlReportStart {
   view?: PnlView
   period?: PnlPeriod
   meeshoBasis?: PnlBasis
+  amazonInHalf?: AmazonInHalf
   currencyView?: ChannelCurrencyView
 }
 
@@ -64,6 +65,11 @@ export function usePnlReport(start: PnlReportStart = {}) {
   // Meesho carries both an order-date and a payment-date statement. Order
   // basis is the default: it is what a month's trading is judged on.
   const [meeshoBasis, setMeeshoBasis] = useState<PnlBasis>(start.meeshoBasis ?? 'order')
+  // Amazon India is wholesale to RK World and a marketplace under one name.
+  // The channel — both halves added — is what opens, because that is the
+  // Amazon India every other screen reports; the halves are there to be read
+  // one at a time, which no single waterfall can do.
+  const [amazonInHalf, setAmazonInHalf] = useState<AmazonInHalf>(start.amazonInHalf ?? 'both')
   // A channel that earns and is charged in dollars or dirhams reads naturally
   // in that currency, so its own statement opens there. Rupees is the second
   // view, for reading it beside the other channels. The Master P&L is always
@@ -74,6 +80,12 @@ export function usePnlReport(start: PnlReportStart = {}) {
   // Every channel's months, from one list in the store. Each screen used to
   // keep its own, and each in turn missed a channel added later.
   const monthsWithData = useMemo(() => statementMonths(store), [store])
+
+  // Whether there are two Amazon India businesses to choose between. A toggle
+  // with an empty side is worse than no toggle: it reads as a channel with
+  // nothing in it rather than as a half that has no file yet.
+  const hasBothAmazonInHalves =
+    (store.amazonInVendorFacts ?? []).length > 0 && (store.amazonInSellerFacts ?? []).length > 0
 
   return useMemo(() => {
     const months =
@@ -88,9 +100,14 @@ export function usePnlReport(start: PnlReportStart = {}) {
     // same choice without this file knowing it exists.
     const displayCurrency: ChannelCurrency = view === 'master' ? 'INR' : displayCurrencyFor(view, currencyView)
 
+    // Reading one half of Amazon India is a choice about that channel's own
+    // report. The Master P&L sums every channel and has to be the company, so
+    // it reads the whole of Amazon India however this is left set.
+    const halfForView: AmazonInHalf = view === 'amazon_in' ? amazonInHalf : 'both'
+
     /** One month's P&L lines for the selected view, in `displayCurrency`. */
     const linesFor = (m: string): PnlLineValues => {
-      const inputs = { ...forMonth(m), meeshoBasis, currencyView }
+      const inputs = { ...forMonth(m), meeshoBasis, currencyView, amazonInHalf: halfForView }
       if (view === 'master') {
         const views = buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, m, inputs)
         return buildMasterPnl(views.map((v) => v.canonical), m).lines
@@ -123,7 +140,7 @@ export function usePnlReport(start: PnlReportStart = {}) {
     const latestMonth = traded[traded.length - 1] ?? months[months.length - 1] ?? month
     const channelBreakdown =
       view === 'master'
-        ? buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, latestMonth, { ...forMonth(latestMonth), meeshoBasis, currencyView })
+        ? buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, latestMonth, { ...forMonth(latestMonth), meeshoBasis, currencyView, amazonInHalf: 'both' })
             .map((v) => ({ channel: v.channel, netSales: v.canonical.lines.netSales ?? 0 }))
             .filter((c) => c.netSales !== 0)
             .sort((a, b) => b.netSales - a.netSales)
@@ -160,11 +177,11 @@ export function usePnlReport(start: PnlReportStart = {}) {
     let missingStatementNote: string | null = null
     if (view !== 'master') {
       for (let i = months.length - 1; i >= 0; i--) {
-        const built = buildChannelPnlView(view, months[i], { ...forMonth(months[i]), meeshoBasis, currencyView })
+        const built = buildChannelPnlView(view, months[i], { ...forMonth(months[i]), meeshoBasis, currencyView, amazonInHalf: halfForView })
         if (built.native) { native = built.native; nativeNotes = built.notes; nativeMonth = months[i]; break }
       }
       if (!native) {
-        const built = buildChannelPnlView(view, latestMonth, { ...forMonth(latestMonth), meeshoBasis, currencyView })
+        const built = buildChannelPnlView(view, latestMonth, { ...forMonth(latestMonth), meeshoBasis, currencyView, amazonInHalf: halfForView })
         missingStatementNote = built.notes[0] ?? null
       }
     }
@@ -175,6 +192,9 @@ export function usePnlReport(start: PnlReportStart = {}) {
       view, setView,
       missingStatementNote,
       meeshoBasis, setMeeshoBasis,
+      amazonInHalf, setAmazonInHalf,
+      // Offered only where there are two halves on file to read apart.
+      showAmazonInHalves: view === 'amazon_in' && hasBothAmazonInHalves,
       currencyView, setCurrencyView,
       displayCurrency,
       // Named for whichever currency this view is settled in, so Amazon UAE
@@ -193,5 +213,8 @@ export function usePnlReport(start: PnlReportStart = {}) {
       trend,
       latestMonth,
     }
-  }, [view, meeshoBasis, currencyView, period, month, currentMonth, monthsWithData, forMonth, fxRates])
+  }, [
+    view, meeshoBasis, amazonInHalf, currencyView, period, month, currentMonth,
+    monthsWithData, hasBothAmazonInHalves, forMonth, fxRates,
+  ])
 }

@@ -1,5 +1,6 @@
 import { BUSINESS_CHANNEL_IDS } from '@/config/channels'
 import { QUICK_PERIODS, type QuickPeriod } from '@/engine/multiMonthPnl'
+import type { AmazonInHalf } from '@/engine/channelPnlRouter'
 import type { PnlPeriod, PnlReportStart, PnlView } from './usePnlReport'
 
 const isView = (v: string | null): v is PnlView =>
@@ -26,7 +27,12 @@ const MONTH = /^\d{4}-\d{2}$/
  * the six months it happened to mean at the time; `from`/`to` without one is
  * a fixed range, which is what the earliest snapshot links carry.
  */
-export function pnlSnapshotStart(params: URLSearchParams): Required<Pick<PnlReportStart, 'view' | 'meeshoBasis' | 'currencyView'>> & { period?: PnlPeriod } {
+const isAmazonInHalf = (v: string | null): v is AmazonInHalf =>
+  v === 'both' || v === 'vendor' || v === 'seller'
+
+export function pnlSnapshotStart(
+  params: URLSearchParams,
+): Required<Pick<PnlReportStart, 'view' | 'meeshoBasis' | 'amazonInHalf' | 'currencyView'>> & { period?: PnlPeriod } {
   const viewParam = params.get('view')
   const from = params.get('from')
   const to = params.get('to')
@@ -41,6 +47,9 @@ export function pnlSnapshotStart(params: URLSearchParams): Required<Pick<PnlRepo
         : undefined,
     // The screen calls it "Payment date"; the value behind it is 'settlement'.
     meeshoBasis: params.get('basis') === 'settlement' ? 'settlement' : 'order',
+    // Which of Amazon India's two businesses the link was taken on. Anything
+    // else means the channel, which is what every other screen reports.
+    amazonInHalf: isAmazonInHalf(params.get('half')) ? (params.get('half') as AmazonInHalf) : 'both',
     // `cur` used to hold a currency code, and links already sent out still
     // carry one. Anything that is not INR means the marketplace's own
     // currency, which is what cur=USD meant on every link ever made.
