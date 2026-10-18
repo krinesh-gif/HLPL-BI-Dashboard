@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ADS_CHANNELS, ADS_CHANNEL_IDS } from '@/config/adsChannels'
 import type { AdsRecord, ManualAdSpend } from '@/data/models'
-import { adsSpendFor, adsSpendForMonth, tacos, totalAdsSpend } from './adsSpend'
+import { adsSpendByProgram, adsSpendFor, adsSpendForMonth, tacos, totalAdsSpend } from './adsSpend'
 import { marketingFromAds } from './marketing'
 
 function report(over: Partial<AdsRecord> = {}): AdsRecord {
@@ -174,5 +174,54 @@ describe('a metric the platform does not publish', () => {
     const f = adsSpendFor('amazon_us', '2026-05', amazon, [])
     expect(f.clicks).toBe(7)
     expect(f.adOrders).toBe(3)
+  })
+})
+
+/**
+ * Amazon's ad products, split out.
+ *
+ * Sponsored Products defends a listing someone is already searching for;
+ * Sponsored Brands buys reach. Blended into one figure neither can be managed
+ * — and the blended ROAS hides whichever of them is not paying for itself.
+ */
+describe('adsSpendByProgram', () => {
+  const rows: AdsRecord[] = [
+    report({ program: 'Sponsored Products', spend: 60000, adSales: 300000 }),
+    report({ program: 'Sponsored Products', campaign: 'C2', spend: 20000, adSales: 40000 }),
+    report({ program: 'Sponsored Brands', campaign: 'Reach', spend: 20000, adSales: 10000 }),
+  ]
+
+  it('splits the month by ad product, heaviest spend first', () => {
+    const split = adsSpendByProgram('amazon_in', '2026-08', rows)
+    expect(split.map((p) => p.program)).toEqual(['Sponsored Products', 'Sponsored Brands'])
+    expect(split[0].spend).toBe(80000)
+    expect(split[0].shareOfSpend).toBeCloseTo(80, 6)
+    expect(split[1].shareOfSpend).toBeCloseTo(20, 6)
+  })
+
+  it('takes ROAS per product, which is the point of splitting it', () => {
+    const split = adsSpendByProgram('amazon_in', '2026-08', rows)
+    // 3.40x blended, and one of the two is returning half what it costs.
+    expect(split[0].roas).toBeCloseTo(340000 / 80000, 6)
+    expect(split[1].roas).toBeCloseTo(0.5, 6)
+  })
+
+  it('keeps both halves of Amazon India on the one ads channel', () => {
+    const split = adsSpendByProgram('amazon_in', '2026-08', [
+      report({ program: 'Sponsored Products', spend: 1000, adSales: 0 }),
+      report({ channel: 'amazon_in_vendor', campaign: 'V', program: 'Sponsored Display', spend: 500, adSales: 0 }),
+    ])
+    expect(split.map((p) => p.program)).toEqual(['Sponsored Products', 'Sponsored Display'])
+  })
+
+  it('reports an unlabelled month under one null entry, not as a product', () => {
+    const split = adsSpendByProgram('flipkart', '2026-08', [report({ channel: 'flipkart', spend: 1000 })])
+    expect(split).toHaveLength(1)
+    expect(split[0].program).toBeNull()
+  })
+
+  it('ignores other channels and other months', () => {
+    expect(adsSpendByProgram('amazon_in', '2026-09', rows)).toEqual([])
+    expect(adsSpendByProgram('flipkart', '2026-08', rows)).toEqual([])
   })
 })

@@ -176,12 +176,19 @@ BEGIN
 
   CREATE INDEX IF NOT EXISTS ads_records_date_idx ON ads_records (date);
 
+  -- Which ad product bought the row — Sponsored Products, Brands, Display.
+  -- Null on every row stored before it was read, and on the platforms whose
+  -- reports carry no such split.
+  ALTER TABLE ads_records ADD COLUMN IF NOT EXISTS program TEXT;
+
   -- An ads row's identity gained the three columns that separate one line of a
   -- campaign report from another: ad group, keyword and search term. Blinkit
   -- reports a row per targeting value and carries no SKU, so without the
   -- keyword its rows shared a key and all but the first of each were dropped
   -- as duplicates — April's advertising stored as 11.20 against the 16.80 its
-  -- report states.
+  -- report states. The ad product followed, for the same reason: Amazon can
+  -- run one campaign name under Sponsored Products and Sponsored Brands on
+  -- the same day, and those are two rows.
   --
   -- The stored keys are recomputed here rather than left on the old formula,
   -- because a row that no longer matches the file it came from is re-inserted
@@ -195,9 +202,11 @@ BEGIN
   UPDATE ads_records SET dedup_key =
     channel || '|' || campaign || '|' || ads_records.date || '|' || coalesce(sku, '')
       || '|' || coalesce(ad_group, '') || '|' || coalesce(keyword, '') || '|' || coalesce(search_term, '')
+      || '|' || coalesce(program, '')
   WHERE dedup_key <>
     channel || '|' || campaign || '|' || ads_records.date || '|' || coalesce(sku, '')
-      || '|' || coalesce(ad_group, '') || '|' || coalesce(keyword, '') || '|' || coalesce(search_term, '');
+      || '|' || coalesce(ad_group, '') || '|' || coalesce(keyword, '') || '|' || coalesce(search_term, '')
+      || '|' || coalesce(program, '');
 
   -- ---------------------------------------------------------------------------
   -- Channel-native P&L facts, stored whole as JSONB per month. The app always

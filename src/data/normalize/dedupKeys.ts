@@ -47,16 +47,21 @@ export function recordKey(r: Pick<CanonicalSalesRecord, 'channel' | 'orderId' | 
  * keys, `ON CONFLICT DO NOTHING` dropped the other four, and the month's
  * advertising read ₹11.20 against the ₹16.80 the file states.
  *
+ * The ad product is part of it too: Amazon runs Sponsored Products and
+ * Sponsored Brands as separate reports, a campaign name can appear in both on
+ * the same day, and without the program one of those two rows is dropped as a
+ * duplicate of the other.
+ *
  * Adding a field changes every key, so the rows already stored would stop
  * matching the file they came from and a re-upload would book the month
  * twice. `SCHEMA_SQL` recomputes the stored keys from the row's own columns
  * with the same formula; the two have to be changed together.
  */
 export function adsRecordKey(
-  r: Pick<AdsRecord, 'channel' | 'campaign' | 'date' | 'sku' | 'adGroup' | 'keyword' | 'searchTerm'>,
+  r: Pick<AdsRecord, 'channel' | 'campaign' | 'date' | 'sku' | 'adGroup' | 'keyword' | 'searchTerm' | 'program'>,
 ): string {
   return [
     r.channel, r.campaign, r.date,
-    r.sku ?? '', r.adGroup ?? '', r.keyword ?? '', r.searchTerm ?? '',
+    r.sku ?? '', r.adGroup ?? '', r.keyword ?? '', r.searchTerm ?? '', r.program ?? '',
   ].join('|')
 }

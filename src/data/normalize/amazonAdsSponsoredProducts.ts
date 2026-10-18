@@ -5,11 +5,15 @@ import { getField, headersPresent, type RowIssue } from './types'
 import { toIsoDate } from '@/lib/format'
 import { parseReportDate } from '@/lib/reportDate'
 
-// Column names as they appear in the Amazon Ads console's Sponsored Products
-// "Campaign report" export. "Portfolio name" is frequently used as the SKU
-// code in single-SKU campaign setups; "Campaign Name" is the actual ad
-// campaign. Retailer + Country determine which of the app's Amazon channels
-// a row belongs to.
+// Column names as they appear in the Amazon Ads console's "Campaign report"
+// export. The console exports the same shape for each ad product and names
+// the product in Program Type, so Sponsored Brands and Sponsored Display
+// downloads read here too — their spend is as real as Sponsored Products' and
+// a month that ran both is two lines, not one.
+//
+// "Portfolio name" is frequently used as the SKU code in single-SKU campaign
+// setups; "Campaign Name" is the actual ad campaign. Retailer + Country
+// determine which of the app's Amazon channels a row belongs to.
 const COLUMNS = {
   /**
    * The day the spend happened. The console exports it only when the report
@@ -29,6 +33,8 @@ const COLUMNS = {
   endDate: ['end date'],
   campaignName: ['campaign name'],
   portfolioName: ['portfolio name'],
+  /** Sponsored Products, Sponsored Brands, Sponsored Display. */
+  programType: ['program type', 'ad product', 'campaign type'],
   retailer: ['retailer'],
   country: ['country'],
   impressions: ['impressions'],
@@ -47,7 +53,11 @@ export function detectAmazonAdsSponsoredProductsReport(headers: string[]): boole
     headersPresent(headers, COLUMNS.campaignName) &&
     headersPresent(headers, COLUMNS.spend) &&
     headersPresent(headers, COLUMNS.impressions) &&
-    headersPresent(headers, COLUMNS.portfolioName)
+    // Either column identifies this console's campaign report. Requiring the
+    // portfolio alone turned away any export without one — and a Sponsored
+    // Brands download that arrives unrecognised is a month of real spend
+    // nobody notices is missing.
+    (headersPresent(headers, COLUMNS.portfolioName) || headersPresent(headers, COLUMNS.programType))
   )
 }
 
@@ -141,6 +151,11 @@ export function normalizeAmazonAdsSponsoredProductsReport(rows: Record<string, s
       date: toIsoDate(startDate),
       channel,
       campaign,
+      // Kept as the console writes it. Normalising "Sponsored Brands" into a
+      // code of our own would need a list of every name Amazon uses, and a
+      // product missing from that list would read as having no program at
+      // all rather than as the one it is.
+      program: getField(row, COLUMNS.programType),
       sku,
       impressions: Number(getField(row, COLUMNS.impressions)) || 0,
       clicks: Number(getField(row, COLUMNS.clicks)) || 0,
@@ -150,6 +165,14 @@ export function normalizeAmazonAdsSponsoredProductsReport(rows: Record<string, s
       importId,
     })
   })
+
+  const programs = new Set(adsRecords.map((r) => r.program).filter((p): p is string => p !== undefined))
+  if (programs.size > 1) {
+    warnings.push(
+      `This export covers ${programs.size} ad products: ${[...programs].sort().join(', ')}. Each is on its own ` +
+      'line in the P&L’s advertising and on the ads page, so the month shows what was spent on which.',
+    )
+  }
 
   // A monthly summary dates every row with the report's own range, and that
   // is the month the spend belongs to. Several start dates means they are

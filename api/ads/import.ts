@@ -103,11 +103,11 @@ export async function POST(request: Request): Promise<Response> {
     const result = (await sql.query(
       `INSERT INTO ads_records (
          dedup_key, date, channel, campaign, ad_group, keyword, search_term, sku, asin,
-         impressions, clicks, spend, ad_sales, ad_orders, import_id
+         impressions, clicks, spend, ad_sales, ad_orders, import_id, program
        )
        SELECT * FROM UNNEST(
          $1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $8::text[], $9::text[],
-         $10::float8[], $11::float8[], $12::float8[], $13::float8[], $14::float8[], $15::text[]
+         $10::float8[], $11::float8[], $12::float8[], $13::float8[], $14::float8[], $15::text[], $16::text[]
        )
        ON CONFLICT (dedup_key) DO NOTHING
        RETURNING dedup_key`,
@@ -127,6 +127,7 @@ export async function POST(request: Request): Promise<Response> {
         chunk.map((r) => r.adSales),
         chunk.map((r) => r.adOrders),
         chunk.map((r) => batchImportId ?? r.importId),
+        chunk.map((r) => r.program ?? null),
       ],
     )) as unknown[]
     inserted += result.length

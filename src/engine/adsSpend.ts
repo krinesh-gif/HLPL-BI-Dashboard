@@ -102,6 +102,55 @@ export function adsSpendForMonth(
   return channels.map((c) => adsSpendFor(c, month, adsRecords, manualEntries))
 }
 
+/**
+ * A month's spend broken out by ad product.
+ *
+ * Amazon runs Sponsored Products, Brands and Display as separate buys with
+ * separate reports, and they answer different questions: Sponsored Products
+ * defends a listing someone is already looking for, Sponsored Brands buys
+ * reach. One figure for the month cannot say which was bought, so where the
+ * rows carry a program this is the split.
+ *
+ * Rows with no program — every platform but Amazon — come back under one
+ * entry with a null label, so a caller can tell "not reported by product"
+ * from "reported as this product".
+ */
+export interface AdsProgramSpend {
+  program: string | null
+  spend: number
+  adSales: number
+  shareOfSpend: number
+  roas: number | null
+}
+
+export function adsSpendByProgram(
+  channel: AdsChannelId,
+  month: string,
+  adsRecords: AdsRecord[],
+): AdsProgramSpend[] {
+  const rows = adsRecords.filter(
+    (r) => channelOfSource(r.channel) === channel && toMonthKey(r.date) === month,
+  )
+  const byProgram = new Map<string | null, { spend: number; adSales: number }>()
+  for (const r of rows) {
+    const key = r.program ?? null
+    const entry = byProgram.get(key) ?? { spend: 0, adSales: 0 }
+    entry.spend += r.spend
+    entry.adSales += r.adSales
+    byProgram.set(key, entry)
+  }
+  const total = [...byProgram.values()].reduce((sum, e) => sum + e.spend, 0)
+  return [...byProgram.entries()]
+    .map(([program, e]) => ({
+      program,
+      spend: e.spend,
+      adSales: e.adSales,
+      shareOfSpend: total > 0 ? (e.spend / total) * 100 : 0,
+      roas: e.spend > 0 ? e.adSales / e.spend : null,
+    }))
+    .sort((a, b) => b.spend - a.spend)
+}
+
 export interface AdsTotals {
   spend: number
   /** Null when no channel in the period reported attributed sales, so ROAS and

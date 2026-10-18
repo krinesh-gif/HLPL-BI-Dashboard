@@ -367,6 +367,21 @@ export interface AdsRecord {
   date: string
   channel: ChannelId
   campaign: string
+  /**
+   * Which ad product bought this — "Sponsored Products", "Sponsored Brands",
+   * "Sponsored Display".
+   *
+   * Amazon's console exports one report shape per ad product and names the
+   * product in a Program Type column. Without it a month that ran Sponsored
+   * Brands as well as Sponsored Products is one undifferentiated figure, and
+   * the two are different decisions: Sponsored Products defends a listing,
+   * Sponsored Brands buys reach. It is also part of a row's identity — the
+   * same campaign name can run under two programs on one day, and a key
+   * without it drops one of them as a duplicate.
+   *
+   * Absent on the platforms whose reports carry no such split.
+   */
+  program?: string
   adGroup?: string
   keyword?: string
   searchTerm?: string

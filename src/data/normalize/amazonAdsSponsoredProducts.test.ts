@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { detectAmazonAdsSponsoredProductsReport, normalizeAmazonAdsSponsoredProductsReport } from './amazonAdsSponsoredProducts'
+import { adsRecordKey } from './dedupKeys'
 
 const headers = [
   'Start Date', 'End Date', 'Portfolio name', 'Program Type', 'Campaign Name', 'Retailer', 'Country', 'Status',
@@ -42,6 +43,49 @@ describe('detectAmazonAdsSponsoredProductsReport', () => {
  * download. The second one put ₹2.29 lakh of Amazon USA's July spend on 30
  * June, because two campaigns happened to launch that day.
  */
+/**
+ * Sponsored Brands and Sponsored Display, which the console exports in the
+ * same shape and names in Program Type. A month that ran both is two lines.
+ */
+describe('every Amazon ad product, not only Sponsored Products', () => {
+  const sbHeaders = ['Date', 'Program Type', 'Campaign Name', 'Country', 'Currency', 'Impressions', 'Clicks', 'Spend', '14 Day Total Orders', '14 Day Total Sales']
+
+  it('recognizes a campaign report with no portfolio column', () => {
+    expect(detectAmazonAdsSponsoredProductsReport(sbHeaders)).toBe(true)
+  })
+
+  it('keeps the ad product the console names', () => {
+    const rows = [
+      { ...realRow({ Country: 'India', Currency: 'INR' }), 'Program Type': 'Sponsored Products' },
+      { ...realRow({ Country: 'India', Currency: 'INR', 'Campaign Name': 'Brand Reach' }), 'Program Type': 'Sponsored Brands' },
+    ]
+    const r = normalizeAmazonAdsSponsoredProductsReport(rows, 'i')
+    expect(r.adsRecords.map((a) => a.program)).toEqual(['Sponsored Products', 'Sponsored Brands'])
+    expect(r.warnings.some((w) => w.includes('2 ad products'))).toBe(true)
+  })
+
+  // Same campaign, same day, two ad products. Without the program in the key
+  // the second row is dropped as a duplicate of the first and the month is
+  // short by whatever Sponsored Brands spent.
+  it('keeps one campaign’s two ad products apart', () => {
+    const rows = [
+      { ...realRow({ Country: 'India', Currency: 'INR', Spend: '₹1000' }), Date: 'Sep 03, 2026', 'Program Type': 'Sponsored Products' },
+      { ...realRow({ Country: 'India', Currency: 'INR', Spend: '₹4000' }), Date: 'Sep 03, 2026', 'Program Type': 'Sponsored Brands' },
+    ]
+    const r = normalizeAmazonAdsSponsoredProductsReport(rows, 'i')
+    expect(new Set(r.adsRecords.map(adsRecordKey)).size).toBe(2)
+    expect(r.adsRecords.reduce((sum, a) => sum + a.spend, 0)).toBe(5000)
+  })
+
+  it('leaves the program unset where the report names none', () => {
+    // Every platform but Amazon. The row still imports; it simply has no
+    // product split to report.
+    const { 'Program Type': _omitted, ...noProgram } = realRow()
+    const r = normalizeAmazonAdsSponsoredProductsReport([noProgram], 'i')
+    expect(r.adsRecords[0].program).toBeUndefined()
+  })
+})
+
 describe('which month the spend lands in', () => {
   const daily = (date: string, spend: string) => ({
     ...realRow({ Country: 'India', Currency: 'INR', Spend: spend }), Date: date,

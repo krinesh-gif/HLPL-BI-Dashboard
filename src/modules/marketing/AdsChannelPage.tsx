@@ -8,13 +8,55 @@ import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
 import { ADS_CHANNELS, ADS_CHANNEL_MAP, isAdsChannel, type AdsChannelId } from '@/config/adsChannels'
 import { addMonths, formatCurrencyCompact, formatCurrencyFull, formatNumber, formatPercent, monthLabel } from '@/lib/format'
-import { adsSpendFor, tacos } from '@/engine/adsSpend'
+import { adsSpendByProgram, adsSpendFor, tacos, type AdsProgramSpend } from '@/engine/adsSpend'
 import { netSalesForChannelMonth } from '@/engine/netSales'
 import { ManualAdSpendForm } from './ManualAdSpendForm'
 import { MyntraAdsDepth } from './MyntraAdsDepth'
 import { FlipkartAdsDepth } from './FlipkartAdsDepth'
 
 const TREND_MONTHS = 6
+
+/**
+ * What the month was spent on, where the platform says.
+ *
+ * Amazon buys Sponsored Products, Brands and Display separately and names the
+ * product on every row. They are different decisions — Sponsored Products
+ * defends a listing someone is already searching for, Sponsored Brands buys
+ * reach — so a single spend figure for the month cannot be managed. ROAS is
+ * per product for the same reason: the blended number hides whichever of them
+ * is not paying for itself.
+ */
+function ByProgram({ rows }: { rows: AdsProgramSpend[] }) {
+  return (
+    <div className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[var(--shadow-card)]">
+      <h3 className="text-sm font-semibold text-[var(--ink-2)]">What it was spent on</h3>
+      <table className="mt-2 w-full text-sm">
+        <thead>
+          <tr className="border-b border-[var(--line)] text-xs uppercase tracking-wide text-[var(--ink-3)]">
+            <th className="py-1.5 text-left font-semibold">Ad product</th>
+            <th className="py-1.5 text-right font-semibold">Spend</th>
+            <th className="py-1.5 text-right font-semibold">Share</th>
+            <th className="py-1.5 text-right font-semibold">Ad sales</th>
+            <th className="py-1.5 text-right font-semibold">ROAS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.program ?? 'unlabelled'} className="border-b border-[var(--line)] last:border-0">
+              <td className="py-1.5 font-medium text-[var(--ink)]">
+                {r.program ?? <span className="text-[var(--ink-3)]">Not reported by product</span>}
+              </td>
+              <td className="py-1.5 text-right tabular-nums">{formatCurrencyFull(r.spend)}</td>
+              <td className="py-1.5 text-right tabular-nums text-[var(--ink-3)]">{formatPercent(r.shareOfSpend, 0)}</td>
+              <td className="py-1.5 text-right tabular-nums">{formatCurrencyFull(r.adSales)}</td>
+              <td className="py-1.5 text-right tabular-nums">{r.roas === null ? '—' : `${r.roas.toFixed(2)}x`}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 /** One advertising channel: its KPIs, its trend, and — where the platform bills
  * by invoice — the form for entering the month's figure. */
@@ -51,7 +93,12 @@ export function AdsChannelPage() {
       }
     })
 
-    return { figure, netSales, trend }
+    // Only where the platform reports one: it is Amazon's split, and a
+    // single row labelled "not reported by product" tells nobody anything.
+    const byProgram = adsSpendByProgram(channel, month, adsRecords)
+    const programs = byProgram.length > 1 || byProgram.some((p) => p.program !== null) ? byProgram : []
+
+    return { figure, netSales, trend, programs }
   }, [def, channel, month, adsRecords, manualAdSpend, salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts])
 
   if (!def || !data) {
@@ -62,7 +109,7 @@ export function AdsChannelPage() {
     )
   }
 
-  const { figure, netSales, trend } = data
+  const { figure, netSales, trend, programs } = data
   const roas = figure.adSales !== null && figure.spend > 0 ? figure.adSales / figure.spend : null
   const acos = figure.adSales !== null && figure.adSales > 0 ? (figure.spend / figure.adSales) * 100 : null
   const ctr = figure.impressions !== null && figure.impressions > 0 && figure.clicks !== null
@@ -108,6 +155,8 @@ export function AdsChannelPage() {
         <KPICard label="CPC" value={cpc === null ? '—' : formatCurrencyFull(cpc)} />
         <KPICard label="CVR" value={cvr === null ? '—' : formatPercent(cvr, 2)} />
       </KPIGrid>
+
+      {programs.length > 0 && <ByProgram rows={programs} />}
 
       {def.usesMonthlyInvoice && <ManualAdSpendForm channel={channel} def={def} month={month} current={figure} />}
 
