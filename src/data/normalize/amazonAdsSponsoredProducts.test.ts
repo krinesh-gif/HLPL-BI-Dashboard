@@ -34,6 +34,53 @@ describe('detectAmazonAdsSponsoredProductsReport', () => {
   })
 })
 
+/**
+ * Which month a row's spend belongs to.
+ *
+ * "Start Date" means two things in this export: the report's own range in a
+ * monthly summary, and each campaign's launch date in the campaign-level
+ * download. The second one put ₹2.29 lakh of Amazon USA's July spend on 30
+ * June, because two campaigns happened to launch that day.
+ */
+describe('which month the spend lands in', () => {
+  const daily = (date: string, spend: string) => ({
+    ...realRow({ Country: 'India', Currency: 'INR', Spend: spend }), Date: date,
+  })
+
+  it('uses the day of spend where the export carries one', () => {
+    const r = normalizeAmazonAdsSponsoredProductsReport(
+      [daily('Sep 03, 2026', '₹1200.50'), daily('Sep 28, 2026', '₹800.25')], 'i')
+    expect(r.adsRecords.map((a) => a.date)).toEqual(['2026-09-03', '2026-09-28'])
+    expect(r.warnings).toEqual([])
+  })
+
+  it('trusts one shared start date, which is the report’s own range', () => {
+    const rows = [realRow(), realRow({ 'Campaign Name': 'Second' })]
+    const r = normalizeAmazonAdsSponsoredProductsReport(rows, 'i')
+    expect(r.adsRecords.every((a) => a.date === '2026-05-01')).toBe(true)
+    expect(r.warnings).toEqual([])
+  })
+
+  it('says so when the dates are campaign launch dates rather than a period', () => {
+    const rows = [
+      realRow({ 'Start Date': 'Jun 30, 2026', 'End Date': 'Jul 31, 2026', 'Campaign Name': 'A' }),
+      realRow({ 'Start Date': 'Jul 13, 2026', 'End Date': 'Jul 31, 2026', 'Campaign Name': 'B' }),
+    ]
+    const r = normalizeAmazonAdsSponsoredProductsReport(rows, 'i')
+    // Still imported — the spend is real, and the warning says what is wrong
+    // with the month it landed in.
+    expect(r.adsRecords).toHaveLength(2)
+    expect(r.warnings[0]).toContain('campaign launch dates')
+    expect(r.warnings[0]).toContain('Time unit: Daily')
+  })
+
+  it('says so when one range crosses a month end', () => {
+    const rows = [realRow({ 'Start Date': 'May 15, 2026', 'End Date': 'Jun 14, 2026' })]
+    const r = normalizeAmazonAdsSponsoredProductsReport(rows, 'i')
+    expect(r.warnings[0]).toContain('2026-05 and 2026-06')
+  })
+})
+
 describe('normalizeAmazonAdsSponsoredProductsReport', () => {
   it('parses real currency-formatted spend/sales figures and converts USD to INR for amazon_us rows', () => {
     const result = normalizeAmazonAdsSponsoredProductsReport([realRow()], 'import-1')

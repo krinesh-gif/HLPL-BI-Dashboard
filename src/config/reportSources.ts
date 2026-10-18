@@ -55,13 +55,23 @@ export const REPORT_SOURCES: ReportSource[] = [
       'Vendor Central, from the manager at RK World Infocom by email: the NPPM file — the month’s shipments, '
         + 'with Net Shipped GMS and Net PPM per ASIN',
       'Vendor Central: the IXD file — units unpacked at the warehouse, which is what the cross-dock charge is on',
+      'Advertising, from a different console — advertising.amazon.in ▸ Measurement & Reporting ▸ Sponsored '
+        + 'Products ▸ Campaign report, as CSV, with Time unit: Daily and the date range set to one calendar '
+        + 'month. Nothing else on Amazon India carries the ad spend: it is billed outside both the settlement '
+        + 'and the vendor files',
     ],
     note: 'Same page and the same three settings as the USA and UAE stores, on India’s Seller Central. The two '
       + 'vendor files come by email, both every month, and the NPPM first: the cross-dock charge attaches to the '
       + 'month that file opens. Neither states a period, so the month is taken from the ship days and the inbound '
       + 'dates. Vendor Central’s Retail Analytics "sales by ASIN" export is not a substitute for the NPPM file — '
       + 'it reports what Amazon sold at, not what they paid, so a month imported from it overstates the revenue '
-      + 'by the whole trade margin.',
+      + 'by the whole trade margin. '
+      + 'On the ads report, Time unit: Daily matters. Run as a summary it can carry each campaign’s own start '
+      + 'date rather than the period, and the whole of a campaign’s spend then lands in the month it launched — '
+      + 'the importer says so when it sees it, but a daily export cannot go wrong. One ad account lifts both '
+      + 'halves of the channel, so the spend is charged once, on the Vendor Central statement. Anything the '
+      + 'console does not bill in that report — Sponsored Brands, Sponsored Display, DSP — comes in as the '
+      + 'monthly advertising invoice instead, which the uploader reads as a figure for the channel-month.',
   },
   {
     key: 'amazon_us',
