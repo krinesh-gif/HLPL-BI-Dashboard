@@ -1,6 +1,7 @@
 import type { BusinessChannelId } from '@/config/channels'
 import type { PnlBasis } from '@/data/models'
 import type {
+  AmazonInSkuFeeFacts,
   PurpllePnlFacts,
   SwiggyInstamartPnlFacts,
   AmazonAePnlFacts,
@@ -54,6 +55,11 @@ import {
   AMAZON_IN_VENDOR_LINE_DEFS, amazonInVendorToCanonicalBuckets, applyAmazonInVendorOtherCosts,
   computeAmazonInVendorPnl, type VendorCogs,
 } from './nativePnl/amazonInVendor'
+import {
+  amazonInSellerExportLineDefs, amazonInSellerExportToCanonicalBuckets,
+  applyAmazonInSellerExportOtherCosts, computeAmazonInSellerExportPnl, EMPTY_SELLER_EXPORT_COGS,
+  type SellerExportCogs,
+} from './nativePnl/amazonInSellerExport'
 import type { NativeLineDef, NativeLineValues } from './nativePnl/types'
 
 export interface NativePnlView {
@@ -105,6 +111,10 @@ export interface ChannelFactsStore {
   swiggyInstamartFacts?: SwiggyInstamartPnlFacts[]
   /** Amazon India's wholesale half, which has its own statement. */
   amazonInVendorFacts?: AmazonInVendorFacts[]
+  /** Amazon India's marketplace half as the Product Profitability export
+   * states it — the whole month, SKU by SKU, which is why it is the statement
+   * for that half rather than only the fee detail behind it. */
+  amazonInSkuFeeFacts?: AmazonInSkuFeeFacts[]
 }
 
 /** Sums this channel's allocated share (sales-contribution method) of the
@@ -240,6 +250,80 @@ function vendorCogs(facts: AmazonInVendorFacts, month: string, inputs: ChannelPn
   return { priced, unpriced: estimate.amount, uncostedAsins: uncostedAsins.length, uncostedUnits }
 }
 
+/**
+ * Cost of goods for a Seller Central month, priced from the MSKUs the export
+ * lists.
+ *
+ * Amazon's own seller-cost column in that export is whatever someone typed
+ * into Seller Central, and ours is blank on every month on file, so the cost
+ * is priced here from our cost sheet against the units each MSKU sold. An
+ * MSKU with no cost behind it falls to the same estimate every other channel
+ * uses.
+ *
+ * A month imported before the export carried units per SKU cannot be priced
+ * at all. Rather than report a 100% gross margin it estimates the whole
+ * month's cost and says so on the statement, and a re-upload prices it.
+ */
+function sellerExportCogs(
+  facts: AmazonInSkuFeeFacts,
+  month: string,
+  inputs: ChannelPnlViewInputs,
+): SellerExportCogs {
+  const tables = {
+    skuMaster: inputs.skuMaster,
+    mappings: inputs.cogs?.mappings ?? [],
+    comboComponents: inputs.cogs?.comboComponents ?? [],
+    costFor: (sku: string) => {
+      const index = inputs.cogs?.costIndex
+      if (!index) return undefined
+      return cogsForMonth(sku, month, index) ?? undefined
+    },
+  }
+  const units = facts.unitsBySku ?? {}
+  const netSalesBySku = facts.netSalesBySku ?? {}
+  const skus = Object.keys(units)
+  if (skus.length === 0) {
+    const charged = Object.keys(facts.feeBySkuInr ?? {})
+    const estimate = estimateUncostedCogs(
+      {
+        cogs: 0, costedUnits: 0, uncostedUnits: facts.netUnitsSoldQty,
+        uncostedSkus: charged, uncostedNetSales: facts.netSalesInr,
+      },
+      facts.netSalesInr,
+    )
+    return {
+      priced: 0, unpriced: estimate.amount, uncostedSkus: charged.length,
+      uncostedUnits: facts.netUnitsSoldQty, estimatedWholeMonth: true,
+    }
+  }
+
+  let priced = 0
+  let costedUnits = 0
+  let uncostedUnits = 0
+  let uncostedNetSales = 0
+  const uncostedSkus: string[] = []
+  for (const sku of skus) {
+    const qty = units[sku] ?? 0
+    const resolved = resolveCogs(sku, tables)
+    if (resolved && resolved.cogs > 0) {
+      priced += resolved.cogs * qty
+      costedUnits += qty
+    } else {
+      uncostedUnits += qty
+      uncostedNetSales += netSalesBySku[sku] ?? 0
+      uncostedSkus.push(sku)
+    }
+  }
+  const estimate = estimateUncostedCogs(
+    { cogs: priced, costedUnits, uncostedUnits, uncostedSkus, uncostedNetSales },
+    uncostedNetSales,
+  )
+  return {
+    priced, unpriced: estimate.amount, uncostedSkus: uncostedSkus.length,
+    uncostedUnits, estimatedWholeMonth: false,
+  }
+}
+
 /** Two canonical bucket sets added line by line, for a channel built from
  * more than one statement. */
 function addBuckets(a: PnlLineValues, b: PnlLineValues): PnlLineValues {
@@ -276,12 +360,11 @@ function sellerBucketsWithoutAds(facts: AmazonInSellerPnlFacts): PnlLineValues {
  */
 function amazonInHalfShare(
   vendor: AmazonInVendorFacts | undefined,
-  seller: AmazonInSellerPnlFacts | undefined,
+  sellerNet: number,
   half: AmazonInHalf,
 ): number {
-  if (half === 'both' || !vendor || !seller) return 1
+  if (half === 'both' || !vendor || sellerNet === 0) return 1
   const vendorNet = vendor.invoiceValue
-  const sellerNet = computeAmazonInSellerPnl(seller).netSales
   const total = vendorNet + sellerNet
   // Neither half sold anything, so there is no revenue to divide on. The
   // overhead stays with the wholesale side rather than being split in two.
@@ -657,10 +740,44 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
     // the month's fixed expenses, so the two still add to Amazon India.
     const half = inputs.amazonInHalf ?? 'both'
     const vendorMonth = inputs.facts.amazonInVendorFacts?.find((f) => f.month === month)
-    const sellerMonth = inputs.facts.amazonInSellerFacts?.find((f) => f.month === month)
-    const share = amazonInHalfShare(vendorMonth, sellerMonth, half)
+
+    // The marketplace half has two possible sources, and they are two
+    // readings of the same trading rather than two months. The Product
+    // Profitability export states every SKU the month sold; a settlement
+    // report states one fortnight's cash. For six months the settlements were
+    // the only source and two of them had been uploaded, which read Seller
+    // Central as an ₹8,000 business against the ₹2 lakh its exports show — so
+    // the export is the month wherever there is one, and the settlement stays
+    // beside it as the tie to what Amazon deposited.
+    const exportMonth = inputs.facts.amazonInSkuFeeFacts?.find((f) => f.month === month)
+    const settlementMonth = inputs.facts.amazonInSellerFacts?.find((f) => f.month === month)
+    const sellerCogs = exportMonth ? sellerExportCogs(exportMonth, month, inputs) : EMPTY_SELLER_EXPORT_COGS
+    const sellerNetSales = exportMonth
+      ? exportMonth.netSalesInr
+      : settlementMonth
+        ? computeAmazonInSellerPnl(settlementMonth).netSales
+        : 0
+    // That half in canonical buckets, for the channel total. Advertising is
+    // dropped from the settlement reading because the channel charges its one
+    // AMC account on the wholesale statement; the export's own advertising
+    // lines are what Amazon billed inside the report and stand.
+    const marketplaceBuckets = (): PnlLineValues | null =>
+      exportMonth
+        ? amazonInSellerExportToCanonicalBuckets(exportMonth, sellerCogs)
+        : settlementMonth
+          ? sellerBucketsWithoutAds(settlementMonth)
+          : null
+    // What to call that half in a note, in the terms of whichever source
+    // states it.
+    const marketplaceSays = exportMonth
+      ? `${formatCurrencyFull(exportMonth.netSalesInr)} of Seller Central net sales on ` +
+        `${exportMonth.netUnitsSoldQty.toLocaleString('en-IN')} unit(s)`
+      : settlementMonth
+        ? `${formatCurrencyFull(settlementMonth.settlementTotal)} settled on Seller Central across ` +
+          `${settlementMonth.units} unit(s)`
+        : null
+    const share = amazonInHalfShare(vendorMonth, sellerNetSales, half)
     const vendor = half === 'seller' ? undefined : vendorMonth
-    const seller = half === 'vendor' ? undefined : sellerMonth
 
     // Amazon India is one channel over two businesses, and the wholesale one
     // is the larger by an order of magnitude. Where its month is on file the
@@ -682,27 +799,31 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       )
 
       const vendorBuckets = amazonInVendorToCanonicalBuckets(vendor, cogs, adSpend)
+      const marketplace = half === 'both' ? marketplaceBuckets() : null
       const canonicalLines = computeSubtotals(
         withAllocatedOpex(
-          seller ? addBuckets(vendorBuckets, sellerBucketsWithoutAds(seller)) : vendorBuckets,
+          marketplace ? addBuckets(vendorBuckets, marketplace) : vendorBuckets,
           inputs, channel, month, share,
         ),
       )
 
       const notes: string[] = []
-      if (seller) {
+      // Said only when there is an allocation to divide. Amazon India's is
+      // zero today — the weights come from order rows and this channel's
+      // statements carry none — and "carries 16% of the fixed expenses"
+      // against a zero on the line reads as a contradiction.
+      const sharedOpex = otherCosts !== 0
+        ? ` This half carries ${(share * 100).toFixed(1)}% of the month's fixed expenses, its share of the two by `
+          + 'net revenue, so the halves still add to Amazon India.'
+        : ''
+      if (marketplaceSays && half === 'both') {
         notes.push(
-          `The statement above is Vendor Central only. Seller Central settled ` +
-          `${formatCurrencyFull(seller.settlementTotal)} in ${month} on ${seller.units} unit(s); that is in the ` +
-          'Master P&L alongside this, but it is a marketplace month with its own fees and it does not belong in a ' +
-          'wholesale waterfall — switch to Seller Central to read it on its own.',
+          `The statement above is Vendor Central only. ${marketplaceSays} in ${month} is in the Master P&L ` +
+          'alongside it, but the marketplace is a different business on a different revenue basis and has its own ' +
+          'fees — switch to Seller Central to read it on its own.',
         )
-      } else if (sellerMonth) {
-        notes.push(
-          `Vendor Central on its own. Seller Central settled ${formatCurrencyFull(sellerMonth.settlementTotal)} in ` +
-          `${month} and none of it is below; this half carries ${(share * 100).toFixed(1)}% of the month's fixed ` +
-          'expenses, its share of the two by net revenue, so the halves still add to Amazon India.',
-        )
+      } else if (marketplaceSays) {
+        notes.push(`Vendor Central on its own. ${marketplaceSays} in ${month} is not below.${sharedOpex}`)
       }
       if (cogs.uncostedAsins > 0) {
         notes.push(
@@ -735,7 +856,96 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       }
     }
 
-    const imported = seller
+    // Seller Central, as the export states the whole month.
+    if (half !== 'vendor' && exportMonth) {
+      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month, share)
+      const values = applyAmazonInSellerExportOtherCosts(
+        computeAmazonInSellerExportPnl(exportMonth, sellerCogs),
+        otherCosts,
+      )
+      const notes: string[] = []
+
+      // Amazon computes its own Net proceeds for the month. A gap against it
+      // is a charge in the file this build has not learnt to read, and it is
+      // the one number that says whether the fees below are the whole of what
+      // was charged.
+      const gap = values.netProceedsDiff
+      if (Math.abs(gap) > 1) {
+        notes.push(
+          `Net sales less every fee read here comes to ${formatCurrencyFull(Math.abs(gap))} ` +
+          `${gap > 0 ? 'more' : 'less'} than Amazon's own Net proceeds column for ${month}. That difference is a ` +
+          'charge in the export this build has not read, so the fees below are short by it. Send the file over and ' +
+          'the column will be named.',
+        )
+      }
+      if (sellerCogs.estimatedWholeMonth) {
+        notes.push(
+          `${month}'s cost of goods is estimated as a share of sales, because this month's export was read before ` +
+          'units per SKU were stored. Upload the Product Profitability export for the month again and the cost is ' +
+          'priced from the cost sheet, SKU by SKU.',
+        )
+      } else if (sellerCogs.uncostedSkus > 0) {
+        notes.push(
+          `${sellerCogs.uncostedSkus} MSKU(s) on ${sellerCogs.uncostedUnits.toLocaleString('en-IN')} unit(s) have ` +
+          'no cost behind them, so their share of COGS is estimated. Link them on the SKU Mapping screen to price ' +
+          'the month outright.',
+        )
+      }
+      if (settlementMonth) {
+        notes.push(
+          `This statement is the Product Profitability export, which states the whole month. The settlement ` +
+          `report(s) on file for ${month} carry ${formatCurrencyFull(settlementMonth.settlementTotal)} of deposits ` +
+          `across ${settlementMonth.settlementIds.length} settlement period(s) — upload every fortnightly ` +
+          'settlement for the month to tie this to the cash as well.',
+        )
+      } else {
+        notes.push(
+          `No settlement report is on file for ${month}, so nothing ties this statement to what Amazon actually ` +
+          'deposited. The export is Amazon\u2019s own and reconciles against its Net proceeds column; the settlement ' +
+          'is the cash.',
+        )
+      }
+      // One AMC account lifts both halves and the channel charges it once, on
+      // the wholesale statement. Advertising Amazon billed inside this export
+      // is different money and is on the statement — if both ever appear, say
+      // so rather than letting the same spend be counted twice.
+      const exportAds = -values.totalAdvertising
+      const channelAds = inputs.marketing[channel]?.ads ?? 0
+      if (exportAds > 0 && channelAds > 0) {
+        notes.push(
+          `This export bills ${formatCurrencyFull(exportAds)} of advertising and ${formatCurrencyFull(channelAds)} ` +
+          `is on file for Amazon India in ${month} from the ads reports. The channel charges the AMC spend on the ` +
+          'Vendor Central statement, so check the two are not the same rupees before reading either.',
+        )
+      } else if (vendorMonth) {
+        notes.push(
+          `Seller Central on its own. Vendor Central invoiced ${formatCurrencyFull(vendorMonth.invoiceValue)} in ` +
+          `${month} on its own statement, and the channel's advertising is charged there because one AMC account ` +
+          `lifts both halves — so this half shows none.` +
+          (otherCosts !== 0
+            ? ` It carries ${(share * 100).toFixed(1)}% of the month's fixed expenses, its share of the two by net revenue.`
+            : ''),
+        )
+      }
+
+      return {
+        channel, month,
+        canonical: {
+          channel, month,
+          lines: computeSubtotals(
+            withAllocatedOpex(
+              amazonInSellerExportToCanonicalBuckets(exportMonth, sellerCogs),
+              inputs, channel, month, share,
+            ),
+          ),
+        },
+        native: { lineDefs: amazonInSellerExportLineDefs(exportMonth), values, currency: 'INR' },
+        notes,
+      }
+    }
+
+    // No export for the month: the settlement report is all there is.
+    const imported = half === 'vendor' ? undefined : settlementMonth
     if (imported) {
       // The settlement report says what Amazon paid, never what the goods
       // cost. COGS is priced here from the order rows at the month's own
@@ -800,8 +1010,10 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
         notes.push(
           `Seller Central on its own. Vendor Central invoiced ${formatCurrencyFull(vendorMonth.invoiceValue)} in ` +
           `${month} on its own statement, and the channel's advertising is charged there because one AMC account ` +
-          `lifts both halves — so this half shows none. It carries ${(share * 100).toFixed(1)}% of the month's ` +
-          'fixed expenses, its share of the two by net revenue.',
+          `lifts both halves — so this half shows none.` +
+          (otherCosts !== 0
+            ? ` It carries ${(share * 100).toFixed(1)}% of the month's fixed expenses, its share of the two by net revenue.`
+            : ''),
         )
       }
       return {

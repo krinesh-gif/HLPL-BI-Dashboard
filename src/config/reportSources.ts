@@ -47,9 +47,11 @@ export const REPORT_SOURCES: ReportSource[] = [
     url: 'https://sellercentral.amazon.in/sereport',
     settings: ['Marketplace: India', 'Data aggregation level: MSKU', 'Date range: Month'],
     files: [
-      'SKU Economics report — the per-SKU fees (the app also calls this Product Profitability; it is the same export)',
-      'Settlement report — the tab-separated .txt, which is what the statement is built from',
-      'All Orders / order report — the channel’s sales',
+      'SKU Economics report — Seller Central’s month, SKU by SKU, which its statement is built from (the app also '
+        + 'calls this Product Profitability; it is the same export)',
+      'Settlement report — the tab-separated .txt. One per fortnightly payment period, so a month needs both of '
+        + 'them: they tie the statement to what Amazon actually deposited',
+      'All Orders / order report — the channel’s order rows',
       'Vendor Central, from the manager at RK World Infocom by email: the NPPM file — the month’s shipments, '
         + 'with Net Shipped GMS and Net PPM per ASIN',
       'Vendor Central: the IXD file — units unpacked at the warehouse, which is what the cross-dock charge is on',

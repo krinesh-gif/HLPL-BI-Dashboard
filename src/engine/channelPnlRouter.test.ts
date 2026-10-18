@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { BUSINESS_CHANNEL_IDS } from '@/config/channels'
 import { buildChannelPnlView, type AmazonInHalf } from './channelPnlRouter'
 import type {
-  AmazonInSellerPnlFacts, AmazonInVendorFacts,
+  AmazonInSellerPnlFacts, AmazonInSkuFeeFacts, AmazonInVendorFacts,
   AmazonUsaPnlFacts, CanonicalSalesRecord, FixedExpenseEntry, FlipkartPnlFacts, NykaaPnlFacts, SkuMaster,
 } from '@/data/models'
 
@@ -469,7 +469,7 @@ describe('buildChannelPnlView, Amazon India over Seller and Vendor Central', () 
     // The statement stays wholesale; the roll-up carries both.
     expect(view.native?.values.invoiceValue).toBeCloseTo(1199291.82, 2)
     expect(view.canonical.lines.grossSales).toBeCloseTo(1682714.56 + 6000, 2)
-    expect(view.notes.some((n) => n.includes('Seller Central settled'))).toBe(true)
+    expect(view.notes.some((n) => n.includes('settled on Seller Central'))).toBe(true)
   })
 
   // One ad account lifts both halves, so the spend is charged once.
@@ -585,6 +585,105 @@ describe('buildChannelPnlView, Amazon India over Seller and Vendor Central', () 
         if (key.endsWith('Pct')) continue
         expect((v[key] ?? 0) + (s[key] ?? 0), `${key} does not add up`).toBeCloseTo(whole[key] ?? 0, 6)
       }
+    })
+  })
+
+  /**
+   * The marketplace half, from the export that states the whole month.
+   *
+   * Its two sources are two readings of the same trading: the Product
+   * Profitability export states every SKU sold, a settlement report states
+   * one fortnight's cash. September's real figures — ₹2,23,113.63 of net
+   * sales against the ₹6,929.64 its one uploaded settlement covers.
+   */
+  describe('Seller Central, from the Product Profitability export', () => {
+    const exportMonth: AmazonInSkuFeeFacts = {
+      month: '2026-09', schemaVersion: 1,
+      grossSalesInr: 234275.02, netSalesInr: 223113.63,
+      unitsSoldQty: 461, unitsReturnedQty: 23, netUnitsSoldQty: 438,
+      sheetNetProceedsInr: 157562.82, sheetCogsInr: 0, sheetMiscCostInr: 0, nonSellingChargedRows: 1,
+      nestedFeeIds: [],
+      feeTotalsInr: { referralFee: 19028.21, fbaWeightHandlingFee: 6110.04 },
+      unmappedFeeTotalsInr: {},
+      feeBySkuInr: { B0CPFP8NNB: { referralFee: 19028.21 }, UNLINKED: { fbaWeightHandlingFee: 6110.04 } },
+      unitsBySku: { B0CPFP8NNB: 400, UNLINKED: 38 },
+      netSalesBySku: { B0CPFP8NNB: 200000, UNLINKED: 23113.63 },
+    }
+    const settlement: AmazonInSellerPnlFacts = {
+      month: '2026-09', schemaVersion: 1, settlementIds: ['27765599792'],
+      amounts: { 'order.itemprice.principal': 8241.5, 'order.itemfees.commission': -672.15 },
+      settlementTotal: 6160.14, orders: 14, units: 15,
+    }
+    const inputs = {
+      ...base,
+      facts: { ...base.facts, amazonInSkuFeeFacts: [exportMonth], amazonInSellerFacts: [settlement] },
+    }
+    const half = (amazonInHalf: AmazonInHalf) =>
+      buildChannelPnlView('amazon_in', '2026-09', { ...inputs, amazonInHalf })
+
+    it('reads the month from the export, not from the one settlement on file', () => {
+      const v = half('seller')
+      expect(v.native?.values.netSales).toBeCloseTo(223113.63, 2)
+      expect(v.native?.values['fee.referralFee']).toBeCloseTo(-19028.21, 2)
+      // The settlement statement's own lines are nowhere on it.
+      expect(v.native?.values.settlementTotal).toBeUndefined()
+    })
+
+    it('prices the goods from the MSKUs the export lists', () => {
+      // 400 units of a mapped SKU at ₹75.50, and 38 of one with no cost.
+      const v = half('seller')
+      expect(v.native?.values.cogsPriced).toBeCloseTo(-(400 * 75.5), 2)
+      expect(v.native?.values.cogsUnpriced).toBeCloseTo(-(38 * 75.5), 2)
+      expect(v.notes.some((n) => n.includes('no cost behind them'))).toBe(true)
+    })
+
+    it('counts the month once, never the export plus the settlement', () => {
+      const whole = half('both').canonical.lines
+      // The channel is the wholesale invoice plus the export's own sales. The
+      // settlement is the same trading read a second way and is not added.
+      expect(whole.grossSales).toBeCloseTo(1682714.56 + 234275.02, 2)
+    })
+
+    it('says what the settlements on file do and do not cover', () => {
+      expect(half('seller').notes.some((n) => n.includes('settlement period(s)'))).toBe(true)
+    })
+
+    // Amazon computes its own Net proceeds, and September's does not meet the
+    // fees read here by ₹1,052.56 — a charge in the file nobody has named.
+    it('reports a gap against Amazon’s own net proceeds rather than hiding it', () => {
+      const v = half('seller')
+      expect(v.native?.values.netProceedsDiff).toBeCloseTo(223113.63 - 19028.21 - 6110.04 - 157562.82, 2)
+      expect(v.notes.some((n) => n.includes('Net proceeds'))).toBe(true)
+    })
+
+    it('still adds up to the channel, line by line', () => {
+      const whole = half('both').canonical.lines
+      const v = half('vendor').canonical.lines
+      const s = half('seller').canonical.lines
+      for (const key of Object.keys(whole) as (keyof typeof whole)[]) {
+        if (key.endsWith('Pct')) continue
+        expect((v[key] ?? 0) + (s[key] ?? 0), `${key} does not add up`).toBeCloseTo(whole[key] ?? 0, 6)
+      }
+    })
+
+    it('falls back to the settlement in a month the export does not cover', () => {
+      const august: AmazonInSellerPnlFacts = { ...settlement, month: '2026-08' }
+      const v = buildChannelPnlView('amazon_in', '2026-08', {
+        ...inputs,
+        facts: { ...inputs.facts, amazonInVendorFacts: [], amazonInSellerFacts: [august] },
+        amazonInHalf: 'seller',
+      })
+      expect(v.native?.lineDefs.some((d) => d.key === 'settlementTotal')).toBe(true)
+    })
+
+    it('estimates the cost of a month imported before units per SKU were read', () => {
+      const old = { ...exportMonth, unitsBySku: undefined, netSalesBySku: undefined }
+      const v = buildChannelPnlView('amazon_in', '2026-09', {
+        ...inputs, facts: { ...inputs.facts, amazonInSkuFeeFacts: [old] }, amazonInHalf: 'seller',
+      })
+      expect(v.native?.values.cogsPriced).toBe(0)
+      expect(v.native?.values.cogsUnpriced).toBeLessThan(0)
+      expect(v.notes.some((n) => n.includes('export for the month again'))).toBe(true)
     })
   })
 })

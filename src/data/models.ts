@@ -803,19 +803,20 @@ export interface PurpllePnlFacts {
 /**
  * Amazon India's fees, traced to the SKUs carrying them.
  *
- * Deliberately not part of `AmazonInSellerPnlFacts`, and deliberately not a
- * P&L. Amazon India's statement is built from the settlement report, which
- * states what Amazon actually charged and settled; this comes from the
- * Product Profitability export, which states the same month per SKU. Two
- * sources for one month is one too many for a statement, so this one answers
- * the question the statement cannot — which products carry which fee — and
- * contributes nothing to any total.
+ * This is the Seller Central half's statement, and the month it states is the
+ * whole month: every SKU sold, with units, returns, sales net of returns and
+ * each fee Amazon charged, column by column.
  *
- * It carries no sales either: Amazon India's revenue comes from the All
- * Orders report, and a second set of sales rows for the same month would
- * count April twice.
+ * It was not always. The statement used to be built from the settlement
+ * report, which states one fortnight's cash — and with two of those uploaded,
+ * Seller Central read as an ₹8,000 business for six months against the ₹2
+ * lakh these exports show. The settlement is now the tie to what Amazon
+ * deposited rather than the source of the month.
  *
- * Everything is in rupees, as the export states it.
+ * Still no sales rows: these are a month's facts, and a second set of order
+ * rows for a month would count it twice. Everything is in rupees, as the
+ * export states it, and ex-GST — see `nativePnl/amazonInSellerExport`, which
+ * establishes that from the file rather than assuming it.
  */
 export interface AmazonInSkuFeeFacts {
   month: string
@@ -832,6 +833,16 @@ export interface AmazonInSkuFeeFacts {
   unmappedFeeTotalsInr: Record<string, number>
   /** sku → fee id → amount, for the fees that SKU was actually charged. */
   feeBySkuInr: Record<string, Record<string, number>>
+  /**
+   * sku → units sold, and sku → net sales.
+   *
+   * Read so the month's cost of goods can be priced from our own cost sheet
+   * per SKU rather than estimated as a share of sales. Optional because the
+   * months imported before this export became the statement do not carry it;
+   * such a month estimates its cost and says so.
+   */
+  unitsBySku?: Record<string, number>
+  netSalesBySku?: Record<string, number>
   /** Fee ids this month's file proved to sit inside another column, checked
    * row by row rather than assumed. */
   nestedFeeIds: string[]

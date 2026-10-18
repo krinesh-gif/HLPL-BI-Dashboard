@@ -27,7 +27,7 @@ export function usePnlInputs(): {
   const {
     salesRecords, adsRecords, skuMaster, fixedExpenses,
     flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts, blinkitFacts,
-    amazonAeFacts, purplleFacts, swiggyInstamartFacts, amazonInVendorFacts,
+    amazonAeFacts, purplleFacts, swiggyInstamartFacts, amazonInVendorFacts, amazonInSkuFeeFacts,
     costVersions, mappings, comboComponents, manualAdSpend, fxRates, freightRates, packagingRates, nykaaDiscounts,
   } = useDataStore()
 
@@ -50,6 +50,7 @@ export function usePnlInputs(): {
         nykaaFacts: nykaaFacts ?? [],
         amazonInSellerFacts: amazonInSellerFacts ?? [],
         amazonInVendorFacts: amazonInVendorFacts ?? [],
+        amazonInSkuFeeFacts: amazonInSkuFeeFacts ?? [],
         blinkitFacts: blinkitFacts ?? [],
         amazonAeFacts: amazonAeFacts ?? [],
         purplleFacts: purplleFacts ?? [],
@@ -82,7 +83,7 @@ export function usePnlInputs(): {
   }, [
     salesRecords, adsRecords, skuMaster, fixedExpenses,
     flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts, blinkitFacts,
-    amazonAeFacts, purplleFacts, swiggyInstamartFacts, amazonInVendorFacts,
+    amazonAeFacts, purplleFacts, swiggyInstamartFacts, amazonInVendorFacts, amazonInSkuFeeFacts,
     costVersions, mappings, comboComponents, manualAdSpend, fxRates, freightRates, packagingRates, nykaaDiscounts,
   ])
 }

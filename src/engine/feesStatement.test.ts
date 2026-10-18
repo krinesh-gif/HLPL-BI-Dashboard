@@ -15,6 +15,7 @@ import { MEESHO_LINE_DEFS, computeMeeshoPnl } from './nativePnl/meesho'
 import { MYNTRA_LINE_DEFS } from './nativePnl/myntra'
 import { NYKAA_LINE_DEFS } from './nativePnl/nykaa'
 import { AMAZON_IN_SELLER_LINE_DEFS } from './nativePnl/amazonInSeller'
+import { AMAZON_IN_SELLER_EXPORT_LINE_DEFS } from './nativePnl/amazonInSellerExport'
 import { AMAZON_USA_LINE_DEFS } from './nativePnl/amazonUsa'
 import type { NativeLineDef, NativeLineValues } from './nativePnl/types'
 
@@ -24,6 +25,7 @@ const CHANNEL_LINE_DEFS: { channel: string; defs: NativeLineDef[] }[] = [
   { channel: 'myntra', defs: MYNTRA_LINE_DEFS },
   { channel: 'nykaa', defs: NYKAA_LINE_DEFS },
   { channel: 'amazon_in', defs: AMAZON_IN_SELLER_LINE_DEFS },
+  { channel: 'amazon_in_export', defs: AMAZON_IN_SELLER_EXPORT_LINE_DEFS },
   { channel: 'blinkit', defs: BLINKIT_LINE_DEFS },
   { channel: 'amazon_us', defs: AMAZON_USA_LINE_DEFS },
 ]
@@ -53,7 +55,8 @@ const NOT_A_CHARGE: Record<string, string> = {
   'nykaa.nykaaFundedCoupon':
     'The part of the discount Nykaa pays for itself, added back. Not a charge in either direction.',
   ...Object.fromEntries(
-    ['flipkart.otherCosts', 'nykaa.otherCosts', 'amazon_in.otherCosts', 'meesho.overheads', 'amazon_us.allocatedOverheadsUsd']
+    ['flipkart.otherCosts', 'nykaa.otherCosts', 'amazon_in.otherCosts', 'amazon_in_export.otherCosts',
+      'meesho.overheads', 'amazon_us.allocatedOverheadsUsd']
       .map((ref) => [
         ref,
         'Our own salaries, rent and software, shared out by this channel’s share of sales. The marketplace neither charges it nor knows about it.',

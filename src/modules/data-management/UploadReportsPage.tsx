@@ -652,10 +652,10 @@ export function UploadReportsPage() {
       // order of these two no longer decides which channel a month lands in.
       else if (detectAmazonUaeProductProfitability(parsed.headers, parsed.rows)) kind = 'amazon_uae_product_profitability'
       else if (detectAmazonUsaProductProfitabilityReport(parsed.headers, parsed.rows)) kind = 'amazon_usa_product_profitability'
-      // India's copy of the same report is read for its per-SKU fees only.
-      // The channel's sales come from the All Orders report and its statement
-      // from the settlement report, and a second source for either would
-      // count the month twice.
+      // India's copy of the same report is Seller Central's statement, as it
+      // is for the USA and UAE stores. The settlement report is kept beside
+      // it as the tie to what Amazon deposited — one month, one source for
+      // the trading, or it would be counted twice.
       else if (detectAmazonIndiaProductProfitability(parsed.headers, parsed.rows)) kind = 'amazon_in_sku_fees'
       else if (detectMeeshoOrderSummaryReport(parsed.headers)) kind = 'meesho_order_summary'
       else if (detectAmazonAdsSponsoredProductsReport(parsed.headers)) kind = 'amazon_ads_sponsored_products'
@@ -1321,11 +1321,11 @@ function QueueRow({
               {item.outcome.mapping
                 ? `${item.outcome.mapping.mappingsSaved.toLocaleString()} mapping(s), ${item.outcome.mapping.recipesSaved.toLocaleString()} recipe(s) saved.`
                 : p?.reportKind === 'amazon_in_sku_fees'
-                  // The one report that feeds no total anywhere. Saying "P&L
-                  // updated" of it is a claim about numbers it never touched:
-                  // Amazon India's month comes from the settlement report.
-                  ? `Fee detail stored for ${item.outcome.monthsUpdated.map(monthLabel).join(', ')} — no records and ` +
-                    'no P&L line. It is read for which SKUs carry which fee — on the Amazon India channel page, under "Fees Amazon charges, by SKU".'
+                  // It stores a month, not rows, and the month it stores is
+                  // Seller Central's statement — so it says which half of
+                  // Amazon India it moved rather than counting to zero.
+                  ? `Seller Central stored for ${item.outcome.monthsUpdated.map(monthLabel).join(', ')} — the month ` +
+                    'per SKU, with its fees. Read it on P&L ▸ Amazon India with Business set to Seller Central.'
                   : (item.outcome.added > 0 || !p || !carriesFacts(p)
                       ? `${item.outcome.added.toLocaleString()} record(s) added`
                       : 'Stored as this month\u2019s statement, not as records') +

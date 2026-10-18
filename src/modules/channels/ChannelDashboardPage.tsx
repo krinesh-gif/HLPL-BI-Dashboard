@@ -270,10 +270,10 @@ export function ChannelDashboardPage() {
         </section>
       )}
 
-      {/* Amazon India's charges come from the settlement report, which states
-          totals and not SKUs. The Product Profitability export states the same
-          month per SKU, and that is all this reads it for: which products
-          carry which fee. It feeds no line of the statement above. */}
+      {/* The same export Seller Central's statement is built from, read here
+          for the question a statement cannot answer: which products carry
+          which fee. A referral fee of ₹19,028 is a fact nobody can act on;
+          the same ₹19,028 in three SKUs is a pricing decision. */}
       {channel === 'amazon_in' && source !== 'amazon_in_vendor' && (
         <section>
           <h2 className="mb-3 text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink)]">

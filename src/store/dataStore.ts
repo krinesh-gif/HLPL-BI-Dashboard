@@ -67,9 +67,10 @@ interface SharedDataset {
   nykaaFacts: NykaaPnlFacts[]
   blinkitFacts: BlinkitPnlFacts[]
   amazonAeFacts?: AmazonAePnlFacts[]
-  /** Amazon India's fees per SKU, from the Product Profitability export.
-   * Beside that channel's statement, never part of it: no P&L line and no
-   * sales read it, and it is not counted in any total. */
+  /** Amazon India Seller Central's months, from the Product Profitability
+   * export: the whole month per SKU, which is the statement for that half of
+   * the channel. No sales rows — a month's facts, like every other
+   * statement here. */
   amazonInSkuFeeFacts?: AmazonInSkuFeeFacts[]
   /** Purplle's months. Optional so a workspace whose API has not redeployed
    * yet still loads. */

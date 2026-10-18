@@ -12,23 +12,26 @@ import {
 } from './amazonProductProfitability'
 
 /**
- * Amazon India's Product Profitability export, read for its fees and nothing
- * else.
+ * Amazon India's Product Profitability export: Seller Central's month.
  *
- * This is the same report the US and UAE marketplaces send, in rupees. What
- * makes India different is that the channel already has its numbers: sales
- * come from the All Orders report, and the statement comes from the settlement
- * report, which states what Amazon actually charged and settled rather than
- * estimating it per SKU. A second source for a month that already has one is
- * not a better statement, it is two statements.
+ * The same report the US and UAE marketplaces send, in rupees, and read here
+ * for the same reason — it states the whole month. Every SKU sold, its units,
+ * its returns, its sales net of those returns, and every fee Amazon charged
+ * it, column by column, against Amazon's own Net proceeds figure to check
+ * them by.
  *
- * So this reads the one thing neither of those gives — **which SKUs carry
- * which fee** — and contributes to no total anywhere. No sales records: a
- * second set of sales rows for April would count April twice. No canonical
- * buckets, no P&L line, nothing the Master P&L reads.
+ * It was read for the fee detail alone until the settlements it was standing
+ * beside turned out to cover two payment periods of six months' trading, and
+ * Seller Central had been reporting ₹8,000 months against ₹2 lakh ones. The
+ * settlement report is now what ties the statement to the cash Amazon
+ * deposited rather than what states the month.
  *
- * What it is for: a referral fee of ₹17,115 is a fact nobody can act on. The
- * same ₹17,115 sitting in three SKUs is a pricing decision.
+ * No sales records: these are a month's facts, and a second set of order rows
+ * for April would count April twice.
+ *
+ * It still answers the question a statement cannot — a referral fee of
+ * ₹19,028 is a fact nobody can act on, the same ₹19,028 in three SKUs is a
+ * pricing decision — which is what `feeBySkuInr` is for.
  */
 const COLUMNS = {
   startDate: ['start date'],
@@ -96,10 +99,16 @@ export function normalizeAmazonIndiaProductProfitability(
   const unmappedFeeTotalsInr: Record<string, number> = {}
   for (const h of unmappedColumns) unmappedFeeTotalsInr[h] = 0
   const feeBySkuInr: Record<string, Record<string, number>> = {}
+  // Per SKU, so the month's goods can be costed from the cost sheet instead
+  // of estimated: this export is the statement for the month, and a statement
+  // with an estimated cost of goods has an estimated margin.
+  const unitsBySku: Record<string, number> = {}
+  const netSalesBySku: Record<string, number> = {}
 
   const facts: AmazonInSkuFeeFacts = {
     month: '', schemaVersion: 1,
     feeTotalsInr, unmappedFeeTotalsInr, feeBySkuInr, nestedFeeIds: [],
+    unitsBySku, netSalesBySku,
     unitsSoldQty: 0, unitsReturnedQty: 0, netUnitsSoldQty: 0,
     grossSalesInr: 0, netSalesInr: 0, sheetNetProceedsInr: 0,
     sheetCogsInr: 0, sheetMiscCostInr: 0, nonSellingChargedRows: 0,
@@ -121,12 +130,17 @@ export function normalizeAmazonIndiaProductProfitability(
 
     const unitsSold = amazonPpNum(row, c.unitsSold)
     const netUnitsSold = amazonPpNum(row, c.netUnitsSold)
+    // Net of returns, because that is the stock that stayed sold and so the
+    // units whose cost the month actually bore.
+    if (netUnitsSold !== 0) unitsBySku[msku] = (unitsBySku[msku] ?? 0) + netUnitsSold
+    const rowNetSales = amazonPpNum(row, c.netSales)
+    if (rowNetSales !== 0) netSalesBySku[msku] = (netSalesBySku[msku] ?? 0) + rowNetSales
 
     facts.unitsSoldQty += unitsSold
     facts.unitsReturnedQty += amazonPpNum(row, c.unitsReturned)
     facts.netUnitsSoldQty += netUnitsSold
     facts.grossSalesInr += amazonPpNum(row, c.sales)
-    facts.netSalesInr += amazonPpNum(row, c.netSales)
+    facts.netSalesInr += rowNetSales
     facts.sheetNetProceedsInr += amazonPpNum(row, c.netProceeds)
     facts.sheetCogsInr += amazonPpNum(row, c.cogsPerUnit) * netUnitsSold
     facts.sheetMiscCostInr += amazonPpNum(row, c.miscCostPerUnit) * netUnitsSold
@@ -164,9 +178,10 @@ export function normalizeAmazonIndiaProductProfitability(
   }
   const skuCount = Object.keys(feeBySkuInr).length
   warnings.push(
-    `Read as Amazon India's per-SKU fees: ${skuCount} SKU(s) charged across ${rows.length} rows. This export adds no ` +
-    'sales and no P&L line — Amazon India’s statement stays on the settlement report, which states what Amazon ' +
-    'actually charged. It is read for which products carry which fee.',
+    `Read as Amazon India Seller Central's month: ${skuCount} SKU(s) across ${rows.length} rows, ` +
+    `${facts.unitsSoldQty.toLocaleString('en-IN')} unit(s) sold and ₹${facts.netSalesInr.toFixed(2)} of net sales. ` +
+    'This is the Seller Central statement for the month. It adds no order rows — the settlement report stays ' +
+    'beside it as the tie to what Amazon actually deposited.',
   )
   if (facts.nonSellingChargedRows > 0) {
     warnings.push(
