@@ -33,7 +33,9 @@ const COLUMNS = {
   endDate: ['end date'],
   campaignName: ['campaign name'],
   portfolioName: ['portfolio name'],
-  /** Sponsored Products, Sponsored Brands, Sponsored Display. */
+  /** Sponsored Products, Sponsored Brands, Sponsored Display. Named on every
+   * row of the Sponsored Products export and on none of the Sponsored Brands
+   * one, which is what `programOf` is for. */
   programType: ['program type', 'ad product', 'campaign type'],
   retailer: ['retailer'],
   country: ['country'],
@@ -46,6 +48,41 @@ const COLUMNS = {
   orders: ['7 day total orders', '14 day total orders', 'total orders'],
   sales: ['7 day total sales', '14 day total sales', 'total sales'],
   currency: ['currency'],
+}
+
+/**
+ * Columns only one ad product's report has, for the exports that name no
+ * product at all.
+ *
+ * The Sponsored Products download states "Sponsored Products" in a Program
+ * Type column on every row. The real Sponsored Brands export states nothing:
+ * September's has Date, Portfolio name, Campaign Name, Cost type, Country and
+ * then fifty columns of brand metrics — video quartile views, Brand Store
+ * page views, new-to-brand orders — and not one that says which product
+ * bought it. Read without this, a month of Sponsored Brands lands beside the
+ * Sponsored Products spend as "not reported by product", which is the one
+ * thing the file makes obvious.
+ */
+const PROGRAM_BY_COLUMN: { column: string; program: string }[] = [
+  // A Brand Store is a Sponsored Brands placement; nothing else can send
+  // traffic to one.
+  { column: 'brand store page views', program: 'Sponsored Brands' },
+  { column: 'video first quartile views', program: 'Sponsored Brands' },
+  { column: '5 second views', program: 'Sponsored Brands' },
+]
+
+/**
+ * Which ad product this export is, where it does not say.
+ *
+ * The row's own Program Type wins wherever Amazon writes one. Nothing is
+ * inferred from a campaign's name — "SBV" in one tells a human what it is and
+ * is a naming habit, not a fact about the file.
+ */
+function programOf(headers: string[], row: Record<string, string>): string | undefined {
+  const stated = getField(row, COLUMNS.programType)
+  if (stated) return stated
+  const lower = headers.map((h) => h.trim().toLowerCase())
+  return PROGRAM_BY_COLUMN.find((p) => lower.includes(p.column))?.program
 }
 
 export function detectAmazonAdsSponsoredProductsReport(headers: string[]): boolean {
@@ -100,7 +137,13 @@ export interface AdsReportNormalizeResult {
   warnings: string[]
 }
 
-export function normalizeAmazonAdsSponsoredProductsReport(rows: Record<string, string>[], importId: string): AdsReportNormalizeResult {
+export function normalizeAmazonAdsSponsoredProductsReport(
+  rows: Record<string, string>[],
+  importId: string,
+): AdsReportNormalizeResult {
+  // The columns this export carries, taken from the rows themselves: the
+  // uploader keys every row by the header it parsed.
+  const headers = Object.keys(rows[0] ?? {})
   const adsRecords: AdsRecord[] = []
   const invalidRows: RowIssue[] = []
   const warnings: string[] = []
@@ -155,7 +198,7 @@ export function normalizeAmazonAdsSponsoredProductsReport(rows: Record<string, s
       // code of our own would need a list of every name Amazon uses, and a
       // product missing from that list would read as having no program at
       // all rather than as the one it is.
-      program: getField(row, COLUMNS.programType),
+      program: programOf(headers, row),
       sku,
       impressions: Number(getField(row, COLUMNS.impressions)) || 0,
       clicks: Number(getField(row, COLUMNS.clicks)) || 0,
@@ -165,6 +208,15 @@ export function normalizeAmazonAdsSponsoredProductsReport(rows: Record<string, s
       importId,
     })
   })
+
+  const spent = adsRecords.reduce((sum, r) => sum + r.spend, 0)
+  if (adsRecords.length > 0 && spent === 0) {
+    warnings.push(
+      `Every row in this export spent nothing: ${adsRecords.length} row(s) across ` +
+      `${new Set(adsRecords.map((r) => r.campaign)).size} campaign(s), ₹0 in total. The campaigns existed and did ` +
+      'not deliver, so the month really did cost nothing — this is not a failed read.',
+    )
+  }
 
   const programs = new Set(adsRecords.map((r) => r.program).filter((p): p is string => p !== undefined))
   if (programs.size > 1) {

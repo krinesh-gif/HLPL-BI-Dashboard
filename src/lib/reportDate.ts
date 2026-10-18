@@ -23,6 +23,35 @@ function localDate(year: number, month1to12: number, day: number): Date | null {
   return d
 }
 
+/**
+ * An Excel serial day as a local date.
+ *
+ * A date cell in an .xlsx arrives as the number Excel stores it as, because
+ * the uploader reads every cell as text — "46266" is 3 September 2026. The
+ * sheet is the only thing that knows it was formatted as a date.
+ *
+ * Below 20000 is 1954 or earlier and above 60000 is 2064: either is a column
+ * that is not a date.
+ */
+export function excelSerialToDate(raw: unknown): Date | null {
+  const n = typeof raw === 'number' ? raw : Number(String(raw ?? '').trim())
+  if (!Number.isFinite(n) || n < 20000 || n > 60000) return null
+  // Built through UTC, where the epoch arithmetic is exact, then handed back
+  // as the same calendar day locally — a report date has no time or zone, and
+  // putting one through UTC is what filed a month's trading under the one
+  // before it.
+  const utc = new Date(Date.UTC(1899, 11, 30) + Math.round(n) * 86400000)
+  return new Date(utc.getUTCFullYear(), utc.getUTCMonth(), utc.getUTCDate())
+}
+
+/** The same serial as `yyyy-mm-dd`. */
+export function excelSerialDate(raw: unknown): string | null {
+  const d = excelSerialToDate(raw)
+  if (!d) return null
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 /** MM/DD/YYYY, the convention every Amazon US report uses. Accepts M/D/YYYY —
  * Amazon does not zero-pad, so "6/1/2026" is 1 June, not 6 January. */
 export function parseUsSlashDate(raw: string): Date | null {
@@ -82,6 +111,18 @@ export function parseReportDate(raw: string | undefined | null, convention: 'us'
   // which disagree with each other about which number is the day.
   const second = parseIsoLocalDate(text) ?? (convention === 'us' ? parseInSlashDate(text) : parseUsSlashDate(text))
   if (second) return second
+  // A workbook's date cell, read as the serial it is stored as. It has to come
+  // before the engine: `new Date('46266')` is not a failure, it is the year
+  // 46266, and 377 rows of a Sponsored Brands export imported under the month
+  // "46266-00" — a month no screen can show and no P&L can charge.
+  const serial = excelSerialToDate(text)
+  if (serial) return serial
   const fallback = new Date(text)
-  return Number.isNaN(fallback.getTime()) ? null : fallback
+  if (Number.isNaN(fallback.getTime())) return null
+  // Whatever the engine made of it has to be a date a marketplace could have
+  // written. Outside that it is a number that happened to parse, and a row
+  // dated in the year 46266 is worse than a row rejected: it is counted,
+  // against nothing.
+  const year = fallback.getFullYear()
+  return year >= 1990 && year <= 2100 ? fallback : null
 }

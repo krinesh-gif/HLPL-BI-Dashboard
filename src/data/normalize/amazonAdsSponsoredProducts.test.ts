@@ -86,6 +86,49 @@ describe('every Amazon ad product, not only Sponsored Products', () => {
   })
 })
 
+/**
+ * September's real Sponsored Brands export, in the shape the uploader hands
+ * over: a workbook, so the Date column arrives as the serial Excel stores,
+ * and no Program Type column anywhere in its fifty-six headings.
+ */
+describe('the Sponsored Brands export as it really arrives', () => {
+  const SEP_1 = '46266'
+  const sbRow = (over: Record<string, string> = {}) => ({
+    Date: SEP_1, 'Portfolio name': 'No Portfolio', Currency: 'INR',
+    'Campaign Name': 'Rosemary Oil-SBV-GKW-MB-RM', 'Cost type': 'CPC', Country: 'India',
+    Impressions: '0', Clicks: '0', Spend: '0', '14 Day Total Sales ': '0', '14 Day Total Orders (#)': '0',
+    'Viewable Impressions': '0', 'Video First Quartile Views': '0', '5 Second Views': '0',
+    'Brand Store page views': '0', 'Long-Term Sales': '0',
+    ...over,
+  })
+
+  it('reads the workbook’s serial date as the day it is', () => {
+    const r = normalizeAmazonAdsSponsoredProductsReport([sbRow()], 'i')
+    expect(r.invalidRows).toEqual([])
+    expect(r.adsRecords[0].date).toBe('2026-09-01')
+  })
+
+  // The file names no ad product, so the product is taken from the columns
+  // only Sponsored Brands has. Without it a month of brand spend reads as
+  // "not reported by product" beside the Sponsored Products figure.
+  it('names the ad product from the columns only that product has', () => {
+    const r = normalizeAmazonAdsSponsoredProductsReport([sbRow()], 'i')
+    expect(r.adsRecords[0].program).toBe('Sponsored Brands')
+  })
+
+  it('says a month of zeroes is a real zero, not a failed read', () => {
+    const r = normalizeAmazonAdsSponsoredProductsReport([sbRow(), sbRow({ Date: '46267' })], 'i')
+    expect(r.adsRecords).toHaveLength(2)
+    expect(r.warnings.some((w) => w.includes('spent nothing'))).toBe(true)
+  })
+
+  it('says nothing of the sort once a row has spend', () => {
+    const r = normalizeAmazonAdsSponsoredProductsReport([sbRow({ Spend: '₹2500.75' })], 'i')
+    expect(r.adsRecords[0].spend).toBeCloseTo(2500.75, 2)
+    expect(r.warnings.some((w) => w.includes('spent nothing'))).toBe(false)
+  })
+})
+
 describe('which month the spend lands in', () => {
   const daily = (date: string, spend: string) => ({
     ...realRow({ Country: 'India', Currency: 'INR', Spend: spend }), Date: date,

@@ -1,7 +1,7 @@
 import type { AmazonInVendorIxd } from '@/data/models'
 import type { RawSheet } from '@/lib/csvParse'
 import type { NormalizeResult } from './types'
-import { excelSerialDate } from './amazonVendorNppm'
+import { excelSerialDate } from '@/lib/reportDate'
 
 /**
  * Amazon India Vendor Central — the inward cross-dock charge.

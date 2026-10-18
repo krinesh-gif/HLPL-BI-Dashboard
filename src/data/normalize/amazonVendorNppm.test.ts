@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { detectAmazonVendorNppm, excelSerialDate, normalizeAmazonVendorNppm } from './amazonVendorNppm'
+import { detectAmazonVendorNppm, normalizeAmazonVendorNppm } from './amazonVendorNppm'
+// Serial dates moved to the one place every report date is read, when an
+// .xlsx ads export turned out to carry them too.
+import { excelSerialDate } from '@/lib/reportDate'
 import type { RawSheet } from '@/lib/csvParse'
 
 // 2026-09-01 and 2026-09-30 as Excel writes them.

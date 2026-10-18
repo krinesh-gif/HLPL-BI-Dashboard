@@ -1,6 +1,7 @@
 import type { AmazonInVendorAsin, AmazonInVendorFacts } from '@/data/models'
 import type { RawSheet } from '@/lib/csvParse'
 import type { NormalizeResult } from './types'
+import { excelSerialDate } from '@/lib/reportDate'
 
 /**
  * Amazon India Vendor Central — the NPPM file the vendor manager sends each
@@ -91,20 +92,6 @@ function num(raw: unknown): number {
   if (text === '' || text === '-') return 0
   const n = Number(text)
   return Number.isFinite(n) ? n : 0
-}
-
-/**
- * An Excel serial day as an ISO date.
- *
- * The sheet writes ship days as serials, and the file carries no other date,
- * so this is the only thing that says which month it is.
- */
-export function excelSerialDate(raw: unknown): string | null {
-  const n = typeof raw === 'number' ? raw : Number(String(raw ?? '').trim())
-  // Below 20000 is 1954 or earlier, which no shipment of ours is; above 60000
-  // is 2064. Either is a column that is not a date.
-  if (!Number.isFinite(n) || n < 20000 || n > 60000) return null
-  return new Date(Date.UTC(1899, 11, 30) + Math.round(n) * 86400000).toISOString().slice(0, 10)
 }
 
 /**
