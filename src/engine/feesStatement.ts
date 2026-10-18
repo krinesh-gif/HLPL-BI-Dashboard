@@ -104,12 +104,22 @@ export interface ChannelFeesStatement {
  * would measure it against a number it had itself created. It goes over net
  * sales at MRP, which is what Nykaa's margin is actually a percentage of.
  */
-const NATIVE_BASIS: Partial<Record<BusinessChannelId, { key: string; label: string }>> = {
+/**
+ * What each native statement's charges are measured against.
+ *
+ * `key` may list more than one, because a channel can have more than one
+ * statement: Amazon India's marketplace half calls its basis `netSales` and
+ * its wholesale half `netRevenue`, and whichever is showing has to be the one
+ * divided by. A key that is not on the statement in hand is not a basis of
+ * zero — it is the wrong statement's key, and taking it would put every
+ * charge at 0% of nothing.
+ */
+const NATIVE_BASIS: Partial<Record<BusinessChannelId, { key: string | string[]; label: string }>> = {
   flipkart: { key: 'netRevenueExGst', label: 'net revenue (ex-GST)' },
   meesho: { key: 'netRevenue', label: 'net revenue (ex-GST)' },
   myntra: { key: 'netRevenueExGst', label: 'net revenue (ex-GST)' },
   nykaa: { key: 'netSalesMrp', label: 'net sales at MRP' },
-  amazon_in: { key: 'netSales', label: 'net sales (ex-GST)' },
+  amazon_in: { key: ['netSales', 'netRevenue'], label: 'net sales (ex-GST)' },
   amazon_us: { key: 'netSalesUsd', label: 'net sales' },
   blinkit: { key: 'netRevenue', label: 'net revenue (ex-GST)' },
 }
@@ -216,7 +226,12 @@ export function buildChannelFeesStatement(view: ChannelPnlView): ChannelFeesStat
       })
     }
     const basisDef = NATIVE_BASIS[view.channel]
-    const basis = basisDef ? (values[basisDef.key] ?? 0) : (view.canonical.lines.netSales ?? 0)
+    const basisKey = basisDef === undefined
+      ? undefined
+      : (Array.isArray(basisDef.key) ? basisDef.key : [basisDef.key]).find((k) => k in values)
+    const basis = basisKey === undefined
+      ? (view.canonical.lines.netSales ?? 0)
+      : (values[basisKey] ?? 0)
     return assemble(
       view.channel,
       view.month,

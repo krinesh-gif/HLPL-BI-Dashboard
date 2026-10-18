@@ -335,3 +335,52 @@ describe('the comparison across channels', () => {
     expect(s.takeRatePct).toBeCloseTo(17.5, 2)
   })
 })
+
+/**
+ * Amazon India has two statements and they name their basis differently —
+ * `netSales` on the marketplace half, `netRevenue` on the wholesale one. The
+ * basis has to follow whichever is showing, or every charge reads as 0% of
+ * nothing.
+ */
+describe('buildChannelFeesStatement, on a channel with more than one statement', () => {
+  const vendorView = {
+    channel: 'amazon_in' as const,
+    month: '2026-09',
+    canonical: { channel: 'amazon_in' as const, month: '2026-09', lines: { netSales: 1199291.82 } },
+    native: {
+      lineDefs: [
+        { key: 'netRevenue', label: 'NET REVENUE (ex-GST)', section: 'SALES', kind: 'subtotal' as const },
+        { key: 'contraCogs', label: 'Less: contra-COGS margin support', section: 'AMAZON CHARGES', kind: 'input' as const, fee: 'otherFees' as const },
+        { key: 'ixd', label: 'Less: inward cross-dock (IXD)', section: 'AMAZON CHARGES', kind: 'input' as const, fee: 'fulfilment' as const },
+      ],
+      values: { netRevenue: 1199291.82, contraCogs: -50000, ixd: -7776 },
+      currency: 'INR' as const,
+    },
+    notes: [],
+  }
+
+  it('measures the wholesale charges against its own revenue line', () => {
+    const s = buildChannelFeesStatement(vendorView)
+    expect(s.basis).toBeCloseTo(1199291.82, 2)
+    // ₹57,776 of charges on ₹11,99,291.82 is 4.82%, not 0% of nothing.
+    expect(s.totalCostOfSelling).toBeCloseTo(-57776, 2)
+    expect(s.takeRatePct).toBeCloseTo((57776 / 1199291.82) * 100, 4)
+  })
+
+  it('still measures the marketplace half against netSales', () => {
+    const sellerView = {
+      ...vendorView,
+      native: {
+        lineDefs: [
+          { key: 'netSales', label: 'Net sales', section: 'SALES', kind: 'subtotal' as const },
+          { key: 'commission', label: 'Commission', section: 'FEES', kind: 'input' as const, fee: 'commission' as const },
+        ],
+        values: { netSales: 100000, commission: -15000 },
+        currency: 'INR' as const,
+      },
+    }
+    const s = buildChannelFeesStatement(sellerView)
+    expect(s.basis).toBe(100000)
+    expect(s.takeRatePct).toBeCloseTo(15, 4)
+  })
+})
