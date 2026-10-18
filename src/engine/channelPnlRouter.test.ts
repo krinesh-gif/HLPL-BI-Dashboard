@@ -141,8 +141,9 @@ describe('a channel share of the company fixed expenses', () => {
     grossSales: net, discount: 0, netSales: net, returnUnits: 0, rtoUnits: 0, shippingCost: 0,
     marketplaceFee: 0, tax: 0, status: 'completed', currency: 'INR', importId: 'x',
   })
-  // Amazon USA and Flipkart each take half the month's net sales, so each
-  // carries half of the 1,00,000 of fixed cost.
+  // Order rows of the same size for both channels — and they decide nothing
+  // here, because both channels have a statement for the month and a
+  // statement is what the share is measured on.
   const salesRecords = [inr('amazon_us', 100000), inr('flipkart', 100000)]
   const fixedExpenses: FixedExpenseEntry[] = [
     { month: '2026-08', category: 'salaries', amount: 60000 },
@@ -170,12 +171,22 @@ describe('a channel share of the company fixed expenses', () => {
 
   const flipkartAugust: FlipkartPnlFacts = { ...flipkartFacts, month: '2026-08' }
 
+  /**
+   * The month's share, from the statements.
+   *
+   *   Amazon USA  $9,000 × 88 = ₹7,92,000  → 90.826%
+   *   Flipkart                   ₹80,000   →  9.174%
+   *
+   * of ₹1,00,000 of fixed cost: ₹90,825.69 and ₹9,174.31.
+   */
+  const US_SHARE = (9000 * 88) / (9000 * 88 + 80000)
+
   it('reaches the Amazon USA statement, in the currency that statement is kept in', () => {
     const v = build('amazon_us')
-    // 50,000 of a 1,00,000 month, converted at the month's rate — not left in
-    // rupees, which the render to INR would then multiply by the rate again.
-    expect(v.native?.values.allocatedOverheadsUsd).toBeCloseTo(-50000 / fxRate, 6)
-    expect(v.native?.values.cm3).toBeCloseTo(v.native!.values.cm2 - 50000 / fxRate, 6)
+    // Converted at the month's rate — not left in rupees, which the render to
+    // INR would then multiply by the rate again.
+    expect(v.native?.values.allocatedOverheadsUsd).toBeCloseTo(-(100000 * US_SHARE) / fxRate, 6)
+    expect(v.native?.values.cm3).toBeCloseTo(v.native!.values.cm2 - (100000 * US_SHARE) / fxRate, 6)
     expect(v.native?.values.cm3).toBeLessThan(v.native!.values.cm2)
   })
 
@@ -186,26 +197,75 @@ describe('a channel share of the company fixed expenses', () => {
   })
 
   it('reaches the multi-month P&L for every channel with its own statement', () => {
-    for (const channel of ['amazon_us', 'flipkart'] as const) {
+    for (const [channel, share] of [['amazon_us', US_SHARE], ['flipkart', 1 - US_SHARE]] as const) {
       const lines = build(channel).canonical.lines
-      expect(lines.salaries, `${channel} salaries`).toBeCloseTo(30000, 6)
-      expect(lines.rent, `${channel} rent`).toBeCloseTo(20000, 6)
+      expect(lines.salaries, `${channel} salaries`).toBeCloseTo(60000 * share, 6)
+      expect(lines.rent, `${channel} rent`).toBeCloseTo(40000 * share, 6)
       // EBITDA used to equal contribution on every one of these channels,
       // which is what made a month of overheads invisible on the report the
       // company is actually run from.
-      expect(lines.ebitda, `${channel} ebitda`).toBeCloseTo((lines.contributionProfit ?? 0) - 50000, 6)
+      expect(lines.ebitda, `${channel} ebitda`).toBeCloseTo((lines.contributionProfit ?? 0) - 100000 * share, 6)
       expect(lines.ebitda).toBeLessThan(lines.contributionProfit ?? 0)
     }
   })
 
   it('splits by each channel share of sales, not evenly', () => {
+    expect(build('amazon_us').canonical.lines.salaries).toBeCloseTo(60000 * US_SHARE, 6)
+    expect(build('flipkart').canonical.lines.salaries).toBeCloseTo(60000 * (1 - US_SHARE), 6)
+    // Which is nowhere near even, on these two statements.
+    expect(US_SHARE).toBeGreaterThan(0.9)
+  })
+
+  // The share is what the channel's own P&L says it sold. Order rows are the
+  // fallback for a channel with no statement, not a second opinion about one
+  // that has one.
+  it('measures the share on the statement, not on the order rows beside it', () => {
     const lopsided = [inr('amazon_us', 150000), inr('flipkart', 50000)]
     const v = buildChannelPnlView('amazon_us', '2026-08', {
       salesRecords: lopsided, skuMaster, fixedExpenses, marketing: {}, fxRate: { USD: fxRate, AED: fxRate / 3.6725 },
       facts: { flipkartFacts: [flipkartAugust], amazonUsaFacts: [amazonUsa], meeshoFacts: [] },
     })
-    expect(v.canonical.lines.salaries).toBeCloseTo(60000 * 0.75, 6)
-    expect(v.native?.values.allocatedOverheadsUsd).toBeCloseTo(-75000 / fxRate, 6)
+    expect(v.canonical.lines.salaries).toBeCloseTo(60000 * US_SHARE, 6)
+  })
+
+  /**
+   * The case this was changed for.
+   *
+   * Amazon India's statements are the NPPM file and the Product Profitability
+   * export, and neither produces a single order row. Measured on order rows it
+   * sold nothing, carried nothing of the month's rent and salaries, and left
+   * its share to be paid by the channels that do file order reports.
+   */
+  it('charges a channel that reports by statement and files no order rows', () => {
+    const vendor: AmazonInVendorFacts = {
+      month: '2026-08', schemaVersion: 1, periodStart: '2026-08-01', periodEnd: '2026-08-31',
+      netShippedGms: 1780611.73, netPpm: 501715.79, invoiceValue: 1278895.94,
+      unitsShipped: 8367, marginClosedPct: 0.32, marginAchievedPct: 0.28177,
+      ccogsClaimed: 68079.97, asins: [], rows: 4000,
+    }
+    const inputs = {
+      salesRecords, skuMaster, fixedExpenses, marketing: {},
+      fxRate: { USD: fxRate, AED: fxRate / 3.6725 },
+      facts: {
+        flipkartFacts: [flipkartAugust], amazonUsaFacts: [amazonUsa], meeshoFacts: [],
+        amazonInVendorFacts: [vendor],
+      },
+    }
+    const amazonIn = buildChannelPnlView('amazon_in', '2026-08', inputs)
+    // ₹12,78,895.94 of a ₹21,50,895.94 month is 59.46% of the fixed expenses.
+    const share = 1278895.94 / (1278895.94 + 9000 * 88 + 80000)
+    expect(amazonIn.canonical.lines.salaries).toBeCloseTo(60000 * share, 4)
+    expect(amazonIn.native?.values.otherCosts).toBeCloseTo(-(100000 * share), 4)
+
+    // And the channels that do file order rows stop carrying its share.
+    const flipkart = buildChannelPnlView('flipkart', '2026-08', inputs)
+    expect(flipkart.canonical.lines.salaries).toBeCloseTo(60000 * (80000 / (1278895.94 + 9000 * 88 + 80000)), 4)
+
+    // Every rupee of the month is still allocated, and only once.
+    const allocated = (['amazon_in', 'amazon_us', 'flipkart'] as const)
+      .map((c) => buildChannelPnlView(c, '2026-08', inputs).canonical.lines)
+      .reduce((sum, l) => sum + (l.salaries ?? 0) + (l.rent ?? 0), 0)
+    expect(allocated).toBeCloseTo(100000, 4)
   })
 })
 

@@ -3,15 +3,9 @@ import { BUSINESS_CHANNEL_IDS, channelOfSource, channelLabel, sourcesOfChannel }
 import { DEFAULT_FX_INR, inrPerUnit, type FxRatesInr } from '@/data/fxRates'
 import { toMonthKey } from '@/lib/format'
 import { nykaaRevenue } from './nativePnl/nykaa'
-import type {
-  AmazonUsaPnlFacts,
-  CanonicalSalesRecord,
-  FlipkartPnlFacts,
-  MeeshoPnlFacts,
-  MyntraPnlFacts,
-  NykaaPnlFacts,
-  PnlBasis,
-} from '@/data/models'
+import { statementRevenue } from './channelNetSales'
+import type { ChannelFactsStore } from './channelFactsStore'
+import type { CanonicalSalesRecord, PnlBasis } from '@/data/models'
 
 /**
  * THE central Net Sales calculation.
@@ -174,15 +168,16 @@ export function orderBasisNetSales(
 // Settlement basis
 // ---------------------------------------------------------------------------
 
-export interface ChannelFacts {
-  flipkartFacts: FlipkartPnlFacts[]
-  amazonUsaFacts: AmazonUsaPnlFacts[]
-  meeshoFacts: MeeshoPnlFacts[]
-  /** Optional so a caller written before Myntra had a statement still
-   * compiles; every screen in the app passes it. */
-  myntraFacts?: MyntraPnlFacts[]
-  nykaaFacts?: NykaaPnlFacts[]
-}
+/**
+ * The statements this module reads, which is every statement the app holds.
+ *
+ * One shape, shared with the P&L router, rather than a list of the five
+ * channels this module happened to know about: a channel whose figures were
+ * missing from here read as having sold nothing, and the fixed-expense
+ * allocation — which measures each channel's share of the month from this —
+ * charged it none of the rent.
+ */
+export type ChannelFacts = ChannelFactsStore
 
 /**
  * Net Sales as the marketplace itself reported it for the month. Returns null
@@ -296,6 +291,24 @@ export function settlementBasisNetSales(
       netSales: f.netSalesUsd * fxRate.USD,
       basis: 'settlement',
       sourceLabel: 'Amazon USA profitability report',
+    }
+  }
+
+  // Every other channel with a statement, read through the same canonical
+  // buckets its P&L is built from. The five above keep their own branches
+  // because each carries something this cannot — Nykaa's MRP basis, Meesho's
+  // unit and order counts — and a statement that states money but no units
+  // leaves those to the order rows, as it always has.
+  const revenue = statementRevenue(channel, month, facts, fxRate, meeshoBasis)
+  if (revenue) {
+    return {
+      ...EMPTY_FIGURE,
+      grossSales: revenue.grossSales,
+      discounts: revenue.discounts,
+      returnsValue: revenue.returnsValue,
+      netSales: revenue.netSales,
+      basis: 'settlement',
+      sourceLabel: `${channelLabel(channel)} statement`,
     }
   }
 

@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { allocateFixedExpensesForMonth, computeSalesContributionWeights } from './allocation'
-import type { CanonicalSalesRecord, FixedExpenseEntry } from '@/data/models'
+import { STATEMENT_CHANNELS } from './channelNetSales'
+import { BUSINESS_CHANNEL_IDS } from '@/config/channels'
+import type {
+  AmazonInVendorFacts, CanonicalSalesRecord, FixedExpenseEntry, FlipkartPnlFacts,
+} from '@/data/models'
 
-function record(channel: CanonicalSalesRecord['channel'], netSales: number): CanonicalSalesRecord {
+function record(
+  channel: CanonicalSalesRecord['channel'],
+  netSales: number,
+  orderDate = '2026-06-10',
+): CanonicalSalesRecord {
   return {
-    orderId: `${channel}-1`, orderDate: '2026-06-10', channel, marketplace: channel, sellerType: 'marketplace',
+    orderId: `${channel}-1`, orderDate, channel, marketplace: channel, sellerType: 'marketplace',
     sku: 'SKU-1', productName: 'Test', category: 'Test', quantity: 1, grossSales: netSales, discount: 0,
     netSales, returnUnits: 0, rtoUnits: 0, shippingCost: 0, marketplaceFee: 0, tax: 0,
     status: 'completed', currency: 'INR', importId: 'test',
@@ -75,5 +83,71 @@ describe('fixed expenses entered as a single figure', () => {
       Object.values(v).reduce<number>((acc, x) => acc + (x ?? 0), 0)
     expect(sum(asOne.flipkart ?? {})).toBeCloseTo(sum(byCategory.flipkart ?? {}), 6)
     expect(sum(asOne.nykaa ?? {})).toBeCloseTo(sum(byCategory.nykaa ?? {}), 6)
+  })
+})
+
+/**
+ * The share is measured on each channel's own P&L, which is the only basis
+ * that includes a channel reporting by statement.
+ *
+ * Amazon India is the case: its months come from the NPPM file and the
+ * Product Profitability export, neither of which produces an order row, so on
+ * the order-row basis it had sold nothing and carried none of the company's
+ * rent — ₹0 of September's ₹5,52,739, with Flipkart, Myntra and Meesho
+ * carrying its share between them.
+ */
+describe('a channel that reports by statement rather than by order row', () => {
+  const vendor: AmazonInVendorFacts = {
+    month: '2026-09', schemaVersion: 1, periodStart: '2026-09-01', periodEnd: '2026-09-30',
+    netShippedGms: 1682714.56, netPpm: 483422.75, invoiceValue: 1199291.81,
+    unitsShipped: 7486, marginClosedPct: 0.32, marginAchievedPct: 0.2873,
+    ccogsClaimed: 55045.91, asins: [], rows: 5178,
+  }
+  const flipkart: FlipkartPnlFacts = {
+    month: '2026-09', grossSales: 1500000, estimatedNetSales: 1199291.81, cogsPriced: 0, cogsUnpriced: 0,
+    commissionFee: 0, collectionFee: 0, fixedFee: 0, pickPackFee: 0, forwardShippingFee: 0,
+    reverseShippingFee: 0, storageFee: 0, recallFee: 0, otherMarketplaceFees: 0, rewardsSpf: 0,
+    flipkartAds: 0, sellerFundedDiscount: 0, customerAddOns: 0, outputGst: 0, googleAds: 0,
+  }
+  const facts = {
+    flipkartFacts: [flipkart], amazonUsaFacts: [], meeshoFacts: [], amazonInVendorFacts: [vendor],
+  }
+
+  it('counts its statement, not the order rows it does not file', () => {
+    const weights = computeSalesContributionWeights([], '2026-09', facts)
+    // Both channels invoiced the same, so they split the month in half.
+    expect(weights.amazon_in).toBeCloseTo(0.5, 6)
+    expect(weights.flipkart).toBeCloseTo(0.5, 6)
+  })
+
+  it('carried nothing at all before, which is what the change is for', () => {
+    const weights = computeSalesContributionWeights([record('flipkart', 1199291.81, '2026-09-10')], '2026-09')
+    expect(weights.amazon_in).toBe(0)
+    expect(weights.flipkart).toBeCloseTo(1, 6)
+  })
+
+  it('splits the month’s expenses on that basis', () => {
+    const expenses: FixedExpenseEntry[] = [{ month: '2026-09', category: 'rent', amount: 552739 }]
+    const allocation = allocateFixedExpensesForMonth([], expenses, '2026-09', facts)
+    expect(allocation.amazon_in?.rent).toBeCloseTo(552739 / 2, 4)
+    expect(allocation.flipkart?.rent).toBeCloseTo(552739 / 2, 4)
+    // Every rupee allocated, once.
+    const total = Object.values(allocation).reduce((sum, lines) => sum + (lines.rent ?? 0), 0)
+    expect(total).toBeCloseTo(552739, 4)
+  })
+
+  it('prefers the statement over order rows for the same channel', () => {
+    // Flipkart files both. The statement is what its P&L reports, so it is
+    // what the share is measured on — the rows are not a second opinion.
+    const withRows = computeSalesContributionWeights([record('flipkart', 50, '2026-09-10')], '2026-09', facts)
+    expect(withRows.flipkart).toBeCloseTo(0.5, 6)
+  })
+
+  // The guarantee the owner asked for, which the type system enforces: a
+  // channel added to the registry cannot compile until this file says how its
+  // statement is read. This is the runtime echo of that, so the promise is
+  // visible in the test output too.
+  it('reads a statement for every channel the company has', () => {
+    expect([...STATEMENT_CHANNELS].sort()).toEqual([...BUSINESS_CHANNEL_IDS].sort())
   })
 })

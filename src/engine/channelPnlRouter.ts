@@ -2,19 +2,12 @@ import type { BusinessChannelId } from '@/config/channels'
 import type { PnlBasis } from '@/data/models'
 import type {
   AmazonInSkuFeeFacts,
-  PurpllePnlFacts,
-  SwiggyInstamartPnlFacts,
-  AmazonAePnlFacts,
-  AmazonUsaPnlFacts,
+  AmazonInSellerPnlFacts,
+  AmazonInVendorFacts,
   CanonicalSalesRecord,
   ChannelPnl,
   FixedExpenseEntry,
-  FlipkartPnlFacts,
   MeeshoPnlFacts,
-  MyntraPnlFacts,
-  BlinkitPnlFacts,
-  AmazonInSellerPnlFacts,
-  AmazonInVendorFacts,
   NykaaPnlFacts,
   PnlLineValues,
   SkuMaster,
@@ -61,6 +54,7 @@ import {
   type SellerExportCogs,
 } from './nativePnl/amazonInSellerExport'
 import type { NativeLineDef, NativeLineValues } from './nativePnl/types'
+import type { ChannelFactsStore } from './channelFactsStore'
 
 export interface NativePnlView {
   lineDefs: NativeLineDef[]
@@ -138,26 +132,7 @@ export function amazonInHalfSplit(facts: ChannelFactsStore, months: string[]): A
   }
 }
 
-export interface ChannelFactsStore {
-  flipkartFacts: FlipkartPnlFacts[]
-  amazonUsaFacts: AmazonUsaPnlFacts[]
-  meeshoFacts: MeeshoPnlFacts[]
-  /** Optional so a caller written before Myntra had a statement still
-   * compiles; every screen in the app passes it. */
-  myntraFacts?: MyntraPnlFacts[]
-  nykaaFacts?: NykaaPnlFacts[]
-  amazonInSellerFacts?: AmazonInSellerPnlFacts[]
-  blinkitFacts?: BlinkitPnlFacts[]
-  amazonAeFacts?: AmazonAePnlFacts[]
-  purplleFacts?: PurpllePnlFacts[]
-  swiggyInstamartFacts?: SwiggyInstamartPnlFacts[]
-  /** Amazon India's wholesale half, which has its own statement. */
-  amazonInVendorFacts?: AmazonInVendorFacts[]
-  /** Amazon India's marketplace half as the Product Profitability export
-   * states it — the whole month, SKU by SKU, which is why it is the statement
-   * for that half rather than only the fee detail behind it. */
-  amazonInSkuFeeFacts?: AmazonInSkuFeeFacts[]
-}
+export type { ChannelFactsStore } from './channelFactsStore'
 
 /** Sums this channel's allocated share (sales-contribution method) of the
  * month's fixed expenses into one lump figure, for channels whose native
@@ -188,7 +163,9 @@ function withAllocatedOpex(
    */
   share = 1,
 ): PnlLineValues {
-  const allocation = allocateFixedExpensesForMonth(inputs.salesRecords, inputs.fixedExpenses, month)[channel]
+  const allocation = allocateFixedExpensesForMonth(
+    inputs.salesRecords, inputs.fixedExpenses, month, inputs.facts, inputs.fxRate,
+  )[channel]
   if (!allocation) return lines
   if (share === 1) return { ...lines, ...allocation }
   const scaled: PnlLineValues = {}
@@ -199,13 +176,14 @@ function withAllocatedOpex(
 }
 
 function computeAllocatedOtherCosts(
-  allRecords: CanonicalSalesRecord[],
-  fixedExpenses: FixedExpenseEntry[],
+  inputs: ChannelPnlViewInputs,
   channel: BusinessChannelId,
   month: string,
   share = 1,
 ): number {
-  const allocation = allocateFixedExpensesForMonth(allRecords, fixedExpenses, month)[channel] ?? {}
+  const allocation = allocateFixedExpensesForMonth(
+    inputs.salesRecords, inputs.fixedExpenses, month, inputs.facts, inputs.fxRate,
+  )[channel] ?? {}
   return Object.values(allocation).reduce((sum, v) => sum + (v ?? 0), 0) * share
 }
 
@@ -576,7 +554,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       const facts = recomputed
         ? { ...imported, cogsPriced: recomputed.priced, cogsUnpriced: recomputed.unpriced }
         : imported
-      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+      const otherCosts = computeAllocatedOtherCosts(inputs, channel, month)
       const values = applyFlipkartOtherCosts(computeFlipkartPnl(facts), otherCosts)
       const canonicalLines = computeSubtotals(withAllocatedOpex(flipkartToCanonicalBuckets(facts), inputs, channel, month))
       return {
@@ -616,7 +594,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       // Amazon USA's own overhead lines are US costs. This is its share of the
       // company's fixed expenses, which every other channel's statement
       // already carried and this one did not.
-      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+      const otherCosts = computeAllocatedOtherCosts(inputs, channel, month)
       const usd = applyAmazonUsaOtherCosts(computeAmazonUsaPnl(facts), otherCosts, fxRate, facts.netSalesUsd)
       const showInr = inputs.currencyView === 'INR'
       const canonicalLines = computeSubtotals(withAllocatedOpex(amazonUsaToCanonicalBuckets(facts, fxRate), inputs, channel, month))
@@ -693,7 +671,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
         confirmedDiscount: inputs.confirmedNykaaDiscount,
         nykaaAds: imported.nykaaAds || adSpend,
       }
-      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+      const otherCosts = computeAllocatedOtherCosts(inputs, channel, month)
       const values = applyNykaaOtherCosts(computeNykaaPnl(facts), otherCosts)
       const notes: string[] = []
       if (inboundFreight === 0 && imported.netUnits > 0) {
@@ -838,7 +816,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
     if (vendor) {
       const cogs = vendorCogs(vendor, month, inputs)
       const adSpend = adsOnVendor
-      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month, share)
+      const otherCosts = computeAllocatedOtherCosts(inputs, channel, month, share)
       const values = applyAmazonInVendorOtherCosts(
         computeAmazonInVendorPnl(vendor, cogs, adSpend),
         otherCosts,
@@ -904,7 +882,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
 
     // Seller Central, as the export states the whole month.
     if (half !== 'vendor' && exportMonth) {
-      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month, share)
+      const otherCosts = computeAllocatedOtherCosts(inputs, channel, month, share)
       const values = applyAmazonInSellerExportOtherCosts(
         computeAmazonInSellerExportPnl(exportMonth, sellerCogs, adsOnSeller),
         otherCosts,
@@ -1016,7 +994,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
         ...(recomputed ? { cogsPriced: recomputed.priced, cogsUnpriced: recomputed.unpriced } : {}),
         ads: vendorMonth ? 0 : (imported.ads || adSpend),
       }
-      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month, share)
+      const otherCosts = computeAllocatedOtherCosts(inputs, channel, month, share)
       const values = applyAmazonInSellerOtherCosts(computeAmazonInSellerPnl(facts), otherCosts)
       const notes: string[] = []
       if (!recomputed) {
@@ -1096,7 +1074,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
         ...(recomputed ? { cogsPriced: recomputed.priced, cogsUnpriced: recomputed.unpriced } : {}),
         myntraAds: imported.myntraAds || adSpend,
       }
-      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+      const otherCosts = computeAllocatedOtherCosts(inputs, channel, month)
       const values = applyMyntraOtherCosts(computeMyntraPnl(facts), otherCosts)
       const notes: string[] = []
       if (facts.myntraAds === 0) {
@@ -1141,7 +1119,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       // instead of leaving whatever was frozen at upload time.
       const recomputed = recomputedCogs(channel, month, inputs)
       const cogs = recomputed ? recomputed.total : 0
-      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+      const otherCosts = computeAllocatedOtherCosts(inputs, channel, month)
       // Advertising is billed separately from the payout, so it comes from
       // where the Ads screens keep it. One figure, one source.
       const adSpend = inputs.marketing[channel]?.ads ?? 0
@@ -1187,7 +1165,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       // it is divided at the month's rate rather than at upload day's.
       const recomputed = recomputedCogs(channel, month, inputs)
       const cogsInr = recomputed ? recomputed.total : (facts.cogsSourceInr ?? 0)
-      const otherCostsInr = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+      const otherCostsInr = computeAllocatedOtherCosts(inputs, channel, month)
 
       const notes: string[] = []
       // Said on the statement, not only at upload: anyone reading the P&L in
@@ -1235,7 +1213,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       // what the Product Master held at upload otherwise.
       const recomputed = recomputedCogs(channel, month, inputs)
       const cogs = recomputed ? recomputed.total : facts.cogsSourceInr
-      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+      const otherCosts = computeAllocatedOtherCosts(inputs, channel, month)
 
       // On the statement, not only at upload: whoever reads this in three
       // months has to know why there is no commission line.
@@ -1277,7 +1255,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
     if (facts) {
       const recomputed = recomputedCogs(channel, month, inputs)
       const cogs = recomputed ? recomputed.total : facts.cogsSourceInr
-      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+      const otherCosts = computeAllocatedOtherCosts(inputs, channel, month)
 
       const notes: string[] = [
         `Swiggy's trade margin of ${(facts.marginPct * 100).toFixed(0)}% inclusive on MRP comes from the agreed ` +
@@ -1344,7 +1322,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
               cogsReturnWriteOff: recomputed.returnWriteOff,
             }
           : imported
-      const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month)
+      const otherCosts = computeAllocatedOtherCosts(inputs, channel, month)
       const packaging = inputs.packagingPerShipmentInr
       const values = applyMeeshoOtherCosts(computeMeeshoPnl(facts, 0, packaging), otherCosts)
       const canonicalLines = computeSubtotals(
@@ -1368,7 +1346,10 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
   // different basis — it cannot show the fees the settlement states, and its
   // Gross Sales will not tie to the file's own column — so a month on it says
   // so rather than letting the reader assume otherwise.
-  const canonical = buildChannelPnl(inputs.salesRecords, inputs.skuMaster, inputs.fixedExpenses, channel, month, inputs.marketing, inputs.cogs)
+  const canonical = buildChannelPnl(
+    inputs.salesRecords, inputs.skuMaster, inputs.fixedExpenses, channel, month, inputs.marketing, inputs.cogs,
+    inputs.facts, inputs.fxRate,
+  )
   const source = NATIVE_STATEMENT_SOURCE[channel]
   return {
     channel, month, canonical,

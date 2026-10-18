@@ -3,6 +3,7 @@ import { PageShell } from '@/components/layout/PageShell'
 import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { DataTable } from '@/components/ui/DataTable'
 import { useDataStore } from '@/store/dataStore'
+import { usePnlInputs } from '@/engine/usePnlInputs'
 import { useFilterStore } from '@/store/filterStore'
 import { BUSINESS_CHANNEL_IDS } from '@/config/channels'
 import { addMonths, formatCurrencyFull, formatNumber, formatPercent, monthLabel } from '@/lib/format'
@@ -12,11 +13,13 @@ import { asp, netSalesForMonth, rtoPct } from '@/engine/netSales'
 const MONTHS_SHOWN = 12
 
 export function MonthlySalesPage() {
-  const { salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts } = useDataStore()
+  const { salesRecords } = useDataStore()
+  // One facts object, the same one the P&L is built from.
+  const { inputs: { facts: pnlFacts } } = usePnlInputs()
   const { month } = useFilterStore()
 
   const rows = useMemo(() => {
-    const facts = { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts }
+    const facts = pnlFacts
     const channelIds = BUSINESS_CHANNEL_IDS
     const months = Array.from({ length: MONTHS_SHOWN }, (_, i) => addMonths(month, i - (MONTHS_SHOWN - 1)))
 
@@ -39,7 +42,7 @@ export function MonthlySalesPage() {
         growthPct: previous ? growthPct(figure.netSales, previous.netSales) : null,
       }
     })
-  }, [salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, month])
+  }, [salesRecords, pnlFacts, month])
 
   return (
     <PageShell title="Monthly Sales" subtitle="Trailing 12-month revenue, units, orders and ASP" showFilters={false}>

@@ -5,6 +5,7 @@ import { KPICard, KPIGrid } from '@/components/ui/KPICard'
 import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useDataStore } from '@/store/dataStore'
+import { usePnlInputs } from '@/engine/usePnlInputs'
 import { useFilterStore } from '@/store/filterStore'
 import { ADS_CHANNELS, ADS_CHANNEL_MAP, isAdsChannel, type AdsChannelId } from '@/config/adsChannels'
 import { addMonths, formatCurrencyCompact, formatCurrencyFull, formatNumber, formatPercent, monthLabel } from '@/lib/format'
@@ -63,7 +64,9 @@ function ByProgram({ rows }: { rows: AdsProgramSpend[] }) {
 export function AdsChannelPage() {
   const { adsChannelId } = useParams<{ adsChannelId: string }>()
   const navigate = useNavigate()
-  const { adsRecords, manualAdSpend, salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts } = useDataStore()
+  const { adsRecords, manualAdSpend, salesRecords } = useDataStore()
+  // One facts object, the same one the P&L is built from.
+  const { inputs: { facts: pnlFacts } } = usePnlInputs()
   const { month } = useFilterStore()
 
   const channel = adsChannelId as AdsChannelId
@@ -74,7 +77,7 @@ export function AdsChannelPage() {
     const figure = adsSpendFor(channel, month, adsRecords, manualAdSpend)
     const netSales = netSalesForChannelMonth({
       records: salesRecords, channel, month,
-      facts: { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts },
+      facts: pnlFacts,
     }).netSales
 
     const trend = Array.from({ length: TREND_MONTHS }, (_, i) => {
@@ -99,7 +102,7 @@ export function AdsChannelPage() {
     const programs = byProgram.length > 1 || byProgram.some((p) => p.program !== null) ? byProgram : []
 
     return { figure, netSales, trend, programs }
-  }, [def, channel, month, adsRecords, manualAdSpend, salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts])
+  }, [def, channel, month, adsRecords, manualAdSpend, salesRecords, pnlFacts])
 
   if (!def || !data) {
     return (

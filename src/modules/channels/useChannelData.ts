@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
+import { usePnlInputs } from '@/engine/usePnlInputs'
 import type { BusinessChannelId, SalesSourceId } from '@/config/channels'
 import { channelOfSource, displayCurrencyFor, hasMultipleSources } from '@/config/channels'
 import { addMonths, monthLabel } from '@/lib/format'
@@ -34,6 +35,10 @@ const TREND_MONTHS = 6
 export function useChannelData(channel: BusinessChannelId, source?: SalesSourceId) {
   const { salesRecords, skuMaster, mappings, comboComponents, flipkartFacts, amazonUsaFacts, amazonAeFacts, purplleFacts, swiggyInstamartFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts, fxRates } =
     useDataStore()
+  // One facts object, the same one the P&L is built from: Amazon India's
+  // statements produce no order rows at all, so read from the rows alone the
+  // channel had no sales.
+  const { inputs: { facts: pnlFacts } } = usePnlInputs()
   const { month, monthChosenByUser, channelCurrencyView } = useFilterStore()
   const defaultMonthTo = useFilterStore((s) => s.defaultMonthTo)
   const fallbackMonthTo = useFilterStore((s) => s.fallbackMonthTo)
@@ -102,7 +107,7 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
     // Reading a channel in its own currency means no conversion at all, which
     // is a rate of 1 for every currency rather than for the dollar alone.
     const rate: FxRatesInr = displayCurrency !== 'INR' ? { USD: 1, AED: 1 } : fxRatesForMonth(month, fxRates)
-    const channelFacts = { flipkartFacts, amazonUsaFacts, amazonAeFacts, purplleFacts, swiggyInstamartFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts }
+    const channelFacts = pnlFacts
 
     const inScope = (r: { channel: SalesSourceId }) =>
       source ? r.channel === source : channelOfSource(r.channel) === channel
@@ -178,5 +183,5 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
       topSkus: [...skuRows].sort((a, b) => b.netSales - a.netSales).slice(0, 5),
       bottomSkus: [...skuRows].sort((a, b) => a.netSales - b.netSales).slice(0, 5),
     }
-  }, [salesRecords, skuMaster, mappings, comboComponents, flipkartFacts, amazonUsaFacts, amazonAeFacts, purplleFacts, swiggyInstamartFacts, meeshoFacts, myntraFacts, nykaaFacts, blinkitFacts, fxRates, channel, source, month, displayCurrency])
+  }, [salesRecords, skuMaster, mappings, comboComponents, pnlFacts, fxRates, channel, source, month, displayCurrency])
 }

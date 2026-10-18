@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { PageShell } from '@/components/layout/PageShell'
 import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { useDataStore } from '@/store/dataStore'
+import { usePnlInputs } from '@/engine/usePnlInputs'
 import { useFilterStore } from '@/store/filterStore'
 import { BUSINESS_CHANNELS, type BusinessChannelId } from '@/config/channels'
 import { addMonths, formatCurrencyCompact, formatCurrencyFull, formatPercent, monthLabel } from '@/lib/format'
@@ -29,13 +30,15 @@ const METRICS: { key: Metric; label: string; format: (v: number) => string }[] =
  * them.
  */
 export function ChannelSalesPage() {
-  const { salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts } = useDataStore()
+  const { salesRecords } = useDataStore()
+  // One facts object, the same one the P&L is built from.
+  const { inputs: { facts: pnlFacts } } = usePnlInputs()
   const { month } = useFilterStore()
   const [metric, setMetric] = useState<Metric>('netSales')
   const [monthsShown, setMonthsShown] = useState(MONTH_WINDOW)
 
   const { months, activeChannels, matrix, monthTotals, channelTotals, grandTotal } = useMemo(() => {
-    const facts = { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts }
+    const facts = pnlFacts
     const months = Array.from({ length: monthsShown }, (_, i) => addMonths(month, i - (monthsShown - 1)))
 
     const matrix = new Map<string, Map<BusinessChannelId, { netSales: number; units: number; orders: number }>>()
@@ -72,7 +75,7 @@ export function ChannelSalesPage() {
     const grandTotal = [...monthTotals.values()].reduce((a, b) => a + b, 0)
 
     return { months, activeChannels, matrix, monthTotals, channelTotals, grandTotal }
-  }, [salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, month, monthsShown, metric])
+  }, [salesRecords, pnlFacts, month, monthsShown, metric])
 
   const format = METRICS.find((m) => m.key === metric)!.format
 

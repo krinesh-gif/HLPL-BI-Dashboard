@@ -4,6 +4,7 @@ import { PageShell } from '@/components/layout/PageShell'
 import { KPICard, KPIGrid } from '@/components/ui/KPICard'
 import { ComparisonBarChart } from '@/components/charts/ComparisonBarChart'
 import { useDataStore } from '@/store/dataStore'
+import { usePnlInputs } from '@/engine/usePnlInputs'
 import { useFilterStore } from '@/store/filterStore'
 import { ADS_CHANNELS } from '@/config/adsChannels'
 import { formatCurrencyCompact, formatCurrencyFull, formatPercent, monthLabel } from '@/lib/format'
@@ -16,7 +17,9 @@ import { exportRowsToCsv } from '@/lib/exportCsv'
  * is being spent in one place rather than a channel at a time.
  */
 export function AdsOverviewPage() {
-  const { adsRecords, manualAdSpend, salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts } = useDataStore()
+  const { adsRecords, manualAdSpend, salesRecords } = useDataStore()
+  // One facts object, the same one the P&L is built from.
+  const { inputs: { facts: pnlFacts } } = usePnlInputs()
   const { month } = useFilterStore()
 
   const { figures, totals, netSales } = useMemo(() => {
@@ -24,9 +27,9 @@ export function AdsOverviewPage() {
     return {
       figures,
       totals: totalAdsSpend(figures),
-      netSales: netSalesForMonth(salesRecords, month, { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts }).netSales,
+      netSales: netSalesForMonth(salesRecords, month, pnlFacts).netSales,
     }
-  }, [adsRecords, manualAdSpend, salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, month])
+  }, [adsRecords, manualAdSpend, salesRecords, pnlFacts, month])
 
   const label = (id: string) => ADS_CHANNELS.find((c) => c.id === id)?.label ?? id
 

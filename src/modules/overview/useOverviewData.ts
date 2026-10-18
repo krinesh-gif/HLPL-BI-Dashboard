@@ -17,14 +17,16 @@ import {
 } from '@/engine/insight'
 
 export function useOverviewData() {
-  const { salesRecords, adsRecords, skuMaster, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts } = useDataStore()
-  const { forMonth } = usePnlInputs()
+  const { salesRecords, adsRecords, skuMaster } = useDataStore()
+  const { inputs: { facts: pnlFacts }, forMonth } = usePnlInputs()
   const { month } = useFilterStore()
 
   return useMemo(() => {
     const previousMonth = addMonths(month, -1)
     const channelIds = BUSINESS_CHANNEL_IDS
-    const facts = { flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts }
+    // Every statement the app holds, not a hand-listed five: a channel
+    // missing from this read as having sold nothing.
+    const facts = pnlFacts
 
     const currentChannelPnls = buildAllChannelPnlViews(channelIds, month, forMonth(month)).map((v) => v.canonical)
     const previousChannelPnls = buildAllChannelPnlViews(channelIds, previousMonth, forMonth(previousMonth)).map((v) => v.canonical)
@@ -150,5 +152,5 @@ export function useOverviewData() {
       decliningSku,
       insights,
     }
-  }, [salesRecords, adsRecords, skuMaster, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, forMonth, month])
+  }, [salesRecords, adsRecords, skuMaster, pnlFacts, forMonth, month])
 }

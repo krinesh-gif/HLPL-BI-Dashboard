@@ -1,12 +1,19 @@
 import type { BusinessChannelId } from '@/config/channels'
 import { BUSINESS_CHANNEL_IDS, channelOfSource } from '@/config/channels'
-import { PNL_STRUCTURE, type PnlLineKey } from '@/config/pnlStructure'
+import { PNL_STRUCTURE } from '@/config/pnlStructure'
 import type { CanonicalSalesRecord, ChannelPnl, FixedExpenseEntry, PnlLineValues, PnlResult, SkuMaster } from '@/data/models'
 import { cogsForMonth, type CostVersionsBySku } from '@/data/costVersions'
 import { resolveCogs, type ComboComponent, type SkuMapping } from '@/data/skuMapping'
 import { filterByMonth } from './sales'
 import { orderBasisNetSales } from './netSales'
 import { allocateFixedExpensesForMonth } from './allocation'
+import type { ChannelFactsStore } from './channelFactsStore'
+import type { FxRatesInr } from '@/data/fxRates'
+import { computeSubtotals } from './subtotals'
+
+// Re-exported because every screen and every test imports it from here, and
+// moving a function is not a reason to touch forty call sites.
+export { computeSubtotals }
 
 /** Marketing spend, keyed by channel, for a given month. Comes from Amazon Ads / other ad-platform imports. */
 export type MarketingByChannel = Partial<Record<BusinessChannelId, { ads: number; performanceMarketing?: number; otherMarketing?: number }>>
@@ -125,6 +132,11 @@ export function buildChannelPnl(
   month: string,
   marketing: MarketingByChannel,
   cogsInputs: CogsInputs = {},
+  /** Every channel's statements, so the month's fixed expenses are shared out
+   * on what each channel's own P&L says it sold — including the channels that
+   * report by statement and produce no order rows at all. */
+  statementFacts?: ChannelFactsStore,
+  fxRate?: FxRatesInr,
 ): ChannelPnl {
   // Every report belonging to this business channel. For Amazon India that is
   // Seller Central and Vendor Central together, which is what makes one P&L
@@ -136,7 +148,7 @@ export function buildChannelPnl(
   const facts = orderBasisNetSales(records)
   const { cogs } = cogsForRecords(records, skuMaster, month, cogsInputs)
   const channelMarketing = marketing[channel] ?? { ads: 0 }
-  const allocation = allocateFixedExpensesForMonth(allRecords, fixedExpenses, month)
+  const allocation = allocateFixedExpensesForMonth(allRecords, fixedExpenses, month, statementFacts, fxRate)
   const myAllocation = allocation[channel] ?? {}
 
   const lines: PnlLineValues = {
@@ -161,52 +173,6 @@ export function buildChannelPnl(
   return { channel, month, lines: computeSubtotals(lines) }
 }
 
-/** Fills in netSales / grossProfit / contributionProfit / ebitda and their margin %s from the input lines. */
-export function computeSubtotals(input: PnlLineValues): PnlLineValues {
-  const lines: PnlLineValues = { ...input }
-  const get = (k: PnlLineKey) => lines[k] ?? 0
-
-  const netSales =
-    get('grossSales') - get('discounts') - get('returns') - get('otherRevenueAdj')
-  lines.netSales = netSales
-
-  const grossProfit = netSales - get('cogs')
-  lines.grossProfit = grossProfit
-  lines.grossMarginPct = netSales !== 0 ? (grossProfit / netSales) * 100 : 0
-
-  const marketplaceVariableTotal =
-    get('marketplaceCommission') +
-    get('fulfilment') +
-    get('shipping') +
-    get('collectionFees') +
-    get('rtoCharges') +
-    get('returnCharges') +
-    get('otherMarketplaceCharges')
-
-  const marketingTotal = get('ads') + get('performanceMarketing') + get('otherMarketing')
-
-  const contributionProfit = grossProfit - marketplaceVariableTotal - marketingTotal
-  lines.contributionProfit = contributionProfit
-  lines.contributionMarginPct = netSales !== 0 ? (contributionProfit / netSales) * 100 : 0
-
-  const opexTotal =
-    get('fixedExpensesTotal') +
-    get('salaries') +
-    get('rent') +
-    get('software') +
-    get('warehouse') +
-    get('logistics') +
-    get('professionalFees') +
-    get('officeExpenses') +
-    get('generalExpenses') +
-    get('otherOpex')
-
-  const ebitda = contributionProfit - opexTotal
-  lines.ebitda = ebitda
-  lines.ebitdaMarginPct = netSales !== 0 ? (ebitda / netSales) * 100 : 0
-
-  return lines
-}
 
 /** Aggregates every channel's P&L for a month into the consolidated Master P&L (same line-by-line structure). */
 export function buildMasterPnl(channelPnls: ChannelPnl[], month: string): PnlResult {
