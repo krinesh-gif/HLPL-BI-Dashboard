@@ -704,6 +704,52 @@ describe('buildChannelPnlView, Amazon India over Seller and Vendor Central', () 
       expect(empty.sellerPct).toBeNull()
     })
 
+    /**
+     * July 2026: an export, no NPPM file, and ₹3,53,388.82 of measured
+     * Sponsored Products spend on file. Charged only on the wholesale
+     * statement, that spend was charged on neither — the month read as having
+     * advertised for nothing.
+     */
+    it('charges the month’s ad spend where there is no wholesale statement to carry it', () => {
+      const july = { ...exportMonth, month: '2026-07', netSalesInr: 199532.13, grossSalesInr: 217838.24 }
+      const v = buildChannelPnlView('amazon_in', '2026-07', {
+        ...inputs,
+        marketing: { amazon_in: { ads: 353388.82 } },
+        facts: { ...inputs.facts, amazonInSkuFeeFacts: [july], amazonInSellerFacts: [], amazonInVendorFacts: [] },
+      })
+      expect(v.native?.values.channelAds).toBeCloseTo(-353388.82, 2)
+      expect(v.native?.values.totalAdvertising).toBeCloseTo(-353388.82, 2)
+      expect(v.canonical.lines.ads).toBeCloseTo(353388.82, 2)
+      expect(v.notes.some((n) => n.includes('understated until that month'))).toBe(true)
+    })
+
+    // Amazon's own Net proceeds column cannot know about spend it did not
+    // bill, so the reconciliation has to ignore the campaign figure.
+    it('keeps the campaign spend out of Amazon’s own net-proceeds check', () => {
+      const withAds = buildChannelPnlView('amazon_in', '2026-09', {
+        ...inputs,
+        marketing: { amazon_in: { ads: 353388.82 } },
+        facts: { ...inputs.facts, amazonInVendorFacts: [] },
+        amazonInHalf: 'seller',
+      })
+      const without = buildChannelPnlView('amazon_in', '2026-09', {
+        ...inputs, facts: { ...inputs.facts, amazonInVendorFacts: [] }, amazonInHalf: 'seller',
+      })
+      expect(withAds.native?.values.netProceedsDiff).toBeCloseTo(without.native?.values.netProceedsDiff ?? 0, 6)
+    })
+
+    // With both halves on file the wholesale statement carries it, which is
+    // what keeps the two halves adding to the channel.
+    it('still charges it once when both halves are on file', () => {
+      const both = { ...inputs, marketing: { amazon_in: { ads: 202718.37 } } }
+      const vendor = buildChannelPnlView('amazon_in', '2026-09', { ...both, amazonInHalf: 'vendor' })
+      const seller = buildChannelPnlView('amazon_in', '2026-09', { ...both, amazonInHalf: 'seller' })
+      const whole = buildChannelPnlView('amazon_in', '2026-09', { ...both, amazonInHalf: 'both' })
+      expect(vendor.canonical.lines.ads).toBeCloseTo(202718.37, 2)
+      expect(seller.canonical.lines.ads).toBe(0)
+      expect(whole.canonical.lines.ads).toBeCloseTo(202718.37, 2)
+    })
+
     it('estimates the cost of a month imported before units per SKU were read', () => {
       const old = { ...exportMonth, unitsBySku: undefined, netSalesBySku: undefined }
       const v = buildChannelPnlView('amazon_in', '2026-09', {

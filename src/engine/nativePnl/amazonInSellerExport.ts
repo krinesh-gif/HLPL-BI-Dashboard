@@ -43,10 +43,13 @@ import type { NativeLineDef, NativeLineValues } from './types'
  *     SKU sold, and estimated only for a SKU with no cost on file, which the
  *     statement says on its own line.
  *
- * Advertising stays off this statement unless Amazon billed it in the export
- * itself. Amazon India's spend is bought through one AMC account that lifts
- * the wholesale half too, so the channel charges it once, on the Vendor
- * Central statement — see `channelPnlRouter`.
+ * Advertising is charged here in the month that has no Vendor Central
+ * statement to carry it. One ad account lifts both halves, so the channel
+ * charges the month's spend once — on the wholesale statement where there is
+ * one, and on this one where there is not. July 2026 is why that second half
+ * of the rule exists: its NPPM file never arrived, so ₹3,53,388.82 of
+ * measured Sponsored Products spend was charged on neither statement and
+ * Amazon India's July read as having advertised for nothing.
  */
 
 /** Cost of goods for a month, priced from the SKUs the export lists. */
@@ -94,8 +97,14 @@ export const AMAZON_IN_SELLER_EXPORT_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm1', label: 'CM1 — after Amazon charges', section: 'AMAZON CHARGES', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'AMAZON CHARGES', kind: 'percent' },
 
-  { key: 'totalAdvertising', label: 'Advertising billed in this report', section: 'ADVERTISING', kind: 'subtotal', isGroupHead: true, group: 'ADVERTISING', hideWhenZero: true, note: 'The channel’s AMC spend is charged once, on the Vendor Central statement' },
+  { key: 'totalAdvertising', label: 'Less: Advertising', section: 'ADVERTISING', kind: 'subtotal', isGroupHead: true, group: 'ADVERTISING', hideWhenZero: true },
   ...feeLineDefs('advertising', 'ADVERTISING'),
+  {
+    key: 'channelAds', label: 'Campaign spend, from the ads reports', section: 'ADVERTISING', kind: 'input',
+    fee: 'advertising', group: 'ADVERTISING', hideWhenZero: true,
+    note: 'Billed outside this export — Sponsored Products and Brands, from the Amazon Ads console. Charged here '
+      + 'only in a month with no Vendor Central statement to carry it, so the channel pays for it once',
+  },
 
   { key: 'netProceeds', label: 'Net proceeds, from the fees read here', section: 'NET PROCEEDS', kind: 'subtotal' },
   { key: 'sheetNetProceeds', label: 'Net proceeds per Amazon’s own column', section: 'NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
@@ -146,6 +155,8 @@ const less = (v: number): number => (v === 0 ? 0 : -v)
 export function computeAmazonInSellerExportPnl(
   facts: AmazonInSkuFeeFacts,
   cogs: SellerExportCogs = EMPTY_SELLER_EXPORT_COGS,
+  /** The month's campaign spend, where this statement is the one carrying it. */
+  ads = 0,
 ): NativeLineValues {
   const nested = nestedIds(facts)
   const fee = (id: string) => facts.feeTotalsInr[id] ?? 0
@@ -155,7 +166,12 @@ export function computeAmazonInSellerExportPnl(
 
   const unmappedFees = Object.values(facts.unmappedFeeTotalsInr ?? {}).reduce((a, b) => a + b, 0)
   const totalMarketplaceCharges = sumGroup('marketplace') + unmappedFees
-  const totalAdvertising = sumGroup('advertising')
+  // Advertising comes from two places and only one of them is in this file.
+  // They are kept apart because Amazon's own Net proceeds column cannot know
+  // about spend it did not bill, and netting it in would put the statement
+  // out against the export by the whole campaign figure.
+  const reportAds = sumGroup('advertising')
+  const totalAdvertising = reportAds + ads
   const netSales = facts.netSalesInr
   const cm1 = netSales - totalMarketplaceCharges
 
@@ -165,7 +181,7 @@ export function computeAmazonInSellerExportPnl(
   // dropping it would put the statement out against the export by that much
   // the first month someone fills the column in.
   const sheetSellerCost = (facts.sheetCogsInr ?? 0) + (facts.sheetMiscCostInr ?? 0)
-  const netProceeds = netSales - totalMarketplaceCharges - totalAdvertising - sheetSellerCost
+  const netProceeds = netSales - totalMarketplaceCharges - reportAds - sheetSellerCost
 
   const totalCogs = cogs.priced + cogs.unpriced
   const cm2 = cm1 - totalAdvertising - totalCogs
@@ -182,6 +198,7 @@ export function computeAmazonInSellerExportPnl(
     cm1Pct: pct(cm1),
 
     totalAdvertising: less(totalAdvertising),
+    channelAds: less(ads),
 
     netProceeds,
     sheetNetProceeds: facts.sheetNetProceedsInr ?? 0,
@@ -228,6 +245,7 @@ export function applyAmazonInSellerExportOtherCosts(
 export function amazonInSellerExportToCanonicalBuckets(
   facts: AmazonInSkuFeeFacts,
   cogs: SellerExportCogs = EMPTY_SELLER_EXPORT_COGS,
+  ads = 0,
 ): PnlLineValues {
   const nested = nestedIds(facts)
   const byBucket = (bucket: string) =>
@@ -250,7 +268,7 @@ export function amazonInSellerExportToCanonicalBuckets(
     rtoCharges: 0,
     returnCharges: byBucket('returnCharges'),
     otherMarketplaceCharges: byBucket('otherMarketplaceCharges') + unmapped + (facts.sheetMiscCostInr ?? 0),
-    ads: byBucket('ads'),
+    ads: byBucket('ads') + ads,
     performanceMarketing: 0,
     otherMarketing: 0,
   }

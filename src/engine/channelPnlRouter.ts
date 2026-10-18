@@ -794,6 +794,14 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
     const exportMonth = inputs.facts.amazonInSkuFeeFacts?.find((f) => f.month === month)
     const settlementMonth = inputs.facts.amazonInSellerFacts?.find((f) => f.month === month)
     const sellerCogs = exportMonth ? sellerExportCogs(exportMonth, month, inputs) : EMPTY_SELLER_EXPORT_COGS
+    // One ad account lifts both halves, so the month's spend is charged once.
+    // The wholesale statement carries it where the month has one, and the
+    // marketplace statement where it does not — July 2026 has no NPPM file,
+    // and with the spend pinned to the wholesale side its ₹3.53 lakh of
+    // measured Sponsored Products spend was charged nowhere at all.
+    const channelAds = inputs.marketing[channel]?.ads ?? 0
+    const adsOnVendor = vendorMonth ? channelAds : 0
+    const adsOnSeller = vendorMonth ? 0 : channelAds
     const sellerNetSales = exportMonth
       ? exportMonth.netSalesInr
       : settlementMonth
@@ -805,7 +813,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
     // lines are what Amazon billed inside the report and stand.
     const marketplaceBuckets = (): PnlLineValues | null =>
       exportMonth
-        ? amazonInSellerExportToCanonicalBuckets(exportMonth, sellerCogs)
+        ? amazonInSellerExportToCanonicalBuckets(exportMonth, sellerCogs, adsOnSeller)
         : settlementMonth
           ? sellerBucketsWithoutAds(settlementMonth)
           : null
@@ -829,11 +837,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
     // both, because the canonical below adds them.
     if (vendor) {
       const cogs = vendorCogs(vendor, month, inputs)
-      // One ad account lifts both halves, so the spend is charged once, here.
-      // Allocating it by net revenue is what the rest of this build does with
-      // a shared cost, and today that puts effectively all of it on this side
-      // because the other has no sales on file at all.
-      const adSpend = inputs.marketing[channel]?.ads ?? 0
+      const adSpend = adsOnVendor
       const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month, share)
       const values = applyAmazonInVendorOtherCosts(
         computeAmazonInVendorPnl(vendor, cogs, adSpend),
@@ -902,7 +906,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
     if (half !== 'vendor' && exportMonth) {
       const otherCosts = computeAllocatedOtherCosts(inputs.salesRecords, inputs.fixedExpenses, channel, month, share)
       const values = applyAmazonInSellerExportOtherCosts(
-        computeAmazonInSellerExportPnl(exportMonth, sellerCogs),
+        computeAmazonInSellerExportPnl(exportMonth, sellerCogs, adsOnSeller),
         otherCosts,
       )
       const notes: string[] = []
@@ -951,13 +955,20 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       // the wholesale statement. Advertising Amazon billed inside this export
       // is different money and is on the statement — if both ever appear, say
       // so rather than letting the same spend be counted twice.
-      const exportAds = -values.totalAdvertising
-      const channelAds = inputs.marketing[channel]?.ads ?? 0
+      const exportAds = -values.totalAdvertising - adsOnSeller
       if (exportAds > 0 && channelAds > 0) {
         notes.push(
-          `This export bills ${formatCurrencyFull(exportAds)} of advertising and ${formatCurrencyFull(channelAds)} ` +
-          `is on file for Amazon India in ${month} from the ads reports. The channel charges the AMC spend on the ` +
-          'Vendor Central statement, so check the two are not the same rupees before reading either.',
+          `This export bills ${formatCurrencyFull(exportAds)} of advertising itself, and ` +
+          `${formatCurrencyFull(channelAds)} is on file for ${month} from the ads reports. Both are charged above; ` +
+          'check they are not the same rupees twice over before reading the margin.',
+        )
+      } else if (adsOnSeller > 0) {
+        notes.push(
+          `${formatCurrencyFull(adsOnSeller)} of campaign spend is charged here, from the ads reports — the whole ` +
+          `channel's, because ${month} has no Vendor Central statement to carry it. One ad account lifts both ` +
+          'halves, so this is the only place it can go without going missing. But it is also lifting a wholesale ' +
+          'half that is not in this statement, so every margin below this line is understated until that month\u2019s ' +
+          'NPPM file is in.',
         )
       } else if (vendorMonth) {
         notes.push(
@@ -976,7 +987,7 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
           channel, month,
           lines: computeSubtotals(
             withAllocatedOpex(
-              amazonInSellerExportToCanonicalBuckets(exportMonth, sellerCogs),
+              amazonInSellerExportToCanonicalBuckets(exportMonth, sellerCogs, adsOnSeller),
               inputs, channel, month, share,
             ),
           ),
