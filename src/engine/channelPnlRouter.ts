@@ -96,6 +96,48 @@ export interface ChannelPnlView {
   notes: string[]
 }
 
+/**
+ * How Amazon India's net sales divide between its two businesses.
+ *
+ * Read off the same figures the statements report — the wholesale invoice and
+ * the marketplace's net sales — so the shares on screen are the shares in the
+ * P&L rather than a second reading of the month.
+ */
+export interface AmazonInHalfSplit {
+  vendorNet: number
+  sellerNet: number
+  /** Each half's share of the two, 0–100. Null when neither half traded in
+   * the months asked for: there is no split to show, and 0% would claim
+   * there is. */
+  vendorPct: number | null
+  sellerPct: number | null
+}
+
+/** Amazon India's split over a set of months, summed. */
+export function amazonInHalfSplit(facts: ChannelFactsStore, months: string[]): AmazonInHalfSplit {
+  let vendorNet = 0
+  let sellerNet = 0
+  for (const month of months) {
+    vendorNet += facts.amazonInVendorFacts?.find((f) => f.month === month)?.invoiceValue ?? 0
+    // The same precedence the statement uses: the export states the month,
+    // the settlement is the fortnight's cash behind it.
+    const exported = facts.amazonInSkuFeeFacts?.find((f) => f.month === month)
+    const settlement = facts.amazonInSellerFacts?.find((f) => f.month === month)
+    sellerNet += exported
+      ? exported.netSalesInr
+      : settlement
+        ? computeAmazonInSellerPnl(settlement).netSales
+        : 0
+  }
+  const total = vendorNet + sellerNet
+  if (total <= 0) return { vendorNet, sellerNet, vendorPct: null, sellerPct: null }
+  return {
+    vendorNet, sellerNet,
+    vendorPct: (vendorNet / total) * 100,
+    sellerPct: (sellerNet / total) * 100,
+  }
+}
+
 export interface ChannelFactsStore {
   flipkartFacts: FlipkartPnlFacts[]
   amazonUsaFacts: AmazonUsaPnlFacts[]

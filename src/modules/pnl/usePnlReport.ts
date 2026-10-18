@@ -7,7 +7,9 @@ import {
   type BusinessChannelId, type ChannelCurrency, type ChannelCurrencyView,
 } from '@/config/channels'
 import { toMonthKey } from '@/lib/format'
-import { buildAllChannelPnlViews, buildChannelPnlView, type AmazonInHalf } from '@/engine/channelPnlRouter'
+import {
+  amazonInHalfSplit, buildAllChannelPnlViews, buildChannelPnlView, type AmazonInHalf,
+} from '@/engine/channelPnlRouter'
 import { buildMasterPnl, computeSubtotals } from '@/engine/pnl'
 import { usePnlInputs } from '@/engine/usePnlInputs'
 import {
@@ -56,7 +58,7 @@ export function usePnlReport(start: PnlReportStart = {}) {
   const store = useDataStore()
   const { fxRates } = store
   const { month } = useFilterStore()
-  const { forMonth } = usePnlInputs()
+  const { inputs: pnlInputs, forMonth } = usePnlInputs()
   // Today's month, which is the one month a comparison must not use as its
   // later column: it is only as much of a month as has happened so far.
   const currentMonth = toMonthKey(new Date().toISOString().slice(0, 10))
@@ -193,8 +195,10 @@ export function usePnlReport(start: PnlReportStart = {}) {
       missingStatementNote,
       meeshoBasis, setMeeshoBasis,
       amazonInHalf, setAmazonInHalf,
-      // Offered only where there are two halves on file to read apart.
+      // Offered only where there are two halves on file to read apart, and
+      // labelled with what each one is of the channel over this period.
       showAmazonInHalves: view === 'amazon_in' && hasBothAmazonInHalves,
+      amazonInSplit: amazonInHalfSplit(pnlInputs.facts, months),
       currencyView, setCurrencyView,
       displayCurrency,
       // Named for whichever currency this view is settled in, so Amazon UAE
@@ -215,6 +219,6 @@ export function usePnlReport(start: PnlReportStart = {}) {
     }
   }, [
     view, meeshoBasis, amazonInHalf, currencyView, period, month, currentMonth,
-    monthsWithData, hasBothAmazonInHalves, forMonth, fxRates,
+    monthsWithData, hasBothAmazonInHalves, pnlInputs, forMonth, fxRates,
   ])
 }

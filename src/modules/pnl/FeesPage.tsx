@@ -34,6 +34,9 @@ export function FeesPage() {
   const [openChannel, setOpenChannel] = useState<string | null>(null)
 
   const { statement } = r
+  // VC and SC, each with what it is of Amazon India this month — so picking
+  // one says how much of the channel is being left out of the comparison.
+  const half = (short: string, pct: number | null) => (pct === null ? short : `${short} (${pct.toFixed(0)}%)`)
   const cell = (s: ChannelFeesStatement, category: FeeCategoryId): number | null => {
     const found = s.categories.find((c) => c.category === category)
     if (!found) return null
@@ -90,9 +93,9 @@ export function FeesPage() {
                 onChange={(e) => r.setAmazonInHalf(e.target.value as typeof r.amazonInHalf)}
                 className="rounded-md border border-[var(--line-2)] bg-[var(--surface)] px-3 py-1.5 text-sm font-medium text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
               >
-                <option value="both">Both businesses</option>
-                <option value="vendor">Vendor Central</option>
-                <option value="seller">Seller Central</option>
+                <option value="both">Both</option>
+                <option value="vendor">{half('VC', r.amazonInSplit.vendorPct)}</option>
+                <option value="seller">{half('SC', r.amazonInSplit.sellerPct)}</option>
               </select>
             </label>
           )}

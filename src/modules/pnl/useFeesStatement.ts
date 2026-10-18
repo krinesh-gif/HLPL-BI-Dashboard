@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { BUSINESS_CHANNEL_IDS } from '@/config/channels'
-import { buildAllChannelPnlViews, type AmazonInHalf } from '@/engine/channelPnlRouter'
+import { amazonInHalfSplit, buildAllChannelPnlViews, type AmazonInHalf } from '@/engine/channelPnlRouter'
 import { buildFeesStatement, buildChannelFeesStatement, type ChannelFeesStatement } from '@/engine/feesStatement'
 import { usePnlInputs } from '@/engine/usePnlInputs'
 import { addMonths } from '@/lib/format'
@@ -26,7 +26,7 @@ const TREND_MONTHS = 6
 export function useFeesStatement() {
   const store = useDataStore()
   const { month } = useFilterStore()
-  const { forMonth } = usePnlInputs()
+  const { inputs: pnlInputs, forMonth } = usePnlInputs()
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
   const [amazonInHalf, setAmazonInHalf] = useState<AmazonInHalf>('both')
 
@@ -64,10 +64,11 @@ export function useFeesStatement() {
       setMonth: setSelectedMonth,
       amazonInHalf, setAmazonInHalf,
       showAmazonInHalves: hasBothAmazonInHalves,
+      amazonInSplit: amazonInHalfSplit(pnlInputs.facts, [active]),
       monthOptions: monthsWithData.length > 0 ? monthsWithData : [active],
       statement,
       trendMonths,
       history,
     }
-  }, [selectedMonth, month, amazonInHalf, hasBothAmazonInHalves, monthsWithData, forMonth])
+  }, [selectedMonth, month, amazonInHalf, hasBothAmazonInHalves, monthsWithData, pnlInputs, forMonth])
 }

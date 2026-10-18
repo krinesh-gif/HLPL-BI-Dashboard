@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BUSINESS_CHANNEL_IDS } from '@/config/channels'
-import { buildChannelPnlView, type AmazonInHalf } from './channelPnlRouter'
+import { amazonInHalfSplit, buildChannelPnlView, type AmazonInHalf } from './channelPnlRouter'
 import type {
   AmazonInSellerPnlFacts, AmazonInSkuFeeFacts, AmazonInVendorFacts,
   AmazonUsaPnlFacts, CanonicalSalesRecord, FixedExpenseEntry, FlipkartPnlFacts, NykaaPnlFacts, SkuMaster,
@@ -674,6 +674,34 @@ describe('buildChannelPnlView, Amazon India over Seller and Vendor Central', () 
         amazonInHalf: 'seller',
       })
       expect(v.native?.lineDefs.some((d) => d.key === 'settlementTotal')).toBe(true)
+    })
+
+    // The share each half is of the channel, which is what the P&L screen
+    // labels its VC and SC buttons with: picking one has to say how much of
+    // Amazon India is being left out.
+    it('splits the channel between the halves on net sales', () => {
+      const split = amazonInHalfSplit(inputs.facts, ['2026-09'])
+      expect(split.vendorNet).toBeCloseTo(1199291.82, 2)
+      expect(split.sellerNet).toBeCloseTo(223113.63, 2)
+      expect(split.vendorPct).toBeCloseTo((1199291.82 / (1199291.82 + 223113.63)) * 100, 4)
+      expect((split.vendorPct ?? 0) + (split.sellerPct ?? 0)).toBeCloseTo(100, 6)
+    })
+
+    it('reads the marketplace share from the export, not the settlement', () => {
+      // The settlement for the month covers ₹6,929.64 of the ₹2,23,113.63 the
+      // export states. Taking the settlement would put SC at under 1%.
+      const split = amazonInHalfSplit(inputs.facts, ['2026-09'])
+      expect(split.sellerPct ?? 0).toBeGreaterThan(10)
+      const settlementOnly = amazonInHalfSplit({ ...inputs.facts, amazonInSkuFeeFacts: [] }, ['2026-09'])
+      expect(settlementOnly.sellerNet).toBeCloseTo(8241.5, 2)
+    })
+
+    it('sums the split over the months asked for, and shows none where nothing traded', () => {
+      const split = amazonInHalfSplit(inputs.facts, ['2026-08', '2026-09'])
+      expect(split.vendorNet).toBeCloseTo(1199291.82, 2)
+      const empty = amazonInHalfSplit(inputs.facts, ['2026-01'])
+      expect(empty.vendorPct).toBeNull()
+      expect(empty.sellerPct).toBeNull()
     })
 
     it('estimates the cost of a month imported before units per SKU were read', () => {
