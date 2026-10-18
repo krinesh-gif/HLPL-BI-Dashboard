@@ -6,7 +6,7 @@ import { freightRateValue } from '@/data/freightRates'
 import { packagingRateValue } from '@/data/packagingRates'
 import { nykaaDiscountForMonth } from '@/data/nykaaDiscounts'
 import { marketingFromAds } from '@/engine/marketing'
-import type { ChannelPnlViewInputs } from '@/engine/channelPnlRouter'
+import type { ChannelFactsStore, ChannelPnlViewInputs } from '@/engine/channelPnlRouter'
 
 /**
  * Assembles everything a P&L needs, in one place.
@@ -27,7 +27,7 @@ export function usePnlInputs(): {
   const {
     salesRecords, adsRecords, skuMaster, fixedExpenses,
     flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts, blinkitFacts,
-    amazonAeFacts, purplleFacts, swiggyInstamartFacts,
+    amazonAeFacts, purplleFacts, swiggyInstamartFacts, amazonInVendorFacts,
     costVersions, mappings, comboComponents, manualAdSpend, fxRates, freightRates, packagingRates, nykaaDiscounts,
   } = useDataStore()
 
@@ -36,14 +36,25 @@ export function usePnlInputs(): {
       salesRecords,
       skuMaster,
       fixedExpenses,
-      // Every channel that has a statement of its own. One missing here does
-      // not fail: the router quietly falls back to the generic order-row
-      // template, which is how Amazon UAE's statement — its single "what
-      // Amazon took" line, its units, its warning — never reached the P&L.
+      // Every channel that has a statement of its own, and the type says so:
+      // `Required` makes a channel added to the store and forgotten here a
+      // compile error. Left optional it is silent — the router falls back to
+      // the generic order-row template and the statement simply never
+      // appears, which happened to Amazon UAE once and to Vendor Central
+      // again.
       facts: {
-        flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts, blinkitFacts,
-        amazonAeFacts, purplleFacts, swiggyInstamartFacts,
-      },
+        flipkartFacts,
+        amazonUsaFacts,
+        meeshoFacts,
+        myntraFacts: myntraFacts ?? [],
+        nykaaFacts: nykaaFacts ?? [],
+        amazonInSellerFacts: amazonInSellerFacts ?? [],
+        amazonInVendorFacts: amazonInVendorFacts ?? [],
+        blinkitFacts: blinkitFacts ?? [],
+        amazonAeFacts: amazonAeFacts ?? [],
+        purplleFacts: purplleFacts ?? [],
+        swiggyInstamartFacts: swiggyInstamartFacts ?? [],
+      } satisfies Required<ChannelFactsStore>,
       cogs: {
         // Costs resolve per month, so a closed month keeps the cost it was
         // closed at however many times the cost has changed since.
@@ -71,7 +82,7 @@ export function usePnlInputs(): {
   }, [
     salesRecords, adsRecords, skuMaster, fixedExpenses,
     flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts, blinkitFacts,
-    amazonAeFacts, purplleFacts, swiggyInstamartFacts,
+    amazonAeFacts, purplleFacts, swiggyInstamartFacts, amazonInVendorFacts,
     costVersions, mappings, comboComponents, manualAdSpend, fxRates, freightRates, packagingRates, nykaaDiscounts,
   ])
 }
