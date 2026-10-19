@@ -460,8 +460,19 @@ export const useDataStore = create<DataState>((set, get) => {
         let skippedAsDuplicate = 0
         const monthsUpdated: string[] = []
 
-        // An import with no rows still records that the file was processed.
-        if (salesRecords.length === 0 && adsRecords.length === 0) {
+        // What the file was, recorded before its rows go anywhere.
+        //
+        // Only `/api/sales/import` writes the imports row, and it is called
+        // once per batch of order rows — so a report made of order rows logs
+        // itself and every other kind depended on this call. The condition
+        // used to be "no rows at all", which left out exactly one case: an
+        // advertising report, which has no order rows and plenty of ads rows.
+        // Every successful ads upload was therefore missing from Upload
+        // history — the September cost report, every campaign report before
+        // it — while the ones that failed to read were listed, because those
+        // had no rows and met the condition. The log showed the failures and
+        // hid the successes.
+        if (salesRecords.length === 0) {
           await api.post('/api/sales/import', { records: [], importRecord })
         }
 
