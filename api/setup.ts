@@ -12,24 +12,80 @@ interface SetupBody {
   password?: unknown
 }
 
+/** Postgres' code for "relation does not exist". The one failure that really
+ * does mean a brand-new database. */
+const UNDEFINED_TABLE = '42P01'
+
+export function isMissingUsersTable(e: unknown): boolean {
+  const code = (e as { code?: unknown } | null)?.code
+  if (code === UNDEFINED_TABLE) return true
+  // The serverless driver does not always carry the code through, so the
+  // message is the fallback. Deliberately narrow: anything else is a database
+  // that exists and did not answer.
+  const message = e instanceof Error ? e.message : ''
+  return /relation .*(users).* does not exist/i.test(message)
+}
+
+/**
+ * Why the database could not be read, in words a reader can act on.
+ *
+ * The error itself is never passed through. A connection failure can carry the
+ * host and the credentials that were tried, and this response is served to
+ * anyone who opens the sign-in page.
+ */
+export function describeDbFailure(e: unknown): string {
+  const raw = e instanceof Error ? e.message : ''
+  if (/quota|HTTP status 402/i.test(raw)) {
+    return 'The database has used up its plan allowance for this billing period and is refusing connections. '
+      + 'Nothing has been lost — the data is intact and returns as soon as the plan is raised or the period rolls over.'
+  }
+  if (/timeout|ETIMEDOUT|ECONNREFUSED|ENOTFOUND|fetch failed/i.test(raw)) {
+    return 'The database did not answer. It may be starting up, or the connection string may point somewhere that no longer exists.'
+  }
+  return 'The database refused the request.'
+}
+
 /** True only while the workspace has no accounts at all. Once one exists this
- * is false forever, which is what closes the setup endpoint permanently. */
+ * is false forever, which is what closes the setup endpoint permanently.
+ * Throws when the database cannot be read, which is a different answer. */
 async function needsSetup(): Promise<boolean> {
   try {
     const rows = (await sql`SELECT 1 FROM users LIMIT 1`) as unknown[]
     return rows.length === 0
-  } catch {
-    // The users table doesn't exist yet — the database is brand new, which is
-    // exactly the state setup is for.
-    return true
+  } catch (e) {
+    if (isMissingUsersTable(e)) return true
+    throw e
   }
 }
 
+/**
+ * What the sign-in page should show.
+ *
+ * The three states are kept apart on purpose. This once answered `needsSetup:
+ * true` to every failure at all, because any error was read as "the users
+ * table isn't there yet". So when the database hit its plan quota and refused
+ * every connection, a working dashboard with months of data in it greeted the
+ * owner with "Setup isn't finished yet" and a form offering to create his
+ * account — the one screen guaranteed to suggest that the data was gone. It
+ * was not, and nothing he could type there would have removed it, but a report
+ * has to say what is actually wrong.
+ */
 export async function GET(): Promise<Response> {
   // Reported separately from needsSetup so the sign-in page can say "no
   // database connected yet" instead of showing a sign-in form nobody can use.
-  if (!isDatabaseConfigured) return json({ needsSetup: false, databaseConfigured: false })
-  return json({ needsSetup: await needsSetup(), databaseConfigured: true })
+  if (!isDatabaseConfigured) {
+    return json({ needsSetup: false, databaseConfigured: false, databaseReachable: false })
+  }
+  try {
+    return json({ needsSetup: await needsSetup(), databaseConfigured: true, databaseReachable: true })
+  } catch (e) {
+    return json({
+      needsSetup: false,
+      databaseConfigured: true,
+      databaseReachable: false,
+      reason: describeDbFailure(e),
+    })
+  }
 }
 
 /**

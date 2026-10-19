@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ApiError, api } from '@/lib/apiClient'
 import { useAuthStore } from '@/store/authStore'
 
-type Mode = 'checking' | 'login' | 'setup' | 'no-database' | 'blocked'
+type Mode = 'checking' | 'login' | 'setup' | 'no-database' | 'database-down' | 'blocked'
 
 /** The mark and the product name, in one place.
  *
@@ -42,9 +42,19 @@ export function LoginPage() {
   // account for would hide the actual problem behind a dead end.
   useEffect(() => {
     api
-      .get<{ needsSetup: boolean; databaseConfigured: boolean }>('/api/setup')
-      .then(({ needsSetup, databaseConfigured }) => {
+      .get<{ needsSetup: boolean; databaseConfigured: boolean; databaseReachable?: boolean; reason?: string }>('/api/setup')
+      .then(({ needsSetup, databaseConfigured, databaseReachable, reason }) => {
         if (!databaseConfigured) return setMode('no-database')
+        // A database that is there and not answering is not a workspace
+        // waiting to be set up, and must never be offered the account form:
+        // the one time it was, a dashboard with six months of trading in it
+        // asked its owner to create his account because the database had hit
+        // its plan quota. `undefined` is an older deployment that does not
+        // report this yet, which is not a failure.
+        if (databaseReachable === false) {
+          setBlockedReason(reason ?? 'The database did not answer.')
+          return setMode('database-down')
+        }
         setMode(needsSetup ? 'setup' : 'login')
       })
       .catch((e: unknown) => {
@@ -76,14 +86,16 @@ export function LoginPage() {
     return <div className="flex min-h-screen items-center justify-center bg-[var(--plane)] text-sm text-[var(--ink-3)]">Loading…</div>
   }
 
-  if (mode === 'no-database' || mode === 'blocked') {
+  if (mode === 'no-database' || mode === 'blocked' || mode === 'database-down') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--plane)] px-4">
         <div className="w-full max-w-md rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] p-8 shadow-[var(--shadow-pop)]">
           <Brand />
 
           <div className="mt-6 rounded-[var(--radius-control)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] px-4 py-3">
-            <p className="text-sm font-semibold text-[var(--ink)]">Setup isn&apos;t finished yet</p>
+            <p className="text-sm font-semibold text-[var(--ink)]">
+              {mode === 'database-down' ? 'The dashboard cannot reach its database' : 'Setup isn\u2019t finished yet'}
+            </p>
             <p className="mt-1 text-sm text-[var(--ink-2)]">
               {mode === 'no-database'
                 ? 'No database is connected to this project yet, so there is nothing to sign in to.'
@@ -102,6 +114,13 @@ export function LoginPage() {
               </li>
               <li>Reload this page — it will offer to create your account.</li>
             </ol>
+          )}
+
+          {mode === 'database-down' && (
+            <p className="mt-4 text-sm text-[var(--ink-2)]">
+              Your uploads, statements and settings are untouched — this is the database declining to serve them, not losing them.
+              Nothing needs to be re-entered, and there is no account to create here.
+            </p>
           )}
 
           <button
