@@ -75,6 +75,26 @@ describe('channel charges', () => {
     expect(v.canonical.lines.channelCharges).toBeCloseTo(31752, 6)
   })
 
+  /**
+   * The statement's line is called "Less: Allocated Fixed Expenses" on every
+   * channel, a name the owner settled so two statements can be read side by
+   * side. A charge folded into it silently would have September's statement
+   * reporting ₹24,252 of allocated head office in a month the company
+   * allocated none — the figure right and the name wrong, which is the worse
+   * of the two.
+   */
+  it('names the charge on the statement line it lands in', () => {
+    const named = buildChannelPnlView('flipkart', '2026-06', base).native?.lineDefs
+      .find((d) => d.key === 'otherCosts')?.label
+    expect(named).toBe('Less: Allocated Fixed Expenses & NextGen charges')
+  })
+
+  it('leaves the settled name alone in a month with no charges', () => {
+    const plain = buildChannelPnlView('flipkart', '2026-06', { ...base, channelCharges: [] }).native?.lineDefs
+      .find((d) => d.key === 'otherCosts')?.label
+    expect(plain).toBe('Less: Allocated Fixed Expenses')
+  })
+
   // The native statement shows one "Other Costs" line where the canonical
   // P&L shows the opex breakdown. A charge left out of it would make the
   // statement's EBITDA disagree with the canonical one by exactly the charge.

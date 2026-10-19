@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { ChannelChargeEntry } from '@/data/models'
-import { channelChargesByChannel, channelChargesFor, channelChargesTotal } from './channelCharges'
+import {
+  channelChargeSummary, channelChargesByChannel, channelChargesFor, channelChargesTotal,
+} from './channelCharges'
 
 const charge = (over: Partial<ChannelChargeEntry> = {}): ChannelChargeEntry => ({
   month: '2026-09', channel: 'flipkart', label: 'NextGen charges', amount: 24252, ...over,
@@ -49,5 +51,13 @@ describe('channelChargesByChannel', () => {
     expect(grouped.get('flipkart')?.map((c) => c.label)).toEqual(['NextGen charges', 'Smart Assist'])
     expect(grouped.get('myntra')?.map((c) => c.label)).toEqual(['Studio fee'])
     expect(grouped.has('nykaa')).toBe(false)
+  })
+})
+
+describe('channelChargeSummary', () => {
+  it('names what is behind one figure', () => {
+    expect(channelChargeSummary([charge(), charge({ label: 'Smart Assist' })]))
+      .toBe('NextGen charges, Smart Assist')
+    expect(channelChargeSummary([])).toBe('')
   })
 })

@@ -20,7 +20,7 @@ import { formatCurrencyFull, toMonthKey } from '@/lib/format'
 import { cogsForMonth } from '@/data/costVersions'
 import { resolveCogs } from '@/data/skuMapping'
 import { allocateFixedExpensesForMonth } from './allocation'
-import { channelChargesTotal } from './channelCharges'
+import { channelChargesFor, channelChargeSummary, channelChargesTotal } from './channelCharges'
 import {
   buildChannelPnl, cogsForRecords, computeSubtotals, estimateUncostedCogs,
   type CogsInputs, type MarketingByChannel, type UncostedCogsEstimate,
@@ -558,12 +558,61 @@ export interface ChannelPnlViewInputs {
 }
 
 /**
+ * The line every native statement deducts head office on, whatever it calls
+ * its key. One of these is on each of the twelve templates.
+ */
+const ALLOCATED_COST_KEYS = ['otherCosts', 'overheads', 'allocatedOverheadsUsd']
+
+/**
+ * The native statement's allocated-costs line, named for what is actually in
+ * it when a channel charge is in it too.
+ *
+ * A native statement has one line for everything below contribution, and it
+ * is called "Less: Allocated Fixed Expenses" on every channel — a name the
+ * owner settled so that two statements side by side could be read as the
+ * same figure. A channel charge is not an allocated fixed expense: it is
+ * Flipkart's own NextGen fee, billed to Flipkart. Folded into that line
+ * silently, September's statement would say ₹25,000 of allocated head office
+ * where the company allocated none, and nothing on the screen would say
+ * otherwise.
+ *
+ * The figure stays where it is — splitting it would mean a thirteenth line
+ * on twelve statements the owner is happy with — and the name is extended to
+ * say what joined it. Only for the months that have charges, so the settled
+ * name is still the name everywhere else.
+ */
+function nameChannelCharges(
+  view: ChannelPnlView,
+  inputs: ChannelPnlViewInputs,
+  channel: BusinessChannelId,
+  month: string,
+): ChannelPnlView {
+  const charges = channelChargesFor(inputs.channelCharges, channel, month)
+  if (charges.length === 0 || !view.native) return view
+  return {
+    ...view,
+    native: {
+      ...view.native,
+      lineDefs: view.native.lineDefs.map((d) => (
+        ALLOCATED_COST_KEYS.includes(d.key)
+          ? { ...d, label: `${d.label} & ${channelChargeSummary(charges)}` }
+          : d
+      )),
+    },
+  }
+}
+
+/**
  * Builds the P&L view for one channel/month. Flipkart, Amazon USA and Meesho
  * render their real native waterfall whenever facts exist for that month;
  * every channel (native or not) also gets the generic canonical bucket
  * structure so the Master P&L and Investor MIS can roll up consistently.
  */
 export function buildChannelPnlView(channel: BusinessChannelId, month: string, inputs: ChannelPnlViewInputs): ChannelPnlView {
+  return nameChannelCharges(buildChannelPnlStatement(channel, month, inputs), inputs, channel, month)
+}
+
+function buildChannelPnlStatement(channel: BusinessChannelId, month: string, inputs: ChannelPnlViewInputs): ChannelPnlView {
   if (channel === 'flipkart') {
     const imported = inputs.facts.flipkartFacts.find((f) => f.month === month)
     if (imported) {

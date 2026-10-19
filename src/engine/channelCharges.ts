@@ -48,3 +48,21 @@ export function channelChargesByChannel(
   for (const list of out.values()) list.sort((a, b) => b.amount - a.amount)
   return out
 }
+
+/**
+ * One label for the charges behind a figure: "NextGen Fees, Smart Assist".
+ *
+ * The canonical P&L has a line of its own for them. A channel's native
+ * statement does not — it shows one "Less: Allocated Fixed Expenses" line
+ * where the canonical P&L shows the whole opex breakdown — so on that
+ * statement a charge lands inside a line whose name says it is the allocated
+ * share of head office, which a direct charge is precisely not. The figure is
+ * right and the name is a lie, which is the worse of the two failures.
+ *
+ * So the name is extended for the months that have charges, with the charges
+ * named. The settled label is unchanged everywhere else, which is what
+ * `lineNaming.test.ts` holds it to.
+ */
+export function channelChargeSummary(charges: ChannelChargeEntry[]): string {
+  return charges.map((c) => c.label).join(', ')
+}
