@@ -1,4 +1,5 @@
 import type { PnlLineValues } from '@/data/models'
+import { PNL_STRUCTURE } from '@/config/pnlStructure'
 import { addMonths, fiscalYearLabel, ytdMonthKeys } from '@/lib/format'
 
 /**
@@ -33,6 +34,16 @@ export interface PnlRowDef {
   total: (totals: PnlLineValues) => number | null
   /** Shown indented under the subtotal it feeds. */
   indent?: boolean
+  /**
+   * Dropped from the table when it is zero in every column.
+   *
+   * Only for a line that most views genuinely do not have. Channel Charges is
+   * the one: a NextGen fee is Flipkart's and nobody else's, and a row of
+   * dashes on nine channels would read as nine channels that forgot to enter
+   * something. Every other line is shown always, zero or not, because a
+   * report whose rows come and go cannot be compared month to month.
+   */
+  hideWhenEmpty?: true
   /**
    * How the figure is shown, not how it is stored.
    *
@@ -90,26 +101,55 @@ export const PNL_ROWS: PnlRowDef[] = [
   { key: 'contribution', label: 'Contribution', kind: 'subtotal', value: contribution, total: contribution },
   { key: 'contributionMarginPct', label: 'Contribution Margin %', kind: 'percent', value: marginOf(contribution), total: marginOf(contribution) },
 
+  // A channel's own charges, above its share of the company's. Flipkart's
+  // NextGen fee is billed to Flipkart and settled outside its marketplace
+  // report, so it is not an allocation and does not belong inside Fixed
+  // Expenses. It had no row at all, which left the one channel that carries
+  // it unable to add up: September read a contribution of 2,13,793, fixed
+  // expenses, and then an EBITDA 25,000 lower than the two of them give.
+  { key: 'channelCharges', label: 'Less: Channel Charges', kind: 'input', indent: true, hideWhenEmpty: true, value: (l) => l.channelCharges ?? 0, total: (t) => t.channelCharges ?? 0, sign: -1 },
   { key: 'fixedExpenses', label: 'Less: Fixed Expenses', kind: 'input', indent: true, value: (l) => sum(l, FIXED_EXPENSE_KEYS), total: (t) => sum(t, FIXED_EXPENSE_KEYS), sign: -1 },
   { key: 'ebitda', label: 'EBITDA', kind: 'subtotal', value: ebitda, total: ebitda },
   { key: 'ebitdaMarginPct', label: 'EBITDA Margin %', kind: 'percent', value: marginOf(ebitda), total: marginOf(ebitda) },
 ]
 
-/** Line keys that are genuinely additive across months. Percentages and
- * subtotals are derived, never summed. */
-const ADDITIVE_KEYS: (keyof PnlLineValues)[] = [
-  'grossSales', 'discounts', 'returns', 'otherRevenueAdj', 'cogs',
-  ...MARKETPLACE_COST_KEYS, ...MARKETING_KEYS, ...FIXED_EXPENSE_KEYS,
-]
+/**
+ * Line keys that are genuinely additive. Percentages and subtotals are
+ * derived, never summed.
+ *
+ * Taken from `PNL_STRUCTURE` rather than listed here, because a hand-kept list
+ * drifts the moment a line is added and the drift is invisible: Channel
+ * Charges was added to the structure and not to this list, so every Total
+ * column silently dropped it and read an EBITDA 75,000 too high over Jul-Sep.
+ * The structure's input lines are exactly what `buildMasterPnl` sums, so
+ * deriving it here is also what keeps the two agreeing.
+ */
+export const PNL_ADDITIVE_KEYS: (keyof PnlLineValues)[] =
+  PNL_STRUCTURE.filter((d) => d.kind === 'input').map((d) => d.key)
+
+/**
+ * Whether a column has nothing in it at all — no sales, no cost, nothing.
+ *
+ * Used to leave a channel that did not trade out of the all-channels report.
+ * Every additive key is zero, so dropping such a column cannot move the Total,
+ * which is what makes it safe to hide.
+ */
+export function isEmptyPnlColumn(lines: PnlLineValues): boolean {
+  return PNL_ADDITIVE_KEYS.every((k) => (lines[k] ?? 0) === 0)
+}
 
 export interface MultiMonthPnlRow {
   def: PnlRowDef
-  /** Value per month, in the same order as `months`. Null means undefined. */
+  /** Value per column, in the same order as `columns`. Null means undefined. */
   values: (number | null)[]
   total: number | null
 }
 
 export interface MultiMonthPnl {
+  /** The columns, as keys. Months across in the month view; channels across in
+   * the all-channels one. */
+  columns: string[]
+  /** The same list under the name the month view reads it by. */
   months: string[]
   rows: MultiMonthPnlRow[]
   /** The summed line values behind the Total column, for anything that needs
@@ -120,32 +160,54 @@ export interface MultiMonthPnl {
 /**
  * Builds the table.
  *
+ * A column is a month on the P&L screen and a channel on the all-channels one.
+ * Both are built here, by one function, for the reason the report exists: the
+ * two readings have to agree, and they cannot disagree if there is only one
+ * piece of arithmetic. Summing the channels of a month gives the company's
+ * month; summing the months of a channel gives the channel's period; and
+ * either way the Total column is the sum of the input lines with the subtotals
+ * taken afterwards, which is exactly what `buildMasterPnl` does.
+ *
  * `computeSubtotals` is passed in rather than imported so the totals column is
- * derived by exactly the same arithmetic as each month — a Total row that is
- * computed differently from the months above it is how a P&L stops adding up.
+ * derived by exactly the same arithmetic as each column — a Total row that is
+ * computed differently from the columns beside it is how a P&L stops adding up.
  */
+export function buildPnlColumns(
+  columns: string[],
+  linesForColumn: (column: string) => PnlLineValues,
+  computeSubtotals: (lines: PnlLineValues) => PnlLineValues,
+): MultiMonthPnl {
+  const perColumn = columns.map((c) => linesForColumn(c))
+
+  const summed: PnlLineValues = {}
+  for (const key of PNL_ADDITIVE_KEYS) {
+    summed[key] = perColumn.reduce((acc, l) => acc + (l[key] ?? 0), 0)
+  }
+  const totals = computeSubtotals(summed)
+
+  const rows = PNL_ROWS.map((def) => ({
+    def,
+    values: perColumn.map((l) => def.value(l)),
+    total: def.total(totals),
+  }))
+
+  return {
+    columns,
+    months: columns,
+    totals,
+    // Dropped here rather than in the table, so the CSV export and the screen
+    // cannot end up showing different rows.
+    rows: rows.filter((r) => !r.def.hideWhenEmpty || r.total !== 0 || r.values.some((v) => v !== 0 && v !== null)),
+  }
+}
+
+/** The month view: one column per month, in the order given. */
 export function buildMultiMonthPnl(
   months: string[],
   linesForMonth: (month: string) => PnlLineValues,
   computeSubtotals: (lines: PnlLineValues) => PnlLineValues,
 ): MultiMonthPnl {
-  const monthly = months.map((m) => linesForMonth(m))
-
-  const summed: PnlLineValues = {}
-  for (const key of ADDITIVE_KEYS) {
-    summed[key] = monthly.reduce((acc, l) => acc + (l[key] ?? 0), 0)
-  }
-  const totals = computeSubtotals(summed)
-
-  return {
-    months,
-    totals,
-    rows: PNL_ROWS.map((def) => ({
-      def,
-      values: monthly.map((l) => def.value(l)),
-      total: def.total(totals),
-    })),
-  }
+  return buildPnlColumns(months, linesForMonth, computeSubtotals)
 }
 
 // ---------------------------------------------------------------------------
