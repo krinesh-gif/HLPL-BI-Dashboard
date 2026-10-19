@@ -166,9 +166,9 @@ h1, h2, h3 { letter-spacing: -0.011em; }
   }
 
   /* The P&L is a wide table — six month columns, a total, and a label column
-     long enough for "Less: Output GST & revenue adjustments". Portrait either
-     clips it or shrinks it past reading. A named page turns that one snapshot
-     sideways without turning the channel snapshot sideways with it. */
+     long enough for "Less: Contribution Margin %". Portrait either clips it or
+     shrinks it past reading. A named page turns that one snapshot sideways
+     without turning the channel snapshot sideways with it. */
   @page landscape {
     size: A4 landscape;
     margin: 10mm;

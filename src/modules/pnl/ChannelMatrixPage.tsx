@@ -109,7 +109,7 @@ export function ChannelMatrixPage() {
           <table className="w-full min-w-max text-sm">
             <thead>
               <tr className="border-b-2 border-[var(--line-2)] bg-[var(--surface-2)]">
-                <th className="sticky left-0 z-20 min-w-56 bg-[var(--surface-2)] px-5 py-3 text-left text-xs font-semibold text-[var(--ink-2)]">
+                <th className="sticky left-0 z-20 min-w-44 bg-[var(--surface-2)] px-5 py-3 text-left text-xs font-semibold text-[var(--ink-2)]">
                   {monthLabel(r.month)}
                   <span className="ml-2 rounded-full bg-[var(--surface)] px-2 py-0.5 text-[10px] font-medium normal-case tracking-normal text-[var(--ink-2)]">
                     in ₹ INR
@@ -151,6 +151,7 @@ export function ChannelMatrixPage() {
                       className={`sticky left-0 z-10 px-5 py-2.5 text-left font-normal ${
                         isSubtotal ? 'bg-[var(--surface-2)] font-semibold text-[var(--ink)]' : 'bg-[var(--surface)] text-[var(--ink-2)]'
                       } ${row.def.indent ? 'pl-8 text-[var(--ink-3)]' : ''}`}
+                      title={row.def.note}
                     >
                       {row.def.label}
                     </th>

@@ -95,3 +95,22 @@ export const NAVIGATION: NavSection[] = [
     ],
   },
 ]
+
+/** Every path the navigation offers, longest first. */
+const NAV_PATHS: string[] = NAVIGATION
+  .flatMap((s) => (s.children ? s.children.map((c) => c.path) : s.path ? [s.path] : []))
+  .sort((a, b) => b.length - a.length)
+
+/**
+ * Which navigation entry the current page belongs to: the most specific one
+ * that contains it.
+ *
+ * React Router's own `isActive` lights up every entry that is a prefix of the
+ * path, so adding Channel P&L at `/pnl/channels` lit P&L as well and the
+ * sidebar claimed the reader was on two pages at once. Matching the longest
+ * path instead keeps a page with no entry of its own — `/pnl/snapshot` — on
+ * its parent, which is where it belongs.
+ */
+export function activeNavPath(pathname: string): string | null {
+  return NAV_PATHS.find((p) => p === pathname || (p !== '/' && pathname.startsWith(`${p}/`))) ?? null
+}

@@ -12,7 +12,12 @@ export function iconFor(label: string): string {
   if (l.includes('insight')) return 'insight'
   if (l.includes('mis')) return 'mis'
   if (l.includes('reconcil')) return 'reconcile'
+  // Before the plain P&L rule, which would otherwise give both reports the
+  // same glyph — and on the collapsed rail the glyph is the whole label.
+  if (l.includes('channel p&l')) return 'channelPnl'
   if (l.includes('p&l') || l.includes('expenses')) return l.includes('expenses') ? 'expenses' : 'pnl'
+  if (l.includes('close')) return 'close'
+  if (l.includes('fees')) return 'fees'
   if (l.includes('channel')) return 'channels'
   if (l.includes('sales')) return 'sales'
   if (l.includes('marketing') || l.includes('ads')) return 'marketing'

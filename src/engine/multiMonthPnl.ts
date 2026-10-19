@@ -35,6 +35,12 @@ export interface PnlRowDef {
   /** Shown indented under the subtotal it feeds. */
   indent?: boolean
   /**
+   * The full name, where the label had to be shortened to keep the column
+   * narrow. Shown on hover, so the abbreviation never costs the reader the
+   * meaning.
+   */
+  note?: string
+  /**
    * Dropped from the table when it is zero in every column.
    *
    * Only for a line that most views genuinely do not have. Channel Charges is
@@ -89,7 +95,12 @@ export const PNL_ROWS: PnlRowDef[] = [
   // 6,77,353 less 1,37,012 of returns and then a Net Sales of 4,48,588, with
   // the 91,753 of Product GST deducted invisibly. A reader checking the
   // arithmetic could only conclude the report was wrong.
-  { key: 'otherRevenueAdj', label: 'Less: Output GST & revenue adjustments', kind: 'input', indent: true, value: (l) => l.otherRevenueAdj ?? 0, total: (t) => t.otherRevenueAdj ?? 0, sign: -1 },
+  // Shortened from "Less: Output GST & revenue adjustments", which was the
+  // longest label on the report by a wide margin and set the width of the
+  // particulars column on every view — costing a month or a channel column
+  // of screen on a table that is read by scanning across. The full name is
+  // on hover.
+  { key: 'otherRevenueAdj', label: 'Less: GST & Adjustments', note: 'Output GST and other revenue adjustments', kind: 'input', indent: true, value: (l) => l.otherRevenueAdj ?? 0, total: (t) => t.otherRevenueAdj ?? 0, sign: -1 },
   { key: 'netSales', label: 'Net Sales', kind: 'subtotal', value: (l) => l.netSales ?? 0, total: (t) => t.netSales ?? 0 },
 
   { key: 'cogs', label: 'Less: COGS', kind: 'input', indent: true, value: (l) => l.cogs ?? 0, total: (t) => t.cogs ?? 0, sign: -1 },
