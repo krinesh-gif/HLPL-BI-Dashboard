@@ -61,9 +61,7 @@ export const REPORT_SOURCES: ReportSource[] = [
         + 'campaign and ASIN, with a Total cost column, covering every ad product and up to a year at a time. '
         + 'Upload it under the name the console gives it (Report_-_10_19_2026T11_32_08.csv) — the month column '
         + 'carries no year, and the download date in that name is what says which year it means',
-      'Advertising, only if ROAS is wanted: the per-product Campaign reports (Sponsored Products, Brands, '
-        + 'Display) with Time unit: Daily. The monthly cost report states cost and nothing else, so it cannot '
-        + 'produce ROAS, ACOS or CTR — it is the money, and these are the measurement',
+
     ],
     note: 'Same page and the same three settings as the USA and UAE stores, on India’s Seller Central. The two '
       + 'vendor files come by email, both every month, and the NPPM first: the cross-dock charge attaches to the '

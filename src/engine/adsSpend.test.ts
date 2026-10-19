@@ -225,3 +225,49 @@ describe('adsSpendByProgram', () => {
     expect(adsSpendByProgram('flipkart', '2026-08', rows)).toEqual([])
   })
 })
+
+/**
+ * A month whose report states cost and nothing else.
+ *
+ * Amazon's monthly cost report is that: every ad product's spend, no
+ * impressions, clicks or attributed sales. The spend is real and the P&L
+ * charges it; what cannot be worked out has to read as unmeasured rather
+ * than as zero, or the Ads page shows a 0.00x ROAS on a month that simply
+ * never carried the sales figure.
+ */
+describe('a cost-only month', () => {
+  const costOnly = report({ spend: 212876.11, adSales: 0, adOrders: 0, impressions: 0, clicks: 0 })
+
+  it('keeps the spend and reports the rest as unmeasured', () => {
+    const f = adsSpendFor('amazon_in', '2026-08', [costOnly], [])
+    expect(f.spend).toBeCloseTo(212876.11, 2)
+    expect(f.costOnly).toBe(true)
+    expect(f.adSales).toBeNull()
+    expect(f.impressions).toBeNull()
+    expect(f.clicks).toBeNull()
+    expect(f.adOrders).toBeNull()
+    expect(f.sourceLabel).toBe('Monthly cost report')
+  })
+
+  it('leaves a measured month alone', () => {
+    const f = adsSpendFor('amazon_in', '2026-08', [report()], [])
+    expect(f.costOnly).toBe(false)
+    expect(f.adSales).toBe(25000)
+    expect(f.sourceLabel).toBe('Ads report')
+  })
+
+  // One campaign spending nothing in a month that otherwise measured fine is
+  // not a cost-only month.
+  it('judges the month, not the row', () => {
+    const f = adsSpendFor('amazon_in', '2026-08', [costOnly, report({ campaign: 'C2' })], [])
+    expect(f.costOnly).toBe(false)
+    expect(f.adSales).toBe(25000)
+  })
+
+  // A hand-entered invoice figure has never had anything behind it either.
+  it('counts a manual figure as cost only', () => {
+    const f = adsSpendFor('nykaa', '2026-08', [], [manual()])
+    expect(f.costOnly).toBe(true)
+    expect(f.spend).toBe(125000)
+  })
+})

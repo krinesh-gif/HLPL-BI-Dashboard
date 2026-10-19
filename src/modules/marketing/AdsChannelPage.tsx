@@ -159,6 +159,16 @@ export function AdsChannelPage() {
         <KPICard label="CVR" value={cvr === null ? '—' : formatPercent(cvr, 2)} />
       </KPIGrid>
 
+      {/* Dashes with no explanation read as a reporting failure. This is a
+          choice about which file is uploaded, so the page says which. */}
+      {figure.costOnly && figure.source === 'report' && (
+        <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-2)] p-3 text-xs text-[var(--ink-2)]">
+          This month comes from the monthly cost report, which states what every ad product cost and nothing else.
+          The spend is the figure the P&L charges. ROAS, ACOS, CTR and CPC need the per-product campaign reports —
+          Sponsored Products, Brands and Display — which carry impressions, clicks and attributed sales.
+        </div>
+      )}
+
       {programs.length > 0 && <ByProgram rows={programs} />}
 
       {def.usesMonthlyInvoice && <ManualAdSpendForm channel={channel} def={def} month={month} current={figure} />}

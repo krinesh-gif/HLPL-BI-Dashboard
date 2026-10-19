@@ -33,6 +33,17 @@ export interface AdsSpendFigure {
   impressions: number | null
   clicks: number | null
   source: AdsSpendSource
+  /**
+   * True where the month's report states what was spent and nothing else.
+   *
+   * Amazon's monthly cost report is this: every ad product's cost, and no
+   * impressions, clicks or attributed sales. The spend is as real as any
+   * other month's — the P&L wants exactly it — but ROAS, ACOS, CTR and CPC
+   * have nothing to divide by, and a row of dashes with no explanation reads
+   * as a reporting failure rather than as a choice about which file to
+   * download.
+   */
+  costOnly: boolean
   /** Shown next to the figure, e.g. "Amazon Ads report" or "Entered manually". */
   sourceLabel: string
   /** The manual entry behind a manual figure, for its note and attachment. */
@@ -42,7 +53,7 @@ export interface AdsSpendFigure {
 const EMPTY = (channel: AdsChannelId, month: string): AdsSpendFigure => ({
   channel, month, spend: 0,
   adSales: null, adOrders: null, impressions: null, clicks: null,
-  source: 'none', sourceLabel: 'No data',
+  source: 'none', costOnly: false, sourceLabel: 'No data',
 })
 
 /**
@@ -66,15 +77,24 @@ export function adsSpendFor(
     // report carries no clicks column, and "0 clicks" beside 29 impressions
     // reads as a campaign nobody touched rather than one nobody counted.
     const omitted = new Set(ADS_CHANNEL_MAP[channel]?.reportOmits ?? [])
+    const spend = sum((r) => r.spend)
+    const adSales = sum((r) => r.adSales)
+    const impressions = sum((r) => r.impressions)
+    const clicks = sum((r) => r.clicks)
+    // Spend and not one measured thing beside it: a cost report rather than a
+    // campaign report. Judged on the month's rows rather than on which reader
+    // wrote them, so it holds whatever the file was called.
+    const costOnly = spend !== 0 && adSales === 0 && impressions === 0 && clicks === 0
     return {
       channel, month,
-      spend: sum((r) => r.spend),
-      adSales: sum((r) => r.adSales),
-      adOrders: omitted.has('adOrders') ? null : sum((r) => r.adOrders),
-      impressions: sum((r) => r.impressions),
-      clicks: omitted.has('clicks') ? null : sum((r) => r.clicks),
+      spend,
+      adSales: costOnly ? null : adSales,
+      adOrders: omitted.has('adOrders') || costOnly ? null : sum((r) => r.adOrders),
+      impressions: costOnly ? null : impressions,
+      clicks: omitted.has('clicks') || costOnly ? null : clicks,
       source: 'report',
-      sourceLabel: 'Ads report',
+      costOnly,
+      sourceLabel: costOnly ? 'Monthly cost report' : 'Ads report',
     }
   }
 
@@ -84,6 +104,7 @@ export function adsSpendFor(
       ...EMPTY(channel, month),
       spend: manual.amount,
       source: 'manual',
+      costOnly: true,
       sourceLabel: manual.fileName ? `Entered manually — ${manual.fileName}` : 'Entered manually',
       manualEntry: manual,
     }
