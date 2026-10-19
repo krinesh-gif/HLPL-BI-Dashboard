@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { api } from '@/lib/apiClient'
-import { toMonthKey } from '@/lib/format'
+import { isMonthKey, toMonthKey } from '@/lib/format'
 import { useFilterStore } from './filterStore'
 import type { ComboComponent, SkuMapping } from '@/data/skuMapping'
 import type { SkuMapWorkbookResult } from '@/data/normalize/skuMapWorkbook'
@@ -304,7 +304,9 @@ export function statementMonths(dataset: SharedDataset): string[] {
     ...(dataset.purplleFacts ?? []).map((f) => f.month),
     ...(dataset.swiggyInstamartFacts ?? []).map((f) => f.month),
     ...(dataset.amazonInSellerFacts ?? []).map((f) => f.month),
-  ].filter(Boolean)
+    ...(dataset.amazonInVendorFacts ?? []).map((f) => f.month),
+    ...(dataset.amazonInSkuFeeFacts ?? []).map((f) => f.month),
+  ].filter(isMonthKey)
   return [...new Set(months)].sort()
 }
 
@@ -315,7 +317,7 @@ export function latestMonthWithData(dataset: SharedDataset): string | null {
   const months = [
     ...statementMonths(dataset),
     ...dataset.adsRecords.map((r) => toMonthKey(r.date)),
-  ].filter(Boolean)
+  ].filter(isMonthKey)
 
   return months.length === 0 ? null : months.reduce((a, b) => (a > b ? a : b))
 }

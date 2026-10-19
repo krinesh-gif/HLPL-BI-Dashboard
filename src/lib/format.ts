@@ -108,6 +108,26 @@ export function toMonthKey(iso: string): string {
   return iso.slice(0, 7)
 }
 
+/**
+ * True for a month a marketplace could have reported in.
+ *
+ * A month key is the first seven characters of a date, and a date that was
+ * read wrongly still produces one: a Sponsored Brands export whose Date column
+ * held Excel serials came through as the year 46295, and "46295-0" then became
+ * a month — the newest one in the data, so the dashboard opened on it and the
+ * close demanded fixed expenses for it.
+ *
+ * Checked wherever months are gathered for a reader to choose between, so one
+ * bad row cannot invent a month. The rows themselves are left alone: they are
+ * still what some file said, and the import warnings are where that belongs.
+ */
+export function isMonthKey(value: string): boolean {
+  const m = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(value)
+  if (!m) return false
+  const year = Number(m[1])
+  return year >= 1990 && year <= 2100
+}
+
 /** Add whole months to a yyyy-mm key. */
 export function addMonths(yyyyMm: string, delta: number): string {
   const [y, m] = yyyyMm.split('-').map(Number)
