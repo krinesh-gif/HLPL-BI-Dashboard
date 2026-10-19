@@ -19,6 +19,7 @@ import { detectMeeshoOrderSummaryReport, normalizeMeeshoOrderSummary } from '@/d
 import { detectMeeshoOrderPaymentsSheet, normalizeMeeshoOrderPayments } from '@/data/normalize/meeshoOrderPayments'
 import { detectSkuMapWorkbook, normalizeSkuMapWorkbook } from '@/data/normalize/skuMapWorkbook'
 import { detectAmazonAdsSponsoredProductsReport, normalizeAmazonAdsSponsoredProductsReport } from '@/data/normalize/amazonAdsSponsoredProducts'
+import { detectAmazonAdsSpendByMonth, normalizeAmazonAdsSpendByMonth } from '@/data/normalize/amazonAdsSpendByMonth'
 import { detectBlinkitAdsReport, normalizeBlinkitAdsReport } from '@/data/normalize/blinkitAdsReport'
 import { detectMyntraAdsReport, normalizeMyntraAdsReport } from '@/data/normalize/myntraAdsReport'
 import { detectFlipkartAdsReport, normalizeFlipkartAdsReport } from '@/data/normalize/flipkartAdsReport'
@@ -77,6 +78,7 @@ type ReportKind =
   | 'meesho_order_payments'
   | 'meesho_settlement_json'
   | 'amazon_ads_sponsored_products'
+  | 'amazon_ads_monthly_cost'
   | 'blinkit_ads'
   | 'myntra_ads'
   | 'flipkart_ads'
@@ -114,6 +116,7 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   meesho_order_payments: 'Meesho — Aggregated Payment File (Order Payments + Ads Cost)',
   meesho_settlement_json: 'Meesho — Settlement Data (JSON)',
   amazon_ads_sponsored_products: 'Amazon Ads — Sponsored Products Campaign Report',
+  amazon_ads_monthly_cost: 'Amazon Ads — monthly cost by campaign (every ad product)',
 }
 const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   blinkit_payout_archive: 'blinkit',
@@ -143,6 +146,7 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   meesho_order_payments: 'meesho',
   meesho_settlement_json: 'meesho',
   amazon_ads_sponsored_products: 'amazon_in_seller', // overridden per-preview when ads records exist
+  amazon_ads_monthly_cost: 'amazon_in_seller', // likewise: the marketplace column decides
 }
 
 type Stage = 'idle' | 'needs-month' | 'parsed' | 'importing' | 'error'
@@ -183,6 +187,8 @@ interface PreviewState {
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
   /** A debit note edits one month's stored facts rather than importing rows. */
   nykaaDebitNote?: { month: string; patch: Partial<NykaaPnlFacts> }
+  /** Channel-months the ads report states in full, which it replaces. */
+  adsReplaces?: { channel: string; months: string[] }[]
   /** A month's ad spend that arrived as an invoice rather than a report. */
   manualAdSpend?: Omit<ManualAdSpend, 'enteredAt'>
   meeshoFactsByMonth?: MeeshoPnlFacts[]
@@ -328,6 +334,15 @@ export function UploadReportsPage() {
       return buildPreview({
         ...base, totalRows: r.totalRows, validRecords: [], invalidCount: r.invalidRows.length,
         warnings: r.warnings, amazonInVendorClaims: r.claims,
+      })
+    }
+    // Every ad product's cost for every month in one file, which is what
+    // this channel's advertising now comes from.
+    if (kind === 'amazon_ads_monthly_cost') {
+      const r = normalizeAmazonAdsSpendByMonth(parsed.rows, importId, fileName)
+      return buildPreview({
+        ...base, totalRows: r.totalRows, validRecords: [], adsRecords: r.adsRecords,
+        invalidCount: r.invalidRows.length, warnings: r.warnings, adsReplaces: r.replaces,
       })
     }
     if (kind === 'meesho_order_summary') {
@@ -676,6 +691,9 @@ export function UploadReportsPage() {
       else if (detectAmazonIndiaProductProfitability(parsed.headers, parsed.rows)) kind = 'amazon_in_sku_fees'
       else if (detectAmazonVendorClaimInvoice(parsed.headers)) kind = 'amazon_in_vendor_claim'
       else if (detectMeeshoOrderSummaryReport(parsed.headers)) kind = 'meesho_order_summary'
+      // Before the per-product report: this one carries a Month column, and
+      // the two share no other distinguishing header.
+      else if (detectAmazonAdsSpendByMonth(parsed.headers)) kind = 'amazon_ads_monthly_cost'
       else if (detectAmazonAdsSponsoredProductsReport(parsed.headers)) kind = 'amazon_ads_sponsored_products'
       else if (detectBlinkitAdsReport(parsed.headers)) kind = 'blinkit_ads'
       else if (detectMyntraAdsReport(parsed.headers)) kind = 'myntra_ads'
@@ -822,6 +840,7 @@ export function UploadReportsPage() {
         flipkartGoogleAdsFacts: preview.flipkartGoogleAdsFacts,
         amazonInVendorFacts: preview.amazonInVendorFacts,
         amazonInVendorClaims: preview.amazonInVendorClaims,
+        adsReplaces: preview.adsReplaces,
         amazonInVendorIxd: preview.amazonInVendorIxd,
         nykaaFacts: preview.nykaaFacts,
         blinkitFacts: preview.blinkitFacts,

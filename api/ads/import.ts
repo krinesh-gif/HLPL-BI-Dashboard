@@ -18,7 +18,14 @@ import { captureUndo } from '../_lib/undo.js'
  * tests/api/functionBudget.test.ts. They are the same resource anyway: what a
  * channel spent on advertising.
  */
+interface ReplaceScope {
+  channel?: unknown
+  months?: unknown
+}
+
 interface Body {
+  /** Channel-months this upload states in full. Cleared before inserting. */
+  replace?: ReplaceScope[]
   records?: unknown
   manualSpend?: unknown
   /** The import this belongs to, when it came from an upload rather than
@@ -92,6 +99,28 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const { records } = body
+
+  /**
+   * Months this upload states in full, which are cleared before it inserts.
+   *
+   * Amazon's monthly cost report is the whole month for every ad product, so
+   * adding it to what the per-product campaign reports left behind would
+   * count September twice — ₹2.02 lakh of Sponsored Products plus ₹2.13 lakh
+   * of everything. Scoped to one channel and the months named, so no other
+   * channel's advertising is touched, and a re-upload of the same file is
+   * then idempotent however the campaign naming changed.
+   */
+  for (const scope of Array.isArray(body?.replace) ? body.replace : []) {
+    const channel = typeof scope?.channel === 'string' ? scope.channel : null
+    const months = Array.isArray(scope?.months)
+      ? scope.months.filter((m): m is string => typeof m === 'string' && MONTH_PATTERN.test(m))
+      : []
+    if (!channel || months.length === 0) continue
+    await sql.query(
+      `DELETE FROM ads_records WHERE channel = $1 AND substring(date, 1, 7) = ANY($2::text[])`,
+      [channel, months],
+    )
+  }
   // The import storing these rows, for the same reason the sales rows carry
   // it: reversing an upload deletes by this column, and the id a record was
   // stamped with during preview is not the id the import was recorded under.

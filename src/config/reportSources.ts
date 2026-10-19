@@ -57,10 +57,13 @@ export const REPORT_SOURCES: ReportSource[] = [
       'Vendor Central: the IXD file — units unpacked at the warehouse, which is what the cross-dock charge is on',
       'Vendor Central: the claim invoice, as the .CSV beside the PDF — one row per claim, and what Amazon '
         + 'actually deducted for the cross-dock charge or the margin support',
-      'Advertising, from a different console — advertising.amazon.in ▸ Measurement & Reporting ▸ Sponsored '
-        + 'Products ▸ Campaign report, as CSV, with Time unit: Daily and the date range set to one calendar '
-        + 'month. Nothing else on Amazon India carries the ad spend: it is billed outside both the settlement '
-        + 'and the vendor files',
+      'Advertising, from a different console — advertising.amazon.in. The monthly cost report: one row per month, '
+        + 'campaign and ASIN, with a Total cost column, covering every ad product and up to a year at a time. '
+        + 'Upload it under the name the console gives it (Report_-_10_19_2026T11_32_08.csv) — the month column '
+        + 'carries no year, and the download date in that name is what says which year it means',
+      'Advertising, only if ROAS is wanted: the per-product Campaign reports (Sponsored Products, Brands, '
+        + 'Display) with Time unit: Daily. The monthly cost report states cost and nothing else, so it cannot '
+        + 'produce ROAS, ACOS or CTR — it is the money, and these are the measurement',
     ],
     note: 'Same page and the same three settings as the USA and UAE stores, on India’s Seller Central. The two '
       + 'vendor files come by email, both every month, and the NPPM first: the cross-dock charge attaches to the '
@@ -68,12 +71,12 @@ export const REPORT_SOURCES: ReportSource[] = [
       + 'dates. Vendor Central’s Retail Analytics "sales by ASIN" export is not a substitute for the NPPM file — '
       + 'it reports what Amazon sold at, not what they paid, so a month imported from it overstates the revenue '
       + 'by the whole trade margin. '
-      + 'On the ads report, Time unit: Daily matters. Run as a summary it can carry each campaign’s own start '
-      + 'date rather than the period, and the whole of a campaign’s spend then lands in the month it launched — '
-      + 'the importer says so when it sees it, but a daily export cannot go wrong. One ad account lifts both '
-      + 'halves of the channel, so the spend is charged once, on the Vendor Central statement. Anything the '
-      + 'console does not bill in that report — Sponsored Brands, Sponsored Display, DSP — comes in as the '
-      + 'monthly advertising invoice instead, which the uploader reads as a figure for the channel-month.',
+      + 'The monthly cost report is the spend, and a month in it replaces whatever was stored for that month: it '
+      + 'states the whole month for every ad product, so adding it to a per-product report’s rows would count '
+      + 'the month twice. September reads ₹2,12,876.11 there against ₹2,02,718.37 from the Sponsored Products '
+      + 'report alone, which is the spend that report never carried. One ad account lifts both halves of the '
+      + 'channel, so the spend is charged once — on the Vendor Central statement where the month has one, and '
+      + 'on Seller Central’s where it does not.',
   },
   {
     key: 'amazon_us',

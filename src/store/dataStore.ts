@@ -149,6 +149,15 @@ export interface ReportImport {
   /** RK World's invoices for a month's claims — the cross-dock charge and the
    * margin support — each of which attaches to that month's statement. */
   amazonInVendorClaims?: VendorClaim[]
+  /**
+   * Channel-months the ads report states in full.
+   *
+   * Amazon's monthly cost report carries every ad product for the month, so
+   * it replaces what is stored for those months rather than adding to it —
+   * otherwise September reads as the Sponsored Products figure plus the whole
+   * month over again.
+   */
+  adsReplaces?: { channel: string; months: string[] }[]
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
   meeshoFactsByMonth?: MeeshoPnlFacts[]
   /** The individual events behind those facts. These are what is stored: a
@@ -429,7 +438,7 @@ export const useDataStore = create<DataState>((set, get) => {
      * file (rows, then one facts call per month) downloaded everything three
      * or more times over, and a large file could not get through at all.
      */
-    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, amazonAeFacts, amazonInSkuFeeFacts, purplleFacts, swiggyInstamartFacts, myntraAdsFacts, flipkartAdsFacts, flipkartGoogleAdsFacts, amazonInVendorFacts, amazonInVendorIxd, amazonInVendorClaims, myntraFacts, nykaaFacts, blinkitFacts, amazonInSellerFacts, meeshoFactsByMonth, meeshoTransactions, meeshoAdsRows, meeshoRecoveryRows }) => {
+    importReport: async ({ importRecord, salesRecords, adsRecords, adsReplaces, flipkartFacts, amazonUsaFacts, amazonAeFacts, amazonInSkuFeeFacts, purplleFacts, swiggyInstamartFacts, myntraAdsFacts, flipkartAdsFacts, flipkartGoogleAdsFacts, amazonInVendorFacts, amazonInVendorIxd, amazonInVendorClaims, myntraFacts, nykaaFacts, blinkitFacts, amazonInSellerFacts, meeshoFactsByMonth, meeshoTransactions, meeshoAdsRows, meeshoRecoveryRows }) => {
       const total = salesRecords.length + adsRecords.length
       set({ importProgress: { sent: 0, total } })
       try {
@@ -473,8 +482,15 @@ export const useDataStore = create<DataState>((set, get) => {
           set({ importProgress: { sent, total } })
         }
 
-        for (const batch of batched(adsRecords, UPLOAD_BATCH_SIZE)) {
-          const result = await api.post<BatchResult>('/api/ads/import', { records: batch, importId })
+        for (const [i, batch] of batched(adsRecords, UPLOAD_BATCH_SIZE).entries()) {
+          // Months this report states in full are cleared first, and only on
+          // the first batch: clearing again between batches would delete the
+          // rows the batch before it just inserted.
+          const result = await api.post<BatchResult>('/api/ads/import', {
+            records: batch,
+            importId,
+            ...(i === 0 && adsReplaces ? { replace: adsReplaces } : {}),
+          })
           added += result.inserted
           skippedAsDuplicate += result.skippedAsDuplicate
           sent += batch.length
