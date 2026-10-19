@@ -1,5 +1,6 @@
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { CHART_AXIS_PROPS, CHART_COLORS, CHART_GRID_COLOR, CHART_TOOLTIP_STYLE } from './theme'
+import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { CHART_AXIS_COLOR, CHART_AXIS_PROPS, CHART_COLORS, CHART_GRID_COLOR, CHART_STATUS, CHART_TOOLTIP_STYLE } from './theme'
+import { signedTicks } from './ticks'
 
 /**
  * Roughly how wide one character of the 11px tick font is.
@@ -73,6 +74,7 @@ export function ComparisonBarChart({
   categoryWidth = 240,
   tooltipFormatter,
   valueLabel = 'Value',
+  signed = false,
 }: {
   data: Record<string, string | number>[]
   xKey: string
@@ -93,11 +95,46 @@ export function ComparisonBarChart({
   /** What the figure is called in the tooltip. Without it recharts prints the
    * data key, so every chart said "value". */
   valueLabel?: string
+  /**
+   * A figure that can be negative: a profit, not a quantity.
+   *
+   * Two things change. The zero line is drawn, because a bar means nothing
+   * without the line it is measured from once some of them point the other
+   * way. And the bars are coloured by their sign rather than cycled through
+   * the series slots, because on this chart the sign is the reading — which
+   * channels made money — and a palette assigned by row would say nothing.
+   *
+   * Blue and red rather than the status green and red: the green/red pair is
+   * ΔE 4.1 apart under deuteranopia, which is indistinguishable, and this
+   * pair measures 23.8. Colour is not carrying the sign on its own either —
+   * the bar's direction does, and the figure is on the tooltip.
+   */
+  signed?: boolean
 }) {
   // A horizontal chart grows with its rows. Fixed height meant that asking for
   // the top 20 of anything made every label unreadable, so the control that
   // chose 20 could not be used.
   const chartHeight = horizontal ? Math.max(height, data.length * ROW_HEIGHT + 48) : height
+
+  // A domain that ends where the data does.
+  //
+  // Recharts picks a round tick interval and then runs the axis to a whole
+  // number of them, which on a signed chart is paid for twice: the interval
+  // has to divide the negative side as well, so EBITDA from −₹2.3L to ₹4.1L
+  // drew an axis to ₹7.5L and spent a third of the width on empty plot. Only
+  // on a signed chart — the unsigned ones start at zero and are already tight.
+  const valueDomain = (): [number, number] | undefined => {
+    if (!signed) return undefined
+    const values = data.map((d) => Number(d[yKey])).filter((v) => Number.isFinite(v))
+    if (values.length === 0) return undefined
+    const max = Math.max(0, ...values)
+    const min = Math.min(0, ...values)
+    // Room for the bar's rounded end, so the longest one is not clipped flat.
+    const pad = (max - min) * 0.04 || 1
+    return [min === 0 ? 0 : min - pad, max === 0 ? 0 : max + pad]
+  }
+  const domain = valueDomain()
+  const ticks = domain ? signedTicks(domain[0], domain[1]) : undefined
 
   return (
     <ResponsiveContainer width="100%" height={chartHeight}>
@@ -109,7 +146,13 @@ export function ComparisonBarChart({
         <CartesianGrid stroke={CHART_GRID_COLOR} strokeDasharray="3 3" horizontal={!horizontal} vertical={horizontal} />
         {horizontal ? (
           <>
-            <XAxis type="number" {...CHART_AXIS_PROPS} tickFormatter={(v) => (valueFormatter ? valueFormatter(v) : String(v))} />
+            <XAxis
+              type="number"
+              {...CHART_AXIS_PROPS}
+              domain={domain}
+              ticks={ticks}
+              tickFormatter={(v) => (valueFormatter ? valueFormatter(v) : String(v))}
+            />
             <YAxis
               type="category"
               dataKey={xKey}
@@ -124,7 +167,12 @@ export function ComparisonBarChart({
         ) : (
           <>
             <XAxis dataKey={xKey} {...CHART_AXIS_PROPS} />
-            <YAxis {...CHART_AXIS_PROPS} tickFormatter={(v) => (valueFormatter ? valueFormatter(v) : String(v))} />
+            <YAxis
+              {...CHART_AXIS_PROPS}
+              domain={domain}
+              ticks={ticks}
+              tickFormatter={(v) => (valueFormatter ? valueFormatter(v) : String(v))}
+            />
           </>
         )}
         <Tooltip
@@ -138,10 +186,19 @@ export function ComparisonBarChart({
             figure being readable on every filter change, and a chart that
             draws itself over half a second cannot be captured or printed. */}
         <Bar dataKey={yKey} radius={[4, 4, 4, 4]} isAnimationActive={false}>
-          {data.map((_, i) => (
-            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+          {data.map((row, i) => (
+            <Cell
+              key={i}
+              fill={signed
+                ? (Number(row[yKey]) < 0 ? CHART_STATUS.loss : CHART_COLORS[0])
+                : CHART_COLORS[i % CHART_COLORS.length]}
+            />
           ))}
         </Bar>
+        {/* After the bars, so the line reads over them rather than under. */}
+        {signed && (
+          <ReferenceLine {...(horizontal ? { x: 0 } : { y: 0 })} stroke={CHART_AXIS_COLOR} />
+        )}
       </BarChart>
     </ResponsiveContainer>
   )

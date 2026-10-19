@@ -140,13 +140,35 @@ export function usePnlReport(start: PnlReportStart = {}) {
     // that traded, not simply the last in the period — on the last of them the
     // breakdown was a table of zeroes, which renders as no table at all.
     const latestMonth = traded[traded.length - 1] ?? months[months.length - 1] ?? month
-    const channelBreakdown =
+    const latestChannelViews =
       view === 'master'
         ? buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, latestMonth, { ...forMonth(latestMonth), meeshoBasis, currencyView, amazonInHalf: 'both' })
-            .map((v) => ({ channel: v.channel, netSales: v.canonical.lines.netSales ?? 0 }))
-            .filter((c) => c.netSales !== 0)
-            .sort((a, b) => b.netSales - a.netSales)
         : []
+    const channelBreakdown = latestChannelViews
+      .map((v) => ({ channel: v.channel, netSales: v.canonical.lines.netSales ?? 0 }))
+      .filter((c) => c.netSales !== 0)
+      .sort((a, b) => b.netSales - a.netSales)
+
+    // The same month's EBITDA, channel by channel, best first — which is the
+    // order the question is asked in: who is making money.
+    //
+    // It adds to the Master EBITDA above it rather than approximating it.
+    // `buildMasterPnl` sums the input lines of these same views and takes the
+    // subtotals of the sum, and every subtotal between them is a sum or a
+    // difference, so the channels' EBITDA and the company's are the same
+    // arithmetic in a different order.
+    //
+    // A channel with no sales is kept where it still has an EBITDA: a month
+    // that spent on a channel and sold nothing is a loss, and dropping it for
+    // having no revenue would hide exactly that.
+    const ebitdaBreakdown = latestChannelViews
+      .map((v) => ({
+        channel: v.channel,
+        ebitda: v.canonical.lines.ebitda ?? 0,
+        netSales: v.canonical.lines.netSales ?? 0,
+      }))
+      .filter((c) => c.netSales !== 0 || c.ebitda !== 0)
+      .sort((a, b) => b.ebitda - a.ebitda)
 
     // The two most recent finished months in the period that traded, which is
     // what "September vs August" asks for.
@@ -213,6 +235,7 @@ export function usePnlReport(start: PnlReportStart = {}) {
       monthsWithData,
       table,
       channelBreakdown,
+      ebitdaBreakdown,
       comparison,
       trend,
       latestMonth,

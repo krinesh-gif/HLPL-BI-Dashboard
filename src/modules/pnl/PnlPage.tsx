@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { PageShell } from '@/components/layout/PageShell'
 import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { ComparisonBarChart } from '@/components/charts/ComparisonBarChart'
-import { BUSINESS_CHANNELS, channelLabel } from '@/config/channels'
+import { BUSINESS_CHANNELS, channelLabel, type BusinessChannelId } from '@/config/channels'
 import { formatCurrencyCompact, formatCurrencyFull, formatPercent, monthLabel, currencyName } from '@/lib/format'
 import { exportRowsToCsv } from '@/lib/exportCsv'
 import { QUICK_PERIODS, type QuickPeriod } from '@/engine/multiMonthPnl'
@@ -530,9 +530,48 @@ export function PnlPage() {
               />
             </ChartCard>
           )}
+          {/* The same month read for profit instead of size, best channel at
+              the top. Revenue says which channel is biggest; this one says
+              which is worth having. */}
+          {r.ebitdaBreakdown.length > 0 && (
+            <ChartCard title={`Channel EBITDA — ${monthLabel(r.latestMonth)}`}>
+              <ComparisonBarChart
+                data={r.ebitdaBreakdown.map((c) => ({ name: channelLabel(c.channel), value: c.ebitda }))}
+                xKey="name" yKey="value" horizontal signed
+                valueFormatter={(v) => formatCurrencyCompact(v)}
+                tooltipFormatter={(v) => formatCurrencyFull(v)}
+                valueLabel="EBITDA"
+              />
+              <EbitdaBreakdownNote rows={r.ebitdaBreakdown} />
+            </ChartCard>
+          )}
         </div>
       )}
     </PageShell>
+  )
+}
+
+/**
+ * What the bars below zero are, in words.
+ *
+ * The colour is not allowed to be the only thing that says a channel lost
+ * money, so the names are written out. It also says what a channel's EBITDA
+ * includes, because the figure is not the channel's own trading result: the
+ * month's rent, salaries and software are shared across the channels by their
+ * contribution to sales, so a channel can trade profitably and still sit
+ * below the line.
+ */
+function EbitdaBreakdownNote({ rows }: { rows: { channel: BusinessChannelId; ebitda: number }[] }) {
+  const losses = rows.filter((c) => c.ebitda < 0)
+  const lost = losses.reduce((sum, c) => sum + c.ebitda, 0)
+  return (
+    <p className="mt-2 text-xs text-[var(--ink-3)]">
+      {losses.length > 0
+        ? `Below the line: ${losses.map((c) => channelLabel(c.channel)).join(', ')} — ${formatCurrencyFull(lost)} between them. `
+        : 'Every channel is above the line this month. '}
+      Each channel carries its share of the month&rsquo;s fixed expenses, allocated by its contribution to sales,
+      so these bars add to the company&rsquo;s EBITDA.
+    </p>
   )
 }
 

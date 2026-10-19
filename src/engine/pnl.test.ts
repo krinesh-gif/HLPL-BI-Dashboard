@@ -85,4 +85,32 @@ describe('buildMasterPnl', () => {
     expect(master.lines.cogs).toBe(2000)
     expect(master.lines.netSales).toBe(master.lines.grossSales! - master.lines.discounts! - master.lines.returns!)
   })
+
+  /**
+   * What the Channel EBITDA chart claims under it: that its bars add to the
+   * company's EBITDA. They do because every subtotal between a channel's
+   * input lines and its EBITDA is a sum or a difference, so summing the
+   * channels and then subtotalling is the same arithmetic as subtotalling
+   * each channel and then summing. Worth a test rather than an argument: a
+   * subtotal that ever stops being linear — a floor at zero, a cap, a rate
+   * applied to a total — would break the claim silently.
+   */
+  it('adds each channel’s EBITDA to the company’s, fixed expenses and losses included', () => {
+    const fixedExpenses: FixedExpenseEntry[] = [
+      { month: '2026-06', category: 'fixedExpensesTotal', amount: 552739 },
+    ]
+    const records = [record({}), record({ orderId: 'o2', channel: 'flipkart' })]
+    // Enough advertising on one channel to put it under, which is the case
+    // the chart's negative bars exist for.
+    const marketing = { flipkart: { ads: 9000 } }
+    const channelPnls = (['amazon_in', 'flipkart'] as const).map((ch) =>
+      buildChannelPnl(records, skuMaster, fixedExpenses, ch, '2026-06', marketing),
+    )
+    const master = buildMasterPnl(channelPnls, '2026-06')
+
+    expect(channelPnls.reduce((sum, p) => sum + (p.lines.ebitda ?? 0), 0)).toBeCloseTo(master.lines.ebitda ?? 0, 6)
+    expect(channelPnls.find((p) => p.channel === 'flipkart')?.lines.ebitda ?? 0).toBeLessThan(0)
+    // And the month's overhead is shared out once, not charged twice.
+    expect(channelPnls.reduce((sum, p) => sum + (p.lines.fixedExpensesTotal ?? 0), 0)).toBeCloseTo(552739, 6)
+  })
 })

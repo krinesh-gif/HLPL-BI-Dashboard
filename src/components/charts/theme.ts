@@ -31,6 +31,16 @@ export const CHART_STATUS = {
   warning: 'var(--warning)',
   serious: 'var(--serious)',
   critical: 'var(--critical)',
+  /**
+   * A figure below zero — a loss, not a warning.
+   *
+   * The red of `critical`, because that is what a loss reads as, but paired
+   * with `--series-1` blue rather than `--good` green for the figures above
+   * zero: the validator puts green against this red at ΔE 4.1 under
+   * deuteranopia, which is the same colour to a reader with it, and the blue
+   * at 23.8. The sign is carried by the bar's direction either way.
+   */
+  loss: 'var(--critical)',
 }
 
 /** Recharts' tooltip, in the app's surface rather than its own white box. */
