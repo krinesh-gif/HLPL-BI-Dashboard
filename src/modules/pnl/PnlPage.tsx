@@ -320,26 +320,6 @@ export function PnlPage() {
         margins is not the margin of the period.
       </p>
 
-      {/* What the Channel Charges line is made of. One P&L line holds them
-          all, so without this the figure has a name nobody can look up. */}
-      {r.chargeMonths.length > 0 && (
-        <div className="rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--ink-2)]">
-          <strong>Channel charges</strong> — billed to the channel and settled outside its own report, so the
-          marketplace&apos;s statement cannot show them. Entered on Monthly Inputs.
-          <ul className="mt-1.5 space-y-1">
-            {r.chargeMonths.map((m) => (
-              <li key={m.month} className="text-[var(--ink-3)]">
-                <span className="text-[var(--ink-2)]">{monthLabel(m.month)}</span>{' '}
-                {formatCurrencyFull(m.total)} —{' '}
-                {m.items.map((c) => (
-                  r.view === 'master' ? `${channelLabel(c.channel)}: ${c.label}` : c.label
-                )).join(', ')}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       {r.isForeign && (
         <p className="rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--ink-2)]">
           {r.currencyView === 'native' ? (

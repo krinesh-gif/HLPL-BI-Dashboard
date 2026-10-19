@@ -11,7 +11,6 @@ import {
   amazonInHalfSplit, buildAllChannelPnlViews, buildChannelPnlView, type AmazonInHalf,
 } from '@/engine/channelPnlRouter'
 import { buildMasterPnl, computeSubtotals } from '@/engine/pnl'
-import { channelChargesFor } from '@/engine/channelCharges'
 import { usePnlInputs } from '@/engine/usePnlInputs'
 import {
   quickPeriodAnchor,
@@ -176,21 +175,6 @@ export function usePnlReport(start: PnlReportStart = {}) {
     const pair = comparisonMonths(traded, currentMonth)
     const comparison = pair && { ...pair, rows: comparePnlMonths(pair.earlierMonth, pair.laterMonth, linesFor) }
 
-    // What is behind the Channel Charges line, month by month.
-    //
-    // The P&L has one line for them because a line per invented charge name
-    // is not a structure anything can roll up — but a figure whose name is
-    // only visible on another screen is a figure nobody can account for, so
-    // the names are listed under the statement that charges them.
-    const chargeMonths = months
-      .map((m) => {
-        const items = view === 'master'
-          ? (pnlInputs.channelCharges ?? []).filter((c) => c.month === m)
-          : channelChargesFor(pnlInputs.channelCharges, view, m)
-        return { month: m, total: items.reduce((sum, c) => sum + c.amount, 0), items }
-      })
-      .filter((x) => x.items.length > 0)
-
     const trend = months.map((m, i) => ({
       month: m,
       netSales: at('netSales', i),
@@ -252,7 +236,6 @@ export function usePnlReport(start: PnlReportStart = {}) {
       table,
       channelBreakdown,
       ebitdaBreakdown,
-      chargeMonths,
       comparison,
       trend,
       latestMonth,
