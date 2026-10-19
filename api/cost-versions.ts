@@ -3,6 +3,7 @@ import { ensureSchema, sql } from './_lib/db.js'
 import { requireSection, requireSession } from './_lib/auth.js'
 import { isNonEmptyString, json, readJson } from './_lib/http.js'
 import type { CostVersion } from '../src/data/costVersions.js'
+import { BUSINESS_CHANNEL_IDS } from '../src/config/channels.js'
 
 interface SaveBody {
   versions?: unknown
@@ -22,6 +23,10 @@ interface SaveBody {
    * budget is full, and this is another hand-entered setting the dashboard
    * reads once at load. */
   channelLogos?: unknown
+  /** Charges billed to one channel outside its own settlement. Same two
+   * reasons again, and the same shape: a figure, a month, and in this case
+   * the channel and the name it was billed under. */
+  channelCharges?: unknown
 }
 
 interface ChannelLogoInput { channel: string; dataUrl: string; fileName?: string }
@@ -73,6 +78,40 @@ function isFixedExpenseArray(v: unknown): v is FixedExpenseInput[] {
       return (
         isNonEmptyString(c.month) && MONTH_PATTERN.test(c.month) &&
         isNonEmptyString(c.category) && EXPENSE_CATEGORIES.has(c.category) &&
+        typeof c.amount === 'number' && Number.isFinite(c.amount) && c.amount >= 0
+      )
+    })
+  )
+}
+
+/**
+ * A charge the owner names himself.
+ *
+ * The label is validated for being there and for fitting in a column, and
+ * for nothing else: the point of the feature is that no list written here
+ * can anticipate what a marketplace will bill for next. The channel is
+ * checked against the real registry, though — a charge filed against a
+ * channel that does not exist would be stored, never read, and never
+ * missed.
+ */
+const MAX_LABEL_CHARS = 60
+
+interface ChannelChargeInput { month: string; channel: string; label: string; amount: number; note?: string }
+
+function isChannelChargeArray(v: unknown): v is ChannelChargeInput[] {
+  return (
+    Array.isArray(v) &&
+    v.every((x) => {
+      if (!x || typeof x !== 'object') return false
+      const c = x as ChannelChargeInput
+      // Zero is allowed: it is how a charge is set back to nothing for a
+      // month without losing the row and the name on it. Negative is not —
+      // a credit note is not a charge, and booking one here would be a
+      // marketplace paying us to use a programme.
+      return (
+        isNonEmptyString(c.month) && MONTH_PATTERN.test(c.month) &&
+        isNonEmptyString(c.channel) && (BUSINESS_CHANNEL_IDS as readonly string[]).includes(c.channel) &&
+        isNonEmptyString(c.label) && c.label.trim().length <= MAX_LABEL_CHARS &&
         typeof c.amount === 'number' && Number.isFinite(c.amount) && c.amount >= 0
       )
     })
@@ -349,6 +388,41 @@ export async function POST(request: Request): Promise<Response> {
     return json({ saved: body.fixedExpenses.length })
   }
 
+  if (body && body.channelCharges !== undefined) {
+    if (!isChannelChargeArray(body.channelCharges)) {
+      return json(
+        {
+          error:
+            'Expected { channelCharges: [{ month: "yyyy-mm", channel, label, amount: number >= 0, note? }] }. ' +
+            `Channel must be one of: ${BUSINESS_CHANNEL_IDS.join(', ')}. ` +
+            `The label is yours to choose, up to ${MAX_LABEL_CHARS} characters.`,
+        },
+        400,
+      )
+    }
+    if (body.channelCharges.length === 0) return json({ saved: 0 })
+    // Keyed on (month, channel, label), so re-entering a charge corrects it
+    // rather than billing the month twice for it.
+    await sql.query(
+      `INSERT INTO channel_charges (month, channel, label, amount, note, updated_by)
+       SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::float8[], $5::text[], $6::text[])
+       ON CONFLICT (month, channel, label) DO UPDATE SET
+         amount = EXCLUDED.amount,
+         note = EXCLUDED.note,
+         updated_by = EXCLUDED.updated_by,
+         updated_at = now()`,
+      [
+        body.channelCharges.map((c) => c.month),
+        body.channelCharges.map((c) => c.channel),
+        body.channelCharges.map((c) => c.label.trim()),
+        body.channelCharges.map((c) => c.amount),
+        body.channelCharges.map((c) => c.note ?? null),
+        body.channelCharges.map(() => auth.user.id),
+      ],
+    )
+    return json({ saved: body.channelCharges.length })
+  }
+
   if (body && body.nykaaDiscounts !== undefined) {
     if (!isNykaaDiscountArray(body.nykaaDiscounts)) {
       return json({ error: 'Expected { nykaaDiscounts: [{ month: "yyyy-mm", amountInr: number >= 0, note? }] }.' }, 400)
@@ -513,6 +587,20 @@ export async function DELETE(request: Request): Promise<Response> {
   if (isNonEmptyString(expenseMonth) && isNonEmptyString(expenseCategory)) {
     await sql`DELETE FROM fixed_expenses WHERE month = ${expenseMonth} AND category = ${expenseCategory}`
     return json({ ok: true })
+  }
+
+  // All three parts, because they are the key: without the label this would
+  // clear every charge the channel carries that month, and the one being
+  // removed is usually one of several.
+  const chargeMonth = url.searchParams.get('chargeMonth')
+  const chargeChannel = url.searchParams.get('chargeChannel')
+  const chargeLabel = url.searchParams.get('chargeLabel')
+  if (isNonEmptyString(chargeMonth) && isNonEmptyString(chargeChannel) && isNonEmptyString(chargeLabel)) {
+    await sql`
+      DELETE FROM channel_charges
+      WHERE month = ${chargeMonth} AND channel = ${chargeChannel} AND label = ${chargeLabel}
+    `
+    return json({ deleted: 1 })
   }
 
   // Removing a confirmed figure puts the month back on what its sales file

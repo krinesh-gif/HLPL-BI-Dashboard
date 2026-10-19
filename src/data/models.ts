@@ -446,6 +446,39 @@ export interface ManualAdSpend {
 // ---------------------------------------------------------------------------
 // Fixed Expenses — entered/imported per month, not derived from order data.
 // ---------------------------------------------------------------------------
+/**
+ * A charge that belongs to one channel and one month, named by whoever
+ * entered it.
+ *
+ * Some charges never reach the marketplace's own report because they were
+ * never settled through it. Flipkart's NextGen programme is billed on a
+ * payment link and paid from the bank, so the SKU P&L export — which is a
+ * statement of what Flipkart deducted — cannot show it, and the channel's
+ * EBITDA read better than it was by exactly that amount.
+ *
+ * Three things follow from what these are:
+ *
+ *  - The name is the owner's, not a fixed list. There is no way to enumerate
+ *    what a marketplace will invent to charge for next, and a charge filed
+ *    under "Other" is a charge nobody can account for a year later.
+ *  - It is charged whole to its channel, never shared out. That is the
+ *    difference between this and a fixed expense: rent is the company's and
+ *    is split across the channels by what each sold; NextGen is Flipkart's.
+ *  - It belongs to the month it is entered against and no other. A quarterly
+ *    fee is one entry in the month it was billed, or three entries of a third
+ *    each — whichever is the truer picture of the month, which is a judgement
+ *    the person entering it makes, not one this app should make for them.
+ */
+export interface ChannelChargeEntry {
+  month: string // yyyy-mm
+  channel: BusinessChannelId
+  /** What it is called on the invoice: "NextGen charges", "Smart Assist". */
+  label: string
+  amount: number
+  note?: string
+  updatedAt?: string
+}
+
 export interface FixedExpenseEntry {
   month: string // yyyy-mm
   /**

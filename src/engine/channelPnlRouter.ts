@@ -5,6 +5,7 @@ import type {
   AmazonInSellerPnlFacts,
   AmazonInVendorFacts,
   CanonicalSalesRecord,
+  ChannelChargeEntry,
   ChannelPnl,
   FixedExpenseEntry,
   MeeshoPnlFacts,
@@ -19,6 +20,7 @@ import { formatCurrencyFull, toMonthKey } from '@/lib/format'
 import { cogsForMonth } from '@/data/costVersions'
 import { resolveCogs } from '@/data/skuMapping'
 import { allocateFixedExpensesForMonth } from './allocation'
+import { channelChargesTotal } from './channelCharges'
 import {
   buildChannelPnl, cogsForRecords, computeSubtotals, estimateUncostedCogs,
   type CogsInputs, type MarketingByChannel, type UncostedCogsEstimate,
@@ -165,14 +167,17 @@ function withAllocatedOpex(
 ): PnlLineValues {
   const allocation = allocateFixedExpensesForMonth(
     inputs.salesRecords, inputs.fixedExpenses, month, inputs.facts, inputs.fxRate,
-  )[channel]
-  if (!allocation) return lines
-  if (share === 1) return { ...lines, ...allocation }
-  const scaled: PnlLineValues = {}
+  )[channel] ?? {}
+  // The channel's own charges go in beside its share of the company's, and
+  // are scaled by the same fraction for the same reason: reading half a
+  // channel has to give half of everything the channel carries, or the two
+  // halves stop adding to it.
+  const own = channelChargesTotal(inputs.channelCharges, channel, month) * share
+  const opex: PnlLineValues = own === 0 ? {} : { channelCharges: own }
   for (const [key, value] of Object.entries(allocation) as [keyof PnlLineValues, number | undefined][]) {
-    scaled[key] = (value ?? 0) * share
+    opex[key] = (value ?? 0) * share
   }
-  return { ...lines, ...scaled }
+  return { ...lines, ...opex }
 }
 
 function computeAllocatedOtherCosts(
@@ -184,7 +189,12 @@ function computeAllocatedOtherCosts(
   const allocation = allocateFixedExpensesForMonth(
     inputs.salesRecords, inputs.fixedExpenses, month, inputs.facts, inputs.fxRate,
   )[channel] ?? {}
-  return Object.values(allocation).reduce((sum, v) => sum + (v ?? 0), 0) * share
+  const allocated = Object.values(allocation).reduce((sum, v) => sum + (v ?? 0), 0)
+  // A native statement shows one "Other Costs" line rather than the opex
+  // breakdown, and a channel charge is one of those costs — left out of it,
+  // the statement's EBITDA would disagree with the canonical one by exactly
+  // the charge.
+  return (allocated + channelChargesTotal(inputs.channelCharges, channel, month)) * share
 }
 
 /** Share of revenue charged as COGS for a SKU with no cost on file. Matches the
@@ -510,6 +520,13 @@ export interface ChannelPnlViewInputs {
   salesRecords: CanonicalSalesRecord[]
   skuMaster: SkuMaster[]
   fixedExpenses: FixedExpenseEntry[]
+  /**
+   * Charges billed to one channel and paid outside its settlement — a
+   * marketplace programme fee on a payment link, say. Charged whole to that
+   * channel in that month, never shared out, which is what separates them
+   * from the fixed expenses above.
+   */
+  channelCharges?: ChannelChargeEntry[]
   marketing: MarketingByChannel
   facts: ChannelFactsStore
   /** Effective-dated costs and combo recipes. Optional so a caller with
@@ -1364,10 +1381,17 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
   // different basis — it cannot show the fees the settlement states, and its
   // Gross Sales will not tie to the file's own column — so a month on it says
   // so rather than letting the reader assume otherwise.
-  const canonical = buildChannelPnl(
+  const generic = buildChannelPnl(
     inputs.salesRecords, inputs.skuMaster, inputs.fixedExpenses, channel, month, inputs.marketing, inputs.cogs,
     inputs.facts, inputs.fxRate,
   )
+  // The channel's own charges, on the generic template as on every native
+  // one. A channel without a statement is the likeliest to be billed off to
+  // one side, so this is the last path that should miss them.
+  const ownCharges = channelChargesTotal(inputs.channelCharges, channel, month)
+  const canonical = ownCharges === 0
+    ? generic
+    : { ...generic, lines: computeSubtotals({ ...generic.lines, channelCharges: ownCharges }) }
   const source = NATIVE_STATEMENT_SOURCE[channel]
   return {
     channel, month, canonical,

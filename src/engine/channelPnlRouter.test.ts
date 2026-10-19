@@ -17,6 +17,74 @@ const flipkartFacts: FlipkartPnlFacts = {
   flipkartAds: 4000, sellerFundedDiscount: 0, customerAddOns: 0, outputGst: 0, googleAds: 0,
 }
 
+/**
+ * A charge billed to one channel and settled off the platform — Flipkart's
+ * NextGen programme fee, paid on a payment link — which the marketplace's own
+ * export therefore cannot carry.
+ */
+describe('channel charges', () => {
+  const base = {
+    salesRecords: [] as CanonicalSalesRecord[], skuMaster, fixedExpenses: [], marketing: {},
+    facts: { flipkartFacts: [flipkartFacts], amazonUsaFacts: [], meeshoFacts: [] },
+    channelCharges: [{ month: '2026-06', channel: 'flipkart' as const, label: 'NextGen charges', amount: 24252 }],
+  }
+
+  it('charges the month to the channel it was billed to', () => {
+    const v = buildChannelPnlView('flipkart', '2026-06', base)
+    expect(v.canonical.lines.channelCharges).toBeCloseTo(24252, 6)
+  })
+
+  // Contribution is what the marketplace's own statement says it is. A charge
+  // the marketplace never deducted cannot move it, or the statement and the
+  // P&L would stop agreeing about the same month.
+  it('comes off EBITDA and leaves contribution alone', () => {
+    const without = buildChannelPnlView('flipkart', '2026-06', { ...base, channelCharges: [] }).canonical.lines
+    const withIt = buildChannelPnlView('flipkart', '2026-06', base).canonical.lines
+    expect(withIt.contributionProfit).toBeCloseTo(without.contributionProfit ?? 0, 6)
+    expect((without.ebitda ?? 0) - (withIt.ebitda ?? 0)).toBeCloseTo(24252, 6)
+  })
+
+  // The whole point of charging it rather than allocating it: Flipkart's fee
+  // is Flipkart's, and Myntra pays none of it.
+  it('is carried by that channel alone', () => {
+    expect(buildChannelPnlView('myntra', '2026-06', base).canonical.lines.channelCharges ?? 0).toBe(0)
+    expect(buildChannelPnlView('flipkart', '2026-07', base).canonical.lines.channelCharges ?? 0).toBe(0)
+  })
+
+  // A channel with no statement of its own is the likeliest to be billed off
+  // to one side, so the generic template has to carry these too.
+  it('reaches a channel built from order rows', () => {
+    const v = buildChannelPnlView('nykaa', '2026-06', {
+      ...base,
+      channelCharges: [{ month: '2026-06', channel: 'nykaa' as const, label: 'Listing fee', amount: 5000 }],
+    })
+    expect(v.native).toBeUndefined()
+    expect(v.canonical.lines.channelCharges).toBeCloseTo(5000, 6)
+    expect(v.canonical.lines.ebitda).toBeCloseTo(-5000, 6)
+  })
+
+  // One line on the P&L, several invoices behind it.
+  it('adds a channel’s charges for the month into one figure', () => {
+    const v = buildChannelPnlView('flipkart', '2026-06', {
+      ...base,
+      channelCharges: [
+        { month: '2026-06', channel: 'flipkart' as const, label: 'NextGen charges', amount: 24252 },
+        { month: '2026-06', channel: 'flipkart' as const, label: 'Smart Assist', amount: 7500 },
+      ],
+    })
+    expect(v.canonical.lines.channelCharges).toBeCloseTo(31752, 6)
+  })
+
+  // The native statement shows one "Other Costs" line where the canonical
+  // P&L shows the opex breakdown. A charge left out of it would make the
+  // statement's EBITDA disagree with the canonical one by exactly the charge.
+  it('is in the native statement’s other costs as well', () => {
+    const without = buildChannelPnlView('flipkart', '2026-06', { ...base, channelCharges: [] })
+    const withIt = buildChannelPnlView('flipkart', '2026-06', base)
+    expect((without.native?.values.otherCosts ?? 0) - (withIt.native?.values.otherCosts ?? 0)).toBeCloseTo(24252, 6)
+  })
+})
+
 describe('buildChannelPnlView', () => {
   it('uses the native Flipkart template when facts exist for the month', () => {
     const view = buildChannelPnlView('flipkart', '2026-06', {
@@ -633,6 +701,21 @@ describe('buildChannelPnlView, Amazon India over Seller and Vendor Central', () 
       // Wholesale is ten times the marketplace this month, and carries that
       // much more of the overhead.
       expect(v).toBeLessThan(s)
+    })
+
+    // A charge is the channel's, not a business inside it, so reading one
+    // half shows that half's share of it — the same rule the overhead
+    // follows, and for the same reason: the halves have to add to the whole.
+    it('divides a channel charge between the halves', () => {
+      const withCharge = {
+        ...inputs,
+        channelCharges: [{ month: '2026-09', channel: 'amazon_in' as const, label: 'Vendor flex fee', amount: 50000 }],
+      }
+      const at = (amazonInHalf: AmazonInHalf) =>
+        buildChannelPnlView('amazon_in', '2026-09', { ...withCharge, amazonInHalf }).canonical.lines.channelCharges ?? 0
+      expect(at('both')).toBeCloseTo(50000, 6)
+      expect(at('vendor') + at('seller')).toBeCloseTo(50000, 6)
+      expect(at('seller')).toBeGreaterThan(0)
     })
 
     it('adds up to the channel, line by line', () => {

@@ -584,6 +584,28 @@ BEGIN
     PRIMARY KEY (month, category)
   );
 
+  -- A charge billed to one channel and settled outside that channel's own
+  -- report — Flipkart's NextGen programme fee, paid on a payment link, is the
+  -- one this was built for. The marketplace's export is a statement of what
+  -- the marketplace deducted, so a charge paid from the bank can never appear
+  -- in it, and the channel's EBITDA read better than it was by that amount.
+  --
+  -- Keyed on (month, channel, label) rather than on an id, for the same
+  -- reason fixed_expenses is keyed on (month, category): re-entering a figure
+  -- corrects it instead of charging it twice. The label is the owner's own
+  -- name for the charge, because no list written here could anticipate what a
+  -- marketplace will invent to bill for next.
+  CREATE TABLE IF NOT EXISTS channel_charges (
+    month      TEXT NOT NULL,
+    channel    TEXT NOT NULL,
+    label      TEXT NOT NULL,
+    amount     DOUBLE PRECISION NOT NULL DEFAULT 0,
+    note       TEXT,
+    updated_by TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (month, channel, label)
+  );
+
   -- -------------------------------------------------------------------------
   -- Marketplace SKU codes are not the internal cost-master codes: a listing may
   -- be a renamed single, a multipack, or a bundle of different products.

@@ -29,7 +29,7 @@ export async function GET(request: Request): Promise<Response> {
   // round trip once rather than on every load.
   await ensureSchema()
 
-  const [skuRows, salesRows, adsRows, importRows, expenseRows, flipkart, amazonUsa, myntra, nykaa, amazonInSeller, blinkit, amazonAe, amazonInSkuFees, purplle, swiggy, myntraAds, flipkartAds, flipkartGoogleAds, amazonInVendor, meesho, manualAds] =
+  const [skuRows, salesRows, adsRows, importRows, expenseRows, flipkart, amazonUsa, myntra, nykaa, amazonInSeller, blinkit, amazonAe, amazonInSkuFees, purplle, swiggy, myntraAds, flipkartAds, flipkartGoogleAds, amazonInVendor, meesho, manualAds, channelCharges] =
     await Promise.all([
       sql`SELECT * FROM sku_master ORDER BY sku`,
       // Grouped, not raw. 74,354 order lines were 42 MB of JSON on every
@@ -77,6 +77,7 @@ export async function GET(request: Request): Promise<Response> {
       sql`SELECT data FROM amazon_in_vendor_facts ORDER BY month`,
       meeshoFactsFromEvents(),
       sql`SELECT channel, month, amount, file_name, note, entered_at FROM manual_ad_spend ORDER BY month`,
+      sql`SELECT month, channel, label, amount, note, updated_at FROM channel_charges ORDER BY month, channel, label`,
     ])
 
   const salesRecords = (salesRows as Row[]).map(toSalesRecord)
@@ -107,6 +108,16 @@ export async function GET(request: Request): Promise<Response> {
     // Summed from the stored events, never from a pre-aggregated copy: the
     // same event arrives in several of Meesho's overlapping downloads.
     meeshoFacts: meesho,
+    // Charged whole to their channel, never shared out — the P&L keeps them
+    // apart from the fixed expenses for exactly that reason.
+    channelCharges: (channelCharges as Row[]).map((r) => ({
+      month: String(r.month),
+      channel: String(r.channel),
+      label: String(r.label),
+      amount: Number(r.amount),
+      note: r.note ? String(r.note) : undefined,
+      updatedAt: r.updated_at ? new Date(String(r.updated_at)).toISOString() : undefined,
+    })),
     manualAdSpend: (manualAds as Row[]).map((r) => ({
       channel: String(r.channel),
       month: String(r.month),

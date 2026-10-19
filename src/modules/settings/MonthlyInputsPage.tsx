@@ -9,8 +9,9 @@ import { packagingRateForMonth } from '@/data/packagingRates'
 import { nykaaDiscountForMonth } from '@/data/nykaaDiscounts'
 import { nykaaDiscountPerSalesFile } from '@/engine/nativePnl/nykaa'
 import { MEESHO_ASSUMPTIONS, NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
-import { addMonths, monthLabel, toMonthKey } from '@/lib/format'
-import type { FixedExpenseEntry } from '@/data/models'
+import { addMonths, formatCurrencyFull, monthLabel, toMonthKey } from '@/lib/format'
+import { BUSINESS_CHANNELS, channelLabel, type BusinessChannelId } from '@/config/channels'
+import type { ChannelChargeEntry, FixedExpenseEntry } from '@/data/models'
 
 /**
  * Every figure the marketplaces cannot tell us, on one screen, a month to a row.
@@ -302,6 +303,223 @@ export function MonthlyInputsPage() {
         </p>
       </Card>
 
+      <ChannelChargesCard months={months} />
     </PageShell>
+  )
+}
+
+/**
+ * Charges that belong to one channel and never reach its report.
+ *
+ * Flipkart's NextGen programme is billed on a payment link and paid from the
+ * bank, so the SKU P&L export — a statement of what Flipkart deducted from a
+ * settlement — cannot carry it, and the channel's EBITDA read better than it
+ * was by the whole fee. The same is true of any charge settled off the
+ * platform.
+ *
+ * Three decisions are deliberate and visible on the form:
+ *
+ *  - The name is typed, not chosen from a list. No list written today
+ *    anticipates what a marketplace invents to bill for next, and a charge
+ *    filed under "Other" is one nobody can account for a year later. Names
+ *    already used are offered back, so the same charge keeps one name across
+ *    months instead of becoming three spellings.
+ *  - It is charged whole to its channel. That is the difference between this
+ *    and the fixed expenses above, which are the company's and are divided
+ *    between the channels by what each one sold.
+ *  - It belongs to the month it is entered against. A quarterly fee is one
+ *    entry in the month it was billed, or three of a third each — which of
+ *    those is truer is a judgement about the business, so it is left to the
+ *    person making it rather than guessed at here.
+ */
+function ChannelChargesCard({ months }: { months: string[] }) {
+  const { channelCharges, saveChannelCharge, removeChannelCharge } = useDataStore()
+  const charges = useMemo(() => channelCharges ?? [], [channelCharges])
+
+  const [month, setMonth] = useState(months[0] ?? '')
+  const [channel, setChannel] = useState<BusinessChannelId>(BUSINESS_CHANNELS[0]?.id ?? 'flipkart')
+  const [label, setLabel] = useState('')
+  const [amount, setAmount] = useState('')
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<string | null>(null)
+
+  const knownLabels = useMemo(
+    () => [...new Set(charges.map((c) => c.label))].sort((a, b) => a.localeCompare(b)),
+    [charges],
+  )
+  const rows = useMemo(
+    () => [...charges].sort((a, b) =>
+      b.month.localeCompare(a.month) || a.channel.localeCompare(b.channel) || a.label.localeCompare(b.label)),
+    [charges],
+  )
+  const keyOf = (c: ChannelChargeEntry) => `${c.month}|${c.channel}|${c.label}`
+
+  async function add(): Promise<void> {
+    const value = Number(amount)
+    if (!/^\d{4}-\d{2}$/.test(month)) return setError('Pick the month the charge belongs to.')
+    if (label.trim() === '') {
+      return setError('Give the charge a name. It is what the figure on the P&L will be called a year from now.')
+    }
+    if (amount.trim() === '' || !Number.isFinite(value) || value < 0) {
+      return setError('Enter the amount as a positive number — it is a cost, so no minus sign.')
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      await saveChannelCharge({
+        month, channel, label: label.trim(), amount: value, note: note.trim() === '' ? undefined : note.trim(),
+      })
+      setLabel('')
+      setAmount('')
+      setNote('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save the charge.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function remove(c: ChannelChargeEntry): Promise<void> {
+    setRemoving(keyOf(c))
+    setError(null)
+    try {
+      await removeChannelCharge(c.month, c.channel, c.label)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not remove the charge.')
+    } finally {
+      setRemoving(null)
+    }
+  }
+
+  const field =
+    'w-full rounded border border-[var(--line-2)] bg-[var(--surface)] px-2 py-1.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none'
+
+  return (
+    <Card padded={false} className="mt-4">
+      <div className="px-5 pt-5">
+        <CardHeader
+          title="Channel charges"
+          subtitle="A charge billed to one channel and paid outside its settlement — a programme fee on a payment link, say. Charged whole to that channel, in that month only, and never shared with the others."
+        />
+      </div>
+
+      <div className="grid gap-3 px-5 pt-4 md:grid-cols-[9rem_11rem_1fr_9rem_auto] md:items-end">
+        <label className="block text-xs text-[var(--ink-3)]">
+          Month
+          <select className={`${field} mt-1`} value={month} onChange={(e) => setMonth(e.target.value)}>
+            {months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+          </select>
+        </label>
+        <label className="block text-xs text-[var(--ink-3)]">
+          Channel
+          <select
+            className={`${field} mt-1`}
+            value={channel}
+            onChange={(e) => setChannel(e.target.value as BusinessChannelId)}
+          >
+            {BUSINESS_CHANNELS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+          </select>
+        </label>
+        <label className="block text-xs text-[var(--ink-3)]">
+          Charge name
+          <input
+            className={`${field} mt-1`}
+            list="channel-charge-names"
+            placeholder="NextGen charges"
+            maxLength={60}
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+          <datalist id="channel-charge-names">
+            {knownLabels.map((l) => <option key={l} value={l} />)}
+          </datalist>
+        </label>
+        <label className="block text-xs text-[var(--ink-3)]">
+          Amount (₹)
+          <input
+            type="number" min="0" step="0.01" inputMode="decimal"
+            className={`${field} mt-1 text-right tabular-nums`}
+            placeholder="0.00"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+        </label>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void add()}
+          className="h-[34px] rounded-md bg-[var(--accent)] px-4 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:opacity-40"
+        >
+          {busy ? 'Saving…' : 'Add'}
+        </button>
+      </div>
+
+      <div className="px-5 pt-3">
+        <label className="block text-xs text-[var(--ink-3)]">
+          Note (optional)
+          <input
+            className={`${field} mt-1`}
+            placeholder="Invoice number, the quarter it covers, who approved it"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </label>
+      </div>
+
+      {error && <p className="px-5 pt-3 text-sm text-[var(--critical-ink)]">{error}</p>}
+
+      {rows.length === 0 ? (
+        <p className="px-5 pb-5 pt-4 text-sm text-[var(--ink-3)]">
+          No channel charges entered. Until one is, every channel&apos;s costs are what its own report states.
+        </p>
+      ) : (
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-[var(--surface-2)] text-[11px] font-semibold text-[var(--ink-3)]">
+              <tr>
+                <th className="px-5 py-2.5 text-left">Month</th>
+                <th className="px-3 py-2.5 text-left">Channel</th>
+                <th className="px-3 py-2.5 text-left">Charge</th>
+                <th className="px-3 py-2.5 text-right">Amount</th>
+                <th className="px-3 py-2.5 text-left">Note</th>
+                <th className="px-5 py-2.5" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--line)]">
+              {rows.map((c) => (
+                <tr key={keyOf(c)} className="hover:bg-[var(--surface-hover)]">
+                  <td className="whitespace-nowrap px-5 py-2 text-[var(--ink-2)]">{monthLabel(c.month)}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-[var(--ink-2)]">{channelLabel(c.channel)}</td>
+                  <td className="px-3 py-2 text-[var(--ink)]">{c.label}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-[var(--ink)]">
+                    {formatCurrencyFull(c.amount)}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-[var(--ink-3)]">{c.note ?? ''}</td>
+                  <td className="whitespace-nowrap px-5 py-2 text-right">
+                    <button
+                      type="button"
+                      disabled={removing === keyOf(c)}
+                      onClick={() => void remove(c)}
+                      className="text-xs font-medium text-[var(--critical-ink)] hover:opacity-80 disabled:opacity-40"
+                    >
+                      {removing === keyOf(c) ? 'Removing…' : 'Remove'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <p className="px-5 pb-5 pt-3 text-xs text-[var(--ink-3)]">
+        A charge lands on the Channel Charges line in Operating Expenses, below Contribution Profit — so the
+        marketplace&apos;s own statement is left exactly as it reports itself, and the charge comes off that
+        channel&apos;s EBITDA and the company&apos;s. Entering the same month, channel and name again corrects the
+        figure rather than charging it twice.
+      </p>
+    </Card>
   )
 }

@@ -25,7 +25,7 @@ export function usePnlInputs(): {
   forMonth: (month: string) => ChannelPnlViewInputs
 } {
   const {
-    salesRecords, adsRecords, skuMaster, fixedExpenses,
+    salesRecords, adsRecords, skuMaster, fixedExpenses, channelCharges,
     flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts, blinkitFacts,
     amazonAeFacts, purplleFacts, swiggyInstamartFacts, amazonInVendorFacts, amazonInSkuFeeFacts,
     costVersions, mappings, comboComponents, manualAdSpend, fxRates, freightRates, packagingRates, nykaaDiscounts,
@@ -36,6 +36,9 @@ export function usePnlInputs(): {
       salesRecords,
       skuMaster,
       fixedExpenses,
+      // Charged whole to their own channel rather than shared out, which is
+      // the one thing that makes them different from the line above.
+      channelCharges,
       // Every channel that has a statement of its own, and the type says so:
       // `Required` makes a channel added to the store and forgotten here a
       // compile error. Left optional it is silent — the router falls back to
@@ -81,7 +84,7 @@ export function usePnlInputs(): {
       }),
     }
   }, [
-    salesRecords, adsRecords, skuMaster, fixedExpenses,
+    salesRecords, adsRecords, skuMaster, fixedExpenses, channelCharges,
     flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts, amazonInSellerFacts, blinkitFacts,
     amazonAeFacts, purplleFacts, swiggyInstamartFacts, amazonInVendorFacts, amazonInSkuFeeFacts,
     costVersions, mappings, comboComponents, manualAdSpend, fxRates, freightRates, packagingRates, nykaaDiscounts,

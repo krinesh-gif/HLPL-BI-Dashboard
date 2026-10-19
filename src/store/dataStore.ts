@@ -19,6 +19,7 @@ import type {
   AdsRecord,
   AmazonUsaPnlFacts,
   CanonicalSalesRecord,
+  ChannelChargeEntry,
   FixedExpenseEntry,
   FlipkartPnlFacts,
   ImportRecord,
@@ -96,6 +97,10 @@ interface SharedDataset {
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
   /** Advertising spend typed in by hand, for platforms that bill by invoice. */
   manualAdSpend: ManualAdSpend[]
+  /** Charges billed to one channel and settled outside its own report, named
+   * by whoever entered them. Optional so a workspace whose API has not
+   * redeployed yet still loads. */
+  channelCharges?: ChannelChargeEntry[]
 }
 
 const EMPTY_DATASET: SharedDataset = {
@@ -121,6 +126,7 @@ const EMPTY_DATASET: SharedDataset = {
   amazonInVendorFacts: [],
   amazonInSellerFacts: [],
   manualAdSpend: [],
+  channelCharges: [],
 }
 
 const EMPTY_MAPPINGS: MappingTablesState = { mappings: [], comboComponents: [], costVersions: [], fxRates: [], freightRates: [], packagingRates: [], nykaaDiscounts: [], channelLogos: [] }
@@ -261,6 +267,10 @@ interface DataState extends SharedDataset, MappingTablesState {
    * saving the same month again corrects it rather than adding to it. */
   saveFixedExpenses: (entries: FixedExpenseEntry[]) => Promise<void>
   removeFixedExpense: (month: string, category: FixedExpenseEntry['category']) => Promise<void>
+  /** One channel's own charge for one month, under a name of your choosing.
+   * Saving the same month, channel and name again corrects the figure. */
+  saveChannelCharge: (entry: ChannelChargeEntry) => Promise<void>
+  removeChannelCharge: (month: string, channel: BusinessChannelId, label: string) => Promise<void>
   /** Records a month's ad spend for a channel that has no report to upload. */
   saveManualAdSpend: (entry: Omit<ManualAdSpend, 'enteredAt'>, importId?: string) => Promise<void>
   /** Takes an upload back out, restoring whatever it displaced. */
@@ -682,6 +692,13 @@ export const useDataStore = create<DataState>((set, get) => {
     removePackagingRate: (month) => writeThen(() => api.delete(
       `/api/cost-versions?packagingMonth=${encodeURIComponent(month)}`,
     )),
+
+    saveChannelCharge: (entry) => writeThen(() => api.post('/api/cost-versions', { channelCharges: [entry] })),
+    removeChannelCharge: (month, channel, label) =>
+      writeThen(() => api.delete(
+        `/api/cost-versions?chargeMonth=${encodeURIComponent(month)}`
+        + `&chargeChannel=${encodeURIComponent(channel)}&chargeLabel=${encodeURIComponent(label)}`,
+      )),
 
     saveFixedExpenses: (entries) => writeThen(() => api.post('/api/cost-versions', { fixedExpenses: entries })),
     removeFixedExpense: (month, category) =>

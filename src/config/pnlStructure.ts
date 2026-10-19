@@ -23,6 +23,7 @@ export type PnlLineKey =
   | 'otherMarketing'
   | 'contributionProfit'
   | 'contributionMarginPct'
+  | 'channelCharges'
   | 'fixedExpensesTotal'
   | 'salaries'
   | 'rent'
@@ -81,6 +82,12 @@ export const PNL_STRUCTURE: PnlLineDef[] = [
   { key: 'contributionProfit', label: 'Contribution Profit', section: 'contribution', kind: 'subtotal', sign: 1 },
   { key: 'contributionMarginPct', label: 'Contribution Margin %', section: 'contribution', kind: 'percent', sign: 1 },
 
+  // A channel's own charges first, then its share of the company's. The two
+  // are different kinds of cost and a reader has to be able to tell them
+  // apart: Flipkart's NextGen fee is Flipkart's whole cost, billed to
+  // Flipkart; the fixed expenses are the month's rent and salaries, shared
+  // across the channels by what each one sold.
+  { key: 'channelCharges', label: 'Channel Charges', section: 'opex', kind: 'input', sign: -1 },
   { key: 'fixedExpensesTotal', label: 'Fixed Expenses', section: 'opex', kind: 'input', sign: -1 },
   { key: 'salaries', label: 'Salaries', section: 'opex', kind: 'input', sign: -1 },
   { key: 'rent', label: 'Rent', section: 'opex', kind: 'input', sign: -1 },
