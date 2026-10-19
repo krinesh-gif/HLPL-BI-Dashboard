@@ -63,6 +63,7 @@ export const NAVIGATION: NavSection[] = [
       { label: 'Ads Overview', path: '/marketing/ads' },
       { label: 'Amazon India', path: '/marketing/ads/amazon_in' },
       { label: 'Amazon USA', path: '/marketing/ads/amazon_us' },
+      { label: 'Amazon UAE', path: '/marketing/ads/amazon_ae' },
       { label: 'Flipkart', path: '/marketing/ads/flipkart' },
       { label: 'Myntra', path: '/marketing/ads/myntra' },
       { label: 'Nykaa', path: '/marketing/ads/nykaa' },

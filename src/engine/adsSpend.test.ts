@@ -20,7 +20,24 @@ describe('the ads channel list', () => {
   it('has its own channels, not the sales list', () => {
     // Meesho and Purplle sell without an ads report; listing them would put
     // permanently empty pages in the navigation.
-    expect(ADS_CHANNEL_IDS).toEqual(['amazon_in', 'amazon_us', 'flipkart', 'myntra', 'nykaa', 'blinkit'])
+    expect(ADS_CHANNEL_IDS).toEqual([
+      'amazon_in', 'amazon_us', 'amazon_ae', 'flipkart', 'myntra', 'nykaa', 'blinkit',
+    ])
+    expect(ADS_CHANNEL_IDS).not.toContain('meesho')
+    expect(ADS_CHANNEL_IDS).not.toContain('purplle')
+  })
+
+  /**
+   * A channel the P&L charges advertising for has to be readable on the Ads
+   * pages. Amazon UAE was charged in the P&L and missing from this list, so
+   * the two screens described different companies: one that advertised in
+   * the UAE and one that did not.
+   */
+  it('lists Amazon UAE, whose spend the P&L already charges', () => {
+    expect(ADS_CHANNEL_IDS).toContain('amazon_ae')
+    // Its console reports a month's cost and nothing else, so clicks and
+    // orders are not measured rather than zero.
+    expect(ADS_CHANNELS.find((c) => c.id === 'amazon_ae')?.reportOmits).toContain('clicks')
   })
 
   it('treats Amazon India as one ads channel', () => {

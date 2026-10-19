@@ -68,7 +68,30 @@ export async function GET(request: Request): Promise<Response> {
                  category, sub_category, status, currency, coalesce(is_aggregate, false)
         ORDER BY order_date
       `,
-      sql`SELECT * FROM ads_records ORDER BY date`,
+      // Grouped, like the sales rows above and for the same reason. 5,004
+      // campaign rows were 1.9 MB on every load, and no screen reads a
+      // campaign row: the Ads pages sum a channel's month, split it by ad
+      // product, or compare months, and the P&L takes one figure per channel
+      // per month. Grouping on exactly what those readings discriminate by —
+      // channel, day, ad product and the currency it was billed in — gives
+      // 201 rows and 30 kB with every figure identical. The day is kept
+      // rather than the month alone because `r.date` is read in several
+      // places and a month-only date would quietly change what they mean;
+      // the extra 25 kB buys that safety. The rows themselves stay in the
+      // database untouched.
+      sql`
+        SELECT date, channel, program, currency,
+               ''                   AS campaign,
+               sum(impressions)     AS impressions,
+               sum(clicks)          AS clicks,
+               sum(spend)           AS spend,
+               sum(ad_sales)        AS ad_sales,
+               sum(ad_orders)       AS ad_orders,
+               min(import_id)       AS import_id
+        FROM ads_records
+        GROUP BY date, channel, program, currency
+        ORDER BY date
+      `,
       sql`SELECT * FROM imports ORDER BY uploaded_at DESC`,
       sql`SELECT * FROM fixed_expenses`,
       sql`SELECT data FROM flipkart_facts ORDER BY month`,

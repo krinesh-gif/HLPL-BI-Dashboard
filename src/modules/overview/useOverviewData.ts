@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useDataStore } from '@/store/dataStore'
+import { fxRatesForMonth } from '@/data/fxRates'
 import { usePnlInputs } from '@/engine/usePnlInputs'
 import { useFilterStore } from '@/store/filterStore'
 import { BUSINESS_CHANNELS, BUSINESS_CHANNEL_IDS, channelLabel } from '@/config/channels'
@@ -7,6 +8,7 @@ import { addMonths, ytdMonthKeys } from '@/lib/format'
 import { buildAllChannelPnlViews } from '@/engine/channelPnlRouter'
 import { buildMasterPnl } from '@/engine/pnl'
 import { filterByMonth, groupBySku, growthPct } from '@/engine/sales'
+import { adsSpendForMonth, totalAdsSpend } from '@/engine/adsSpend'
 import { asp as aspOf, aov as aovOf, netSalesForMonth, orderBasisNetSales, rtoPct } from '@/engine/netSales'
 import {
   marginDeclineInsight,
@@ -17,7 +19,7 @@ import {
 } from '@/engine/insight'
 
 export function useOverviewData() {
-  const { salesRecords, adsRecords, skuMaster } = useDataStore()
+  const { salesRecords, adsRecords, manualAdSpend, skuMaster, fxRates } = useDataStore()
   const { inputs: { facts: pnlFacts }, forMonth } = usePnlInputs()
   const { month } = useFilterStore()
 
@@ -66,12 +68,21 @@ export function useOverviewData() {
     const currentFacts = netSalesForMonth(salesRecords, month, facts, channelIds)
     const previousFacts = netSalesForMonth(salesRecords, previousMonth, facts, channelIds)
 
-    const currentAdsMonth = adsRecords.filter((r) => r.date.slice(0, 7) === month)
-    const totalAdSpend = currentAdsMonth.reduce((s, r) => s + r.spend, 0)
-    const totalAdSales = currentAdsMonth.reduce((s, r) => s + r.adSales, 0)
-    const acos = totalAdSales > 0 ? (totalAdSpend / totalAdSales) * 100 : 0
+    // Through the ads engine, not by summing the rows here.
+    //
+    // Summing them directly added a dirham to a rupee: Amazon UAE's spend is
+    // billed in AED and Amazon USA's in dollars, and both counted at face
+    // value — September's 272.11 dirhams of UAE spend went in as 272 rupees
+    // rather than 7,075. It also ignored a channel whose spend was typed in
+    // by hand rather than uploaded. The engine does both, and it is the same
+    // engine the Ads pages and the P&L read, so the front page cannot
+    // disagree with them.
+    const adsFigures = adsSpendForMonth(month, adsRecords, manualAdSpend, undefined, fxRatesForMonth(month, fxRates))
+    const adsTotals = totalAdsSpend(adsFigures)
+    const totalAdSpend = adsTotals.spend
+    const acos = adsTotals.acos ?? 0
     const tacos = currentFacts.netSales > 0 ? (totalAdSpend / currentFacts.netSales) * 100 : 0
-    const roas = totalAdSpend > 0 ? totalAdSales / totalAdSpend : 0
+    const roas = adsTotals.roas ?? 0
 
     // Channel performance
     const channelSummaries = BUSINESS_CHANNELS.map((c) => {
@@ -152,5 +163,5 @@ export function useOverviewData() {
       decliningSku,
       insights,
     }
-  }, [salesRecords, adsRecords, skuMaster, pnlFacts, forMonth, month])
+  }, [salesRecords, adsRecords, manualAdSpend, skuMaster, fxRates, pnlFacts, forMonth, month])
 }

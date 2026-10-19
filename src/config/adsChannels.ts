@@ -13,7 +13,7 @@ import type { BusinessChannelId } from './channels'
  */
 export type AdsChannelId = Extract<
   BusinessChannelId,
-  'amazon_in' | 'amazon_us' | 'flipkart' | 'myntra' | 'nykaa' | 'blinkit'
+  'amazon_in' | 'amazon_us' | 'amazon_ae' | 'flipkart' | 'myntra' | 'nykaa' | 'blinkit'
 >
 
 export interface AdsChannelDef {
@@ -41,6 +41,12 @@ export interface AdsChannelDef {
 export const ADS_CHANNELS: AdsChannelDef[] = [
   { id: 'amazon_in', label: 'Amazon India', usesMonthlyInvoice: false },
   { id: 'amazon_us', label: 'Amazon USA', usesMonthlyInvoice: false },
+  // Billed in dirhams, and reported only as a monthly cost — the UAE Product
+  // Profitability export carries no fee columns at all, so the Ads console is
+  // the only place this spend is stated. It was missing from this list while
+  // the P&L was already charging it, which left the Ads pages reporting a
+  // company that did not advertise in the UAE and the P&L one that did.
+  { id: 'amazon_ae', label: 'Amazon UAE', usesMonthlyInvoice: false, reportOmits: ['clicks', 'adOrders'] },
   { id: 'flipkart', label: 'Flipkart', usesMonthlyInvoice: false },
   { id: 'myntra', label: 'Myntra', usesMonthlyInvoice: false },
   { id: 'nykaa', label: 'Nykaa', usesMonthlyInvoice: true, invoiceLabel: 'MI value' },
