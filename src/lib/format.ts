@@ -109,6 +109,39 @@ export function toMonthKey(iso: string): string {
 }
 
 /**
+ * Today's month.
+ *
+ * On India time, which is the business's time: at UTC+5:30 the first five and
+ * a half hours of the 1st are still the previous month in UTC, and taking the
+ * month from an ISO string in UTC would open the dashboard on last month for
+ * that stretch — and, worse, judge which months are finished by it.
+ */
+export function currentMonthKey(now: Date = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
+/**
+ * The newest month of `months` that has finished — what a screen should open
+ * on.
+ *
+ * Never the running month. It holds whatever has been uploaded of it so far,
+ * so a report that opens there shows a business that appears to have stopped
+ * trading. Monthly Close is the sharpest case: it opens asking what is still
+ * missing before the report goes out, and on the current month the answer is
+ * always "everything", which tells the reader nothing.
+ *
+ * The exception is having nothing else: if the running month is all there is,
+ * it is what there is to show. It stays reachable either way — every month
+ * picker offers it — but nothing lands on it by default.
+ */
+export function latestFinishedMonth(months: string[], today: string = currentMonthKey()): string | null {
+  if (months.length === 0) return null
+  const sorted = [...months].sort()
+  const finished = sorted.filter((m) => m < today)
+  return finished.length > 0 ? finished[finished.length - 1] : sorted[sorted.length - 1]
+}
+
+/**
  * True for a month a marketplace could have reported in.
  *
  * A month key is the first seven characters of a date, and a date that was

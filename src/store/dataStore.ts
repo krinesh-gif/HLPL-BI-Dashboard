@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { api } from '@/lib/apiClient'
-import { isMonthKey, toMonthKey } from '@/lib/format'
+import { currentMonthKey, isMonthKey, latestFinishedMonth, toMonthKey } from '@/lib/format'
 import { useFilterStore } from './filterStore'
 import type { ComboComponent, SkuMapping } from '@/data/skuMapping'
 import type { SkuMapWorkbookResult } from '@/data/normalize/skuMapWorkbook'
@@ -333,16 +333,30 @@ export function statementMonths(dataset: SharedDataset): string[] {
   return [...new Set(months)].sort()
 }
 
-/** The newest month present anywhere in the dataset — order rows, any
- * channel's P&L facts, or advertising — so the dashboard can open on a month
- * that has numbers in it rather than on today's date. */
-export function latestMonthWithData(dataset: SharedDataset): string | null {
+/** Every month the dataset holds anything for — order rows, any channel's P&L
+ * facts, or advertising — in order. This is the set of months the dashboard
+ * can be pointed at, so it is also the set a month picker must offer. */
+export function datasetMonths(dataset: SharedDataset): string[] {
   const months = [
     ...statementMonths(dataset),
     ...dataset.adsRecords.map((r) => toMonthKey(r.date)),
   ].filter(isMonthKey)
 
-  return months.length === 0 ? null : months.reduce((a, b) => (a > b ? a : b))
+  return [...new Set(months)].sort()
+}
+
+/** The newest month present anywhere in the dataset — order rows, any
+ * channel's P&L facts, or advertising — so the dashboard can open on a month
+ * that has numbers in it rather than on today's date. */
+export function latestMonthWithData(dataset: SharedDataset): string | null {
+  const months = datasetMonths(dataset)
+  return months.length === 0 ? null : months[months.length - 1]
+}
+
+/** The month the dashboard opens on: the newest month with data that has
+ * finished — see `latestFinishedMonth` for why never the running one. */
+export function openingMonth(dataset: SharedDataset, today: string = currentMonthKey()): string | null {
+  return latestFinishedMonth(datasetMonths(dataset), today)
 }
 
 type MappingPayload = Omit<MappingTablesState, 'costVersions' | 'fxRates' | 'freightRates' | 'packagingRates' | 'nykaaDiscounts'>
@@ -430,12 +444,12 @@ export const useDataStore = create<DataState>((set, get) => {
           nykaaDiscounts: costs.nykaaDiscounts ?? [], channelLogos: costs.channelLogos ?? [],
           loading: false, error: null,
         })
-        // Point the dashboard at the newest month that has data. Left on the
-        // current calendar month, every page reads as empty whenever the
-        // latest upload covers an earlier period — which looks exactly like
-        // the import having failed.
-        const latest = latestMonthWithData(dataset)
-        if (latest) useFilterStore.getState().defaultMonthTo(latest)
+        // Point the dashboard at the newest finished month that has data.
+        // Left on the current calendar month, every page reads as empty
+        // whenever the latest upload covers an earlier period — which looks
+        // exactly like the import having failed.
+        const opening = openingMonth(dataset)
+        if (opening) useFilterStore.getState().defaultMonthTo(opening)
       } catch (e) {
         set({ loading: false, error: e instanceof Error ? e.message : 'Could not load the shared dataset.' })
       }

@@ -5,6 +5,7 @@ import { buildAllChannelPnlViews } from '@/engine/channelPnlRouter'
 import { buildMasterPnl, computeSubtotals } from '@/engine/pnl'
 import { buildPnlColumns, isEmptyPnlColumn } from '@/engine/multiMonthPnl'
 import { usePnlInputs } from '@/engine/usePnlInputs'
+import { latestFinishedMonth } from '@/lib/format'
 import type { PnlBasis, PnlLineValues } from '@/data/models'
 
 /**
@@ -32,9 +33,10 @@ export function useChannelMatrix() {
   const { forMonth } = usePnlInputs()
 
   const monthsWithData = useMemo(() => statementMonths(store), [store])
-  // Opens on the newest month there is a statement for, which is the month
-  // this question is nearly always asked about.
-  const latest = monthsWithData[monthsWithData.length - 1] ?? ''
+  // The newest *finished* month there is a statement for. Never the running
+  // month: a month four days old has one channel's file in it, and this
+  // report would show the rest of the business as having stopped trading.
+  const latest = latestFinishedMonth(monthsWithData) ?? ''
   const [chosenMonth, setMonth] = useState<string | null>(null)
   const month = chosenMonth ?? latest
 

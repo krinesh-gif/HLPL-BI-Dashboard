@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { CHANNELS } from '@/config/channels'
 import { useFilterStore } from '@/store/filterStore'
-import { useDataStore } from '@/store/dataStore'
+import { datasetMonths, useDataStore } from '@/store/dataStore'
 import { monthLabel } from '@/lib/format'
 import { distinctCategories } from '@/data/categories'
 
@@ -13,12 +13,29 @@ import { distinctCategories } from '@/data/categories'
  */
 export function GlobalFilters({ showChannel = true }: { showChannel?: boolean }) {
   const { month, channel, category, setMonth, setChannel, setCategory, reset } = useFilterStore()
-  const salesRecords = useDataStore((s) => s.salesRecords)
+  const store = useDataStore()
+  const salesRecords = store.salesRecords
 
+  /**
+   * Every month the dashboard can be on, which is not the same as every month
+   * that has order rows.
+   *
+   * It was the latter, and a native select whose value is not among its
+   * options shows the first option instead. The app opens on the newest month
+   * with anything in it — including a month that has only channel facts or
+   * only ad spend — so whenever that month had no order rows, this control
+   * displayed the oldest month in the data while the page underneath reported
+   * the newest. Monthly Close read "Dec 2024" over a report for a month two
+   * years later.
+   *
+   * The selected month is forced in for the same reason: the control must
+   * never name a month other than the one being shown.
+   */
   const months = useMemo(() => {
-    const set = new Set(salesRecords.map((r) => r.orderDate.slice(0, 7)))
-    return Array.from(set).sort()
-  }, [salesRecords])
+    const set = new Set(datasetMonths(store))
+    set.add(month)
+    return [...set].sort()
+  }, [store, month])
 
   // distinctCategories folds every spelling of "no category" into one entry
   // and puts it last, so the filter offers one Uncategorized rather than a
