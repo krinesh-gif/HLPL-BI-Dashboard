@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { PageShell } from '@/components/layout/PageShell'
 import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
@@ -15,9 +15,19 @@ import { reconcileAllChannels, type ChannelReconciliation, type ReconciliationCa
  * engine; this page shows what that engine had to choose between.
  */
 export function NetSalesReconciliationPage() {
-  const { salesRecords, flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts } = useDataStore()
+  const {
+    dailySales, dailySalesLoading, loadDailySales,
+    flipkartFacts, amazonUsaFacts, meeshoFacts, myntraFacts, nykaaFacts,
+  } = useDataStore()
   const { month } = useFilterStore()
   const [expanded, setExpanded] = useState<string | null>(null)
+
+  // Day-level rows, because one cause here is measured on them: orders placed
+  // in the last few days of the month, which typically settle in the next
+  // one. On monthly rows every order would carry the first of the month and
+  // that cause would silently read as nothing at all.
+  useEffect(() => { void loadDailySales() }, [loadDailySales])
+  const salesRecords = useMemo(() => dailySales ?? [], [dailySales])
 
   const rows = useMemo(
     () =>
@@ -38,6 +48,12 @@ export function NetSalesReconciliationPage() {
       title="Net Sales Reconciliation"
       subtitle={`Order reports against settlement reports — ${monthLabel(month)}`}
     >
+      {(dailySalesLoading || dailySales === null) && (
+        <p className="flex items-center gap-2.5 rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface-2)] px-3.5 py-2.5 text-sm text-[var(--ink-3)]">
+          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--line-2)] border-t-[var(--accent)]" aria-hidden />
+          Loading the day-level rows this reconciliation is measured on…
+        </p>
+      )}
       <section className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
         <h3 className="text-sm font-semibold text-[var(--ink)]">How Net Sales is calculated</h3>
         <p className="mt-1 text-sm text-[var(--ink-2)]">

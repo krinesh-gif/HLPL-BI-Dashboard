@@ -12,6 +12,7 @@ import type {
 } from '../../src/data/models.js'
 import type { ChannelId } from '../../src/config/channels.js'
 import { normalizeCategory } from '../../src/data/categories.js'
+import type { LabelledSalesRow, SalesLabel } from '../../src/data/salesLabels.js'
 
 type Row = Record<string, unknown>
 
@@ -48,17 +49,17 @@ export function toSkuMaster(r: Row): SkuMaster {
  * where de-dup, the audit trail and reversing an import need them; they simply
  * do not travel to the browser.
  */
-export function toSalesRecord(r: Row): CanonicalSalesRecord {
+export function toSalesRecord(r: Row): LabelledSalesRow {
   return {
     isAggregate: r.is_aggregate === true,
     orderDate: str(r.order_date),
     channel: str(r.channel) as ChannelId,
-    marketplace: str(r.marketplace),
     sellerType: str(r.seller_type) as CanonicalSalesRecord['sellerType'],
     sku: str(r.sku),
-    productName: str(r.product_name),
-    category: normalizeCategory(r.category),
-    subCategory: optStr(r.sub_category),
+    // The product text travels once, in `salesLabels`, and the browser puts
+    // it back. See src/data/salesLabels.ts for why it is an id rather than a
+    // rejoin by SKU.
+    labelId: r.label_id === null || r.label_id === undefined ? undefined : num(r.label_id),
     quantity: num(r.quantity),
     grossSales: num(r.gross_sales),
     discount: num(r.discount),
@@ -95,6 +96,17 @@ export function toAdsRecord(r: Row): AdsRecord {
     importId: str(r.import_id),
     program: optStr(r.program),
     currency: optStr(r.currency) as AdsRecord['currency'],
+  }
+}
+
+/** One entry of the product-text dictionary the sales rows point at. */
+export function toSalesLabel(r: Row): SalesLabel {
+  return {
+    id: num(r.label_id),
+    productName: str(r.product_name),
+    category: normalizeCategory(r.category),
+    subCategory: optStr(r.sub_category),
+    marketplace: str(r.marketplace),
   }
 }
 

@@ -75,6 +75,20 @@ export function DailySalesPage() {
 
   return (
     <PageShell title="Daily Sales" subtitle="Day-level revenue, units, orders, ASP and RTO" showFilters={false}>
+      {/* The day-level rows are fetched by this screen rather than carried by
+          every page, so there is a moment before they arrive. Saying so beats
+          drawing a chart of zeroes, which reads as a month with no sales. */}
+      {d.loading && (
+        <p className="flex items-center gap-2.5 rounded-[var(--radius-control)] border border-[var(--line)] bg-[var(--surface-2)] px-3.5 py-2.5 text-sm text-[var(--ink-3)]">
+          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--line-2)] border-t-[var(--accent)]" aria-hidden />
+          Loading the day-level rows…
+        </p>
+      )}
+      {d.error && (
+        <p className="rounded-[var(--radius-control)] border border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] px-3.5 py-2.5 text-sm text-[var(--ink)]">
+          {d.error}
+        </p>
+      )}
       <div className="flex flex-wrap items-end gap-3 rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
         <Field label="Level">
           <div className="flex rounded-md border border-[var(--line-2)] bg-[var(--surface)] p-0.5">

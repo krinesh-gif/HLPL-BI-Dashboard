@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { api } from '@/lib/apiClient'
 import { BUILD_COMMIT } from '@/lib/buildInfo'
 import { currentMonthKey, isMonthKey, latestFinishedMonth, toMonthKey } from '@/lib/format'
+import { applySalesLabels, type LabelledSalesRow, type SalesLabel } from '@/data/salesLabels'
 import { useFilterStore } from './filterStore'
 import type { ComboComponent, SkuMapping } from '@/data/skuMapping'
 import type { SkuMapWorkbookResult } from '@/data/normalize/skuMapWorkbook'
@@ -229,6 +230,17 @@ interface DataState extends SharedDataset, MappingTablesState {
   /** Non-null while an import is uploading, so the page can show how far along
    * a large file is instead of appearing frozen. */
   importProgress: ImportProgress | null
+  /**
+   * The sales rows by day, or null until a screen asks for them.
+   *
+   * The dataset every page loads carries them by month; by day they are six
+   * times the size and only two screens read one. Null is "not fetched",
+   * which a screen must tell apart from an empty month.
+   */
+  dailySales: CanonicalSalesRecord[] | null
+  dailySalesLoading: boolean
+  dailySalesError: string | null
+  loadDailySales: () => Promise<void>
   loadState: () => Promise<void>
   importReport: (report: ReportImport) => Promise<ImportOutcome>
   updateSkuMaster: (sku: string, patch: Partial<SkuMaster>) => Promise<void>
@@ -369,7 +381,15 @@ type CostsPayload = {
   nykaaDiscounts?: NykaaDiscountEntry[]
   channelLogos?: ChannelLogo[]
 }
-type Bundle = [SharedDataset, MappingPayload, CostsPayload]
+/** /api/state as it arrives: sales rows carry a label id, and the product
+ * text travels once beside them. `loadState` puts the two back together, so
+ * every screen still reads a whole `CanonicalSalesRecord`. */
+type StatePayload = Omit<SharedDataset, 'salesRecords'> & {
+  salesRecords: LabelledSalesRow[]
+  salesLabels?: SalesLabel[]
+}
+
+type Bundle = [StatePayload, MappingPayload, CostsPayload]
 
 /**
  * The build asking, on every bootstrap read.
@@ -390,7 +410,7 @@ const withBuild = (path: string) => `${path}?b=${encodeURIComponent(BUILD_COMMIT
 
 const fetchDataset = (): Promise<Bundle> =>
   Promise.all([
-    api.get<SharedDataset>(withBuild('/api/state')),
+    api.get<StatePayload>(withBuild('/api/state')),
     api.get<MappingPayload>(withBuild('/api/sku-map')),
     api.get<CostsPayload>(withBuild('/api/cost-versions')),
   ])
@@ -446,6 +466,37 @@ export const useDataStore = create<DataState>((set, get) => {
     loading: true,
     error: null,
     importProgress: null,
+    dailySales: null,
+    dailySalesLoading: false,
+    dailySalesError: null,
+
+      /**
+     * The sales rows by day, for the two screens that read a day.
+     *
+     * Not in the dataset every page loads: by day it is 20,357 rows and
+     * 7.8 MB against 3,496 and 888 kB by month, and only Daily Sales and the
+     * settlement-lag cause on the Net Sales Reconciliation ever look at one.
+     * Null means "not asked for yet", which a screen can tell apart from
+     * "asked for, and the answer is no rows".
+     */
+    loadDailySales: async () => {
+      if (get().dailySales !== null || get().dailySalesLoading) return
+      set({ dailySalesLoading: true })
+      try {
+        const payload = await api.get<{ salesRecords: LabelledSalesRow[]; salesLabels?: SalesLabel[] }>(
+          `${withBuild('/api/state')}&grain=daily`,
+        )
+        set({
+          dailySales: applySalesLabels(payload.salesRecords, payload.salesLabels),
+          dailySalesLoading: false,
+        })
+      } catch (e) {
+        set({
+          dailySalesLoading: false,
+          dailySalesError: e instanceof Error ? e.message : 'Could not load the daily sales rows.',
+        })
+      }
+    },
 
     loadState: async () => {
       try {
@@ -454,8 +505,18 @@ export const useDataStore = create<DataState>((set, get) => {
         // data, so the whole dataset round trip began only after an earlier
         // one had finished — dead time on every single visit.
         const bundle = takeWarmStart() ?? fetchDataset()
-        const [dataset, mapping, costs] = await bundle
+        const [payload, mapping, costs] = await bundle
+        // The rows arrive by month, with the product text as an id into a
+        // dictionary sent beside them; this is where they become the whole
+        // records every screen reads.
+        const dataset: SharedDataset = {
+          ...payload,
+          salesRecords: applySalesLabels(payload.salesRecords, payload.salesLabels),
+        }
         set({
+          // A reload means something changed, so a daily copy fetched before
+          // it is no longer the same month's data.
+          dailySales: null, dailySalesError: null,
           ...dataset, ...mapping, costVersions: costs.versions,
           fxRates: costs.fxRates ?? [], freightRates: costs.freightRates ?? [],
           packagingRates: costs.packagingRates ?? [],

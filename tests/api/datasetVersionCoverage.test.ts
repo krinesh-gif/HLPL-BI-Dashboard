@@ -28,21 +28,33 @@ function watchedTables(): Set<string> {
   return new Set([...block.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]))
 }
 
-/** The tables the bootstrap reads, read out of the routes themselves. */
+/** Every table the schema declares. */
+function declaredTables(): Set<string> {
+  return new Set(
+    [...SCHEMA_SQL.matchAll(/CREATE TABLE IF NOT EXISTS\s+([a-z_]+)/g)].map((m) => m[1]),
+  )
+}
+
+/**
+ * The tables the bootstrap reads, taken from the routes themselves and
+ * narrowed to names the schema actually declares.
+ *
+ * Narrowed rather than pattern-matched: `FROM` appears in a table alias
+ * (`FROM sales_records s`), in a CTE, and inside `IS NOT DISTINCT FROM
+ * s.product_name`, and a heuristic that tried to tell those apart reported
+ * `s` as an unwatched table.
+ */
 function tablesRead(): Set<string> {
   const files = [
     'api/state.ts', 'api/sku-map.ts', 'api/cost-versions.ts', 'api/_lib/meeshoFacts.ts',
   ]
+  const declared = declaredTables()
   const found = new Set<string>()
   for (const file of files) {
-    for (const m of readFileSync(file, 'utf8').matchAll(/\bFROM\s+([a-z_]+)/g)) {
-      // `FROM` also appears in JavaScript — `Array.from`, a `for...of` over a
-      // match — so only names that are really tables count.
-      if (m[1].endsWith('_facts') || m[1].includes('_') || m[1].endsWith('s')) found.add(m[1])
+    for (const m of readFileSync(file, 'utf8').matchAll(/\b(?:FROM|JOIN)\s+([a-z_]+)/g)) {
+      if (declared.has(m[1])) found.add(m[1])
     }
   }
-  // Not a table: `item` comes from a SQL fragment in a comment or a cast.
-  found.delete('item')
   return found
 }
 
@@ -59,6 +71,12 @@ describe('the dataset version counter covers what the dashboard reads', () => {
     // Statement-level: a forty-thousand-row import must bump the counter once.
     expect(SCHEMA_SQL).toContain('FOR EACH STATEMENT EXECUTE FUNCTION bump_dataset_version()')
     expect(watchedTables().size).toBeGreaterThanOrEqual(30)
+  })
+
+  it('reads the table names from somewhere real, so the check cannot pass vacuously', () => {
+    expect(tablesRead().size).toBeGreaterThanOrEqual(25)
+    expect(tablesRead()).toContain('sales_records')
+    expect(tablesRead()).toContain('meesho_ads')
   })
 
   it('does not watch the sessions table, since signing in changes no figure', () => {

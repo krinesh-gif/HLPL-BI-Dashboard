@@ -27,7 +27,11 @@ const SUMMED: (keyof CanonicalSalesRecord)[] = [
 ]
 
 /** What the GROUP BY in api/state.ts produces, in TypeScript. */
-function rollup(records: CanonicalSalesRecord[]): CanonicalSalesRecord[] {
+function rollup(records: CanonicalSalesRecord[], grain: 'day' | 'month' = 'day'): CanonicalSalesRecord[] {
+  if (grain === 'month') {
+    // `salesQuery('month')` dates every group at the first of its month.
+    records = records.map((r) => ({ ...r, orderDate: `${r.orderDate.slice(0, 7)}-01` }))
+  }
   const groups = new Map<string, CanonicalSalesRecord>()
   for (const r of records) {
     const key = KEY.map((k) => String(r[k] ?? '')).join('\u0000')
@@ -136,5 +140,70 @@ describe('grouping the sales rows changes no figure', () => {
     // Rows the app normalises during an upload have never been grouped.
     const fresh = MONTH.map((r) => ({ ...r, orders: undefined }))
     expect(orderBasisNetSales(fresh, RATES).orders).toBe(79)
+  })
+})
+
+/**
+ * The same rows by month, which is what every page but two now loads.
+ *
+ * By day the grouped rows are 20,357 and 7.8 MB; by month 3,496 and 888 kB,
+ * and the database bills what it sends. Only Daily Sales and the
+ * settlement-lag cause on the Net Sales Reconciliation read a day, and both
+ * ask for the daily grain themselves.
+ *
+ * Which is only safe if a month of monthly rows and a month of daily rows are
+ * the same month. The product text stays in the grouping key — as an id, not
+ * a rejoin by SKU — so no two products merge that did not merge before.
+ */
+describe('grouping the sales rows by month changes no monthly figure', () => {
+  const raw = orderBasisNetSales(MONTH, RATES)
+  const monthly = orderBasisNetSales(rollup(MONTH, 'month'), RATES)
+
+  it('collapses further than the daily grouping does', () => {
+    expect(rollup(MONTH, 'month').length).toBeLessThan(rollup(MONTH).length)
+  })
+
+  it('reports the same figure, field for field', () => {
+    expectSameFigure(monthly, raw)
+  })
+
+  it('keeps the order count and every ratio', () => {
+    expect(monthly.orders).toBe(raw.orders)
+    expect(aov(monthly)).toBeCloseTo(aov(raw) as number, 10)
+    expect(asp(monthly)).toBeCloseTo(asp(raw) as number, 10)
+    expect(rtoPct(monthly)).toBeCloseTo(rtoPct(raw) as number, 10)
+    expect(returnPct(monthly)).toBeCloseTo(returnPct(raw) as number, 10)
+  })
+
+  it('still answers the month filter, since every row is dated inside it', () => {
+    for (const r of rollup(MONTH, 'month')) expect(r.orderDate.slice(0, 7)).toBe('2026-08')
+  })
+
+  it('keeps each channel separate, so a channel P&L is unchanged', () => {
+    for (const channel of ['amazon_in_seller', 'flipkart', 'amazon_us'] as const) {
+      expectSameFigure(
+        orderBasisNetSales(rollup(MONTH, 'month').filter((r) => r.channel === channel), RATES),
+        orderBasisNetSales(MONTH.filter((r) => r.channel === channel), RATES),
+      )
+    }
+  })
+
+  it('keeps each SKU separate, so SKU analytics is unchanged', () => {
+    for (const sku of ['AO-ROSE-30', 'AO-ARGAN-50'] as const) {
+      expectSameFigure(
+        orderBasisNetSales(rollup(MONTH, 'month').filter((r) => r.sku === sku), RATES),
+        orderBasisNetSales(MONTH.filter((r) => r.sku === sku), RATES),
+      )
+    }
+  })
+
+  /**
+   * The one thing a monthly row cannot answer. Both screens that ask it load
+   * the daily grain for exactly this reason, and this is what says why.
+   */
+  it('cannot answer which day an order was placed, which is why daily exists', () => {
+    const days = new Set(rollup(MONTH, 'month').map((r) => r.orderDate))
+    expect(days).toEqual(new Set(['2026-08-01']))
+    expect(new Set(rollup(MONTH).map((r) => r.orderDate)).size).toBeGreaterThan(1)
   })
 })

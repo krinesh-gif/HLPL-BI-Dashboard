@@ -7,6 +7,7 @@ import {
   toAdsRecord,
   toFixedExpense,
   toImportRecord,
+  toSalesLabel,
   toSalesRecord,
   toSkuMaster,
 } from './_lib/rows.js'
@@ -19,6 +20,50 @@ type Row = Record<string, unknown>
  * reads from the same in-memory copy exactly as it did before the backend
  * existed.
  */
+/**
+ * The grouped sales rows, by month or by day.
+ *
+ * One query text with one substitution, so the two grains cannot drift into
+ * different groupings — which is the way a daily figure and a monthly one
+ * start disagreeing. The product text is replaced by an id into the
+ * dictionary selected beside it; it stays in the GROUP BY, because fifty-one
+ * SKUs carry more than one spelling on a single channel and rejoining by SKU
+ * would have picked one of them.
+ */
+function salesQuery(grain: 'month' | 'day'): string {
+  const dateExpr = grain === 'day' ? 's.order_date' : `left(s.order_date, 7) || '-01'`
+  return `
+    WITH labels AS (
+      SELECT row_number() OVER (ORDER BY product_name, category, sub_category, marketplace) AS label_id,
+             product_name, category, sub_category, marketplace
+      FROM (SELECT DISTINCT product_name, category, sub_category, marketplace FROM sales_records) d
+    )
+    SELECT ${dateExpr}        AS order_date,
+           s.channel, s.seller_type, s.sku, s.status, s.currency,
+           coalesce(s.is_aggregate, false) AS is_aggregate,
+           l.label_id,
+           count(*)                AS orders,
+           sum(s.quantity)         AS quantity,
+           sum(s.gross_sales)      AS gross_sales,
+           sum(s.discount)         AS discount,
+           sum(s.net_sales)        AS net_sales,
+           sum(s.return_units)     AS return_units,
+           sum(s.rto_units)        AS rto_units,
+           sum(s.shipping_cost)    AS shipping_cost,
+           sum(s.marketplace_fee)  AS marketplace_fee,
+           sum(s.tax)              AS tax
+      FROM sales_records s
+      JOIN labels l
+        ON l.product_name  IS NOT DISTINCT FROM s.product_name
+       AND l.category      IS NOT DISTINCT FROM s.category
+       AND l.sub_category  IS NOT DISTINCT FROM s.sub_category
+       AND l.marketplace   IS NOT DISTINCT FROM s.marketplace
+     GROUP BY 1, s.channel, s.seller_type, s.sku, s.status, s.currency,
+              coalesce(s.is_aggregate, false), l.label_id
+     ORDER BY 1
+  `
+}
+
 export async function GET(request: Request): Promise<Response> {
   const auth = await requireSession(request)
   if (auth.response) return auth.response
@@ -39,34 +84,50 @@ export async function GET(request: Request): Promise<Response> {
   const unchanged = notModified(request, etag)
   if (unchanged) return unchanged
 
-  const [skuRows, salesRows, adsRows, importRows, expenseRows, flipkart, amazonUsa, myntra, nykaa, amazonInSeller, blinkit, amazonAe, amazonInSkuFees, purplle, swiggy, myntraAds, flipkartAds, flipkartGoogleAds, amazonInVendor, meesho, manualAds, channelCharges] =
+  // Daily rows are asked for by the two screens that read a day — Daily Sales
+  // and the settlement-lag cause on the Net Sales Reconciliation — and come
+  // back on their own, without the rest of the dataset the caller already
+  // holds.
+  const grain: 'month' | 'day' =
+    new URL(request.url).searchParams.get('grain') === 'daily' ? 'day' : 'month'
+
+  if (grain === 'day') {
+    const [dailyRows, dailyLabels] = await Promise.all([
+      sql.query(salesQuery('day'), []),
+      sql`
+        SELECT row_number() OVER (ORDER BY product_name, category, sub_category, marketplace) AS label_id,
+               product_name, category, sub_category, marketplace
+        FROM (SELECT DISTINCT product_name, category, sub_category, marketplace FROM sales_records) d
+      `,
+    ])
+    return jsonTagged({
+      salesRecords: (dailyRows as Row[]).map(toSalesRecord),
+      salesLabels: (dailyLabels as Row[]).map(toSalesLabel),
+    }, etag)
+  }
+
+  const [skuRows, salesRows, labelRows, adsRows, importRows, expenseRows, flipkart, amazonUsa, myntra, nykaa, amazonInSeller, blinkit, amazonAe, amazonInSkuFees, purplle, swiggy, myntraAds, flipkartAds, flipkartGoogleAds, amazonInVendor, meesho, manualAds, channelCharges] =
     await Promise.all([
       sql`SELECT * FROM sku_master ORDER BY sku`,
-      // Grouped, not raw. 74,354 order lines were 42 MB of JSON on every
-      // load, and no screen reads an order line: every one of them sums by
-      // day, channel, SKU or month first. Grouping on exactly the fields a
-      // screen can discriminate by — and carrying the line count, so order
-      // counts and average order values are unchanged — gives 16,300 rows and
-      // 6 MB. Every figure is identical; `salesRollup.test.ts` is what proves
-      // it. The lines themselves stay in the database untouched.
+      // Grouped, not raw, and by month unless a screen asks for the day.
+      //
+      // 74,354 order lines were 42 MB of JSON on every load; grouping by day
+      // brought that to 20,357 rows and 7.8 MB. It was still the largest
+      // thing the dashboard read, and the database bills what it sends — the
+      // team's ordinary use spent a five-gigabyte monthly allowance in three
+      // weeks. Only two screens read a day: Daily Sales, and the settlement-
+      // lag cause on the Net Sales Reconciliation. Everything else sums by
+      // month, channel, SKU or category first, so the month is what travels
+      // and those two ask for `?grain=daily`.
+      //
+      // 3,496 rows and 888 kB, from 20,357 and 7.8 MB. Every figure is
+      // identical and `salesRollup.test.ts` is what proves it. The order
+      // lines themselves stay in the database untouched.
+      sql.query(salesQuery('month'), []),
       sql`
-        SELECT order_date, channel, marketplace, seller_type, sku, product_name,
-               category, sub_category, status, currency,
-               coalesce(is_aggregate, false) AS is_aggregate,
-               count(*)                AS orders,
-               sum(quantity)           AS quantity,
-               sum(gross_sales)        AS gross_sales,
-               sum(discount)           AS discount,
-               sum(net_sales)          AS net_sales,
-               sum(return_units)       AS return_units,
-               sum(rto_units)          AS rto_units,
-               sum(shipping_cost)      AS shipping_cost,
-               sum(marketplace_fee)    AS marketplace_fee,
-               sum(tax)                AS tax
-        FROM sales_records
-        GROUP BY order_date, channel, marketplace, seller_type, sku, product_name,
-                 category, sub_category, status, currency, coalesce(is_aggregate, false)
-        ORDER BY order_date
+        SELECT row_number() OVER (ORDER BY product_name, category, sub_category, marketplace) AS label_id,
+               product_name, category, sub_category, marketplace
+        FROM (SELECT DISTINCT product_name, category, sub_category, marketplace FROM sales_records) d
       `,
       // Grouped, like the sales rows above and for the same reason. 5,004
       // campaign rows were 1.9 MB on every load, and no screen reads a
@@ -121,6 +182,9 @@ export async function GET(request: Request): Promise<Response> {
     isEmpty: salesRecords.length === 0,
     skuMaster: (skuRows as Row[]).map(toSkuMaster),
     salesRecords,
+    // The product text the rows point at, sent once rather than on each of
+    // them — see src/data/salesLabels.ts.
+    salesLabels: (labelRows as Row[]).map(toSalesLabel),
     adsRecords: (adsRows as Row[]).map(toAdsRecord),
     imports: (importRows as Row[]).map(toImportRecord),
     fixedExpenses: (expenseRows as Row[]).map(toFixedExpense),

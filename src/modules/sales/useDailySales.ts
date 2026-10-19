@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useDataStore } from '@/store/dataStore'
 import { CHANNELS, type ChannelId } from '@/config/channels'
 import { normalizeCategory, distinctCategories } from '@/data/categories'
@@ -53,7 +53,16 @@ function isoDaysAgo(from: string, days: number): string {
  * over here.
  */
 export function useDailySales() {
-  const { salesRecords, skuMaster, mappings, comboComponents } = useDataStore()
+  const { dailySales, dailySalesLoading, dailySalesError, loadDailySales, skuMaster, mappings, comboComponents } = useDataStore()
+
+  // The dataset every page loads carries sales by month; this is the one
+  // screen that reads a day, so it asks for the daily rows itself. Six times
+  // the size, fetched by the screen that needs them rather than by everyone.
+  useEffect(() => { void loadDailySales() }, [loadDailySales])
+
+  // Null is "not fetched yet", which must not be read as a month with no
+  // sales: an empty array here would draw a chart of zeroes.
+  const salesRecords = useMemo(() => dailySales ?? [], [dailySales])
 
   const latestDate = useMemo(() => {
     let latest = ''
@@ -153,5 +162,11 @@ export function useDailySales() {
     }
   }, [salesRecords, skuMaster, mappings, comboComponents])
 
-  return { ...result, filters: { ...filters, from, to }, setFilters, options, latestDate }
+  return {
+    ...result, filters: { ...filters, from, to }, setFilters, options, latestDate,
+    // So the page can say the rows are on their way, rather than drawing a
+    // chart of zeroes that reads as a month with no sales.
+    loading: dailySalesLoading || dailySales === null,
+    error: dailySalesError,
+  }
 }
