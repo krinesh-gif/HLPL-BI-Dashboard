@@ -1,8 +1,8 @@
 import { createHandler } from './_lib/handler.js'
-import { ensureSchema, sql } from './_lib/db.js'
+import { datasetEtag, ensureSchema, sql } from './_lib/db.js'
 import { meeshoFactsFromEvents } from './_lib/meeshoFacts.js'
 import { requireSession } from './_lib/auth.js'
-import { jsonCached } from './_lib/http.js'
+import { jsonTagged, notModified } from './_lib/http.js'
 import {
   toAdsRecord,
   toFixedExpense,
@@ -28,6 +28,16 @@ export async function GET(request: Request): Promise<Response> {
   // dashboard is what would fail. Memoized per warm instance, so this costs a
   // round trip once rather than on every load.
   await ensureSchema()
+
+  // Before the queries, not after. This endpoint reads the whole dataset —
+  // roughly ten megabytes, eight of them grouped sales rows — and it used to
+  // read all of it on every page load before discovering, from a hash of the
+  // result, that it had nothing new to send. Four people opening the
+  // dashboard a few times a day spent the database's monthly transfer
+  // allowance in three weeks that way and took the dashboard offline.
+  const etag = await datasetEtag()
+  const unchanged = notModified(request, etag)
+  if (unchanged) return unchanged
 
   const [skuRows, salesRows, adsRows, importRows, expenseRows, flipkart, amazonUsa, myntra, nykaa, amazonInSeller, blinkit, amazonAe, amazonInSkuFees, purplle, swiggy, myntraAds, flipkartAds, flipkartGoogleAds, amazonInVendor, meesho, manualAds, channelCharges] =
     await Promise.all([
@@ -82,7 +92,7 @@ export async function GET(request: Request): Promise<Response> {
 
   const salesRecords = (salesRows as Row[]).map(toSalesRecord)
 
-  return jsonCached(request, {
+  return jsonTagged({
     // Nothing has been uploaded to the shared database yet, so every figure
     // downstream is a genuine zero rather than a real measurement.
     isEmpty: salesRecords.length === 0,
@@ -126,7 +136,7 @@ export async function GET(request: Request): Promise<Response> {
       note: r.note ? String(r.note) : undefined,
       enteredAt: r.entered_at ? new Date(String(r.entered_at)).toISOString() : new Date().toISOString(),
     })),
-  })
+  }, etag)
 }
 
 export default createHandler({ GET })

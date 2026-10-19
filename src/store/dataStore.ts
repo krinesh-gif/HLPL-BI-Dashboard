@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { api } from '@/lib/apiClient'
+import { BUILD_COMMIT } from '@/lib/buildInfo'
 import { currentMonthKey, isMonthKey, latestFinishedMonth, toMonthKey } from '@/lib/format'
 import { useFilterStore } from './filterStore'
 import type { ComboComponent, SkuMapping } from '@/data/skuMapping'
@@ -370,11 +371,28 @@ type CostsPayload = {
 }
 type Bundle = [SharedDataset, MappingPayload, CostsPayload]
 
+/**
+ * The build asking, on every bootstrap read.
+ *
+ * The three bootstrap responses are cached in the browser and revalidated by
+ * ETag, and that ETag is the dataset's version — it moves when a figure
+ * moves. A deploy can change the *shape* of a response without changing a
+ * figure: a field added to the grouped sales rows, a new line on a statement.
+ * Carrying the build in the URL makes a new bundle ask a new question, so a
+ * browser can never be handed "nothing has changed" about a response it has
+ * only ever seen in the old shape.
+ *
+ * It is a query parameter rather than a header because the browser's own
+ * cache is keyed on the URL, which is the cache doing the work rather than
+ * the server being asked to reason about it.
+ */
+const withBuild = (path: string) => `${path}?b=${encodeURIComponent(BUILD_COMMIT)}`
+
 const fetchDataset = (): Promise<Bundle> =>
   Promise.all([
-    api.get<SharedDataset>('/api/state'),
-    api.get<MappingPayload>('/api/sku-map'),
-    api.get<CostsPayload>('/api/cost-versions'),
+    api.get<SharedDataset>(withBuild('/api/state')),
+    api.get<MappingPayload>(withBuild('/api/sku-map')),
+    api.get<CostsPayload>(withBuild('/api/cost-versions')),
   ])
 
 /**

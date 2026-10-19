@@ -11,6 +11,8 @@
  */
 export const SCHEMA_SQL = `
 DO $schema$
+DECLARE
+  watched TEXT;
 BEGIN
   CREATE TABLE IF NOT EXISTS users (
     id            TEXT PRIMARY KEY,
@@ -664,6 +666,65 @@ BEGIN
   );
 
   CREATE INDEX IF NOT EXISTS combo_components_combo_idx ON combo_components (combo_sku);
+
+  -- ---------------------------------------------------------------------------
+  -- One counter, bumped whenever anything the dashboard reads changes.
+  --
+  -- /api/state reads the whole dataset: roughly ten megabytes, of which the
+  -- grouped sales rows are eight. It did that on every page load, for every
+  -- person, whether or not a single figure had moved since the last one — and
+  -- the team's ordinary use, four people opening the dashboard a few times a
+  -- day, spent the database's five-gigabyte monthly transfer allowance in
+  -- three weeks and took the whole thing offline.
+  --
+  -- The response already carried an ETag, but it was a hash of the body, so
+  -- the ten megabytes had to be read out of the database before the server
+  -- could discover it had nothing new to send. This is read first and costs
+  -- one small number, so a load that changes nothing now reads nothing.
+  --
+  -- A trigger rather than a call in each write route, because a correct
+  -- answer here cannot depend on twenty routes all remembering: a route that
+  -- forgot would leave the browser holding figures that had since changed,
+  -- which on this dashboard is the one failure that must not happen. The
+  -- database bumps it, so nothing can write without being counted.
+  -- ---------------------------------------------------------------------------
+  CREATE TABLE IF NOT EXISTS dataset_version (
+    id         SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    version    BIGINT NOT NULL DEFAULT 1,
+    changed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+  INSERT INTO dataset_version (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+  CREATE OR REPLACE FUNCTION bump_dataset_version() RETURNS trigger
+  LANGUAGE plpgsql AS $bump$
+  BEGIN
+    UPDATE dataset_version SET version = version + 1, changed_at = now() WHERE id = 1;
+    RETURN NULL;
+  END
+  $bump$;
+
+  -- Statement-level, so importing forty thousand rows bumps the counter once
+  -- rather than forty thousand times. Every table the three bootstrap
+  -- endpoints read is here; \`sessions\` deliberately is not, since signing in
+  -- changes no figure.
+  FOREACH watched IN ARRAY ARRAY[
+    'sku_master', 'sales_records', 'ads_records', 'imports', 'fixed_expenses',
+    'flipkart_facts', 'amazon_usa_facts', 'myntra_facts', 'nykaa_facts',
+    'amazon_in_seller_facts', 'blinkit_facts', 'amazon_ae_facts',
+    'amazon_in_sku_fee_facts', 'purplle_facts', 'swiggy_instamart_facts',
+    'myntra_ads_facts', 'flipkart_ads_facts', 'flipkart_google_ads_facts',
+    'amazon_in_vendor_facts', 'meesho_transactions', 'meesho_ads',
+    'meesho_platform_recovery', 'manual_ad_spend',
+    'channel_charges', 'sku_map', 'combo_components', 'cost_versions',
+    'fx_rates', 'freight_rates', 'packaging_rates', 'nykaa_discounts',
+    'channel_logos'
+  ] LOOP
+    EXECUTE format(
+      'CREATE OR REPLACE TRIGGER %I AFTER INSERT OR UPDATE OR DELETE OR TRUNCATE ON %I'
+      || ' FOR EACH STATEMENT EXECUTE FUNCTION bump_dataset_version()',
+      'bump_dataset_version_' || watched, watched
+    );
+  END LOOP;
 END
 $schema$;
 `

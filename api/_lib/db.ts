@@ -45,3 +45,28 @@ export function ensureSchema(): Promise<void> {
   })
   return schemaApplied
 }
+
+/**
+ * The tag for the dataset as it stands: one small read, in place of the ten
+ * megabytes it takes to find out the same thing from the data itself.
+ *
+ * It carries the data only. A deploy that changes the shape of a response is
+ * handled by the client asking at a build-stamped URL — see `withBuild` in
+ * the data store — so the browser's own cache, which is keyed on the URL,
+ * cannot hand an old shape back under a matching tag.
+ *
+ * A failure here returns a tag that cannot match, so the caller falls through
+ * and reads the data. The cost of being wrong in that direction is one extra
+ * read; the cost of being wrong in the other is a dashboard quietly showing
+ * figures that have since changed.
+ */
+export async function datasetEtag(): Promise<string> {
+  try {
+    const rows = (await sql`SELECT version FROM dataset_version WHERE id = 1`) as { version: string }[]
+    const version = rows[0]?.version
+    if (version === undefined) return `W/"ds-unknown-${Date.now()}"`
+    return `W/"ds${version}"`
+  } catch {
+    return `W/"ds-unreadable-${Date.now()}"`
+  }
+}

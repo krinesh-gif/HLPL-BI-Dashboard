@@ -1,7 +1,7 @@
 import { createHandler } from './_lib/handler.js'
-import { ensureSchema, sql } from './_lib/db.js'
+import { datasetEtag, ensureSchema, sql } from './_lib/db.js'
 import { requireSection, requireSession } from './_lib/auth.js'
-import { isNonEmptyString, json, readJson } from './_lib/http.js'
+import { isNonEmptyString, json, jsonTagged, notModified, readJson } from './_lib/http.js'
 import type { CostVersion } from '../src/data/costVersions.js'
 import { BUSINESS_CHANNEL_IDS } from '../src/config/channels.js'
 
@@ -242,6 +242,12 @@ export async function GET(request: Request): Promise<Response> {
   const auth = await requireSession(request)
   if (auth.response) return auth.response
 
+  // The same version check the other two bootstrap reads make. The logos
+  // alone are a hundred kilobytes of data URL, and they change about once.
+  const etag = await datasetEtag()
+  const unchanged = notModified(request, etag)
+  if (unchanged) return unchanged
+
   const rows = (await sql`
     SELECT sku, effective_from, cogs, source, note, file_name, uploaded_at
     FROM cost_versions
@@ -268,7 +274,7 @@ export async function GET(request: Request): Promise<Response> {
     SELECT channel, data_url, file_name, updated_at FROM channel_logos ORDER BY channel
   `) as Row[]
 
-  return json({
+  return jsonTagged({
     channelLogos: logoRows.map((r) => ({
       channel: String(r.channel),
       dataUrl: String(r.data_url),
@@ -310,7 +316,7 @@ export async function GET(request: Request): Promise<Response> {
       fileName: r.file_name ? String(r.file_name) : undefined,
       uploadedAt: r.uploaded_at ? new Date(String(r.uploaded_at)).toISOString() : undefined,
     })),
-  })
+  }, etag)
 }
 
 /**

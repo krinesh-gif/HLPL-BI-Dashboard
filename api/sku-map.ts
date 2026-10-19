@@ -1,7 +1,7 @@
 import { createHandler } from './_lib/handler.js'
-import { ensureSchema, sql } from './_lib/db.js'
+import { datasetEtag, ensureSchema, sql } from './_lib/db.js'
 import { requireSection, requireSession } from './_lib/auth.js'
-import { isNonEmptyString, json, readJson } from './_lib/http.js'
+import { isNonEmptyString, json, jsonTagged, notModified, readJson } from './_lib/http.js'
 import type { ComboComponent, SkuMapping } from '../src/data/skuMapping.js'
 
 interface SaveBody {
@@ -39,13 +39,19 @@ export async function GET(request: Request): Promise<Response> {
   const auth = await requireSession(request)
   if (auth.response) return auth.response
 
+  // The same version check /api/state makes, for the same reason: this is a
+  // bootstrap read that most loads do not need to repeat.
+  const etag = await datasetEtag()
+  const unchanged = notModified(request, etag)
+  if (unchanged) return unchanged
+
   const [mappings, comboComponents] = await Promise.all([
     sql`SELECT channel_sku, internal_sku, kind, source, verified, note FROM sku_map ORDER BY channel_sku`,
     sql`SELECT combo_sku, component_sku, quantity, source FROM combo_components ORDER BY combo_sku`,
   ])
 
   type Row = Record<string, unknown>
-  return json({
+  return jsonTagged({
     mappings: (mappings as Row[]).map((r) => ({
       channelSku: String(r.channel_sku),
       internalSku: String(r.internal_sku),
@@ -60,7 +66,7 @@ export async function GET(request: Request): Promise<Response> {
       quantity: Number(r.quantity) || 1,
       source: String(r.source),
     })),
-  })
+  }, etag)
 }
 
 export async function POST(request: Request): Promise<Response> {
