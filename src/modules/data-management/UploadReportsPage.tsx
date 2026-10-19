@@ -116,7 +116,7 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   meesho_order_payments: 'Meesho — Aggregated Payment File (Order Payments + Ads Cost)',
   meesho_settlement_json: 'Meesho — Settlement Data (JSON)',
   amazon_ads_sponsored_products: 'Amazon Ads — Sponsored Products Campaign Report',
-  amazon_ads_monthly_cost: 'Amazon Ads — monthly cost by campaign (every ad product)',
+  amazon_ads_monthly_cost: 'Amazon Ads — cost by month (every ad product)',
 }
 const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   blinkit_payout_archive: 'blinkit',
@@ -146,7 +146,7 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   meesho_order_payments: 'meesho',
   meesho_settlement_json: 'meesho',
   amazon_ads_sponsored_products: 'amazon_in_seller', // overridden per-preview when ads records exist
-  amazon_ads_monthly_cost: 'amazon_in_seller', // likewise: the marketplace column decides
+  amazon_ads_monthly_cost: 'amazon_in_seller', // likewise: the marketplace, or the billing currency, decides
 }
 
 type Stage = 'idle' | 'needs-month' | 'parsed' | 'importing' | 'error'

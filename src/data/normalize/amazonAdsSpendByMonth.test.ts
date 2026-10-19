@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  detectAmazonAdsSpendByMonth, monthKeyFor, normalizeAmazonAdsSpendByMonth, reportDownloadDate, unarmour,
+  detectAmazonAdsSpendByMonth, monthKeyFor, normalizeAmazonAdsSpendByMonth, reportDownloadDate, statedYear,
+  unarmour,
 } from './amazonAdsSpendByMonth'
 
 const FILE = 'Report_-_10_19_2026T11_32_08.csv'
@@ -64,10 +65,17 @@ describe('which year a month number means', () => {
 
   // Guessing would file a month twelve months out, which is worse than
   // refusing the file.
-  it('refuses the file when the name carries no date', () => {
+  it('refuses the file when neither the row nor the name carries a date', () => {
     const r = normalizeAmazonAdsSpendByMonth([row()], 'i', 'renamed.csv')
     expect(r.adsRecords).toEqual([])
     expect(r.warnings[0]).toContain('no way to tell which year')
+  })
+
+  it('reads a year the file states, and bounds it', () => {
+    expect(statedYear('2026')).toBe(2026)
+    expect(statedYear(undefined)).toBeNull()
+    expect(statedYear('26')).toBeNull()
+    expect(statedYear('not a year')).toBeNull()
   })
 })
 
@@ -113,14 +121,22 @@ describe('normalizeAmazonAdsSpendByMonth', () => {
     const r = normalizeAmazonAdsSpendByMonth([
       row({ Month: '13' }),
       row({ 'Advertised product marketplace': 'AMAZON_JP' }),
-      row({ 'Campaign ID': '' }),
     ], 'i', FILE)
     expect(r.adsRecords).toEqual([])
     expect(r.invalidRows.map((x) => x.reason)).toEqual([
       '"13" is not a month',
       'AMAZON_JP is not an Amazon this app reports on',
-      'Missing campaign id',
     ])
+  })
+
+  // A row whose campaign the console left blank is still money the month
+  // cost. Booking it to the account keeps the month's total tying to the
+  // file; dropping it as unplaceable would quietly understate the spend.
+  it('books a row with no campaign to the account rather than dropping it', () => {
+    const r = normalizeAmazonAdsSpendByMonth([row({ 'Campaign ID': '' })], 'i', FILE)
+    expect(r.invalidRows).toEqual([])
+    expect(r.adsRecords[0].campaign).toBe('amzn1.ads-account.g.6oc6amdel479kw11ke0o0aucn')
+    expect(r.adsRecords[0].spend).toBe(5.54)
   })
 
   // The P&L wants the cost and that is what this states. Saying so beats a
@@ -135,5 +151,121 @@ describe('normalizeAmazonAdsSpendByMonth', () => {
     const r = normalizeAmazonAdsSpendByMonth([row({ 'Total cost': '0.00' })], 'i', FILE)
     expect(r.adsRecords[0].spend).toBe(0)
     expect(r.warnings.some((w) => w.includes('cost nothing'))).toBe(true)
+  })
+})
+
+/**
+ * The shape the owner settled on: one row per month, the year beside the
+ * month, and the account's whole cost. No campaign, no ASIN, no marketplace
+ * — so the year comes from the file instead of its name, and the store from
+ * what the account is billed in.
+ */
+describe('the month-per-row shape', () => {
+  const ACCOUNT = '="amzn1.ads-account.g.6oc6amdel479kw11ke0o0aucn"'
+  const monthRow = (over: Record<string, string> = {}) => ({
+    Year: '2026',
+    Month: '9',
+    'Budget currency': 'INR',
+    'Advertiser account ID': ACCOUNT,
+    'Total cost': '212876.10',
+    ...over,
+  })
+
+  it('is recognized without a marketplace column', () => {
+    expect(detectAmazonAdsSpendByMonth(['Year', 'Month', 'Budget currency', 'Advertiser account ID', 'Total cost']))
+      .toBe(true)
+  })
+
+  it('books the month to the account, since there is no campaign to book it to', () => {
+    const r = normalizeAmazonAdsSpendByMonth([monthRow()], 'i', 'Amazon_Monthly_Ad_Spend_Report.csv')
+    expect(r.invalidRows).toEqual([])
+    expect(r.adsRecords).toEqual([{
+      date: '2026-09-01',
+      channel: 'amazon_in_seller',
+      campaign: 'amzn1.ads-account.g.6oc6amdel479kw11ke0o0aucn',
+      sku: undefined,
+      asin: undefined,
+      impressions: 0,
+      clicks: 0,
+      spend: 212876.1,
+      adSales: 0,
+      adOrders: 0,
+      importId: 'i',
+    }])
+  })
+
+  // The whole point of the Year column: the file name is then irrelevant,
+  // which is what stops a renamed copy being refused.
+  it('takes the year from the row, whatever the file is called', () => {
+    const r = normalizeAmazonAdsSpendByMonth(
+      [monthRow({ Year: '2025', Month: '11' })], 'i', 'renamed by somebody.csv',
+    )
+    expect(r.adsRecords[0].date).toBe('2025-11-01')
+    expect(r.warnings.some((w) => w.includes('file name'))).toBe(false)
+  })
+
+  it('routes by the currency the account is billed in', () => {
+    const r = normalizeAmazonAdsSpendByMonth([
+      monthRow(),
+      monthRow({ 'Budget currency': 'USD', 'Advertiser account ID': '="amzn1.ads-account.g.usa"' }),
+      monthRow({ 'Budget currency': 'AED', 'Advertiser account ID': '="amzn1.ads-account.g.uae"' }),
+    ], 'i', 'f.csv')
+    expect(r.adsRecords.map((a) => a.channel)).toEqual(['amazon_in_seller', 'amazon_us', 'amazon_ae'])
+  })
+
+  // The marketplace column is the better evidence and wins where it exists,
+  // so a campaign-level export is not re-routed by its currency.
+  it('prefers the marketplace column over the currency', () => {
+    const r = normalizeAmazonAdsSpendByMonth(
+      [{ ...monthRow(), 'Advertised product marketplace': 'AMAZON_US', 'Campaign ID': '="1"' }], 'i', 'f.csv',
+    )
+    expect(r.adsRecords[0].channel).toBe('amazon_us')
+  })
+
+  it('refuses a row that names neither a marketplace nor a currency it knows', () => {
+    const r = normalizeAmazonAdsSpendByMonth([
+      monthRow({ 'Budget currency': 'GBP' }),
+      monthRow({ 'Budget currency': '' }),
+    ], 'i', 'f.csv')
+    expect(r.adsRecords).toEqual([])
+    expect(r.invalidRows.map((x) => x.reason)).toEqual([
+      'No marketplace, and GBP does not say which Amazon this is',
+      'No marketplace, and (no currency) does not say which Amazon this is',
+    ])
+  })
+
+  it('refuses a row with no account and no campaign to book the month to', () => {
+    const r = normalizeAmazonAdsSpendByMonth([monthRow({ 'Advertiser account ID': '' })], 'i', 'f.csv')
+    expect(r.invalidRows.map((x) => x.reason)).toEqual([
+      'Neither a campaign id nor an advertiser account to book it to',
+    ])
+  })
+
+  // The owner's own file: April to September in six rows.
+  it('reads the six months of back data as six months to replace', () => {
+    const months = [
+      ['4', '363426.23'], ['5', '403496.35'], ['6', '333345.32'],
+      ['7', '384334.72'], ['8', '300476.04'], ['9', '212876.10'],
+    ]
+    const r = normalizeAmazonAdsSpendByMonth(
+      months.map(([m, cost]) => monthRow({ Month: m, 'Total cost': cost })), 'i', 'Amazon_Monthly_Ad_Spend.csv',
+    )
+    expect(r.invalidRows).toEqual([])
+    expect(r.adsRecords).toHaveLength(6)
+    expect(r.adsRecords.reduce((s, a) => s + a.spend, 0)).toBeCloseTo(1997954.76, 2)
+    expect(r.replaces).toEqual([{
+      channel: 'amazon_in_seller',
+      months: ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09'],
+    }])
+    expect(r.warnings[0]).toContain('₹1997954.76')
+    expect(r.warnings[0]).toContain('no campaign or ASIN split')
+  })
+
+  // One month twice is one row: the insert drops a repeated key rather than
+  // adding it, so a file that restates a month has to be summed here.
+  it('sums a month stated twice', () => {
+    const r = normalizeAmazonAdsSpendByMonth([monthRow(), monthRow({ 'Total cost': '1000' })], 'i', 'f.csv')
+    expect(r.adsRecords).toHaveLength(1)
+    expect(r.adsRecords[0].spend).toBeCloseTo(213876.1, 2)
   })
 })

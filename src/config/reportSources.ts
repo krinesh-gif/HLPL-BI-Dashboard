@@ -57,10 +57,12 @@ export const REPORT_SOURCES: ReportSource[] = [
       'Vendor Central: the IXD file — units unpacked at the warehouse, which is what the cross-dock charge is on',
       'Vendor Central: the claim invoice, as the .CSV beside the PDF — one row per claim, and what Amazon '
         + 'actually deducted for the cross-dock charge or the margin support',
-      'Advertising, from a different console — advertising.amazon.in. The monthly cost report: one row per month, '
-        + 'campaign and ASIN, with a Total cost column, covering every ad product and up to a year at a time. '
-        + 'Upload it under the name the console gives it (Report_-_10_19_2026T11_32_08.csv) — the month column '
-        + 'carries no year, and the download date in that name is what says which year it means',
+      'Advertising, from a different console — advertising.amazon.in. The monthly cost report: Year, Month, '
+        + 'Budget currency, the advertiser account and Total cost, one row per month, covering every ad product '
+        + 'and up to a year at a time. Six months of back data is six rows',
+      'The same report broken down by campaign and advertised ASIN also reads, and that export states no year — '
+        + 'upload it under the name the console gives it (Report_-_10_19_2026T11_32_08.csv), which is where the '
+        + 'download date is. The month-per-row shape needs no particular name, because it carries its own year',
 
     ],
     note: 'Same page and the same three settings as the USA and UAE stores, on India’s Seller Central. The two '
@@ -71,10 +73,12 @@ export const REPORT_SOURCES: ReportSource[] = [
       + 'by the whole trade margin. '
       + 'The monthly cost report is the spend, and a month in it replaces whatever was stored for that month: it '
       + 'states the whole month for every ad product, so adding it to a per-product report’s rows would count '
-      + 'the month twice. September reads ₹2,12,876.11 there against ₹2,02,718.37 from the Sponsored Products '
-      + 'report alone, which is the spend that report never carried. One ad account lifts both halves of the '
-      + 'channel, so the spend is charged once — on the Vendor Central statement where the month has one, and '
-      + 'on Seller Central’s where it does not.',
+      + 'the month twice. It is also the completer figure where a per-product report was missed — April to July '
+      + '2026 read ₹12,86,795.27 from the campaign reports against ₹14,84,602.62 here, ₹1.98 lakh of Sponsored '
+      + 'Brands and Display that never arrived — while August and September, where all three were uploaded, '
+      + 'agree with it to ₹11.62 and to the paisa. One ad account lifts both halves of the channel, so the '
+      + 'spend is charged once — on the Vendor Central statement where the month has one, and on Seller '
+      + 'Central’s where it does not.',
   },
   {
     key: 'amazon_us',
