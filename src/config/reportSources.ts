@@ -55,6 +55,8 @@ export const REPORT_SOURCES: ReportSource[] = [
       'Vendor Central, from the manager at RK World Infocom by email: the NPPM file — the month’s shipments, '
         + 'with Net Shipped GMS and Net PPM per ASIN',
       'Vendor Central: the IXD file — units unpacked at the warehouse, which is what the cross-dock charge is on',
+      'Vendor Central: the claim invoice, as the .CSV beside the PDF — one row per claim, and what Amazon '
+        + 'actually deducted for the cross-dock charge or the margin support',
       'Advertising, from a different console — advertising.amazon.in ▸ Measurement & Reporting ▸ Sponsored '
         + 'Products ▸ Campaign report, as CSV, with Time unit: Daily and the date range set to one calendar '
         + 'month. Nothing else on Amazon India carries the ad spend: it is billed outside both the settlement '

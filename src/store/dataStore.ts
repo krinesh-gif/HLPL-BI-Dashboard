@@ -4,6 +4,7 @@ import { isMonthKey, toMonthKey } from '@/lib/format'
 import { useFilterStore } from './filterStore'
 import type { ComboComponent, SkuMapping } from '@/data/skuMapping'
 import type { SkuMapWorkbookResult } from '@/data/normalize/skuMapWorkbook'
+import type { VendorClaim } from '@/data/normalize/amazonVendorClaimInvoice'
 import type { CostVersion } from '@/data/costVersions'
 import type { MeeshoTransaction } from '@/data/meesho/transaction'
 import type { MeeshoAdsRow, MeeshoRecoveryRow } from '@/data/normalize/meeshoOrderPayments'
@@ -145,6 +146,9 @@ export interface ReportImport {
   /** The inward cross-dock charge, which arrives as its own file and is
    * merged into the month the NPPM file already opened. */
   amazonInVendorIxd?: { month: string; ixd: AmazonInVendorIxd }
+  /** RK World's invoices for a month's claims — the cross-dock charge and the
+   * margin support — each of which attaches to that month's statement. */
+  amazonInVendorClaims?: VendorClaim[]
   amazonInSellerFacts?: AmazonInSellerPnlFacts[]
   meeshoFactsByMonth?: MeeshoPnlFacts[]
   /** The individual events behind those facts. These are what is stored: a
@@ -425,7 +429,7 @@ export const useDataStore = create<DataState>((set, get) => {
      * file (rows, then one facts call per month) downloaded everything three
      * or more times over, and a large file could not get through at all.
      */
-    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, amazonAeFacts, amazonInSkuFeeFacts, purplleFacts, swiggyInstamartFacts, myntraAdsFacts, flipkartAdsFacts, flipkartGoogleAdsFacts, amazonInVendorFacts, amazonInVendorIxd, myntraFacts, nykaaFacts, blinkitFacts, amazonInSellerFacts, meeshoFactsByMonth, meeshoTransactions, meeshoAdsRows, meeshoRecoveryRows }) => {
+    importReport: async ({ importRecord, salesRecords, adsRecords, flipkartFacts, amazonUsaFacts, amazonAeFacts, amazonInSkuFeeFacts, purplleFacts, swiggyInstamartFacts, myntraAdsFacts, flipkartAdsFacts, flipkartGoogleAdsFacts, amazonInVendorFacts, amazonInVendorIxd, amazonInVendorClaims, myntraFacts, nykaaFacts, blinkitFacts, amazonInSellerFacts, meeshoFactsByMonth, meeshoTransactions, meeshoAdsRows, meeshoRecoveryRows }) => {
       const total = salesRecords.length + adsRecords.length
       set({ importProgress: { sent: 0, total } })
       try {
@@ -545,6 +549,43 @@ export const useDataStore = create<DataState>((set, get) => {
             )
           }
           monthsUpdated.push(amazonInVendorIxd.month)
+        }
+        // A claim invoice is what Amazon actually deducted, so it is the money
+        // on the line it belongs to. The cross-dock workbook, where one has
+        // been uploaded, keeps the units and the value behind it: the patch is
+        // a shallow merge at the top level, so the existing `ixd` has to be
+        // carried forward here or the units would be replaced by nothing.
+        for (const claim of amazonInVendorClaims ?? []) {
+          if (claim.kind === 'unknown') continue
+          const existing = get().amazonInVendorFacts?.find((f) => f.month === claim.month)
+          const invoice = { number: claim.invoiceNumber, date: claim.invoiceDate, amount: claim.amount }
+          const patch = claim.kind === 'ixd'
+            ? {
+                ixd: {
+                  unitsUnpacked: existing?.ixd?.unitsUnpacked ?? 0,
+                  ratePerUnit: existing?.ixd?.ratePerUnit ?? 0,
+                  valueUnpacked: existing?.ixd?.valueUnpacked ?? 0,
+                  asins: existing?.ixd?.asins ?? 0,
+                  periodStart: existing?.ixd?.periodStart ?? claim.periodStart,
+                  periodEnd: existing?.ixd?.periodEnd ?? claim.periodEnd,
+                  charge: claim.amount,
+                  invoice,
+                },
+              }
+            // What the margin-support claim settled at, from the invoice that
+            // settled it rather than from a figure typed in by hand.
+            : { ccogsFinal: claim.amount, ccogsInvoice: invoice }
+          const { updated } = await api.patch<{ updated: boolean }>('/api/facts/amazon-in-vendor', {
+            month: claim.month,
+            patch,
+          })
+          if (!updated) {
+            throw new Error(
+              `No Vendor Central statement is stored for ${claim.month}, so invoice ${claim.invoiceNumber} has ` +
+              'nothing to attach to. Upload that month\u2019s NPPM file first, then this invoice.',
+            )
+          }
+          monthsUpdated.push(claim.month)
         }
         if (amazonInSkuFeeFacts) {
           await api.post('/api/facts/amazon-in-sku-fees', { facts: amazonInSkuFeeFacts, importId })

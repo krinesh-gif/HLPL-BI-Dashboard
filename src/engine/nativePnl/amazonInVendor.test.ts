@@ -122,6 +122,34 @@ describe('computeAmazonInVendorPnl', () => {
   })
 })
 
+/**
+ * The cross-dock charge arrives two ways: RK World's claim invoice, which is
+ * what they deducted, and the IXD workbook, which is the units behind it.
+ * August's invoice bills ₹24,252 — 12,126 units at ₹2 — and the statement
+ * charges the invoice.
+ */
+describe('the cross-dock charge, from the invoice', () => {
+  const invoiced: AmazonInVendorFacts = {
+    ...MONTHS.april,
+    month: '2026-08',
+    ixd: {
+      unitsUnpacked: 12126, ratePerUnit: 2, charge: 24252, valueUnpacked: 0,
+      periodStart: '2026-08-01', periodEnd: '2026-08-31', asins: 0,
+      invoice: { number: '20000036977', date: '2026-09-21', amount: 24252 },
+    },
+  }
+
+  it('charges what the invoice says was deducted', () => {
+    const v = computeAmazonInVendorPnl(invoiced)
+    expect(v.ixd).toBe(-24252)
+    expect(v.unitsUnpacked).toBe(12126)
+  })
+
+  it('rolls it up as fulfilment, the way the workbook charge does', () => {
+    expect(amazonInVendorToCanonicalBuckets(invoiced).fulfilment).toBe(24252)
+  })
+})
+
 describe('amazonInVendorToCanonicalBuckets', () => {
   // A wholesale price cut is not a marketplace fee. Putting it in commission
   // would sit it beside Flipkart's referral fee and make both unreadable —

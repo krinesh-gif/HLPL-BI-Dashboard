@@ -857,8 +857,23 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
       }
       if (!vendor.ixd) {
         notes.push(
-          `No inward cross-dock file is on file for ${month}, so the statement charges none. It is billed on ` +
-          'units unpacked at the warehouse, which no other file carries — upload that month\u2019s IXD workbook.',
+          `No inward cross-dock charge is on file for ${month}, so the statement charges none. It arrives two ways ` +
+          'and either will do: RK World\u2019s claim invoice, which is what they deducted, or the IXD workbook, ' +
+          'which is the units behind it.',
+        )
+      } else if (vendor.ixd.invoice) {
+        const implied = vendor.ixd.unitsUnpacked * vendor.ixd.ratePerUnit
+        notes.push(
+          `The cross-dock charge is ${formatCurrencyFull(vendor.ixd.invoice.amount)} on invoice ` +
+          `${vendor.ixd.invoice.number}, which is what Amazon deducted` +
+          (vendor.ixd.unitsUnpacked > 0
+            ? `, against ${vendor.ixd.unitsUnpacked.toLocaleString('en-IN')} unit(s) unpacked in the workbook` +
+              (Math.abs(implied - vendor.ixd.invoice.amount) > 1
+                ? ` — which at ${formatCurrencyFull(vendor.ixd.ratePerUnit)} a unit comes to ` +
+                  `${formatCurrencyFull(implied)}, ${formatCurrencyFull(Math.abs(implied - vendor.ixd.invoice.amount))} ` +
+                  'from the invoice. The invoice is charged; the gap is worth taking up with them.'
+                : ', which agrees with it.')
+            : '. No workbook is on file, so the units behind it are not known.'),
         )
       }
       if (vendor.marginClosedPct > 0 && vendor.marginAchievedPct < vendor.marginClosedPct) {
@@ -868,7 +883,10 @@ export function buildChannelPnlView(channel: BusinessChannelId, month: string, i
           `${formatCurrencyFull(vendor.ccogsClaimed)} was billed back as contra-COGS` +
           (vendor.ccogsFinal === undefined
             ? '. The statement charges the claim, since no settlement is recorded against it.'
-            : `, settled at ${formatCurrencyFull(vendor.ccogsFinal)}, which is what the statement charges.`),
+            : `, settled at ${formatCurrencyFull(vendor.ccogsFinal)}, which is what the statement charges` +
+              (vendor.ccogsInvoice
+                ? ` — the figure on invoice ${vendor.ccogsInvoice.number}, which is what they deducted.`
+                : '.')),
         )
       }
 

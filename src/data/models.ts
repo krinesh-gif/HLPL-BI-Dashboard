@@ -226,6 +226,14 @@ export interface AmazonInVendorFacts {
   /** What the claim settled at, where the file records one. Absent means the
    * claim stands as billed. */
   ccogsFinal?: number
+  /**
+   * RK World's invoice for that claim, where it has arrived.
+   *
+   * With it, `ccogsFinal` is what Amazon actually deducted, under a number
+   * the accounts team can find in the bank — rather than a figure somebody
+   * entered after a phone call.
+   */
+  ccogsInvoice?: { number: string; date: string; amount: number }
   /** Per-unit price shortfall against the agreed price, where the file
    * carries the comparison. This is what eroded the margin. */
   priceMatchShortfall?: number
@@ -252,6 +260,22 @@ export interface AmazonInVendorIxd {
   periodStart: string
   periodEnd: string
   asins: number
+  /**
+   * Amazon's own invoice for the charge, where it has arrived.
+   *
+   * The cross-dock workbook states units and a rate; the invoice states what
+   * was actually deducted from the payment, under a number the accounts team
+   * can find in the bank. Where both are on file the invoice is the money and
+   * the workbook is the detail behind it — and if they disagree, the
+   * statement says so rather than choosing quietly.
+   */
+  invoice?: {
+    number: string
+    /** As the invoice is dated, which is after the period it bills. */
+    date: string
+    /** The claim before tax. GST on it is input credit, not a cost. */
+    amount: number
+  }
 }
 
 // ---------------------------------------------------------------------------

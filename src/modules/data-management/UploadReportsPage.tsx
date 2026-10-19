@@ -25,6 +25,9 @@ import { detectFlipkartAdsReport, normalizeFlipkartAdsReport } from '@/data/norm
 import { detectFlipkartGoogleAdsReport, flipkartGoogleAdsPeriodFromName, flipkartGoogleAdsWholeMonth, normalizeFlipkartGoogleAdsReport } from '@/data/normalize/flipkartGoogleAdsReport'
 import { detectAmazonVendorNppm, normalizeAmazonVendorNppm } from '@/data/normalize/amazonVendorNppm'
 import { detectAmazonVendorIxd, normalizeAmazonVendorIxd } from '@/data/normalize/amazonVendorIxd'
+import {
+  detectAmazonVendorClaimInvoice, normalizeAmazonVendorClaimInvoice, type VendorClaim,
+} from '@/data/normalize/amazonVendorClaimInvoice'
 import { detectAmazonVendorCentralSalesReport, normalizeAmazonVendorCentralSales } from '@/data/normalize/amazonVendorCentralSales'
 import { detectMyntraPnlWorkbook, normalizeMyntraPnlWorkbook } from '@/data/normalize/myntraPnlWorkbook'
 import { detectPurplleSalesReport, normalizePurplleSalesReport } from '@/data/normalize/purplleSalesReport'
@@ -80,6 +83,7 @@ type ReportKind =
   | 'flipkart_google_ads'
   | 'amazon_in_vendor_nppm'
   | 'amazon_in_vendor_ixd'
+  | 'amazon_in_vendor_claim'
   | 'blinkit_payout_archive'
 
 const REPORT_LABELS: Record<ReportKind, string> = {
@@ -99,6 +103,7 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   flipkart_google_ads: 'Flipkart — Google Ads product performance',
   amazon_in_vendor_nppm: 'Amazon India Vendor Central — NPPM monthly sales',
   amazon_in_vendor_ixd: 'Amazon India Vendor Central — inward cross-dock (IXD)',
+  amazon_in_vendor_claim: 'Amazon India Vendor Central — claim invoice (IXD / contra-COGS)',
   myntra_pnl_workbook: 'Myntra — P&L Report (PnL_Summary + SKU_Detail)',
   nykaa_sales: 'Nykaa — Monthly Sales Data (B2B, margin on MRP)',
   nykaa_companion: 'Nykaa — Cart Rule / Combo file',
@@ -127,6 +132,7 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   flipkart_google_ads: 'flipkart',
   amazon_in_vendor_nppm: 'amazon_in_vendor',
   amazon_in_vendor_ixd: 'amazon_in_vendor',
+  amazon_in_vendor_claim: 'amazon_in_vendor',
   myntra_pnl_workbook: 'myntra',
   nykaa_sales: 'nykaa',
   nykaa_companion: 'nykaa',
@@ -168,6 +174,8 @@ interface PreviewState {
   flipkartGoogleAdsFacts?: FlipkartGoogleAdsFacts
   /** Amazon India's wholesale half for a month. */
   amazonInVendorFacts?: AmazonInVendorFacts
+  /** A month's claim invoices, which attach to that month's statement. */
+  amazonInVendorClaims?: VendorClaim[]
   /** Its inward cross-dock charge, which merges into that month. */
   amazonInVendorIxd?: { month: string; ixd: AmazonInVendorIxd }
   nykaaFacts?: NykaaPnlFacts
@@ -311,6 +319,15 @@ export function UploadReportsPage() {
       return buildPreview({
         ...base, totalRows: r.totalRows, validRecords: [], invalidCount: r.invalidRows.length,
         warnings: r.warnings, amazonInSkuFeeFacts: r.facts,
+      })
+    }
+    // RK World's invoice for a month's claim. The money is what the statement
+    // charges; the workbook behind it keeps the units.
+    if (kind === 'amazon_in_vendor_claim') {
+      const r = normalizeAmazonVendorClaimInvoice(parsed.rows)
+      return buildPreview({
+        ...base, totalRows: r.totalRows, validRecords: [], invalidCount: r.invalidRows.length,
+        warnings: r.warnings, amazonInVendorClaims: r.claims,
       })
     }
     if (kind === 'meesho_order_summary') {
@@ -657,6 +674,7 @@ export function UploadReportsPage() {
       // it as the tie to what Amazon deposited — one month, one source for
       // the trading, or it would be counted twice.
       else if (detectAmazonIndiaProductProfitability(parsed.headers, parsed.rows)) kind = 'amazon_in_sku_fees'
+      else if (detectAmazonVendorClaimInvoice(parsed.headers)) kind = 'amazon_in_vendor_claim'
       else if (detectMeeshoOrderSummaryReport(parsed.headers)) kind = 'meesho_order_summary'
       else if (detectAmazonAdsSponsoredProductsReport(parsed.headers)) kind = 'amazon_ads_sponsored_products'
       else if (detectBlinkitAdsReport(parsed.headers)) kind = 'blinkit_ads'
@@ -803,6 +821,7 @@ export function UploadReportsPage() {
         flipkartAdsFacts: preview.flipkartAdsFacts,
         flipkartGoogleAdsFacts: preview.flipkartGoogleAdsFacts,
         amazonInVendorFacts: preview.amazonInVendorFacts,
+        amazonInVendorClaims: preview.amazonInVendorClaims,
         amazonInVendorIxd: preview.amazonInVendorIxd,
         nykaaFacts: preview.nykaaFacts,
         blinkitFacts: preview.blinkitFacts,
@@ -1192,7 +1211,7 @@ const FACT_FIELDS = [
   'flipkartFacts', 'amazonUsaFacts', 'amazonAeFacts', 'amazonInSkuFeeFacts', 'purplleFacts',
   'swiggyInstamartFacts', 'myntraFacts', 'myntraAdsFacts', 'flipkartAdsFacts', 'flipkartGoogleAdsFacts',
   'amazonInVendorFacts', 'amazonInVendorIxd', 'nykaaFacts', 'blinkitFacts', 'amazonInSellerFacts',
-  'nykaaDebitNote', 'manualAdSpend', 'meeshoFactsByMonth', 'meeshoTransactions',
+  'nykaaDebitNote', 'manualAdSpend', 'meeshoFactsByMonth', 'meeshoTransactions', 'amazonInVendorClaims',
 ] as const satisfies readonly (keyof PreviewState)[]
 
 function carriesFacts(p: PreviewState): boolean {
