@@ -47,7 +47,12 @@ describe('every writing route is gated to a section', () => {
       }
       // Count the guards rather than just looking for the import: a route can
       // define several writing verbs and gate only the first.
-      const gated = (source.match(/requireSection\(/g) ?? []).length
+      //
+      // An administrator check counts as one. It is stricter than any section
+      // — the report route lets anyone who can read the P&L send the month,
+      // and only an administrator change who it goes to — so a verb behind it
+      // is gated, not ungated.
+      const gated = (source.match(/require(Section|Admin)\(/g) ?? []).length
       const sessionOnly = (source.match(/requireSession\(request\)/g) ?? []).length
       expect(gated, `${route} has ${writes.length} writing verb(s) and ${gated} requireSection call(s)`)
         .toBeGreaterThanOrEqual(writes.length)

@@ -104,6 +104,18 @@ BEGIN
   );
 
   -- ---------------------------------------------------------------------------
+  -- Who the monthly report may be sent to, beyond the addresses pinned in
+  -- REPORT_RECIPIENTS. An allowlist either way: the send route refuses an
+  -- address that is on neither, and only an administrator may add one here.
+  -- ---------------------------------------------------------------------------
+  CREATE TABLE IF NOT EXISTS report_recipients (
+    email     TEXT PRIMARY KEY,
+    label     TEXT,
+    added_by  TEXT REFERENCES users(id) ON DELETE SET NULL,
+    added_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+  -- ---------------------------------------------------------------------------
   -- Import audit trail. uploaded_by is recorded from the first upload onwards so
   -- history stays attributable.
   -- ---------------------------------------------------------------------------
