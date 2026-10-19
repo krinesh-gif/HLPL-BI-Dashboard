@@ -86,7 +86,7 @@ describe('normalizeAmazonAdsSpendByMonth', () => {
     expect(r.adsRecords).toEqual([{
       date: '2026-09-01', channel: 'amazon_in_seller', campaign: '236903289006813',
       sku: 'B0F7FHMKKW', asin: 'B0F7FHMKKW',
-      impressions: 0, clicks: 0, spend: 5.54, adSales: 0, adOrders: 0, importId: 'i',
+      impressions: 0, clicks: 0, spend: 5.54, adSales: 0, adOrders: 0, currency: 'INR', importId: 'i',
     }])
   })
 
@@ -190,6 +190,7 @@ describe('the month-per-row shape', () => {
       spend: 212876.1,
       adSales: 0,
       adOrders: 0,
+      currency: 'INR',
       importId: 'i',
     }])
   })
@@ -267,5 +268,46 @@ describe('the month-per-row shape', () => {
     const r = normalizeAmazonAdsSpendByMonth([monthRow(), monthRow({ 'Total cost': '1000' })], 'i', 'f.csv')
     expect(r.adsRecords).toHaveLength(1)
     expect(r.adsRecords[0].spend).toBeCloseTo(213876.1, 2)
+  })
+})
+
+/**
+ * The owner's own UAE and USA files, which share one advertiser account id
+ * and differ only in the currency column — so the currency is the only thing
+ * that can say which Amazon a row belongs to, and the only thing that says
+ * what the figure is worth.
+ */
+describe('an account billed in something other than rupees', () => {
+  const uae = (month: string, cost: string) => ({
+    Year: '2026', Month: month, 'Budget currency': 'AED',
+    'Advertiser account ID': '="amzn1.ads-account.g.atibnke5ymv6jpm8pvlubi8sg"', 'Total cost': cost,
+  })
+
+  it('routes the same account to two channels on its currency', () => {
+    const r = normalizeAmazonAdsSpendByMonth([
+      uae('9', '272.11'),
+      { ...uae('9', '1177.72'), 'Budget currency': 'USD' },
+    ], 'i', 'f.csv')
+    expect(r.adsRecords.map((a) => [a.channel, a.currency, a.spend])).toEqual([
+      ['amazon_ae', 'AED', 272.11],
+      ['amazon_us', 'USD', 1177.72],
+    ])
+  })
+
+  // Stored as the file states them. Converting here would freeze the rate at
+  // upload day, and the statement this feeds is itself rendered in dirhams.
+  it('stores the dirhams, and says so in its own currency', () => {
+    const r = normalizeAmazonAdsSpendByMonth([uae('4', '390.54'), uae('6', '1547.42')], 'i', 'f.csv')
+    expect(r.adsRecords.every((a) => a.currency === 'AED')).toBe(true)
+    expect(r.warnings[0]).toContain('AED 1937.96')
+    expect(r.warnings.some((w) => w.includes('Billed in AED'))).toBe(true)
+  })
+
+  it('says nothing about currency for a rupee account', () => {
+    const r = normalizeAmazonAdsSpendByMonth(
+      [{ ...uae('9', '100'), 'Budget currency': 'INR' }], 'i', 'f.csv',
+    )
+    expect(r.warnings.some((w) => w.includes('Billed in'))).toBe(false)
+    expect(r.warnings[0]).toContain('₹100.00')
   })
 })

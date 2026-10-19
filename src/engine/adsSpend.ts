@@ -2,6 +2,8 @@ import type { AdsChannelId } from '@/config/adsChannels'
 import { adsChannelLabel, ADS_CHANNEL_IDS, ADS_CHANNEL_MAP } from '@/config/adsChannels'
 import { channelOfSource } from '@/config/channels'
 import type { AdsRecord, ManualAdSpend } from '@/data/models'
+import { DEFAULT_FX_INR, type FxRatesInr } from '@/data/fxRates'
+import { adsAmountInr } from './adsAmounts'
 import { toMonthKey } from '@/lib/format'
 
 /**
@@ -66,19 +68,25 @@ export function adsSpendFor(
   month: string,
   adsRecords: AdsRecord[],
   manualEntries: ManualAdSpend[],
+  /** The month's rates, for an account billed in dirhams or dollars. Every
+   * figure here is rupees, as the rest of the app's are. */
+  fx: FxRatesInr = DEFAULT_FX_INR,
 ): AdsSpendFigure {
   const reported = adsRecords.filter(
     (r) => channelOfSource(r.channel) === channel && toMonthKey(r.date) === month,
   )
 
   if (reported.length > 0) {
+    // Money is converted; impressions and clicks are counts and are not.
     const sum = (pick: (r: AdsRecord) => number) => reported.reduce((s, r) => s + pick(r), 0)
+    const sumMoney = (pick: (r: AdsRecord) => number) =>
+      reported.reduce((s, r) => s + adsAmountInr(pick(r), r.currency, fx), 0)
     // A metric the platform does not publish is null, not zero. Blinkit's
     // report carries no clicks column, and "0 clicks" beside 29 impressions
     // reads as a campaign nobody touched rather than one nobody counted.
     const omitted = new Set(ADS_CHANNEL_MAP[channel]?.reportOmits ?? [])
-    const spend = sum((r) => r.spend)
-    const adSales = sum((r) => r.adSales)
+    const spend = sumMoney((r) => r.spend)
+    const adSales = sumMoney((r) => r.adSales)
     const impressions = sum((r) => r.impressions)
     const clicks = sum((r) => r.clicks)
     // Spend and not one measured thing beside it: a cost report rather than a
@@ -119,8 +127,9 @@ export function adsSpendForMonth(
   adsRecords: AdsRecord[],
   manualEntries: ManualAdSpend[],
   channels: AdsChannelId[] = ADS_CHANNEL_IDS,
+  fx: FxRatesInr = DEFAULT_FX_INR,
 ): AdsSpendFigure[] {
-  return channels.map((c) => adsSpendFor(c, month, adsRecords, manualEntries))
+  return channels.map((c) => adsSpendFor(c, month, adsRecords, manualEntries, fx))
 }
 
 /**
@@ -148,6 +157,7 @@ export function adsSpendByProgram(
   channel: AdsChannelId,
   month: string,
   adsRecords: AdsRecord[],
+  fx: FxRatesInr = DEFAULT_FX_INR,
 ): AdsProgramSpend[] {
   const rows = adsRecords.filter(
     (r) => channelOfSource(r.channel) === channel && toMonthKey(r.date) === month,
@@ -156,8 +166,8 @@ export function adsSpendByProgram(
   for (const r of rows) {
     const key = r.program ?? null
     const entry = byProgram.get(key) ?? { spend: 0, adSales: 0 }
-    entry.spend += r.spend
-    entry.adSales += r.adSales
+    entry.spend += adsAmountInr(r.spend, r.currency, fx)
+    entry.adSales += adsAmountInr(r.adSales, r.currency, fx)
     byProgram.set(key, entry)
   }
   const total = [...byProgram.values()].reduce((sum, e) => sum + e.spend, 0)

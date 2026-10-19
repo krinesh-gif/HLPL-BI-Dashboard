@@ -416,6 +416,19 @@ export interface AdsRecord {
   spend: number
   adSales: number
   adOrders: number
+  /**
+   * What `spend` and `adSales` are denominated in. Absent means rupees,
+   * which every row stored before this field existed is.
+   *
+   * Amazon bills an advertising account in its marketplace's currency, and
+   * the UAE account bills in dirhams: 5,006.88 of them across April to
+   * September, which read as ₹5,006.88 and are nearer ₹1.2 lakh. Stored in
+   * the currency the file states and converted when read, at the month's own
+   * rate — the same rule every other foreign figure here follows, and the
+   * only one that lets Amazon UAE's statement stay in dirhams while the
+   * Master P&L stays in rupees.
+   */
+  currency?: 'INR' | 'USD' | 'AED'
   importId: string
 }
 

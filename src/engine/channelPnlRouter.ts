@@ -1250,6 +1250,11 @@ function buildChannelPnlStatement(channel: BusinessChannelId, month: string, inp
       const recomputed = recomputedCogs(channel, month, inputs)
       const cogsInr = recomputed ? recomputed.total : (facts.cogsSourceInr ?? 0)
       const otherCostsInr = computeAllocatedOtherCosts(inputs, channel, month)
+      // The UAE export carries no advertising column, so the console's
+      // monthly cost report is the only place this channel's spend is
+      // stated. In rupees here, because the marketing roll-up has already
+      // brought the dirhams across at this month's rate.
+      const adsInr = inputs.marketing[channel]?.ads ?? 0
 
       const notes: string[] = []
       // Said on the statement, not only at upload: anyone reading the P&L in
@@ -1273,10 +1278,17 @@ function buildChannelPnlStatement(channel: BusinessChannelId, month: string, inp
         channel, month,
         canonical: {
           channel, month,
-          lines: computeSubtotals(withAllocatedOpex(amazonAeToCanonicalBuckets(facts, rate, cogsInr), inputs, channel, month)),
+          lines: computeSubtotals(
+            withAllocatedOpex(amazonAeToCanonicalBuckets(facts, rate, cogsInr, adsInr), inputs, channel, month),
+          ),
         },
         native: (() => {
-          const aed = computeAmazonAePnl(facts, rate !== 0 ? cogsInr / rate : 0, rate !== 0 ? otherCostsInr / rate : 0)
+          const aed = computeAmazonAePnl(
+            facts,
+            rate !== 0 ? cogsInr / rate : 0,
+            rate !== 0 ? otherCostsInr / rate : 0,
+            rate !== 0 ? adsInr / rate : 0,
+          )
           const showInr = inputs.currencyView === 'INR'
           return {
             lineDefs: AMAZON_AE_LINE_DEFS,

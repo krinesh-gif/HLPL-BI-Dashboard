@@ -75,7 +75,9 @@ export function usePnlInputs(): {
       // on rather than being restated whenever this month's rate is entered.
       forMonth: (month: string) => ({
         ...inputs,
-        marketing: marketingFromAds(adsRecords, month, manualAdSpend),
+        // The month's rates reach the marketing roll-up too: an advertising
+        // account billed in dirhams or dollars is converted on the way in.
+        marketing: marketingFromAds(adsRecords, month, manualAdSpend, fxRatesForMonth(month, fxRates)),
         fxRate: fxRatesForMonth(month, fxRates),
         freightPerUnitInr: freightRateValue(month, freightRates, 'india_usa'),
         nykaaFreightPerUnitInr: freightRateValue(month, freightRates, 'nykaa_inbound'),

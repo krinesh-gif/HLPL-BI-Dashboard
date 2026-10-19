@@ -924,3 +924,58 @@ describe('buildChannelPnlView, Amazon India over Seller and Vendor Central', () 
     })
   })
 })
+
+/**
+ * Amazon UAE's advertising, which has nowhere else to come from.
+ *
+ * The Product Profitability export Amazon sends for the UAE carries no fee
+ * columns at all — no referral fee, no fulfilment, no advertising — so the
+ * console's monthly cost report is the only statement of what the channel
+ * spent. Until it was read, the canonical buckets held `ads: 0` and the
+ * statement had no advertising line, so a month that cost AED 1,547 reported
+ * none and an EBITDA that much too good.
+ */
+describe('Amazon UAE advertising', () => {
+  const facts = {
+    month: '2026-09', schemaVersion: 1 as const, grossSalesAed: 7501.29, netSalesAed: 7250.33,
+    netProceedsAed: 4311.287, cogsSourceInr: 8880.25, unitsSoldQty: 241, unitsReturnedQty: 7,
+    netUnitsSoldQty: 234, nonSellingRows: 3,
+  }
+  const inputs = {
+    salesRecords: [] as CanonicalSalesRecord[], skuMaster, fixedExpenses: [],
+    facts: { flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [], amazonAeFacts: [facts] },
+    fxRate: { USD: 88, AED: 26 },
+  }
+  const view = (ads: number) =>
+    buildChannelPnlView('amazon_ae', '2026-09', { ...inputs, marketing: ads === 0 ? {} : { amazon_ae: { ads } } })
+
+  // The marketing input is rupees; the statement is dirhams. AED 272.11 at
+  // the month's 26 is ₹7,074.86, and it has to read as 272.11 again on the
+  // statement or the two disagree about one month.
+  it('charges it in rupees on the roll-up and in dirhams on the statement', () => {
+    const v = view(7074.86)
+    expect(v.canonical.lines.ads).toBeCloseTo(7074.86, 2)
+    expect(v.native?.values.ads).toBeCloseTo(-272.11, 2)
+  })
+
+  it('takes it off EBITDA, on both', () => {
+    const before = view(0)
+    const after = view(7074.86)
+    expect((before.canonical.lines.ebitda ?? 0) - (after.canonical.lines.ebitda ?? 0)).toBeCloseTo(7074.86, 2)
+    expect((before.native?.values.ebitda ?? 0) - (after.native?.values.ebitda ?? 0)).toBeCloseTo(272.11, 2)
+  })
+
+  // Amazon does not bill it through the settlement this statement
+  // reconciles to, so it cannot move what Amazon took or what Amazon paid.
+  it('leaves Amazon’s own figures where they were', () => {
+    const before = view(0)
+    const after = view(7074.86)
+    expect(after.native?.values.netProceeds).toBeCloseTo(before.native?.values.netProceeds ?? 0, 6)
+    expect(after.native?.values.amazonFees).toBeCloseTo(before.native?.values.amazonFees ?? 0, 6)
+    expect(after.canonical.lines.netSales).toBeCloseTo(before.canonical.lines.netSales ?? 0, 6)
+  })
+
+  it('shows no advertising line in a month with none', () => {
+    expect(view(0).native?.values.ads).toBe(-0)
+  })
+})

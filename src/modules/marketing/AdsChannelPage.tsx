@@ -5,6 +5,7 @@ import { KPICard, KPIGrid } from '@/components/ui/KPICard'
 import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useDataStore } from '@/store/dataStore'
+import { fxRatesForMonth } from '@/data/fxRates'
 import { usePnlInputs } from '@/engine/usePnlInputs'
 import { useFilterStore } from '@/store/filterStore'
 import { ADS_CHANNELS, ADS_CHANNEL_MAP, isAdsChannel, type AdsChannelId } from '@/config/adsChannels'
@@ -64,7 +65,7 @@ function ByProgram({ rows }: { rows: AdsProgramSpend[] }) {
 export function AdsChannelPage() {
   const { adsChannelId } = useParams<{ adsChannelId: string }>()
   const navigate = useNavigate()
-  const { adsRecords, manualAdSpend, salesRecords } = useDataStore()
+  const { adsRecords, manualAdSpend, salesRecords, fxRates } = useDataStore()
   // One facts object, the same one the P&L is built from.
   const { inputs: { facts: pnlFacts } } = usePnlInputs()
   const { month } = useFilterStore()
@@ -74,7 +75,9 @@ export function AdsChannelPage() {
 
   const data = useMemo(() => {
     if (!def) return null
-    const figure = adsSpendFor(channel, month, adsRecords, manualAdSpend)
+    // An Amazon account billed in dirhams or dollars is converted at the
+    // month's own rate, so every figure on this page is rupees.
+    const figure = adsSpendFor(channel, month, adsRecords, manualAdSpend, fxRatesForMonth(month, fxRates))
     const netSales = netSalesForChannelMonth({
       records: salesRecords, channel, month,
       facts: pnlFacts,
@@ -82,7 +85,7 @@ export function AdsChannelPage() {
 
     const trend = Array.from({ length: TREND_MONTHS }, (_, i) => {
       const m = addMonths(month, i - (TREND_MONTHS - 1))
-      const f = adsSpendFor(channel, m, adsRecords, manualAdSpend)
+      const f = adsSpendFor(channel, m, adsRecords, manualAdSpend, fxRatesForMonth(m, fxRates))
       return {
         month: monthLabel(m),
         spend: f.spend,
@@ -98,11 +101,11 @@ export function AdsChannelPage() {
 
     // Only where the platform reports one: it is Amazon's split, and a
     // single row labelled "not reported by product" tells nobody anything.
-    const byProgram = adsSpendByProgram(channel, month, adsRecords)
+    const byProgram = adsSpendByProgram(channel, month, adsRecords, fxRatesForMonth(month, fxRates))
     const programs = byProgram.length > 1 || byProgram.some((p) => p.program !== null) ? byProgram : []
 
     return { figure, netSales, trend, programs }
-  }, [def, channel, month, adsRecords, manualAdSpend, salesRecords, pnlFacts])
+  }, [def, channel, month, adsRecords, manualAdSpend, salesRecords, pnlFacts, fxRates])
 
   if (!def || !data) {
     return (

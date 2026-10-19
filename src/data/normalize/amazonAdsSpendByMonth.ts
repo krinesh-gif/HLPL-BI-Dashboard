@@ -63,6 +63,12 @@ const COLUMNS = {
   cost: ['total cost'],
 }
 
+/** What an account's figures are denominated in, where the app knows the
+ * currency. An ads account bills in its marketplace's currency. */
+const CURRENCIES = ['INR', 'USD', 'AED'] as const
+type AdsCurrency = (typeof CURRENCIES)[number]
+const SYMBOL: Record<AdsCurrency, string> = { INR: '₹', USD: '$', AED: 'AED ' }
+
 /** Which Amazon a row belongs to, from the marketplace the product is on. */
 const CHANNEL_BY_MARKETPLACE: Record<string, ChannelId> = {
   AMAZON_IN: 'amazon_in_seller',
@@ -189,6 +195,7 @@ export function normalizeAmazonAdsSpendByMonth(
   // dropped by the insert rather than added.
   const byKey = new Map<string, AdsRecord>()
   const accounts = new Set<string>()
+  const currencies = new Set<AdsCurrency>()
   let zeroCost = 0
   let inferredYears = 0
   let campaignRows = 0
@@ -243,6 +250,13 @@ export function normalizeAmazonAdsSpendByMonth(
     }
     if (account !== '') accounts.add(account)
 
+    // Kept as the file states it. The UAE account bills in dirhams, and a
+    // dirham figure stored as a rupee one understates the month by the rate.
+    const rowCurrency: AdsCurrency = (CURRENCIES as readonly string[]).includes(currency)
+      ? (currency as AdsCurrency)
+      : 'INR'
+    currencies.add(rowCurrency)
+
     const spend = money(getField(row, COLUMNS.cost))
     if (spend === 0) zeroCost++
 
@@ -261,6 +275,7 @@ export function normalizeAmazonAdsSpendByMonth(
       spend,
       adSales: 0,
       adOrders: 0,
+      currency: rowCurrency,
       importId,
     }
     const key = adsRecordKey(record)
@@ -284,7 +299,11 @@ export function normalizeAmazonAdsSpendByMonth(
   const months = [...new Set(adsRecords.map((r) => r.date.slice(0, 7)))].sort()
   if (months.length > 0) {
     const spend = adsRecords.reduce((sum, r) => sum + r.spend, 0)
-    const read = `Read as Amazon advertising for ${months.join(', ')} — ₹${spend.toFixed(2)}`
+    // In the currency the file states, because that is the figure somebody
+    // can check against the console. What it comes to in rupees depends on
+    // the month's rate and is worked out when the P&L is read, not here.
+    const symbol = currencies.size === 1 ? SYMBOL[[...currencies][0]] : ''
+    const read = `Read as Amazon advertising for ${months.join(', ')} — ${symbol}${spend.toFixed(2)}`
     warnings.push(campaignRows > 0
       ? `${read} across ${new Set(adsRecords.map((r) => r.campaign)).size} campaign(s).`
       : `${read} in all, one row per month: the whole account's cost on ` +
@@ -303,6 +322,14 @@ export function normalizeAmazonAdsSpendByMonth(
       'impressions, clicks and attributed sales those carried — this report states cost only, so ROAS and ACOS ' +
       'cannot be worked out from it.',
     )
+    for (const c of currencies) {
+      if (c === 'INR') continue
+      warnings.push(
+        `Billed in ${c}. The figures are stored as the file states them and brought to rupees at each month's ` +
+        `own ${c}→INR rate, so the P&L moves with the rate on Monthly Inputs rather than with whatever it was ` +
+        'on the day of the upload. A month with no rate entered uses the standing one.',
+      )
+    }
   }
   if (zeroCost > 0) {
     warnings.push(`${zeroCost} row(s) cost nothing — a month or campaign that advertised without spending.`)

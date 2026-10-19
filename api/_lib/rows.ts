@@ -94,6 +94,7 @@ export function toAdsRecord(r: Row): AdsRecord {
     adOrders: num(r.ad_orders),
     importId: str(r.import_id),
     program: optStr(r.program),
+    currency: optStr(r.currency) as AdsRecord['currency'],
   }
 }
 

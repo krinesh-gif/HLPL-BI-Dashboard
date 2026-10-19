@@ -40,6 +40,8 @@ export const AMAZON_AE_LINE_DEFS: NativeLineDef[] = [
     note: 'Priced from the Product Master at the month’s cost, converted from rupees at the month’s rate' },
   { key: 'grossProfit', label: 'Gross Profit (after COGS)', section: 'PROFIT', kind: 'subtotal' },
   { key: 'grossMarginPct', label: 'Gross Margin %', section: 'PROFIT', kind: 'percent' },
+  { key: 'ads', label: 'Less: Advertising', section: 'PROFIT', kind: 'input', hideWhenZero: true,
+    note: 'From the Amazon Ads console’s monthly cost report, which is the only place this channel’s advertising is stated — the Product Profitability export Amazon sends for the UAE carries no advertising column. Billed in dirhams.' },
   { key: 'overheads', label: 'Less: Allocated Fixed Expenses', section: 'PROFIT', kind: 'input',
     note: 'This channel’s share of the month’s fixed expenses, by its share of sales' },
   { key: 'ebitda', label: 'EBITDA', section: 'PROFIT', kind: 'subtotal' },
@@ -68,11 +70,22 @@ export function computeAmazonAePnl(
   facts: AmazonAePnlFacts,
   cogsAed: number,
   overheadsAed: number,
+  /**
+   * The month's advertising, in dirhams.
+   *
+   * It comes from the Ads console rather than from this export, which
+   * carries no advertising column — so until it was wired in, a channel that
+   * spent AED 1,547 in June reported no advertising at all and an EBITDA
+   * that much too good. Amazon does not bill it through the settlement this
+   * statement reconciles to, so it sits below Net proceeds, beside the
+   * overheads, rather than among what Amazon took.
+   */
+  adsAed = 0,
 ): NativeLineValues {
   const netSales = facts.netSalesAed
   const amazonFees = amazonAeFeesTaken(facts)
   const grossProfit = facts.netProceedsAed - cogsAed
-  const ebitda = grossProfit - overheadsAed
+  const ebitda = grossProfit - adsAed - overheadsAed
 
   return {
     grossSales: facts.grossSalesAed,
@@ -86,6 +99,7 @@ export function computeAmazonAePnl(
     cogs: -cogsAed,
     grossProfit,
     grossMarginPct: netSales !== 0 ? (grossProfit / netSales) * 100 : 0,
+    ads: -adsAed,
     overheads: -overheadsAed,
     ebitda,
     ebitdaPct: netSales !== 0 ? (ebitda / netSales) * 100 : 0,
@@ -112,6 +126,10 @@ export function amazonAeToCanonicalBuckets(
   facts: AmazonAePnlFacts,
   rateInrPerAed: number,
   cogsInr: number,
+  /** The month's advertising, already in rupees — it comes from the ads
+   * records, which the marketing roll-up has converted at this month's
+   * rate. Zero where the caller only wants the revenue lines. */
+  adsInr = 0,
 ): PnlLineValues {
   const aed = (v: number) => v * rateInrPerAed
   return {
@@ -127,7 +145,7 @@ export function amazonAeToCanonicalBuckets(
     rtoCharges: 0,
     returnCharges: 0,
     otherMarketplaceCharges: aed(amazonAeFeesTaken(facts)),
-    ads: 0,
+    ads: adsInr,
     performanceMarketing: 0,
     otherMarketing: 0,
   }
@@ -138,7 +156,7 @@ export function amazonAeToCanonicalBuckets(
  * not money — converting 241 units at the month's rate would report 5,801. */
 const MONEY_LINES = [
   'grossSales', 'returns', 'netSales', 'amazonFees', 'netProceeds',
-  'cogs', 'grossProfit', 'overheads', 'ebitda',
+  'cogs', 'grossProfit', 'ads', 'overheads', 'ebitda',
 ]
 
 /**

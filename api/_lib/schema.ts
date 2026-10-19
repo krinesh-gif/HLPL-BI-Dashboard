@@ -186,6 +186,20 @@ BEGIN
     import_id   TEXT NOT NULL
   );
 
+  -- What a row's spend is denominated in. NULL means rupees, which every
+  -- row stored before this column existed is: the readers that wrote them
+  -- converted at import. An Amazon advertising account bills in its
+  -- marketplace's currency, and the UAE account bills in dirhams — stored as
+  -- rupees, its 5,006.88 of spend across six months read as ₹5,006.88
+  -- instead of around ₹1.2 lakh.
+  ALTER TABLE ads_records ADD COLUMN IF NOT EXISTS currency TEXT;
+
+  -- The dirham rows already uploaded, which went in before the column
+  -- existed and are dirhams whatever they say. Safe to re-run and safe
+  -- afterwards: every row written from now on states its own currency, and
+  -- an Amazon UAE account cannot bill in anything but dirhams.
+  UPDATE ads_records SET currency = 'AED' WHERE channel = 'amazon_ae' AND currency IS NULL;
+
   CREATE INDEX IF NOT EXISTS ads_records_date_idx ON ads_records (date);
 
   -- Which ad product bought the row — Sponsored Products, Brands, Display.
