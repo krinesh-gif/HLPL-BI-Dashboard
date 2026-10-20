@@ -21,6 +21,8 @@ export type PnlLineKey =
   | 'ads'
   | 'performanceMarketing'
   | 'otherMarketing'
+  | 'channelMargin'
+  | 'channelMarginPct'
   | 'contributionProfit'
   | 'contributionMarginPct'
   | 'channelCharges'
@@ -42,6 +44,7 @@ export type PnlSection =
   | 'cogs'
   | 'grossProfit'
   | 'marketplaceVariable'
+  | 'channelMargin'
   | 'marketing'
   | 'contribution'
   | 'opex'
@@ -74,6 +77,14 @@ export const PNL_STRUCTURE: PnlLineDef[] = [
   { key: 'rtoCharges', label: 'RTO Charges', section: 'marketplaceVariable', kind: 'input', sign: -1 },
   { key: 'returnCharges', label: 'Return Charges', section: 'marketplaceVariable', kind: 'input', sign: -1 },
   { key: 'otherMarketplaceCharges', label: 'Other Marketplace Charges', section: 'marketplaceVariable', kind: 'input', sign: -1 },
+
+  // The rung between the fees and the advertising, and the one the ladder was
+  // missing. "Is this marketplace worth being on?" is answered here, before a
+  // rupee of advertising is counted; "is this channel worth running?" is
+  // answered two lines below, after it. Flipkart, Myntra and Amazon Vendor
+  // all strike it on their own statements, and the P&L had nowhere to put it.
+  { key: 'channelMargin', label: 'Channel Margin (CM2)', section: 'channelMargin', kind: 'subtotal', sign: 1 },
+  { key: 'channelMarginPct', label: 'Channel Margin % (CM2 %)', section: 'channelMargin', kind: 'percent', sign: 1 },
 
   { key: 'ads', label: 'Amazon / Marketplace Ads', section: 'marketing', kind: 'input', sign: -1 },
   { key: 'performanceMarketing', label: 'Performance Marketing', section: 'marketing', kind: 'input', sign: -1 },
@@ -108,6 +119,7 @@ export const SECTION_LABELS: Record<PnlSection, string> = {
   cogs: 'Cost of Goods Sold',
   grossProfit: 'Gross Profit',
   marketplaceVariable: 'Marketplace Fees',
+  channelMargin: 'Channel Margin',
   marketing: 'Advertising (MI)',
   contribution: 'Contribution Profit',
   opex: 'Operating Expenses',

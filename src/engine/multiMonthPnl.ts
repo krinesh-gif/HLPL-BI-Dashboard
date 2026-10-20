@@ -99,6 +99,7 @@ const marginOf = (profit: (l: PnlLineValues) => number) => (l: PnlLineValues): n
 }
 
 const grossProfit = (l: PnlLineValues) => l.grossProfit ?? 0
+const channelMargin = (l: PnlLineValues) => l.channelMargin ?? 0
 const contribution = (l: PnlLineValues) => l.contributionProfit ?? 0
 const ebitda = (l: PnlLineValues) => l.ebitda ?? 0
 
@@ -123,17 +124,24 @@ export const PNL_ROWS: PnlRowDef[] = [
   { key: 'netSales', label: 'Net Sales', kind: 'subtotal', value: (l) => l.netSales ?? 0, total: (t) => t.netSales ?? 0 },
 
   { key: 'cogs', label: '(−) COGS', kind: 'input', indent: true, value: (l) => l.cogs ?? 0, total: (t) => t.cogs ?? 0, sign: -1 },
-  { key: 'grossProfit', label: 'Gross Profit', kind: 'subtotal', value: grossProfit, total: grossProfit },
+  { key: 'grossProfit', label: 'Gross Profit (CM1)', kind: 'subtotal', value: grossProfit, total: grossProfit },
   // Named twice because it is one figure: net revenue less the cost of the
   // goods is the gross margin here and CM1 on every channel's own statement,
   // and a reader moving between the two screens should not have to work that
   // out. `flipkartTieOut.test.ts` holds the two to the same number.
-  { key: 'grossMarginPct', label: 'Gross Margin % (CM1 %)', kind: 'percent', value: marginOf(grossProfit), total: marginOf(grossProfit) },
+  { key: 'grossMarginPct', label: 'Gross Margin % (CM1 %)', note: 'Net sales less what the goods cost', kind: 'percent', value: marginOf(grossProfit), total: marginOf(grossProfit) },
 
   { key: 'marketplaceCosts', label: '(−) Marketplace Fees', kind: 'input', indent: true, value: (l) => sum(l, MARKETPLACE_COST_KEYS), total: (t) => sum(t, MARKETPLACE_COST_KEYS), sign: -1 },
+  // The ladder's missing rung. Flipkart, Myntra and Amazon Vendor all strike
+  // a margin here on their own statements — after the marketplace's fees and
+  // before any advertising — and the P&L had nowhere to show it, so the one
+  // question it answers could not be asked of every channel at once.
+  { key: 'channelMargin', label: 'Channel Margin (CM2)', kind: 'subtotal', value: channelMargin, total: channelMargin },
+  { key: 'channelMarginPct', label: 'Channel Margin % (CM2 %)', note: 'After the marketplace\u2019s fees, before advertising \u2014 is this marketplace worth being on?', kind: 'percent', value: marginOf(channelMargin), total: marginOf(channelMargin) },
+
   { key: 'marketing', label: '(−) Advertising (MI)', kind: 'input', indent: true, value: (l) => sum(l, MARKETING_KEYS), total: (t) => sum(t, MARKETING_KEYS), sign: -1 },
-  { key: 'contribution', label: 'Contribution', kind: 'subtotal', value: contribution, total: contribution },
-  { key: 'contributionMarginPct', label: 'Contribution Margin %', kind: 'percent', value: marginOf(contribution), total: marginOf(contribution) },
+  { key: 'contribution', label: 'Contribution (CM3)', kind: 'subtotal', value: contribution, total: contribution },
+  { key: 'contributionMarginPct', label: 'Contribution Margin % (CM3 %)', note: 'After advertising \u2014 is this channel worth running?', kind: 'percent', value: marginOf(contribution), total: marginOf(contribution) },
 
   // A channel's own charges, above its share of the company's. Flipkart's
   // NextGen fee is billed to Flipkart and settled outside its marketplace
@@ -144,7 +152,7 @@ export const PNL_ROWS: PnlRowDef[] = [
   { key: 'channelCharges', label: '(−) Channel Charges', kind: 'input', indent: true, hideWhenEmpty: true, value: (l) => l.channelCharges ?? 0, total: (t) => t.channelCharges ?? 0, sign: -1 },
   { key: 'fixedExpenses', label: '(−) Fixed Expenses', kind: 'input', indent: true, value: (l) => sum(l, FIXED_EXPENSE_KEYS), total: (t) => sum(t, FIXED_EXPENSE_KEYS), sign: -1 },
   { key: 'ebitda', label: 'EBITDA', kind: 'subtotal', value: ebitda, total: ebitda },
-  { key: 'ebitdaMarginPct', label: 'EBITDA Margin %', kind: 'percent', value: marginOf(ebitda), total: marginOf(ebitda) },
+  { key: 'ebitdaMarginPct', label: 'EBITDA Margin % (CM4 %)', note: 'After the channel\u2019s own charges and its share of the month\u2019s fixed expenses', kind: 'percent', value: marginOf(ebitda), total: marginOf(ebitda) },
 ]
 
 /**

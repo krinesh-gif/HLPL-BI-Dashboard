@@ -62,15 +62,24 @@ describe('the statement and the P&L agree about September', () => {
   })
 
   /**
-   * CM2 is struck before advertising and Contribution after it, so the two
-   * are different lines on purpose. CM3 is the comparable one.
+   * The rung the P&L was missing. Flipkart strikes a margin after the
+   * marketplace's fees and before advertising; the P&L now strikes the same
+   * one, so "is this marketplace worth being on?" can be asked of every
+   * channel at once instead of only on the statements that happen to show it.
    */
-  it('reports the same contribution as CM3, once advertising is off both', () => {
-    expect(canonical.contributionProfit).toBeCloseTo(native.cm3, 6)
+  it('reports the same channel margin as CM2', () => {
+    expect(canonical.channelMargin).toBeCloseTo(native.cm2, 6)
+    expect(canonical.channelMarginPct).toBeCloseTo(native.cm2Pct, 6)
   })
 
-  it('leaves CM2 above Contribution by exactly the advertising', () => {
-    expect(native.cm2 - (canonical.contributionProfit ?? 0))
-      .toBeCloseTo(SEPT.flipkartAds + SEPT.googleAds, 6)
+  it('reports the same contribution as CM3, once advertising is off both', () => {
+    expect(canonical.contributionProfit).toBeCloseTo(native.cm3, 6)
+    expect(canonical.contributionMarginPct).toBeCloseTo(native.cm3Pct, 6)
+  })
+
+  it('steps down the ladder one cost at a time', () => {
+    const marketing = SEPT.flipkartAds + SEPT.googleAds
+    expect((canonical.grossProfit ?? 0) - marketplaceFees).toBeCloseTo(canonical.channelMargin ?? 0, 6)
+    expect((canonical.channelMargin ?? 0) - marketing).toBeCloseTo(canonical.contributionProfit ?? 0, 6)
   })
 })

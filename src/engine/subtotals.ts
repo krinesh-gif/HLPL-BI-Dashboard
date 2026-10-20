@@ -32,9 +32,17 @@ export function computeSubtotals(input: PnlLineValues): PnlLineValues {
     get('returnCharges') +
     get('otherMarketplaceCharges')
 
+  // What the channel earns on the goods once the marketplace has taken its
+  // fees, before anything is spent advertising them. It answers a different
+  // question from the contribution below it: whether being on this
+  // marketplace pays, rather than whether this month's spending on it did.
+  const channelMargin = grossProfit - marketplaceVariableTotal
+  lines.channelMargin = channelMargin
+  lines.channelMarginPct = netSales !== 0 ? (channelMargin / netSales) * 100 : 0
+
   const marketingTotal = get('ads') + get('performanceMarketing') + get('otherMarketing')
 
-  const contributionProfit = grossProfit - marketplaceVariableTotal - marketingTotal
+  const contributionProfit = channelMargin - marketingTotal
   lines.contributionProfit = contributionProfit
   lines.contributionMarginPct = netSales !== 0 ? (contributionProfit / netSales) * 100 : 0
 

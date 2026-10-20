@@ -36,17 +36,22 @@ const MIS_PARTICULARS: MisParticularDef[] = [
   { label: 'Gross Sales', isPercent: false, value: (l) => l.grossSales ?? 0 },
   { label: 'Net Sales', isPercent: false, value: (l) => l.netSales ?? 0 },
   { label: 'COGS', isPercent: false, value: (l) => l.cogs ?? 0 },
-  { label: 'Gross Profit', isPercent: false, value: (l) => l.grossProfit ?? 0 },
-  { label: 'Gross Margin %', isPercent: true, value: (l) => l.grossMarginPct ?? 0 },
+  { label: 'Gross Profit (CM1)', isPercent: false, value: (l) => l.grossProfit ?? 0 },
+  { label: 'Gross Margin % (CM1 %)', isPercent: true, value: (l) => l.grossMarginPct ?? 0 },
   { label: 'Marketplace Fees', isPercent: false, value: (l) => sumLines(l, MARKETPLACE_COST_KEYS) },
+  // The same rung the P&L strikes, named the same way. The two reports show
+  // one ladder; a step that appeared on one and not the other would be read
+  // as two different accounts of the month.
+  { label: 'Channel Margin (CM2)', isPercent: false, value: (l) => l.channelMargin ?? 0 },
+  { label: 'Channel Margin % (CM2 %)', isPercent: true, value: (l) => l.channelMarginPct ?? 0 },
   { label: 'Advertising (MI)', isPercent: false, value: (l) => sumLines(l, MARKETING_KEYS) },
-  { label: 'Contribution', isPercent: false, value: (l) => l.contributionProfit ?? 0 },
-  { label: 'Contribution Margin %', isPercent: true, value: (l) => l.contributionMarginPct ?? 0 },
+  { label: 'Contribution (CM3)', isPercent: false, value: (l) => l.contributionProfit ?? 0 },
+  { label: 'Contribution Margin % (CM3 %)', isPercent: true, value: (l) => l.contributionMarginPct ?? 0 },
   { label: 'Employee Cost', isPercent: false, value: (l) => l.salaries ?? 0 },
   { label: 'Rent', isPercent: false, value: (l) => l.rent ?? 0 },
   { label: 'Other OPEX', isPercent: false, value: (l) => sumLines(l, OTHER_OPEX_KEYS) },
   { label: 'EBITDA', isPercent: false, value: (l) => l.ebitda ?? 0 },
-  { label: 'EBITDA Margin %', isPercent: true, value: (l) => l.ebitdaMarginPct ?? 0 },
+  { label: 'EBITDA Margin % (CM4 %)', isPercent: true, value: (l) => l.ebitdaMarginPct ?? 0 },
 ]
 
 /**

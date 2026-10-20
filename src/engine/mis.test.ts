@@ -23,7 +23,7 @@ describe('buildMisRows', () => {
 
   it('treats percentage particulars as point deltas, not growth %', () => {
     const rows = buildMisRows('2026-07', getLines)
-    const gm = rows.find((r) => r.particular === 'Gross Margin %')!
+    const gm = rows.find((r) => r.particular === 'Gross Margin % (CM1 %)')!
     expect(gm.currentMonth).toBeCloseTo(59.1)
     expect(gm.momPct).toBeCloseTo(59.1 - 55.6)
   })
