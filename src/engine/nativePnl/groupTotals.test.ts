@@ -51,14 +51,24 @@ const SEPT: FlipkartPnlFacts = {
  * Every group's head against the sum of the leaves it hides.
  *
  * Only `input` leaves are added: a group may carry its own sub-totals for
- * reading, and adding those as well would count the same charge twice. A memo
- * line is reference, never part of a sum.
+ * reading, and adding those as well would count the same charge twice.
+ *
+ * A memo line is reference and never part of a sum — except where the line
+ * it is a memo of is this block's own head, which is a different statement:
+ * it says the figure is inside the total above and must not be added to the
+ * statement a second time, not that the total above excludes it. Myntra's
+ * Commission Discount is the case. Myntra prints Rewards & Other Benefits at
+ * 42,276, of which only the 30,131 incentive reaches the bank and the 12,145
+ * discount is already inside the commission fee. Both are parts of the 42,276,
+ * so a reader who opens that block has to land back on it.
  */
 export function groupTotalsAgree(defs: NativeLineDef[], values: NativeLineValues): string[] {
   const complaints: string[] = []
   for (const head of defs.filter((d) => d.isGroupHead && d.group)) {
     const leaves = defs.filter(
-      (d) => d.group === head.group && !d.isGroupHead && d.kind === 'input' && !d.memoOf,
+      (d) =>
+        d.group === head.group && !d.isGroupHead && d.kind === 'input' &&
+        (!d.memoOf || d.memoOf === head.key),
     )
     const summed = leaves.reduce((sum, d) => sum + (values[d.key] ?? 0), 0)
     const shown = values[head.key] ?? 0

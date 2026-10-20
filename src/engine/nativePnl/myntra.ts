@@ -11,6 +11,12 @@ import type { NativeLineDef, NativeLineValues } from './types'
  * company's own: what the goods cost and what is left, which Myntra has no way
  * of knowing.
  *
+ * Myntra prints its charges first, above anything about the goods, because it
+ * has no way of knowing what the goods cost. The company's section below does
+ * not inherit that order: it strikes CM1 after COGS and CM2 after the
+ * marketplace, the same ladder every other channel uses, and restates the
+ * charges as a single block in the place the ladder deducts them.
+ *
  * Two lines on Myntra's sheet are memos and must never be treated as
  * deductions or additions:
  *
@@ -65,9 +71,6 @@ export const MYNTRA_LINE_DEFS: NativeLineDef[] = [
   },
   { key: 'orderSpf', label: '• Order SPF', section: 'SETTLEMENT', kind: 'input', fee: 'otherFees', hideWhenZero: true },
 
-  { key: 'bankSettlementProjected', label: 'Bank Settlement (Projected)', section: 'SETTLEMENT', kind: 'subtotal' },
-  { key: 'bankSettlementSettled', label: 'Bank Settlement (Settled)', section: 'SETTLEMENT', kind: 'input' },
-  { key: 'bankSettlementUnsettled', label: 'Bank Settlement (Unsettled)', section: 'SETTLEMENT', kind: 'input' },
   {
     key: 'inputTaxCredits', label: 'Total Input Tax Credits', section: 'SETTLEMENT',
     kind: 'subtotal', group: 'itc', isGroupHead: true,
@@ -77,13 +80,34 @@ export const MYNTRA_LINE_DEFS: NativeLineDef[] = [
   { key: 'earningsOnPlatform', label: 'Earnings on Platform', section: 'SETTLEMENT', kind: 'subtotal' },
   { key: 'netMarginPct', label: 'Net Margin (% of Net Sales)', section: 'SETTLEMENT', kind: 'percent' },
 
-  { key: 'netRevenueExGst', label: 'NET REVENUE (ex-GST)', section: 'YOUR MARGIN', kind: 'subtotal', note: '⭐ denominator for every %' },
-  { key: 'cogsPriced', label: 'COGS — priced SKUs', section: 'YOUR MARGIN', kind: 'input' },
-  { key: 'cogsUnpriced', label: 'COGS — unpriced SKUs (est.)', section: 'YOUR MARGIN', kind: 'input', note: '⚠ estimate — goes to zero once every SKU is priced' },
-  { key: 'totalCogs', label: 'Total COGS', section: 'YOUR MARGIN', kind: 'subtotal' },
+  { key: 'netRevenueExGst', label: 'NET REVENUE (ex-GST)', section: 'YOUR MARGIN', kind: 'subtotal', note: '⭐ denominator for every % — Estimated Net Sales less Product GST' },
+  { key: 'totalCogs', label: 'Total COGS', section: 'YOUR MARGIN', kind: 'subtotal', group: 'cogs', isGroupHead: true },
+  { key: 'cogsPriced', label: 'COGS — priced SKUs', section: 'YOUR MARGIN', kind: 'input', group: 'cogs' },
+  { key: 'cogsUnpriced', label: 'COGS — unpriced SKUs (est.)', section: 'YOUR MARGIN', kind: 'input', note: '⚠ estimate — goes to zero once every SKU is priced', group: 'cogs' },
   { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'YOUR MARGIN', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'YOUR MARGIN', kind: 'percent' },
-  { key: 'cm2', label: 'CHANNEL MARGIN (CM2)', section: 'YOUR MARGIN', kind: 'subtotal', note: 'Earnings on Platform, less GST and what the goods cost' },
+
+  // The rung between CM1 and CM2 used to be invisible here. Myntra's own
+  // report prints its charges at the top, above anything about the goods,
+  // because Myntra does not know what the goods cost — so the margin section
+  // jumped straight from CM1 to CM2 with nothing between them, and read as
+  // though this channel deducted its charges before its COGS while Flipkart
+  // deducted them after. It never did: both strike CM1 after the goods and
+  // CM2 after the marketplace. This block is that deduction, written where
+  // the ladder makes it, and it restates the figures above rather than
+  // adding any new cost — CM2 is unchanged to the paisa.
+  {
+    key: 'netMarketplaceCharges', label: 'Net Marketplace Charges', section: 'YOUR MARGIN',
+    kind: 'subtotal', group: 'mpCharges', isGroupHead: true,
+    note: 'Everything Myntra kept between Estimated Net Sales and Earnings on Platform — the same figure the P&L carries as this channel’s marketplace fees',
+  },
+  { key: 'mpChargesExpenses', label: '(−) Total Expenses (Forward − Reverse)', section: 'YOUR MARGIN', kind: 'input', group: 'mpCharges', note: 'The block at the top of this statement, restated here — not a second charge' },
+  { key: 'mpChargesNodDeducted', label: '(−) NOD Deducted', section: 'YOUR MARGIN', kind: 'input', group: 'mpCharges', hideWhenZero: true },
+  { key: 'mpChargesNodPaid', label: 'Add: NOD Paid', section: 'YOUR MARGIN', kind: 'input', group: 'mpCharges', hideWhenZero: true },
+  { key: 'mpChargesOrderSpf', label: 'Add: Order SPF', section: 'YOUR MARGIN', kind: 'input', group: 'mpCharges', hideWhenZero: true },
+  { key: 'mpChargesSjit', label: 'Add: SJIT Incentive', section: 'YOUR MARGIN', kind: 'input', group: 'mpCharges' },
+  { key: 'mpChargesItc', label: 'Add: Input Tax Credits', section: 'YOUR MARGIN', kind: 'input', group: 'mpCharges' },
+  { key: 'cm2', label: 'CHANNEL MARGIN (CM2)', section: 'YOUR MARGIN', kind: 'subtotal', note: 'Is this marketplace worth being on?' },
   { key: 'cm2Pct', label: 'CM2 %', section: 'YOUR MARGIN', kind: 'percent' },
   { key: 'myntraAds', label: '(−) Myntra Ads', section: 'YOUR MARGIN', kind: 'input', fee: 'advertising', note: 'From the PLA campaign report\u2019s ad_spend column, summed over the month. Myntra\u2019s P&L report carries no advertising line of its own.' },
   { key: 'cm3', label: 'CONTRIBUTION MARGIN (CM3)', section: 'YOUR MARGIN', kind: 'subtotal', note: '⭐ the number to manage the business on' },
@@ -91,6 +115,19 @@ export const MYNTRA_LINE_DEFS: NativeLineDef[] = [
   { key: 'otherCosts', label: '(−) Allocated Fixed Expenses', section: 'YOUR MARGIN', kind: 'input' },
   { key: 'cm4', label: 'NET PROFIT (CM4)', section: 'YOUR MARGIN', kind: 'subtotal' },
   { key: 'cm4Pct', label: 'Net Profit %', section: 'YOUR MARGIN', kind: 'percent' },
+
+  // When the money arrives, not what was earned. These three sat in the
+  // middle of the statement, between the charges and Earnings on Platform,
+  // where Settled read as though it contradicted Projected — 3,37,919
+  // against 2,65,629 for September, because what lands in a month is partly
+  // last month's sales. Nothing above or below is computed from them, so they
+  // belong at the end, after the margin they have no part in.
+  {
+    key: 'bankSettlementProjected', label: 'Bank Settlement (Projected)', section: 'CASH SETTLEMENT', kind: 'input',
+    note: 'What this month\u2019s sales should settle to \u2014 cash timing only, in neither the P&L nor any margin above',
+  },
+  { key: 'bankSettlementSettled', label: 'Bank Settlement (Settled)', section: 'CASH SETTLEMENT', kind: 'input', note: 'Received in the month, including settlements of earlier months\u2019 sales' },
+  { key: 'bankSettlementUnsettled', label: 'Bank Settlement (Unsettled)', section: 'CASH SETTLEMENT', kind: 'input', note: 'Still owed at month end' },
 ]
 
 /**
@@ -106,9 +143,18 @@ export function computeMyntraPnl(facts: MyntraPnlFacts): NativeLineValues {
   const netRevenueExGst = facts.estimatedNetSales - facts.productGst
   const totalCogs = facts.cogsPriced + facts.cogsUnpriced
   const cm1 = netRevenueExGst - totalCogs
-  // Earnings on Platform is cash including the GST that has to be paid onward,
-  // so the GST comes off once here and the goods come off once.
-  const cm2 = facts.earningsOnPlatform - facts.productGst - totalCogs
+  // What Myntra kept: the forward and reverse expenses, less the incentive,
+  // the tax credits and the other settlement credits that come back.
+  //
+  // Built from the parts rather than as `Estimated Net Sales less Earnings on
+  // Platform`, because Earnings on Platform does not carry NOD or Order SPF.
+  // Those have been zero every month so far, but the day one is not, the
+  // difference would be a charge this statement deducted and the P&L did not.
+  // Summed this way the two agree by construction.
+  const netMarketplaceCharges =
+    facts.totalExpenses + facts.nodDeducted - facts.nodPaid - facts.orderSpf -
+    facts.sjitIncentive - facts.inputTaxCredits
+  const cm2 = cm1 - netMarketplaceCharges
   const cm3 = cm2 - facts.myntraAds
   const pct = (v: number): number => (netRevenueExGst !== 0 ? (v / netRevenueExGst) * 100 : 0)
 
@@ -158,6 +204,13 @@ export function computeMyntraPnl(facts: MyntraPnlFacts): NativeLineValues {
     totalCogs: -totalCogs,
     cm1,
     cm1Pct: pct(cm1),
+    netMarketplaceCharges: -netMarketplaceCharges,
+    mpChargesExpenses: -facts.totalExpenses,
+    mpChargesNodDeducted: -facts.nodDeducted,
+    mpChargesNodPaid: facts.nodPaid,
+    mpChargesOrderSpf: facts.orderSpf,
+    mpChargesSjit: facts.sjitIncentive,
+    mpChargesItc: facts.inputTaxCredits,
     cm2,
     cm2Pct: pct(cm2),
     myntraAds: -facts.myntraAds,
