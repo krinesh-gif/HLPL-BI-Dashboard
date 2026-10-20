@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { computeSubtotals } from '../subtotals'
 import { readFileSync, existsSync } from 'node:fs'
 import { normalizeBlinkitPayoutZip } from '@/data/normalize/blinkitPayout'
 import { blinkitToCanonicalBuckets, computeBlinkitPnl } from './blinkit'
@@ -47,11 +48,14 @@ describe.skipIf(!existsSync(ARCHIVE))('August 2026, from the owner’s own archi
     expect(-v.totalInventoryCharges).toBeGreaterThan(-v.totalOrderCharges)
   })
 
-  it('is thin but positive before cost of goods', async () => {
+  it('is thin but positive once Blinkit has taken its charges', async () => {
     const v = await load()
-    // 5,449.06 of net revenue, less 1,628.60 of order charges, less 3,126 of
-    // ageing, is 694.46. Storage alone takes 57% of what Blinkit sold.
-    expect(v.cm1).toBeCloseTo(3820.46, 2)
+    // This archive carries no cost of goods — Blinkit's file holds its own
+    // item codes and no seller SKU — so CM1 is the whole of net revenue and
+    // the charges are the whole of the distance to CM2: 5,449.06 less
+    // 1,628.60 of order charges and 3,126 of ageing is 694.46. Storage alone
+    // takes 57% of what Blinkit sold.
+    expect(v.cm1).toBeCloseTo(5449.06, 2)
     expect(v.cm2).toBeCloseTo(694.46, 2)
     expect(-v.totalInventoryCharges / v.netRevenue).toBeGreaterThan(0.5)
   })
@@ -59,7 +63,7 @@ describe.skipIf(!existsSync(ARCHIVE))('August 2026, from the owner’s own archi
   it('keeps the LP-SP memo out of every margin', async () => {
     const v = await load()
     expect(v.lpSpAdjustment).toBeCloseTo(4483.4, 2)
-    // Six times CM2, on a month whose net revenue is 5,449. Folding it in
+    // Six times CM3, on a month whose net revenue is 5,449. Folding it in
     // would be the difference between a thin month and a good one, which is
     // exactly why it waits for someone to confirm what it settles.
     expect(v.cm3).toBeCloseTo(694.46, 2)
@@ -72,7 +76,7 @@ describe('the statement holds together', () => {
     const v = computeBlinkitPnl(facts())
     expect(v.netRevenue).toBe(0)
     expect(Number.isFinite(v.cm1Pct)).toBe(true)
-    expect(Number.isFinite(v.ebitdaPct)).toBe(true)
+    expect(Number.isFinite(v.cm4Pct)).toBe(true)
   })
 
   it('treats a storage reversal bigger than its charge as the credit it is', () => {
@@ -96,6 +100,31 @@ describe('the statement holds together', () => {
     const b = blinkitToCanonicalBuckets(f)
     const canonicalNetSales = (b.grossSales ?? 0) - (b.discounts ?? 0) - (b.returns ?? 0) - (b.otherRevenueAdj ?? 0)
     expect(canonicalNetSales).toBeCloseTo(computeBlinkitPnl(f).netRevenue, 6)
+  })
+
+  /**
+   * Rung for rung, on the one ladder.
+   *
+   * Blinkit's payout sheet works down from what the shopper paid through
+   * every charge it makes, and never mentions what the goods cost. This
+   * statement followed it and reached COGS at the very bottom, below
+   * advertising — so its CM1 meant "after Blinkit's order charges" where the
+   * P&L's gross profit for the same month meant "after the goods", and no
+   * line on the statement was the figure the P&L reported.
+   */
+  it('agrees with the P&L at every margin, not only at net revenue', () => {
+    const f = facts({
+      customerPayable: 6430, outputGstOnSales: 980.94, commission: 128.6, shipping: 1500,
+      storageCharge: 3126, lostDamagedCompensation: 400, otherDeductions: 150,
+    })
+    const cogs = 2200
+    const ads = 500
+    const native = computeBlinkitPnl(f, cogs, 0, ads)
+    const canonical = computeSubtotals(blinkitToCanonicalBuckets(f, cogs, ads))
+    expect(canonical.netSales).toBeCloseTo(native.netRevenue, 6)
+    expect(canonical.grossProfit).toBeCloseTo(native.cm1, 6)
+    expect(canonical.channelMargin).toBeCloseTo(native.cm2, 6)
+    expect(canonical.contributionProfit).toBeCloseTo(native.cm3, 6)
   })
 
   it('files storage as fulfilment, not as commission', () => {

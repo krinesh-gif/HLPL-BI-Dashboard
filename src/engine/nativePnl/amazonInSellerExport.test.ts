@@ -66,7 +66,9 @@ describe('computeAmazonInSellerExportPnl', () => {
     // A refund is money coming back, so it reads as a credit rather than
     // being added to what Amazon took.
     expect(v['fee.referralFeeRefunds']).toBeCloseTo(921.66, 2)
-    expect(v.cm1).toBeCloseTo(223113.63 - FEES, 2)
+    // With no cost sheet passed, the goods cost nothing and CM2 is net sales
+    // less exactly what Amazon charged.
+    expect(v.cm2).toBeCloseTo(223113.63 - FEES, 2)
   })
 
   it('leaves a contained column to its parent instead of charging it twice', () => {
@@ -111,7 +113,7 @@ describe('computeAmazonInSellerExportPnl', () => {
   it('applies the allocated fixed expenses', () => {
     const v = applyAmazonInSellerExportOtherCosts(computeAmazonInSellerExportPnl(SEPTEMBER, COGS), 25000)
     expect(v.otherCosts).toBe(-25000)
-    expect(v.cm3).toBeCloseTo(v.cm2 - 25000, 2)
+    expect(v.cm4).toBeCloseTo(v.cm3 - 25000, 2)
   })
 
   // A charge that is genuinely absent should read as nothing, not as minus
@@ -155,7 +157,9 @@ describe('amazonInSellerExportToCanonicalBuckets', () => {
     const native = computeAmazonInSellerExportPnl(SEPTEMBER, COGS)
     const lines = computeSubtotals(amazonInSellerExportToCanonicalBuckets(SEPTEMBER, COGS))
     expect(lines.netSales).toBeCloseTo(native.netSales, 2)
-    expect(lines.contributionProfit).toBeCloseTo(native.cm2, 2)
+    expect(lines.grossProfit).toBeCloseTo(native.cm1, 2)
+    expect(lines.channelMargin).toBeCloseTo(native.cm2, 2)
+    expect(lines.contributionProfit).toBeCloseTo(native.cm3, 2)
   })
 
   it('takes nothing off for GST, because the export is already ex-GST', () => {

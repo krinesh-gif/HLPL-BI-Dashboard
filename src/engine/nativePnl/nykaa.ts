@@ -96,13 +96,18 @@ export const NYKAA_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 
+  { key: 'marketplaceCharges', label: '(−) Marketplace Charges', section: 'MARKETPLACE CHARGES', kind: 'input',
+    note: 'Nil below the line, and not because Nykaa is cheap: its 38% margin and the discount it charges back are both taken off revenue above, because Nykaa buys the goods rather than selling them for us. They come to more than any marketplace fee on this dashboard. A listing, logistics or payment fee, if Nykaa ever bills one, belongs on this line.' },
+  { key: 'cm2', label: 'CHANNEL MARGIN (CM2)', section: 'MARKETPLACE CHARGES', kind: 'subtotal', note: 'Is this marketplace worth being on?' },
+  { key: 'cm2Pct', label: 'CM2 %', section: 'MARKETPLACE CHARGES', kind: 'percent' },
+
   { key: 'nykaaAds', label: '(−) Nykaa Ads / MI', section: 'ADVERTISING', kind: 'input', fee: 'advertising', note: 'Manual entry — billed by invoice, not reported' },
-  { key: 'cm2', label: 'CONTRIBUTION MARGIN (CM2)', section: 'ADVERTISING', kind: 'subtotal', note: '⭐ the number to manage the channel on' },
-  { key: 'cm2Pct', label: 'CM2 %', section: 'ADVERTISING', kind: 'percent' },
+  { key: 'cm3', label: 'CONTRIBUTION MARGIN (CM3)', section: 'ADVERTISING', kind: 'subtotal', note: '⭐ the number to manage the channel on' },
+  { key: 'cm3Pct', label: 'CM3 %', section: 'ADVERTISING', kind: 'percent' },
 
   { key: 'otherCosts', label: '(−) Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input' },
-  { key: 'cm3', label: 'NET PROFIT (CM3)', section: 'FIXED EXPENSES', kind: 'subtotal' },
-  { key: 'cm3Pct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
+  { key: 'cm4', label: 'NET PROFIT (CM4)', section: 'FIXED EXPENSES', kind: 'subtotal' },
+  { key: 'cm4Pct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
 
   {
     key: 'customerPaidValue', label: 'Value shoppers actually paid', section: 'MEMO',
@@ -217,7 +222,13 @@ export function computeNykaaPnl(facts: NykaaPnlFacts): NativeLineValues {
   const inboundFreight = facts.inboundFreight ?? 0
   const totalCogs = facts.cogsPriced + facts.cogsUnpriced + inboundFreight
   const cm1 = netRevenueExGst - totalCogs
-  const cm2 = cm1 - facts.nykaaAds
+  // Nil on this channel, and the rung is struck all the same: Nykaa's margin
+  // and its discount recovery are deducted above revenue, because Nykaa buys
+  // the goods rather than selling them for us. CM2 reads beside Flipkart's
+  // because the ladder is the same ladder, not because the costs are alike.
+  const marketplaceCharges = 0
+  const cm2 = cm1 - marketplaceCharges
+  const cm3 = cm2 - facts.nykaaAds
   const pct = (v: number): number => (netRevenueExGst !== 0 ? (v / netRevenueExGst) * 100 : 0)
   const ofMrp = (v: number): number => (facts.netSalesMrp !== 0 ? (v / facts.netSalesMrp) * 100 : 0)
 
@@ -263,13 +274,17 @@ export function computeNykaaPnl(facts: NykaaPnlFacts): NativeLineValues {
     cm1,
     cm1Pct: pct(cm1),
 
-    nykaaAds: -facts.nykaaAds,
+    marketplaceCharges: marketplaceCharges === 0 ? 0 : -marketplaceCharges,
     cm2,
     cm2Pct: pct(cm2),
 
+    nykaaAds: -facts.nykaaAds,
+    cm3,
+    cm3Pct: pct(cm3),
+
     otherCosts: 0, // filled in by applyNykaaOtherCosts once the allocation is known
-    cm3: cm2,
-    cm3Pct: pct(cm2),
+    cm4: cm3,
+    cm4Pct: pct(cm3),
 
     discountPerSalesFile: confirmed === undefined ? 0 : -perSalesFile,
     discountConfirmationVariance: confirmed === undefined ? 0 : confirmed - perSalesFile,
@@ -282,9 +297,9 @@ export function computeNykaaPnl(facts: NykaaPnlFacts): NativeLineValues {
 
 /** Applies this month's allocated share of fixed expenses to reach Net Profit. */
 export function applyNykaaOtherCosts(computed: NativeLineValues, otherCosts: number): NativeLineValues {
-  const cm3 = computed.cm2 - otherCosts
+  const cm4 = computed.cm3 - otherCosts
   const netRevenueExGst = computed.netRevenueExGst
-  return { ...computed, otherCosts: -otherCosts, cm3, cm3Pct: netRevenueExGst !== 0 ? (cm3 / netRevenueExGst) * 100 : 0 }
+  return { ...computed, otherCosts: -otherCosts, cm4, cm4Pct: netRevenueExGst !== 0 ? (cm4 / netRevenueExGst) * 100 : 0 }
 }
 
 /**

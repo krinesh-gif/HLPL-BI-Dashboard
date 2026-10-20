@@ -1353,17 +1353,25 @@ function buildChannelPnlStatement(channel: BusinessChannelId, month: string, inp
       const cogs = recomputed ? recomputed.total : facts.cogsSourceInr
       const otherCosts = computeAllocatedOtherCosts(inputs, channel, month)
 
+      // A month stored before the trade margin was computed carries none, and
+      // reads as though Swiggy took nothing. Saying so is the point: the
+      // revenue above is MRP less GST, with the 25% still in it.
+      const marginStated = facts.marginInr !== undefined
       const notes: string[] = [
-        `Swiggy's trade margin of ${(facts.marginPct * 100).toFixed(0)}% inclusive on MRP comes from the agreed ` +
-        'terms and purchase order FC5PO365689, which proves it line by line. It is deducted from revenue rather ' +
-        'than charged below gross profit, because we invoice MRP less the margin and the rest was never ours.',
+        marginStated
+          ? `Swiggy's trade margin of ${((facts.marginPct ?? 0) * 100).toFixed(0)}% inclusive on MRP comes from the agreed ` +
+            'terms and purchase order FC5PO365689, which proves it line by line. It is deducted from revenue rather ' +
+            'than charged below gross profit, because we invoice MRP less the margin and the rest was never ours.'
+          : '⚠ This month was read before Swiggy\'s trade margin was modelled, so no margin is deducted and the ' +
+            'revenue above is GMV less GST with Swiggy\'s 25% still in it. Upload the month\'s sales report again ' +
+            'to restate it — the terms are proved line by line on purchase order FC5PO365689.',
         'Beyond that margin the report carries no fulfilment, payment or return charge, and on a return-to-vendor ' +
         'basis no record of stock sent back. GST comes out at each item’s own rate from that purchase order; the ' +
         'report itself states none.',
       ]
-      if (facts.marketingContributionInr > 0) {
+      if ((facts.marketingContributionInr ?? 0) > 0) {
         notes.push(
-          `Marketing contribution of ${(facts.marketingContributionPct * 100).toFixed(0)}% of MRP sales applies ` +
+          `Marketing contribution of ${((facts.marketingContributionPct ?? 0) * 100).toFixed(0)}% of MRP sales applies ` +
           'for the first six months from launch, taken here from the date of the first purchase order on file.',
         )
       }

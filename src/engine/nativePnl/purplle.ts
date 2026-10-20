@@ -49,18 +49,25 @@ export const PURPLLE_LINE_DEFS: NativeLineDef[] = [
 
   { key: 'cogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'input',
     note: 'Priced from the Product Master at the month’s cost, through the SKU mapping for Purplle’s own codes' },
-  { key: 'grossProfit', label: 'Gross Profit (after COGS)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
-  { key: 'grossMarginPct', label: 'Gross Margin %', section: 'COST OF GOODS SOLD', kind: 'percent' },
+  { key: 'grossProfit', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'grossMarginPct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 
+  { key: 'marketplaceCharges', label: '(−) Marketplace Charges', section: 'MARKETPLACE CHARGES', kind: 'input',
+    note: 'Nil, and not because Purplle is free: its 31% margin is taken on the invoice, so it is already out of revenue above rather than charged here. If Purplle ever bills a commission, logistics or payment fee, it belongs on this line.' },
+  { key: 'channelMargin', label: 'CHANNEL MARGIN (CM2)', section: 'MARKETPLACE CHARGES', kind: 'subtotal',
+    note: 'Is this marketplace worth being on?' },
+  { key: 'channelMarginPct', label: 'CM2 %', section: 'MARKETPLACE CHARGES', kind: 'percent' },
 
-  { key: 'marketing', label: '(−) Advertising (MI)', section: 'PROFIT', kind: 'input', fee: 'advertising',
+  { key: 'marketing', label: '(−) Advertising (MI)', section: 'ADVERTISING', kind: 'input', fee: 'advertising',
     note: 'Purplle’s marketing charge, which is 5% of the month’s MRP: April writes it once above the table under a "Marketing" label, June as an unnamed column of the same 5% per row. It is not on the margin sheet, where every line but the 31% is blank — so check it against Purplle’s invoice.' },
-  { key: 'contribution', label: 'Contribution (after advertising)', section: 'PROFIT', kind: 'subtotal' },
-  { key: 'contributionPct', label: 'Contribution %', section: 'PROFIT', kind: 'percent' },
-  { key: 'overheads', label: '(−) Allocated Fixed Expenses', section: 'PROFIT', kind: 'input',
+  { key: 'contribution', label: 'CONTRIBUTION MARGIN (CM3)', section: 'ADVERTISING', kind: 'subtotal',
+    note: '⭐ the number to manage the business on' },
+  { key: 'contributionPct', label: 'CM3 %', section: 'ADVERTISING', kind: 'percent' },
+
+  { key: 'overheads', label: '(−) Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input',
     note: 'This channel’s share of the month’s fixed expenses, by its share of sales' },
-  { key: 'ebitda', label: 'EBITDA', section: 'PROFIT', kind: 'subtotal' },
-  { key: 'ebitdaPct', label: 'EBITDA %', section: 'PROFIT', kind: 'percent' },
+  { key: 'ebitda', label: 'NET PROFIT (CM4)', section: 'FIXED EXPENSES', kind: 'subtotal' },
+  { key: 'ebitdaPct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
 
   { key: 'unitsSold', label: 'Units sold', section: 'UNITS', kind: 'count' },
   { key: 'orders', label: 'Orders', section: 'UNITS', kind: 'count' },
@@ -75,8 +82,12 @@ export const PURPLLE_LINE_DEFS: NativeLineDef[] = [
 export function computePurpllePnl(facts: PurpllePnlFacts, cogs = 0, overheads = 0): NativeLineValues {
   const netRevenue = facts.netRevenue
   const grossProfit = netRevenue - cogs
+  // Nil, on this channel. The rung is struck all the same, so Purplle's CM2
+  // can be read beside Flipkart's and the ladder means one thing everywhere.
+  const marketplaceCharges = 0
+  const channelMargin = grossProfit - marketplaceCharges
   const marketing = facts.marketingInr
-  const contribution = grossProfit - marketing
+  const contribution = channelMargin - marketing
   const ebitda = contribution - overheads
   const pct = (part: number, whole: number) => (whole !== 0 ? (part / whole) * 100 : 0)
 
@@ -95,6 +106,9 @@ export function computePurpllePnl(facts: PurpllePnlFacts, cogs = 0, overheads = 
     cogs: -cogs,
     grossProfit,
     grossMarginPct: pct(grossProfit, netRevenue),
+    marketplaceCharges: marketplaceCharges === 0 ? 0 : -marketplaceCharges,
+    channelMargin,
+    channelMarginPct: pct(channelMargin, netRevenue),
     marketing: -marketing,
     contribution,
     contributionPct: pct(contribution, netRevenue),

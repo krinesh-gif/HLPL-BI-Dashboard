@@ -53,43 +53,45 @@ export const MEESHO_LINE_DEFS: NativeLineDef[] = [
   { key: 'cogsUnitsSold', label: 'COGS — units sold', section: 'COST OF GOODS SOLD', kind: 'input', group: 'cogs' },
   { key: 'cogsRtoWriteOff', label: 'COGS — RTO write-off (unsaleable)', section: 'COST OF GOODS SOLD', kind: 'input', group: 'cogs' },
   { key: 'cogsReturnWriteOff', label: 'COGS — customer return write-off (unsaleable)', section: 'COST OF GOODS SOLD', kind: 'input', group: 'cogs' },
-  { key: 'grossProfit', label: 'GROSS PROFIT', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
-  { key: 'grossMarginPct', label: 'Gross Margin %', section: 'COST OF GOODS SOLD', kind: 'percent' },
+  { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'cm1Pct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
   { key: 'totalMarketplaceCharges', label: 'Total Marketplace Charges', section: 'MEESHO MARKETPLACE CHARGES', kind: 'subtotal', group: 'charges', isGroupHead: true },
 
   { key: 'forwardShipping', label: 'Forward shipping charge', section: 'MEESHO MARKETPLACE CHARGES', kind: 'input', fee: 'shipping', group: 'charges' },
   { key: 'returnShipping', label: 'Return shipping charge', section: 'MEESHO MARKETPLACE CHARGES', kind: 'input', fee: 'returnsLogistics', group: 'charges' },
   { key: 'otherMarketplaceFees', label: 'All other marketplace fees (commission, fixed, warehousing)', section: 'MEESHO MARKETPLACE CHARGES', kind: 'input', fee: 'otherFees', group: 'charges' },
-  { key: 'cm1', label: 'CONTRIBUTION MARGIN 1 (after marketplace charges)', section: 'MEESHO MARKETPLACE CHARGES', kind: 'subtotal' },
-  { key: 'cm1Pct', label: 'CM1 %', section: 'MEESHO MARKETPLACE CHARGES', kind: 'percent' },
-  { key: 'totalAdvertising', label: 'Total Advertising', section: 'ADVERTISING', kind: 'subtotal', group: 'ads', isGroupHead: true },
-
-  { key: 'adsSpend', label: 'Meesho Ads — spend (ex-GST)', section: 'ADVERTISING', kind: 'input', fee: 'advertising', group: 'ads' },
-  { key: 'adCredits', label: 'Ad credits / waivers / discounts', section: 'ADVERTISING', kind: 'input', fee: 'advertising', group: 'ads' },
-  { key: 'adsGst', label: 'GST on Meesho Ads', section: 'ADVERTISING', kind: 'input', group: 'ads' },
-  { key: 'affiliateFee', label: 'Affiliate / referral commission', section: 'ADVERTISING', kind: 'input', fee: 'advertising', group: 'ads' },
-  { key: 'cm2', label: 'CONTRIBUTION MARGIN 2 (after advertising)', section: 'ADVERTISING', kind: 'subtotal' },
-  { key: 'cm2Pct', label: 'CM2 %', section: 'ADVERTISING', kind: 'percent' },
-  { key: 'acosPct', label: 'ACOS % (ad spend / net revenue)', section: 'ADVERTISING', kind: 'percent' },
 
   // No "Total Own Fulfilment Cost" row: with labour gone it would restate the
   // single line above it. The value is still computed, so a caller that wants
   // the section's total has it without the statement printing it twice.
   { key: 'packaging', label: 'Packaging material', section: 'OWN FULFILMENT COST', kind: 'input' },
-  { key: 'cm3', label: 'CONTRIBUTION MARGIN 3 (after fulfilment)', section: 'OWN FULFILMENT COST', kind: 'subtotal' },
-  { key: 'cm3Pct', label: 'CM3 %', section: 'OWN FULFILMENT COST', kind: 'percent' },
-  { key: 'netPlatformAdjustments', label: 'Net Platform Adjustments', section: 'PLATFORM ADJUSTMENTS', kind: 'subtotal', group: 'adjustments', isGroupHead: true },
 
+  { key: 'netPlatformAdjustments', label: 'Net Platform Adjustments', section: 'PLATFORM ADJUSTMENTS', kind: 'subtotal', group: 'adjustments', isGroupHead: true },
   { key: 'compensation', label: 'Compensation received (order level)', section: 'PLATFORM ADJUSTMENTS', kind: 'input', fee: 'otherFees', group: 'adjustments' },
   { key: 'claims', label: 'Claims received', section: 'PLATFORM ADJUSTMENTS', kind: 'input', fee: 'otherFees', group: 'adjustments' },
   { key: 'recovery', label: 'Recovery / penalties (order level)', section: 'PLATFORM ADJUSTMENTS', kind: 'input', fee: 'penalty', group: 'adjustments' },
   { key: 'platformRecovery', label: 'Platform recovery — subscriptions & programmes', section: 'PLATFORM ADJUSTMENTS', kind: 'input', fee: 'otherFees', group: 'adjustments' },
-  { key: 'cm4', label: 'CONTRIBUTION MARGIN 4 (after adjustments)', section: 'PLATFORM ADJUSTMENTS', kind: 'subtotal' },
-  { key: 'cm4Pct', label: 'CM4 %', section: 'PLATFORM ADJUSTMENTS', kind: 'percent' },
+
+  // One rung for everything between the goods and advertising: Meesho's
+  // charges, the packaging this company buys to ship for it, and the
+  // adjustments it settles afterwards. Three blocks, in Meesho's own
+  // vocabulary, and one CM2 — the same CM2 every other channel strikes, and
+  // the same deduction the P&L makes.
+  { key: 'cm2', label: 'CHANNEL MARGIN (CM2)', section: 'PLATFORM ADJUSTMENTS', kind: 'subtotal', note: 'Is this marketplace worth being on? — after the marketplace charges, the packaging and the adjustments above' },
+  { key: 'cm2Pct', label: 'CM2 %', section: 'PLATFORM ADJUSTMENTS', kind: 'percent' },
+
+  { key: 'totalAdvertising', label: 'Total Advertising', section: 'ADVERTISING', kind: 'subtotal', group: 'ads', isGroupHead: true },
+  { key: 'adsSpend', label: 'Meesho Ads — spend (ex-GST)', section: 'ADVERTISING', kind: 'input', fee: 'advertising', group: 'ads' },
+  { key: 'adCredits', label: 'Ad credits / waivers / discounts', section: 'ADVERTISING', kind: 'input', fee: 'advertising', group: 'ads' },
+  { key: 'adsGst', label: 'GST on Meesho Ads', section: 'ADVERTISING', kind: 'input', group: 'ads' },
+  { key: 'affiliateFee', label: 'Affiliate / referral commission', section: 'ADVERTISING', kind: 'input', fee: 'advertising', group: 'ads' },
+  { key: 'cm3', label: 'CONTRIBUTION MARGIN (CM3)', section: 'ADVERTISING', kind: 'subtotal', note: '⭐ the number to manage the channel on' },
+  { key: 'cm3Pct', label: 'CM3 %', section: 'ADVERTISING', kind: 'percent' },
+  { key: 'acosPct', label: 'ACOS % (ad spend / net revenue)', section: 'ADVERTISING', kind: 'percent' },
 
   { key: 'overheads', label: '(−) Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input' },
-  { key: 'ebitda', label: 'CHANNEL EBITDA', section: 'FIXED EXPENSES', kind: 'subtotal' },
-  { key: 'ebitdaPct', label: 'EBITDA %', section: 'FIXED EXPENSES', kind: 'percent' },
+  { key: 'cm4', label: 'NET PROFIT (CM4)', section: 'FIXED EXPENSES', kind: 'subtotal' },
+  { key: 'cm4Pct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
 
   { key: 'tcs', label: 'TCS collected u/s 52 (creditable)', section: 'MEMO — STATUTORY (not charged to P&L)', kind: 'input', fee: 'withholding' },
   { key: 'tds', label: 'TDS deducted u/s 194-O (creditable)', section: 'MEMO — STATUTORY (not charged to P&L)', kind: 'input', fee: 'withholding', feeSign: 'amount' },
@@ -129,32 +131,37 @@ export function computeMeeshoPnl(
   const netRevenue = netSalesInclGst - facts.outputGstOnSales
 
   const totalCogs = facts.cogsUnitsSold + facts.cogsRtoWriteOff + facts.cogsReturnWriteOff
-  const grossProfit = netRevenue - totalCogs
+  const cm1 = netRevenue - totalCogs
 
   const totalMarketplaceCharges = facts.forwardShipping + facts.returnShipping + facts.otherMarketplaceFees
-  const cm1 = grossProfit - totalMarketplaceCharges
-
-  // Affiliate commission sits here rather than among marketplace fees: it is
-  // paid to acquire a customer, so hiding it in fees understates what demand
-  // costs and overstates CM1.
-  //
-  // Advertising is carried including GST, which is the Total Ads Cost column
-  // the business reconciles the month against. Spend and tax are shown on
-  // their own lines above so the split stays visible.
-  const totalAdvertising = facts.adsSpendExGst - facts.adCredits + facts.gstOnAds + facts.affiliateFee
-  const cm2 = cm1 - totalAdvertising
 
   // Charged per shipment, not per unit: one parcel takes one mailer whatever
   // is in it.
   const packaging = facts.subOrdersDispatched * packagingPerShipment
   const totalOwnFulfilment = packaging
-  const cm3 = cm2 - totalOwnFulfilment
 
   const netPlatformAdjustments =
     facts.compensation + facts.claims - facts.recovery - facts.platformRecoverySubscriptions
-  const cm4 = cm3 + netPlatformAdjustments
 
-  const ebitda = cm4 - overheads
+  // Everything between the goods and advertising, struck once. The four rungs
+  // this statement used to carry were numbered CM1 to CM4 and meant something
+  // different at every number from what the same names meant on Flipkart, so
+  // two channels could not be read side by side. One ladder now: the goods,
+  // the marketplace, advertising, the fixed expenses. Nothing is deducted
+  // that was not deducted before, and net profit is unchanged.
+  const cm2 = cm1 - totalMarketplaceCharges - totalOwnFulfilment + netPlatformAdjustments
+
+  // Affiliate commission sits here rather than among marketplace fees: it is
+  // paid to acquire a customer, so hiding it in fees understates what demand
+  // costs and overstates the margin above.
+  //
+  // Advertising is carried including GST, which is the Total Ads Cost column
+  // the business reconciles the month against. Spend and tax are shown on
+  // their own lines above so the split stays visible.
+  const totalAdvertising = facts.adsSpendExGst - facts.adCredits + facts.gstOnAds + facts.affiliateFee
+  const cm3 = cm2 - totalAdvertising
+
+  const cm4 = cm3 - overheads
 
   // The tax is read from the file rather than re-derived at an assumed rate.
   const adsInclGst = facts.adsSpendExGst - facts.adCredits + facts.gstOnAds
@@ -173,41 +180,37 @@ export function computeMeeshoPnl(
     cogsRtoWriteOff: -facts.cogsRtoWriteOff,
     cogsReturnWriteOff: -facts.cogsReturnWriteOff,
     totalCogs: -totalCogs,
-    grossProfit,
-    grossMarginPct: pct(grossProfit, netRevenue),
+    cm1,
+    cm1Pct: pct(cm1, netRevenue),
 
     forwardShipping: -facts.forwardShipping,
     returnShipping: -facts.returnShipping,
     otherMarketplaceFees: -facts.otherMarketplaceFees,
     totalMarketplaceCharges: -totalMarketplaceCharges,
-    cm1,
-    cm1Pct: pct(cm1, netRevenue),
-
-    adsSpend: -facts.adsSpendExGst,
-    adCredits: facts.adCredits,
-    adsGst: -facts.gstOnAds,
-    affiliateFee: -facts.affiliateFee,
-    totalAdvertising: -totalAdvertising,
-    cm2,
-    cm2Pct: pct(cm2, netRevenue),
-    acosPct: pct(totalAdvertising, netRevenue),
 
     packaging: -packaging,
     totalOwnFulfilment: -totalOwnFulfilment,
-    cm3,
-    cm3Pct: pct(cm3, netRevenue),
 
     compensation: facts.compensation,
     claims: facts.claims,
     recovery: -facts.recovery,
     platformRecovery: -facts.platformRecoverySubscriptions,
     netPlatformAdjustments,
-    cm4,
-    cm4Pct: pct(cm4, netRevenue),
+    cm2,
+    cm2Pct: pct(cm2, netRevenue),
+
+    adsSpend: -facts.adsSpendExGst,
+    adCredits: facts.adCredits,
+    adsGst: -facts.gstOnAds,
+    affiliateFee: -facts.affiliateFee,
+    totalAdvertising: -totalAdvertising,
+    cm3,
+    cm3Pct: pct(cm3, netRevenue),
+    acosPct: pct(totalAdvertising, netRevenue),
 
     overheads: -overheads,
-    ebitda,
-    ebitdaPct: pct(ebitda, netRevenue),
+    cm4,
+    cm4Pct: pct(cm4, netRevenue),
 
     tcs: -facts.tcs,
     tds: facts.tds,
@@ -235,13 +238,12 @@ export function computeMeeshoPnl(
 /** Overheads arrive from the company-wide fixed-expense allocation, which is
  * computed outside this module, so EBITDA is applied as a second pass. */
 export function applyMeeshoOtherCosts(computed: NativeLineValues, otherCosts: number): NativeLineValues {
-  const cm4 = computed.cm4
-  const ebitda = cm4 - otherCosts
+  const cm4 = computed.cm3 - otherCosts
   return {
     ...computed,
     overheads: -otherCosts,
-    ebitda,
-    ebitdaPct: pct(ebitda, computed.netRevenue),
+    cm4,
+    cm4Pct: pct(cm4, computed.netRevenue),
   }
 }
 

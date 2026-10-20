@@ -29,23 +29,36 @@ export const AMAZON_AE_LINE_DEFS: NativeLineDef[] = [
     note: 'Sales less Amazon’s net-of-returns figure' },
   { key: 'netSales', label: 'NET SALES', section: 'REVENUE', kind: 'subtotal' },
 
-  { key: 'amazonFees', label: '(−) Amazon fees', section: 'WHAT AMAZON TOOK', kind: 'input',
+  { key: 'cogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'input',
+    note: 'Priced from the Product Master at the month’s cost, converted from rupees at the month’s rate' },
+  { key: 'grossProfit', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'grossMarginPct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
+
+  { key: 'amazonFees', label: '(−) Amazon fees', section: 'MARKETPLACE CHARGES', kind: 'input',
     fee: 'otherFees',
     note: '⚠ One figure, not a breakdown. Amazon exported this month without its fee columns, so this is net sales less the Net proceeds Amazon states — everything it took, with nothing saying how much was referral fee, fulfilment or storage.' },
-  { key: 'netProceeds', label: 'NET PROCEEDS (per Amazon)', section: 'WHAT AMAZON TOOK', kind: 'subtotal',
-    note: 'Amazon’s own bottom line for the month, taken from the export rather than computed' },
-  { key: 'feePct', label: 'Amazon’s take %', section: 'WHAT AMAZON TOOK', kind: 'percent' },
+  { key: 'channelMargin', label: 'CHANNEL MARGIN (CM2)', section: 'MARKETPLACE CHARGES', kind: 'subtotal',
+    note: 'Is this marketplace worth being on?' },
+  { key: 'channelMarginPct', label: 'CM2 %', section: 'MARKETPLACE CHARGES', kind: 'percent' },
 
-  { key: 'cogs', label: 'Total COGS', section: 'PROFIT', kind: 'input',
-    note: 'Priced from the Product Master at the month’s cost, converted from rupees at the month’s rate' },
-  { key: 'grossProfit', label: 'Gross Profit (after COGS)', section: 'PROFIT', kind: 'subtotal' },
-  { key: 'grossMarginPct', label: 'Gross Margin %', section: 'PROFIT', kind: 'percent' },
-  { key: 'ads', label: '(−) Advertising', section: 'PROFIT', kind: 'input', hideWhenZero: true,
+  { key: 'ads', label: '(−) Advertising', section: 'ADVERTISING', kind: 'input',
     note: 'From the Amazon Ads console’s monthly cost report, which is the only place this channel’s advertising is stated — the Product Profitability export Amazon sends for the UAE carries no advertising column. Billed in dirhams.' },
-  { key: 'overheads', label: '(−) Allocated Fixed Expenses', section: 'PROFIT', kind: 'input',
+  { key: 'contribution', label: 'CONTRIBUTION MARGIN (CM3)', section: 'ADVERTISING', kind: 'subtotal',
+    note: '⭐ the number to manage the business on' },
+  { key: 'contributionPct', label: 'CM3 %', section: 'ADVERTISING', kind: 'percent' },
+
+  { key: 'overheads', label: '(−) Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input',
     note: 'This channel’s share of the month’s fixed expenses, by its share of sales' },
-  { key: 'ebitda', label: 'EBITDA', section: 'PROFIT', kind: 'subtotal' },
-  { key: 'ebitdaPct', label: 'EBITDA %', section: 'PROFIT', kind: 'percent' },
+  { key: 'ebitda', label: 'NET PROFIT (CM4)', section: 'FIXED EXPENSES', kind: 'subtotal' },
+  { key: 'ebitdaPct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
+
+  // Amazon's own bottom line, kept because it is a fact of the file and the
+  // figure the settlement is read against. It is not a rung of the ladder:
+  // Amazon strikes it before the goods, which is why it sits here rather
+  // than where it used to, above COGS.
+  { key: 'netProceeds', label: 'NET PROCEEDS (per Amazon)', section: 'MEMO — AMAZON’S OWN FIGURES', kind: 'subtotal',
+    note: 'Net sales less what Amazon took, before anything about the goods — taken from the export rather than computed' },
+  { key: 'feePct', label: 'Amazon’s take %', section: 'MEMO — AMAZON’S OWN FIGURES', kind: 'percent' },
 
   { key: 'unitsSold', label: 'Units sold', section: 'UNITS', kind: 'count' },
   { key: 'unitsReturned', label: 'Units returned', section: 'UNITS', kind: 'count', hideWhenZero: true },
@@ -77,15 +90,22 @@ export function computeAmazonAePnl(
    * carries no advertising column — so until it was wired in, a channel that
    * spent AED 1,547 in June reported no advertising at all and an EBITDA
    * that much too good. Amazon does not bill it through the settlement this
-   * statement reconciles to, so it sits below Net proceeds, beside the
-   * overheads, rather than among what Amazon took.
+   * statement reconciles to, so it is struck below CM2 as advertising on
+   * every other channel is, rather than among what Amazon took.
    */
   adsAed = 0,
 ): NativeLineValues {
   const netSales = facts.netSalesAed
   const amazonFees = amazonAeFeesTaken(facts)
-  const grossProfit = facts.netProceedsAed - cogsAed
-  const ebitda = grossProfit - adsAed - overheadsAed
+  // The goods first, then the marketplace — the order every channel's ladder
+  // uses, and the order the P&L already rolled this channel up in. Amazon's
+  // own export strikes its proceeds before COGS, which is why CM1 here used
+  // to be net proceeds less the goods: a figure no other statement showed and
+  // the P&L never agreed with. The bottom line is unchanged either way.
+  const grossProfit = netSales - cogsAed
+  const channelMargin = grossProfit - amazonFees
+  const contribution = channelMargin - adsAed
+  const ebitda = contribution - overheadsAed
 
   return {
     grossSales: facts.grossSalesAed,
@@ -99,7 +119,11 @@ export function computeAmazonAePnl(
     cogs: -cogsAed,
     grossProfit,
     grossMarginPct: netSales !== 0 ? (grossProfit / netSales) * 100 : 0,
+    channelMargin,
+    channelMarginPct: netSales !== 0 ? (channelMargin / netSales) * 100 : 0,
     ads: -adsAed,
+    contribution,
+    contributionPct: netSales !== 0 ? (contribution / netSales) * 100 : 0,
     overheads: -overheadsAed,
     ebitda,
     ebitdaPct: netSales !== 0 ? (ebitda / netSales) * 100 : 0,

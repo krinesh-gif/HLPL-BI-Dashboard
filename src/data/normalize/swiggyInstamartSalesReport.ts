@@ -154,7 +154,14 @@ export function normalizeSwiggyInstamartReport(
   const monthsSeen = new Set<string>()
   const gstFallback = new Set<string>()
 
-  const facts: SwiggyInstamartPnlFacts = {
+  // Every field the stored shape marks optional is written here, so the
+  // accumulator is the complete version: a month imported today carries its
+  // trade margin, its invoice value and its marketing contribution. The
+  // fields are optional on the stored shape because the months already on
+  // file were imported before this code existed and carry none.
+  const facts: SwiggyInstamartPnlFacts & Required<Pick<SwiggyInstamartPnlFacts,
+    'marginInr' | 'marginPct' | 'invoiceValueInr' | 'marketingContributionInr' | 'marketingContributionPct'
+  >> = {
     month: '', schemaVersion: 1,
     gmv: 0, mrpValue: 0,
     marginInr: 0, marginPct: SWIGGY_ASSUMPTIONS.marginPct, invoiceValueInr: 0,

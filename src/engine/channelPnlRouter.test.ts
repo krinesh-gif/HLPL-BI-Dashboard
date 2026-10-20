@@ -274,14 +274,14 @@ describe('a channel share of the company fixed expenses', () => {
     // Converted at the month's rate — not left in rupees, which the render to
     // INR would then multiply by the rate again.
     expect(v.native?.values.allocatedOverheadsUsd).toBeCloseTo(-(100000 * US_SHARE) / fxRate, 6)
-    expect(v.native?.values.cm3).toBeCloseTo(v.native!.values.cm2 - (100000 * US_SHARE) / fxRate, 6)
-    expect(v.native?.values.cm3).toBeLessThan(v.native!.values.cm2)
+    expect(v.native?.values.cm4).toBeCloseTo(v.native!.values.cm3 - (100000 * US_SHARE) / fxRate, 6)
+    expect(v.native?.values.cm4).toBeLessThan(v.native!.values.cm3)
   })
 
-  it('leaves Net Profit at CM2 for a month with no fixed expenses entered', () => {
+  it('leaves Net Profit at CM3 for a month with no fixed expenses entered', () => {
     const v = build('amazon_us', [])
     expect(v.native?.values.allocatedOverheadsUsd).toBe(-0)
-    expect(v.native?.values.cm3).toBeCloseTo(v.native!.values.cm2, 6)
+    expect(v.native?.values.cm4).toBeCloseTo(v.native!.values.cm3, 6)
   })
 
   it('reaches the multi-month P&L for every channel with its own statement', () => {

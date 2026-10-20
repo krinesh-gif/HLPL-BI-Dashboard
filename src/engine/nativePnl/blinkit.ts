@@ -40,13 +40,16 @@ export const BLINKIT_LINE_DEFS: NativeLineDef[] = [
   { key: 'outputGst', label: '(−) Output GST', section: 'REVENUE', kind: 'input',
     note: 'Collected for the government, never revenue' },
   { key: 'netRevenue', label: 'NET REVENUE (ex-GST)', section: 'REVENUE', kind: 'subtotal' },
-  { key: 'totalOrderCharges', label: 'Total Order Charges', section: 'ORDER CHARGES', kind: 'subtotal', group: 'orderCharges', isGroupHead: true },
+  { key: 'cogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'input',
+    note: 'From the cost sheet, for the units Blinkit sold' },
+  { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'cm1Pct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 
+  { key: 'totalOrderCharges', label: 'Total Order Charges', section: 'ORDER CHARGES', kind: 'subtotal', group: 'orderCharges', isGroupHead: true },
   { key: 'commission', label: 'Commission', section: 'ORDER CHARGES', kind: 'input', fee: 'commission', group: 'orderCharges' },
   { key: 'shipping', label: 'Shipping', section: 'ORDER CHARGES', kind: 'input', fee: 'shipping', group: 'orderCharges' },
   { key: 'customerReturnCharge', label: 'Customer return charge', section: 'ORDER CHARGES', kind: 'input', fee: 'returnsLogistics', hideWhenZero: true, group: 'orderCharges' },
-  { key: 'cm1', label: 'CONTRIBUTION MARGIN 1 (after order charges)', section: 'ORDER CHARGES', kind: 'subtotal' },
-  { key: 'cm1Pct', label: 'CM1 %', section: 'ORDER CHARGES', kind: 'percent' },
+
   { key: 'totalInventoryCharges', label: 'Total Inventory & Fulfilment', section: 'INVENTORY & FULFILMENT', kind: 'subtotal', group: 'inventory', isGroupHead: true },
 
   { key: 'storageCharge', label: 'Storage / ageing charge', section: 'INVENTORY & FULFILMENT', kind: 'input', fee: 'storage',
@@ -54,27 +57,28 @@ export const BLINKIT_LINE_DEFS: NativeLineDef[] = [
   { key: 'upfrontStorage', label: 'Upfront storage charge', section: 'INVENTORY & FULFILMENT', kind: 'input', fee: 'storage', hideWhenZero: true, group: 'inventory' },
   { key: 'recallCharge', label: 'Recall charge', section: 'INVENTORY & FULFILMENT', kind: 'input', fee: 'returnsLogistics', hideWhenZero: true, group: 'inventory' },
   { key: 'courierCharge', label: 'Courier charge', section: 'INVENTORY & FULFILMENT', kind: 'input', fee: 'shipping', hideWhenZero: true, group: 'inventory' },
-  { key: 'cm2', label: 'CONTRIBUTION MARGIN 2 (after inventory)', section: 'INVENTORY & FULFILMENT', kind: 'subtotal' },
-  { key: 'cm2Pct', label: 'CM2 %', section: 'INVENTORY & FULFILMENT', kind: 'percent' },
   { key: 'netAdjustments', label: 'Net Adjustments', section: 'ADJUSTMENTS', kind: 'subtotal', group: 'adjustments', isGroupHead: true },
 
   { key: 'adsRefund', label: 'Ads refund', section: 'ADJUSTMENTS', kind: 'input', fee: 'otherFees', hideWhenZero: true, group: 'adjustments' },
   { key: 'lostDamagedCompensation', label: 'Lost / damaged stock compensation', section: 'ADJUSTMENTS', kind: 'input', fee: 'otherFees', hideWhenZero: true, group: 'adjustments' },
   { key: 'otherCreditDebitNote', label: 'Other credit / debit notes', section: 'ADJUSTMENTS', kind: 'input', fee: 'otherFees', hideWhenZero: true, group: 'adjustments' },
   { key: 'otherDeductions', label: 'Other deductions', section: 'ADJUSTMENTS', kind: 'input', fee: 'otherFees', hideWhenZero: true, group: 'adjustments' },
-  { key: 'cm3', label: 'CONTRIBUTION MARGIN 3 (after adjustments)', section: 'ADJUSTMENTS', kind: 'subtotal' },
-  { key: 'cm3Pct', label: 'CM3 %', section: 'ADJUSTMENTS', kind: 'percent' },
+  // Every charge Blinkit makes, in its own three blocks, struck as one rung:
+  // CM2 is the margin after the marketplace, on this statement as on every
+  // other. The blocks keep Blinkit's own names because they are Blinkit's
+  // own charges; what is uniform is the rung, not the vocabulary.
+  { key: 'cm2', label: 'CHANNEL MARGIN (CM2)', section: 'ADJUSTMENTS', kind: 'subtotal', note: 'Is this marketplace worth being on? — after the order charges, the inventory charges and the adjustments above' },
+  { key: 'cm2Pct', label: 'CM2 %', section: 'ADJUSTMENTS', kind: 'percent' },
 
-  { key: 'adsSpend', label: '(−) Advertising', section: 'PROFIT', kind: 'input', fee: 'advertising', hideWhenZero: true,
-    note: 'From Blinkit’s own campaign report — the Estimated Budget Consumed column, summed over the month. Billed separately from the payout, so it is not in the ladder above.' },
-  { key: 'cogs', label: 'Total COGS', section: 'PROFIT', kind: 'input',
-    note: 'From the cost sheet, for the units Blinkit sold' },
-  { key: 'grossProfit', label: 'Gross Profit (after COGS)', section: 'PROFIT', kind: 'subtotal' },
-  { key: 'grossMarginPct', label: 'Gross Margin %', section: 'PROFIT', kind: 'percent' },
-  { key: 'overheads', label: '(−) Allocated Fixed Expenses', section: 'PROFIT', kind: 'input',
+  { key: 'adsSpend', label: '(−) Advertising', section: 'ADVERTISING', kind: 'input', fee: 'advertising',
+    note: 'From Blinkit’s own campaign report — the Estimated Budget Consumed column, summed over the month. Billed separately from the payout, which is why it is not in the charge blocks above.' },
+  { key: 'cm3', label: 'CONTRIBUTION MARGIN (CM3)', section: 'ADVERTISING', kind: 'subtotal', note: '⭐ the number to manage the channel on' },
+  { key: 'cm3Pct', label: 'CM3 %', section: 'ADVERTISING', kind: 'percent' },
+
+  { key: 'overheads', label: '(−) Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input',
     note: 'This channel’s share of the month’s fixed expenses, by its share of sales' },
-  { key: 'ebitda', label: 'EBITDA', section: 'PROFIT', kind: 'subtotal' },
-  { key: 'ebitdaPct', label: 'EBITDA %', section: 'PROFIT', kind: 'percent' },
+  { key: 'cm4', label: 'NET PROFIT (CM4)', section: 'FIXED EXPENSES', kind: 'subtotal' },
+  { key: 'cm4Pct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
 
   // ---- Cash, which is a different question from profit -------------------
   { key: 'gstOnCharges', label: 'GST charged on the above', section: 'WHAT BLINKIT PAID', kind: 'input', fee: 'feeTax',
@@ -112,23 +116,30 @@ export function computeBlinkitPnl(facts: BlinkitPnlFacts, cogs = 0, overheads = 
   const netRevenue = facts.customerPayable - facts.outputGstOnSales
   const blinkitDiscount = Math.max(0, facts.mrpValue - facts.customerPayable)
 
-  const totalOrderCharges = facts.commission + facts.shipping + facts.customerReturnCharge
-  const cm1 = netRevenue - totalOrderCharges
+  // The goods first. Blinkit's payout sheet works down from what the shopper
+  // paid through every charge it makes and never mentions what the goods
+  // cost, so this statement used to follow it and reach COGS at the bottom,
+  // below advertising — which left its first margin meaning "after Blinkit's
+  // order charges" where every other channel's meant "after the goods", and
+  // left it disagreeing with the P&L's gross profit for the same month. The
+  // charge blocks below are still Blinkit's, in Blinkit's order. Net profit
+  // is the same figure either way.
+  const cm1 = netRevenue - cogs
 
+  const totalOrderCharges = facts.commission + facts.shipping + facts.customerReturnCharge
   const totalInventoryCharges =
     facts.storageCharge + facts.upfrontStorage + facts.recallCharge + facts.courierCharge
-  const cm2 = cm1 - totalInventoryCharges
-
   // Additions count for us, deductions against. Blinkit's own D block is
   // money coming back, so it lifts the margin rather than lowering it.
   const netAdjustments =
     facts.adsRefund + facts.lostDamagedCompensation + facts.otherCreditDebitNote - facts.otherDeductions
-  const cm3 = cm2 + netAdjustments
 
-  const grossProfit = cm3 - cogs
-  // Advertising sits below gross profit and above the allocated overhead, the
-  // same place it sits in the canonical buckets, so the two agree on EBITDA.
-  const ebitda = grossProfit - adsSpend - overheads
+  const cm2 = cm1 - totalOrderCharges - totalInventoryCharges + netAdjustments
+  // Advertising is struck below CM2 and above the allocated overhead, the
+  // same place it sits in the canonical buckets, so the two agree rung for
+  // rung and not just at the bottom.
+  const cm3 = cm2 - adsSpend
+  const cm4 = cm3 - overheads
 
   // What actually moves: every charge's GST and the tax withheld at source.
   // Recoverable or creditable, so none of it is in the ladder above, but all
@@ -153,35 +164,34 @@ export function computeBlinkitPnl(facts: BlinkitPnlFacts, cogs = 0, overheads = 
     outputGst: -facts.outputGstOnSales,
     netRevenue,
 
+    cogs: -cogs,
+    cm1,
+    cm1Pct: pct(cm1, netRevenue),
+
     commission: -facts.commission,
     shipping: -facts.shipping,
     customerReturnCharge: -facts.customerReturnCharge,
     totalOrderCharges: -totalOrderCharges,
-    cm1,
-    cm1Pct: pct(cm1, netRevenue),
 
     storageCharge: -facts.storageCharge,
     upfrontStorage: -facts.upfrontStorage,
     recallCharge: -facts.recallCharge,
     courierCharge: -facts.courierCharge,
     totalInventoryCharges: -totalInventoryCharges,
-    cm2,
-    cm2Pct: pct(cm2, netRevenue),
 
     adsRefund: facts.adsRefund,
     lostDamagedCompensation: facts.lostDamagedCompensation,
     otherCreditDebitNote: facts.otherCreditDebitNote,
     otherDeductions: -facts.otherDeductions,
     netAdjustments,
+    cm2,
+    cm2Pct: pct(cm2, netRevenue),
+
     cm3,
     cm3Pct: pct(cm3, netRevenue),
-
-    cogs: -cogs,
-    grossProfit,
-    grossMarginPct: pct(grossProfit, netRevenue),
     overheads: -overheads,
-    ebitda,
-    ebitdaPct: pct(ebitda, netRevenue),
+    cm4,
+    cm4Pct: pct(cm4, netRevenue),
 
     gstOnCharges: -gstOnCharges,
     tcs: -facts.tcs,

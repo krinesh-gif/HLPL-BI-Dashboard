@@ -78,31 +78,39 @@ export const AMAZON_IN_SELLER_LINE_DEFS: NativeLineDef[] = [
   { key: 'returns', label: '(−) Returns and refunds', section: 'SALES', kind: 'input' },
   { key: 'promotions', label: '(−) Seller-funded promotions', section: 'SALES', kind: 'input', note: 'Coupons, rebates and the shipping we absorb' },
   { key: 'netSales', label: 'NET SALES (ex-GST)', section: 'SALES', kind: 'subtotal', note: '⭐ denominator for every %' },
-  { key: 'totalFees', label: 'Total Amazon Fees', section: 'AMAZON FEES', kind: 'subtotal', group: 'fees', isGroupHead: true },
 
-  { key: 'commission', label: '(−) Commission', section: 'AMAZON FEES', kind: 'input', fee: 'commission', group: 'fees' },
-  { key: 'closingFee', label: '(−) Fixed closing fee', section: 'AMAZON FEES', kind: 'input', fee: 'fixedFee', group: 'fees' },
-  { key: 'fbaFees', label: '(−) FBA pick, pack, weight and storage', section: 'AMAZON FEES', kind: 'input', fee: 'fulfilment', hideWhenZero: true, group: 'fees' },
-  { key: 'shippingFees', label: '(−) Easy Ship postage', section: 'AMAZON FEES', kind: 'input', fee: 'shipping', hideWhenZero: true, note: 'Net of the reversals Amazon credits back', group: 'fees' },
-  { key: 'unrecognised', label: '(−) Charges this build does not recognise', section: 'AMAZON FEES', kind: 'input', fee: 'otherFees', hideWhenZero: true, note: '⚠ a new Amazon description — counted so the month still ties, but not yet named', group: 'fees' },
-  { key: 'feesPctOfSales', label: 'Fees, % of net sales', section: 'AMAZON FEES', kind: 'percent' },
-
-  { key: 'reimbursements', label: 'Add: Reimbursements', section: 'OTHER SETTLEMENT ITEMS', kind: 'input', fee: 'otherFees', hideWhenZero: true, note: 'Lost and damaged stock Amazon pays for' },
-  { key: 'contributionBeforeCogs', label: 'SETTLED REVENUE AFTER FEES', section: 'OTHER SETTLEMENT ITEMS', kind: 'subtotal' },
   { key: 'totalCogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal', group: 'cogs', isGroupHead: true },
-
   { key: 'cogsPriced', label: 'COGS — priced SKUs', section: 'COST OF GOODS SOLD', kind: 'input', group: 'cogs' },
   { key: 'cogsUnpriced', label: 'COGS — unpriced SKUs (est.)', section: 'COST OF GOODS SOLD', kind: 'input', hideWhenZero: true, note: '⚠ estimate — goes to zero once every SKU is mapped and priced', group: 'cogs' },
   { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 
+  { key: 'totalFees', label: 'Total Amazon Fees', section: 'AMAZON FEES', kind: 'subtotal', group: 'fees', isGroupHead: true },
+  { key: 'commission', label: '(−) Commission', section: 'AMAZON FEES', kind: 'input', fee: 'commission', group: 'fees' },
+  { key: 'closingFee', label: '(−) Fixed closing fee', section: 'AMAZON FEES', kind: 'input', fee: 'fixedFee', group: 'fees' },
+  { key: 'fbaFees', label: '(−) FBA pick, pack, weight and storage', section: 'AMAZON FEES', kind: 'input', fee: 'fulfilment', hideWhenZero: true, group: 'fees' },
+  { key: 'shippingFees', label: '(−) Easy Ship postage', section: 'AMAZON FEES', kind: 'input', fee: 'shipping', hideWhenZero: true, note: 'Net of the reversals Amazon credits back', group: 'fees' },
+  { key: 'unrecognised', label: '(−) Charges this build does not recognise', section: 'AMAZON FEES', kind: 'input', fee: 'otherFees', hideWhenZero: true, note: '⚠ a new Amazon description — counted so the month still ties, but not yet named', group: 'fees' },
+  // Outside the group, as Flipkart's rewards are: money coming back, not one
+  // of the fees, and it moves the margin below rather than the total above.
+  { key: 'reimbursements', label: 'Add: Reimbursements', section: 'AMAZON FEES', kind: 'input', fee: 'otherFees', hideWhenZero: true, note: 'Lost and damaged stock Amazon pays for' },
+  { key: 'cm2', label: 'CHANNEL MARGIN (CM2)', section: 'AMAZON FEES', kind: 'subtotal', note: 'Is this marketplace worth being on?' },
+  { key: 'cm2Pct', label: 'CM2 %', section: 'AMAZON FEES', kind: 'percent' },
+  { key: 'feesPctOfSales', label: 'Fees, % of net sales', section: 'AMAZON FEES', kind: 'percent' },
+
   { key: 'ads', label: '(−) Advertising', section: 'ADVERTISING', kind: 'input', fee: 'advertising', note: 'Sponsored Products — billed separately, not in the settlement' },
-  { key: 'cm2', label: 'CONTRIBUTION MARGIN (CM2)', section: 'ADVERTISING', kind: 'subtotal', note: '⭐ the number to manage the channel on' },
-  { key: 'cm2Pct', label: 'CM2 %', section: 'ADVERTISING', kind: 'percent' },
+  { key: 'cm3', label: 'CONTRIBUTION MARGIN (CM3)', section: 'ADVERTISING', kind: 'subtotal', note: '⭐ the number to manage the channel on' },
+  { key: 'cm3Pct', label: 'CM3 %', section: 'ADVERTISING', kind: 'percent' },
 
   { key: 'otherCosts', label: '(−) Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input' },
-  { key: 'cm3', label: 'NET PROFIT (CM3)', section: 'FIXED EXPENSES', kind: 'subtotal' },
-  { key: 'cm3Pct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
+  { key: 'cm4', label: 'NET PROFIT (CM4)', section: 'FIXED EXPENSES', kind: 'subtotal' },
+  { key: 'cm4Pct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
+
+  // Not a rung: Amazon strikes this before anything about the goods, which is
+  // why the fees used to sit above COGS here and this channel's CM1 meant
+  // something no other channel's did. Kept because the deposit is read
+  // against it.
+  { key: 'contributionBeforeCogs', label: 'Settled revenue after fees', section: 'MEMO — THE SETTLEMENT', kind: 'input', note: 'Net sales less Amazon’s fees, plus reimbursements — before anything about the goods' },
 
   { key: 'outputGst', label: 'GST collected on sales', section: 'MONEY HELD, NOT EARNED OR SPENT', kind: 'input', note: 'Collected from the shopper and paid onward — never revenue' },
   { key: 'feeGst', label: 'GST charged on Amazon fees', section: 'MONEY HELD, NOT EARNED OR SPENT', kind: 'input', fee: 'feeTax', note: 'Input tax credit — recoverable, so it is not in any margin above' },
@@ -120,9 +128,16 @@ export function computeAmazonInSellerPnl(facts: AmazonInSellerPnlFacts): NativeL
   const cogsPriced = facts.cogsPriced ?? 0
   const cogsUnpriced = facts.cogsUnpriced ?? 0
   const totalCogs = cogsPriced + cogsUnpriced
-  const cm1 = contributionBeforeCogs - totalCogs
+  // The goods first, then the marketplace. Amazon's settlement nets its fees
+  // before it ever mentions a cost of goods, and following that order left
+  // this channel's CM1 meaning "after Amazon's fees as well" while every
+  // other channel's meant "after the goods" — and left it disagreeing with
+  // the P&L's gross profit for the same month. Net profit is the same figure
+  // either way.
+  const cm1 = netSales - totalCogs
+  const cm2 = cm1 + totalFees + b.reimbursements
   const ads = facts.ads ?? 0
-  const cm2 = cm1 - ads
+  const cm3 = cm2 - ads
   const pct = (v: number): number => (netSales !== 0 ? (v / netSales) * 100 : 0)
 
   // Every bucket adds back to the deposit. If this is not zero the statement
@@ -153,13 +168,16 @@ export function computeAmazonInSellerPnl(facts: AmazonInSellerPnlFacts): NativeL
     cm1,
     cm1Pct: pct(cm1),
 
-    ads: -ads,
     cm2,
     cm2Pct: pct(cm2),
 
+    ads: -ads,
+    cm3,
+    cm3Pct: pct(cm3),
+
     otherCosts: 0, // filled in by applyAmazonInSellerOtherCosts
-    cm3: cm2,
-    cm3Pct: pct(cm2),
+    cm4: cm3,
+    cm4Pct: pct(cm3),
 
     outputGst: b.outputGst,
     feeGst: b.feeGst,
@@ -171,9 +189,9 @@ export function computeAmazonInSellerPnl(facts: AmazonInSellerPnlFacts): NativeL
 }
 
 export function applyAmazonInSellerOtherCosts(computed: NativeLineValues, otherCosts: number): NativeLineValues {
-  const cm3 = computed.cm2 - otherCosts
+  const cm4 = computed.cm3 - otherCosts
   const netSales = computed.netSales
-  return { ...computed, otherCosts: -otherCosts, cm3, cm3Pct: netSales !== 0 ? (cm3 / netSales) * 100 : 0 }
+  return { ...computed, otherCosts: -otherCosts, cm4, cm4Pct: netSales !== 0 ? (cm4 / netSales) * 100 : 0 }
 }
 
 /**

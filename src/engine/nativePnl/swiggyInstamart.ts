@@ -42,18 +42,26 @@ export const SWIGGY_LINE_DEFS: NativeLineDef[] = [
 
   { key: 'cogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'input',
     note: 'Priced from the Product Master at the month’s cost, through the SKU mapping for Swiggy’s own item codes' },
-  { key: 'grossProfit', label: 'Gross Profit (after COGS)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
-  { key: 'grossMarginPct', label: 'Gross Margin %', section: 'COST OF GOODS SOLD', kind: 'percent' },
+  { key: 'grossProfit', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'grossMarginPct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 
-  { key: 'marketingContribution', label: '(−) Marketing contribution', section: 'PROFIT', kind: 'input',
+  { key: 'marketplaceCharges', label: '(−) Marketplace Charges', section: 'MARKETPLACE CHARGES', kind: 'input',
+    note: 'Nil, and not because Swiggy is free: its 25% trade margin is taken on the invoice, so it is already out of revenue above rather than charged here. If Instamart ever bills a listing, logistics or payment fee, it belongs on this line.' },
+  { key: 'channelMargin', label: 'CHANNEL MARGIN (CM2)', section: 'MARKETPLACE CHARGES', kind: 'subtotal',
+    note: 'Is this marketplace worth being on?' },
+  { key: 'channelMarginPct', label: 'CM2 %', section: 'MARKETPLACE CHARGES', kind: 'percent' },
+
+  { key: 'marketingContribution', label: '(−) Marketing contribution', section: 'ADVERTISING', kind: 'input',
     fee: 'advertising', hideWhenZero: true,
     note: '10% of MRP sales, for the first six months from launch. The window is taken from the date of the first purchase order on file, so confirm the launch month — it decides which month this stops in.' },
-  { key: 'contribution', label: 'Contribution (after marketing)', section: 'PROFIT', kind: 'subtotal' },
-  { key: 'contributionPct', label: 'Contribution %', section: 'PROFIT', kind: 'percent' },
-  { key: 'overheads', label: '(−) Allocated Fixed Expenses', section: 'PROFIT', kind: 'input',
+  { key: 'contribution', label: 'CONTRIBUTION MARGIN (CM3)', section: 'ADVERTISING', kind: 'subtotal',
+    note: '⭐ the number to manage the business on' },
+  { key: 'contributionPct', label: 'CM3 %', section: 'ADVERTISING', kind: 'percent' },
+
+  { key: 'overheads', label: '(−) Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input',
     note: 'This channel’s share of the month’s fixed expenses, by its share of sales' },
-  { key: 'ebitda', label: 'EBITDA', section: 'PROFIT', kind: 'subtotal' },
-  { key: 'ebitdaPct', label: 'EBITDA %', section: 'PROFIT', kind: 'percent' },
+  { key: 'ebitda', label: 'NET PROFIT (CM4)', section: 'FIXED EXPENSES', kind: 'subtotal' },
+  { key: 'ebitdaPct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
 
   { key: 'unitsSold', label: 'Units sold', section: 'UNITS', kind: 'count' },
   { key: 'skusSold', label: 'SKUs sold', section: 'UNITS', kind: 'count' },
@@ -82,20 +90,35 @@ export function computeSwiggyInstamartPnl(
 ): NativeLineValues {
   const netRevenue = facts.gmvExGst
   const grossProfit = netRevenue - cogs
-  const marketing = facts.marketingContributionInr
-  const contribution = grossProfit - marketing
+  // Nil, on this channel. The rung is struck all the same, so Swiggy's CM2
+  // can be read beside Flipkart's and the ladder means one thing everywhere.
+  const marketplaceCharges = 0
+  const channelMargin = grossProfit - marketplaceCharges
+  // Every Swiggy month on file was stored before the trade margin and the
+  // marketing contribution were computed, so these three fields are absent
+  // from the stored row. Reading them straight gave NaN, and the statement
+  // printed it from the trade margin down: a report with no figure at all on
+  // five of its lines. Nothing is filled in here — a missing figure reads as
+  // nothing charged, which is what those months recorded — but the months
+  // need their sales reports uploading again for the 25% to be taken off.
+  const margin = facts.marginInr ?? 0
+  const marketing = facts.marketingContributionInr ?? 0
+  const contribution = channelMargin - marketing
   const ebitda = contribution - overheads
   const pct = (part: number, whole: number) => (whole !== 0 ? (part / whole) * 100 : 0)
 
   return {
     gmv: facts.gmv,
-    margin: -facts.marginInr,
-    invoiceValue: facts.invoiceValueInr,
+    margin: -margin,
+    invoiceValue: facts.invoiceValueInr ?? facts.gmv - margin,
     outputGst: -facts.outputGst,
     netRevenue,
     cogs: -cogs,
     grossProfit,
     grossMarginPct: pct(grossProfit, netRevenue),
+    marketplaceCharges: marketplaceCharges === 0 ? 0 : -marketplaceCharges,
+    channelMargin,
+    channelMarginPct: pct(channelMargin, netRevenue),
     marketingContribution: -marketing,
     contribution,
     contributionPct: pct(contribution, netRevenue),
@@ -132,8 +155,9 @@ export function swiggyInstamartToCanonicalBuckets(
   return {
     grossSales: facts.gmv,
     // Swiggy's trade margin: a deduction from revenue, as Nykaa's and
-    // Purplle's are, because we invoice MRP less the margin.
-    discounts: facts.marginInr,
+    // Purplle's are, because we invoice MRP less the margin. Absent on every
+    // month stored before it was computed, which reads as nothing deducted.
+    discounts: facts.marginInr ?? 0,
     returns: 0,
     otherRevenueAdj: facts.outputGst,
     cogs,
@@ -148,6 +172,6 @@ export function swiggyInstamartToCanonicalBuckets(
     performanceMarketing: 0,
     // The marketing contribution: 10% of MRP sales while the launch window
     // runs. A real cost of the channel, and one that ends.
-    otherMarketing: facts.marketingContributionInr,
+    otherMarketing: facts.marketingContributionInr ?? 0,
   }
 }

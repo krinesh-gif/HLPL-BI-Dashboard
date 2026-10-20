@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { computeSubtotals } from '../subtotals'
 import { AMAZON_USA_FEE_COLUMNS } from '@/data/amazonUsa/feeColumns'
 import {
   AMAZON_USA_LINE_DEFS,
@@ -171,24 +172,29 @@ describe('every line on the statement is a real column', () => {
 
   it('opens each cost block on its total, with the charges behind it', () => {
     const heads = AMAZON_USA_LINE_DEFS.filter((d) => d.isGroupHead)
-    expect(heads.map((d) => d.label)).toEqual(['Total Marketplace Charges', 'Total Advertising', 'Total Landed Cost'])
+    expect(heads.map((d) => d.label)).toEqual(['Total Landed Cost', 'Total Marketplace Charges', 'Total Advertising'])
     for (const h of heads) expect(h.group).toBe(h.section)
   })
 })
 
 describe('the CM ladder continues below the tie-point', () => {
-  it('takes landed cost off Net proceeds, not off Net Sales', () => {
+  it('takes the landed cost off Net Sales, where every channel takes its goods', () => {
+    // It used to come off Amazon's Net proceeds, which is struck after
+    // Amazon's charges and after a per-unit cost typed into Seller Central.
+    // That made this statement's first margin a figure no other channel's
+    // first margin meant, and one the P&L's gross profit never matched.
     const v = computeAmazonUsaPnl(july({ cogsUsd: 3000, freightUsd: 250 }))
-    expect(v.cm2).toBeCloseTo(v.netProceedsUsd - 3250, 4)
+    expect(v.cm1).toBeCloseTo(30738.235 - 3250, 4)
+    expect(v.netProceedsUsd).not.toBeCloseTo(v.cm1, 2)
   })
 
-  it('leaves Net Profit at CM2 until the company overhead is allocated', () => {
+  it('leaves Net Profit at CM3 until the company overhead is allocated', () => {
     // The five US overhead lines are gone: they were a second place to enter
     // fixed costs, always left at zero, and the company's are now entered once
     // as a monthly total and allocated by sales share. Two places to put one
     // cost is how it gets counted twice.
     const v = computeAmazonUsaPnl(july({ cogsUsd: 3000, freightUsd: 250 }))
-    expect(v.cm3).toBeCloseTo(v.cm2, 6)
+    expect(v.cm4).toBeCloseTo(v.cm3, 6)
     for (const gone of ['Amazon Selling Plan', 'Product Liability Insurance', 'FDA / MoCRA, Trademark, Legal',
       'Agency, Software & Tools', 'Other US Overhead', 'Total Overheads & Finance']) {
       expect(AMAZON_USA_LINE_DEFS.map((d) => d.label)).not.toContain(gone)
@@ -203,7 +209,7 @@ describe('the CM ladder continues below the tie-point', () => {
     expect(AMAZON_USA_LINE_DEFS.map((d) => d.label)).not.toContain('FX Conversion & Remittance Cost')
     const v = computeAmazonUsaPnl(july())
     expect(v.fxConversionCostUsd).toBeUndefined()
-    expect(v.cm3).toBeCloseTo(v.cm2, 6)
+    expect(v.cm4).toBeCloseTo(v.cm3, 6)
   })
 })
 
@@ -220,6 +226,34 @@ describe('amazonUsaToCanonicalBuckets', () => {
     expect(b.fulfilment).toBeCloseTo((10099.8 + 1090.56) * 90, 2)
     expect(b.returnCharges).toBeCloseTo((37.73 + 2.36) * 90, 2)
     expect(b.ads).toBeCloseTo(3466.76 * 90, 2)
+  })
+
+  /**
+   * Rung for rung, on the one ladder, in rupees.
+   *
+   * Amazon's export nets its charges before it mentions a cost of goods, so
+   * this statement did too: its CM1 was net sales less Amazon's charges, and
+   * the landed cost came off a Net proceeds figure further down. The P&L's
+   * gross profit for the same month was net sales less the goods — no line on
+   * the statement.
+   *
+   * Two bucketings had to move with the order. Freight, export documentation
+   * and import duty were in `shipping`, below the margin line, while the
+   * statement had them inside Total Landed Cost: what a unit cost landed in
+   * the USA is what it cost, which is the treatment Nykaa's inbound freight
+   * already had. And the per-unit cost typed into Seller Central was in
+   * `cogs` beside this company's own: Amazon nets it off its own Net proceeds,
+   * it is not this company's cost accounting, and counting both would charge
+   * the goods twice the month the cost sheet is complete.
+   */
+  it('agrees with the statement at every margin', () => {
+    const facts = july({ cogsUsd: 3000, freightUsd: 250, exportDocsUsd: 40, usImportDutyUsd: 110 })
+    const native = computeAmazonUsaPnl(facts)
+    const canonical = computeSubtotals(amazonUsaToCanonicalBuckets(facts, 1))
+    expect(canonical.netSales).toBeCloseTo(native.netSalesUsd, 4)
+    expect(canonical.grossProfit).toBeCloseTo(native.cm1, 4)
+    expect(canonical.channelMargin).toBeCloseTo(native.cm2, 4)
+    expect(canonical.contributionProfit).toBeCloseTo(native.cm3, 4)
   })
 
   it('never counts a component column, so the roll-up matches the statement', () => {
@@ -314,22 +348,29 @@ describe('Total Advertising is all three placements', () => {
   })
 })
 
-describe('CM1 sits between the marketplace and advertising', () => {
+describe('CM2 sits between the marketplace and advertising', () => {
   const v = computeAmazonUsaPnl(july())
 
-  it('is Net Sales less the marketplace’s cut, before a rupee of advertising', () => {
-    expect(v.cm1).toBeCloseTo(30738.235 - 15966.9936, 4)
-    expect(v.cm1Pct).toBeCloseTo((v.cm1 / 30738.235) * 100, 6)
+  it('is the goods margin less the marketplace’s cut, before a dollar of advertising', () => {
+    // July carries no cost of goods, so CM1 is the whole of net sales and the
+    // marketplace's $15,966.99 takes it to CM2. The day a cost sheet covers
+    // these SKUs, CM1 drops and CM2 drops with it by the same amount.
+    expect(v.cm1).toBeCloseTo(30738.235, 4)
+    expect(v.cm2).toBeCloseTo(30738.235 - 15966.9936, 4)
+    expect(v.cm2Pct).toBeCloseTo((v.cm2 / 30738.235) * 100, 6)
   })
 
   it('is unmoved by advertising, which is the point of reading it there', () => {
-    expect(computeAmazonUsaPnl(july({ sponsoredBrandsUsd: 5000 })).cm1).toBeCloseTo(v.cm1, 4)
+    expect(computeAmazonUsaPnl(july({ sponsoredBrandsUsd: 5000 })).cm2).toBeCloseTo(v.cm2, 4)
   })
 
-  it('appears above the Total Advertising head on the statement', () => {
+  it('reads goods, then marketplace, then advertising, in that order', () => {
     const labels = AMAZON_USA_LINE_DEFS.map((d) => d.label)
-    expect(labels.indexOf('CM1 — After Marketplace Charges')).toBeLessThan(labels.indexOf('Total Advertising'))
-    expect(labels.indexOf('Marketplace Charges')).toBeLessThan(labels.indexOf('CM1 — After Marketplace Charges'))
+    const order = ['Total Landed Cost', 'GROSS MARGIN (CM1)', 'Total Marketplace Charges',
+      'CHANNEL MARGIN (CM2)', 'Total Advertising', 'CONTRIBUTION MARGIN (CM3)']
+    const positions = order.map((l) => labels.indexOf(l))
+    expect(positions).not.toContain(-1)
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions)
   })
 })
 

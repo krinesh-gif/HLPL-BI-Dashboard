@@ -157,11 +157,11 @@ describe('computeNykaaPnl', () => {
     expect(louder.cm1).toBeCloseTo(v.cm1, 6)
   })
 
-  it('carries CM2 down to Net Profit until fixed expenses are allocated', () => {
-    expect(v.cm3).toBeCloseTo(v.cm2, 6)
+  it('carries CM3 down to Net Profit until fixed expenses are allocated', () => {
+    expect(v.cm4).toBeCloseTo(v.cm3, 6)
     const withCosts = applyNykaaOtherCosts(v, 50000)
     expect(withCosts.otherCosts).toBe(-50000)
-    expect(withCosts.cm3).toBeCloseTo(v.cm2 - 50000, 6)
+    expect(withCosts.cm4).toBeCloseTo(v.cm3 - 50000, 6)
   })
 })
 
@@ -204,7 +204,11 @@ describe('nykaaToCanonicalBuckets', () => {
     const canonical = computeSubtotals(nykaaToCanonicalBuckets(AUG))
     expect(canonical.netSales).toBeCloseTo(native.netRevenueExGst, 6)
     expect(canonical.grossMarginPct).toBeCloseTo(native.cm1Pct, 6)
-    expect(canonical.contributionProfit).toBeCloseTo(native.cm2, 6)
+    // Rung for rung, on the one ladder every channel is now read on: the
+    // marketplace takes nothing below Nykaa's revenue line, so CM2 is CM1.
+    expect(canonical.grossProfit).toBeCloseTo(native.cm1, 6)
+    expect(canonical.channelMargin).toBeCloseTo(native.cm2, 6)
+    expect(canonical.contributionProfit).toBeCloseTo(native.cm3, 6)
   })
 
   it('books the margin and the discount as the trade discounts they are', () => {
@@ -233,24 +237,24 @@ describe('the MI reaches the statement', () => {
    * Nykaa's Marketing Invest bill arrives as a PDF, not inside the sales
    * files, so the P&L reads ad spend from where the Ads screens store it.
    * Without that the MI would be entered, shown on the Ads page, and silently
-   * missing from CM2.
+   * missing from CM3.
    */
-  it('takes CM2 below CM1 once a month has marketing', () => {
+  it('takes CM3 below CM2 once a month has marketing', () => {
     const withMi = computeNykaaPnl({ ...AUG, nykaaAds: 135542 })
-    expect(withMi.cm2).toBeCloseTo(withMi.cm1 - 135542, 6)
-    expect(withMi.cm2).toBeLessThan(withMi.cm1)
+    expect(withMi.cm3).toBeCloseTo(withMi.cm2 - 135542, 6)
+    expect(withMi.cm3).toBeLessThan(withMi.cm2)
     expect(withMi.nykaaAds).toBe(-135542)
   })
 
   it('charges the taxable value only — the GST on it is not a cost', () => {
     const taxable = computeNykaaPnl({ ...AUG, nykaaAds: 135542 })
     const wrongly = computeNykaaPnl({ ...AUG, nykaaAds: 159939.56 })
-    expect(taxable.cm2 - wrongly.cm2).toBeCloseTo(24397.56, 2)
+    expect(taxable.cm3 - wrongly.cm3).toBeCloseTo(24397.56, 2)
   })
 
-  it('leaves CM2 equal to CM1 when no invoice has arrived', () => {
+  it('leaves CM3 equal to CM2 when no invoice has arrived', () => {
     const v = computeNykaaPnl({ ...AUG, nykaaAds: 0 })
-    expect(v.cm2).toBeCloseTo(v.cm1, 6)
+    expect(v.cm3).toBeCloseTo(v.cm2, 6)
   })
 })
 

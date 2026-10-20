@@ -117,11 +117,11 @@ describe('computeAmazonInSellerPnl', () => {
     expect(noTax.cm2).toBeCloseTo(v.cm2, 6)
   })
 
-  it('carries CM2 down to Net Profit until fixed expenses are allocated', () => {
-    expect(v.cm3).toBeCloseTo(v.cm2, 6)
+  it('carries CM3 down to Net Profit until fixed expenses are allocated', () => {
+    expect(v.cm4).toBeCloseTo(v.cm3, 6)
     const withCosts = applyAmazonInSellerOtherCosts(v, 5000)
     expect(withCosts.otherCosts).toBe(-5000)
-    expect(withCosts.cm3).toBeCloseTo(v.cm2 - 5000, 6)
+    expect(withCosts.cm4).toBeCloseTo(v.cm3 - 5000, 6)
   })
 
   it('still ties to the deposit when Amazon invents a new charge', () => {
@@ -141,7 +141,13 @@ describe('amazonInSellerToCanonicalBuckets', () => {
     const native = computeAmazonInSellerPnl(AUG)
     const canonical = computeSubtotals(amazonInSellerToCanonicalBuckets(AUG))
     expect(canonical.netSales).toBeCloseTo(native.netSales, 6)
-    expect(canonical.contributionProfit).toBeCloseTo(native.cm2, 6)
+    // Rung for rung, not only at the bottom. Amazon's settlement nets its
+    // fees before it mentions a cost of goods, and while the statement
+    // followed that order its CM1 was net sales less the fees AND the goods —
+    // a figure the P&L's gross profit for the same channel never matched.
+    expect(canonical.grossProfit).toBeCloseTo(native.cm1, 6)
+    expect(canonical.channelMargin).toBeCloseTo(native.cm2, 6)
+    expect(canonical.contributionProfit).toBeCloseTo(native.cm3, 6)
   })
 
   it('leaves GST and withheld tax out of every bucket', () => {

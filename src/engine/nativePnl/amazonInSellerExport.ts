@@ -91,11 +91,17 @@ export const AMAZON_IN_SELLER_EXPORT_LINE_DEFS: NativeLineDef[] = [
   { key: 'returns', label: '(−) Returns and refunds', section: 'SALES', kind: 'input' },
   { key: 'netSales', label: 'NET SALES (ex-GST)', section: 'SALES', kind: 'subtotal', note: '⭐ denominator for every %' },
 
+  { key: 'totalCogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal', group: 'cogs', isGroupHead: true },
+  { key: 'cogsPriced', label: 'COGS — priced from the cost sheet', section: 'COST OF GOODS SOLD', kind: 'input', group: 'cogs' },
+  { key: 'cogsUnpriced', label: 'COGS — SKUs with no cost on file (est.)', section: 'COST OF GOODS SOLD', kind: 'input', note: '⚠ estimate — goes to zero once every MSKU is linked to a SKU', hideWhenZero: true, group: 'cogs' },
+  { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'cm1Pct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
+
   { key: 'totalMarketplaceCharges', label: 'Total Amazon Charges', section: 'AMAZON CHARGES', kind: 'subtotal', isGroupHead: true, group: 'AMAZON CHARGES' },
   ...feeLineDefs('marketplace', 'AMAZON CHARGES'),
   { key: 'unmappedFees', label: 'Fee columns not yet named', section: 'AMAZON CHARGES', kind: 'input', fee: 'otherFees', group: 'AMAZON CHARGES', hideWhenZero: true, note: 'Amazon sent a fee block with no heading — counted here rather than dropped or guessed at' },
-  { key: 'cm1', label: 'CM1 — after Amazon charges', section: 'AMAZON CHARGES', kind: 'subtotal' },
-  { key: 'cm1Pct', label: 'CM1 %', section: 'AMAZON CHARGES', kind: 'percent' },
+  { key: 'cm2', label: 'CHANNEL MARGIN (CM2)', section: 'AMAZON CHARGES', kind: 'subtotal', note: 'Is this marketplace worth being on?' },
+  { key: 'cm2Pct', label: 'CM2 %', section: 'AMAZON CHARGES', kind: 'percent' },
 
   { key: 'totalAdvertising', label: 'Total Advertising', section: 'ADVERTISING', kind: 'subtotal', isGroupHead: true, group: 'ADVERTISING', hideWhenZero: true },
   ...feeLineDefs('advertising', 'ADVERTISING'),
@@ -105,20 +111,19 @@ export const AMAZON_IN_SELLER_EXPORT_LINE_DEFS: NativeLineDef[] = [
     note: 'Billed outside this export — Sponsored Products and Brands, from the Amazon Ads console. Charged here '
       + 'only in a month with no Vendor Central statement to carry it, so the channel pays for it once',
   },
-
-  { key: 'netProceeds', label: 'Net proceeds, from the fees read here', section: 'NET PROCEEDS', kind: 'subtotal' },
-  { key: 'sheetNetProceeds', label: 'Net proceeds per Amazon’s own column', section: 'NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
-  { key: 'netProceedsDiff', label: 'Difference', section: 'NET PROCEEDS', kind: 'input', note: 'Reconciliation — anything here is a charge in the file this build has not read' },
-  { key: 'totalCogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal', group: 'cogs', isGroupHead: true },
-
-  { key: 'cogsPriced', label: 'COGS — priced from the cost sheet', section: 'COST OF GOODS SOLD', kind: 'input', group: 'cogs' },
-  { key: 'cogsUnpriced', label: 'COGS — SKUs with no cost on file (est.)', section: 'COST OF GOODS SOLD', kind: 'input', note: '⚠ estimate — goes to zero once every MSKU is linked to a SKU', hideWhenZero: true, group: 'cogs' },
-  { key: 'cm2', label: 'CONTRIBUTION MARGIN (CM2)', section: 'COST OF GOODS SOLD', kind: 'subtotal', note: '⭐ the number to manage this half on' },
-  { key: 'cm2Pct', label: 'CM2 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
+  { key: 'cm3', label: 'CONTRIBUTION MARGIN (CM3)', section: 'ADVERTISING', kind: 'subtotal', note: '⭐ the number to manage this half on' },
+  { key: 'cm3Pct', label: 'CM3 %', section: 'ADVERTISING', kind: 'percent' },
 
   { key: 'otherCosts', label: '(−) Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input' },
-  { key: 'cm3', label: 'NET PROFIT (CM3)', section: 'FIXED EXPENSES', kind: 'subtotal' },
-  { key: 'cm3Pct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
+  { key: 'cm4', label: 'NET PROFIT (CM4)', section: 'FIXED EXPENSES', kind: 'subtotal' },
+  { key: 'cm4Pct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
+
+  // Amazon's own bottom line and the check against it. Not a rung: Amazon
+  // strikes it before the goods, which is what used to pull this statement's
+  // CM1 out of line with every other channel's.
+  { key: 'netProceeds', label: 'Net proceeds, from the fees read here', section: 'MEMO — NET PROCEEDS', kind: 'subtotal' },
+  { key: 'sheetNetProceeds', label: 'Net proceeds per Amazon’s own column', section: 'MEMO — NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
+  { key: 'netProceedsDiff', label: 'Difference', section: 'MEMO — NET PROCEEDS', kind: 'input', note: 'Reconciliation — anything here is a charge in the file this build has not read' },
 
   { key: 'unitsSold', label: 'Units sold', section: 'THE MONTH IN UNITS', kind: 'count' },
   { key: 'unitsReturned', label: 'Units returned', section: 'THE MONTH IN UNITS', kind: 'count' },
@@ -173,7 +178,11 @@ export function computeAmazonInSellerExportPnl(
   const reportAds = sumGroup('advertising')
   const totalAdvertising = reportAds + ads
   const netSales = facts.netSalesInr
-  const cm1 = netSales - totalMarketplaceCharges
+  // The goods first, then the marketplace, then advertising: the ladder every
+  // channel is read on. Amazon's export nets its charges before it mentions a
+  // cost of goods, and following that order gave this statement a CM1 that
+  // meant "after Amazon's charges" while the P&L's meant "after the goods".
+  const cm1 = netSales - (cogs.priced + cogs.unpriced)
 
   // Amazon's Net proceeds also nets off the per-unit seller costs typed into
   // Seller Central. Ours are blank, so this is zero on every month on file —
@@ -184,7 +193,8 @@ export function computeAmazonInSellerExportPnl(
   const netProceeds = netSales - totalMarketplaceCharges - reportAds - sheetSellerCost
 
   const totalCogs = cogs.priced + cogs.unpriced
-  const cm2 = cm1 - totalAdvertising - totalCogs
+  const cm2 = cm1 - totalMarketplaceCharges
+  const cm3 = cm2 - totalAdvertising
   const pct = (v: number): number => (netSales !== 0 ? (v / netSales) * 100 : 0)
 
   const values: NativeLineValues = {
@@ -209,10 +219,12 @@ export function computeAmazonInSellerExportPnl(
     totalCogs: less(totalCogs),
     cm2,
     cm2Pct: pct(cm2),
+    cm3,
+    cm3Pct: pct(cm3),
 
     otherCosts: 0, // filled in by applyAmazonInSellerExportOtherCosts
-    cm3: cm2,
-    cm3Pct: pct(cm2),
+    cm4: cm3,
+    cm4Pct: pct(cm3),
 
     unitsSold: facts.unitsSoldQty,
     unitsReturned: facts.unitsReturnedQty,
@@ -230,9 +242,9 @@ export function applyAmazonInSellerExportOtherCosts(
   computed: NativeLineValues,
   otherCosts: number,
 ): NativeLineValues {
-  const cm3 = computed.cm2 - otherCosts
+  const cm4 = computed.cm3 - otherCosts
   const netSales = computed.netSales
-  return { ...computed, otherCosts: less(otherCosts), cm3, cm3Pct: netSales !== 0 ? (cm3 / netSales) * 100 : 0 }
+  return { ...computed, otherCosts: less(otherCosts), cm4, cm4Pct: netSales !== 0 ? (cm4 / netSales) * 100 : 0 }
 }
 
 /**

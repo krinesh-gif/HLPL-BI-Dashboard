@@ -254,9 +254,11 @@ describe.skipIf(!existsSync(REPORT))('the owner’s June 2026 Swiggy Instamart r
 
   it('invoices GMV less Swiggy’s 25%, and takes GST off that at each item’s rate', () => {
     const f = run().result.facts
+    // An import carries all three; only the months stored before this code
+    // existed do not, which is why the stored shape marks them optional.
     expect(f.marginInr).toBeCloseTo(4983.50, 2)
     expect(f.invoiceValueInr).toBeCloseTo(14950.50, 2)
-    expect(f.gmv - f.marginInr).toBeCloseTo(f.invoiceValueInr, 6)
+    expect(f.gmv - (f.marginInr ?? 0)).toBeCloseTo(f.invoiceValueInr ?? 0, 6)
     // Nothing in the Product Master yet, so each item's rate comes from the
     // purchase order — four 18% items and two 5% ones — and every code is
     // named as having fallen back.

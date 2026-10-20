@@ -87,15 +87,24 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
   { key: 'refundsReturnsUsd', label: '(−) Return', section: 'REVENUE', kind: 'input' },
   { key: 'netSalesUsd', label: 'Net Sales', section: 'REVENUE', kind: 'subtotal' },
 
+  { key: 'totalLandedCostUsd', label: 'Total Landed Cost', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'subtotal', group: 'COST OF GOODS & INBOUND LOGISTICS', isGroupHead: true },
+  { key: 'cogsUsd', label: 'Total COGS', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', group: 'COST OF GOODS & INBOUND LOGISTICS' },
+  { key: 'cogsPricedUsd', label: 'Priced from the cost sheet', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', memoOf: 'cogsUsd', hideWhenZero: true, group: 'COST OF GOODS & INBOUND LOGISTICS' },
+  { key: 'cogsEstimatedUsd', label: 'Estimated — no cost on file for these SKUs', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', memoOf: 'cogsUsd', hideWhenZero: true, group: 'COST OF GOODS & INBOUND LOGISTICS' },
+  { key: 'freightUsd', label: 'India → USA Air Freight', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', group: 'COST OF GOODS & INBOUND LOGISTICS' },
+  { key: 'exportDocsUsd', label: 'Export Documentation & Handling', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', note: 'Manual entry', group: 'COST OF GOODS & INBOUND LOGISTICS' },
+  { key: 'usImportDutyUsd', label: 'US Import Duty & Clearance', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', note: 'Manual entry', group: 'COST OF GOODS & INBOUND LOGISTICS' },
+  { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'subtotal' },
+  { key: 'cm1Pct', label: 'CM1 %', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'percent' },
+
   { key: 'totalMarketplaceChargesUsd', label: 'Total Marketplace Charges', section: 'MARKETPLACE CHARGES', kind: 'subtotal', isGroupHead: true, group: 'MARKETPLACE CHARGES' },
   ...feeLineDefs('marketplace', 'MARKETPLACE CHARGES', DEFAULT_NESTED),
   { key: 'unmappedFeesUsd', label: 'Fee columns not yet mapped', section: 'MARKETPLACE CHARGES', kind: 'input', fee: 'otherFees', group: 'MARKETPLACE CHARGES', hideWhenZero: true, note: 'New Amazon column — check the import warnings' },
-
-  // What the month earned after the marketplace has taken its cut, before a
-  // rupee of advertising. It is the line that says whether the product pays
+  // What the month earned once the marketplace has taken its cut, before a
+  // dollar of advertising. It is the line that says whether the product pays
   // for itself; advertising is then a choice made against it.
-  { key: 'cm1', label: 'CM1 — After Marketplace Charges', section: 'CM1', kind: 'subtotal' },
-  { key: 'cm1Pct', label: 'CM1 %', section: 'CM1', kind: 'percent' },
+  { key: 'cm2', label: 'CHANNEL MARGIN (CM2)', section: 'MARKETPLACE CHARGES', kind: 'subtotal', note: 'Is this marketplace worth being on?' },
+  { key: 'cm2Pct', label: 'CM2 %', section: 'MARKETPLACE CHARGES', kind: 'percent' },
 
   { key: 'totalAdvertisingUsd', label: 'Total Advertising', section: 'ADVERTISING FEES', kind: 'subtotal', isGroupHead: true, group: 'ADVERTISING FEES' },
   ...feeLineDefs('advertising', 'ADVERTISING FEES', DEFAULT_NESTED),
@@ -104,33 +113,30 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
   // lands in the right place the first month it happens.
   { key: 'sponsoredBrandsUsd', label: 'Sponsored Brands', section: 'ADVERTISING FEES', kind: 'input', fee: 'advertising', group: 'ADVERTISING FEES', note: 'Manual entry' },
   { key: 'sponsoredDisplayDspUsd', label: 'Sponsored Display / DSP', section: 'ADVERTISING FEES', kind: 'input', fee: 'advertising', group: 'ADVERTISING FEES', note: 'Manual entry' },
-
-  { key: 'netProceedsUsd', label: 'Net proceeds total', section: 'NET PROCEEDS', kind: 'subtotal' },
-  // Sponsored Brands and Display are billed outside this report, so Amazon's
-  // own Net proceeds cannot know about them. Adding them back is what keeps
-  // the two figures comparable once that spend starts.
-  { key: 'adsNotBilledByAmazonUsd', label: 'Add back: advertising Amazon does not bill in this report', section: 'NET PROCEEDS', kind: 'input', hideWhenZero: true, note: 'Reconciliation' },
-  { key: 'sheetNetProceedsUsd', label: 'Net proceeds per Amazon export', section: 'NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
-  { key: 'netProceedsDiffUsd', label: 'Difference', section: 'NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
-  { key: 'totalLandedCostUsd', label: 'Total Landed Cost', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'subtotal', group: 'COST OF GOODS & INBOUND LOGISTICS', isGroupHead: true },
-
-  { key: 'cogsUsd', label: 'Total COGS', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', group: 'COST OF GOODS & INBOUND LOGISTICS' },
-  { key: 'cogsPricedUsd', label: 'Priced from the cost sheet', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', memoOf: 'cogsUsd', hideWhenZero: true, group: 'COST OF GOODS & INBOUND LOGISTICS' },
-  { key: 'cogsEstimatedUsd', label: 'Estimated — no cost on file for these SKUs', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', memoOf: 'cogsUsd', hideWhenZero: true, group: 'COST OF GOODS & INBOUND LOGISTICS' },
-  { key: 'freightUsd', label: 'India → USA Air Freight', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', group: 'COST OF GOODS & INBOUND LOGISTICS' },
-  { key: 'exportDocsUsd', label: 'Export Documentation & Handling', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', note: 'Manual entry', group: 'COST OF GOODS & INBOUND LOGISTICS' },
-  { key: 'usImportDutyUsd', label: 'US Import Duty & Clearance', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', note: 'Manual entry', group: 'COST OF GOODS & INBOUND LOGISTICS' },
-  { key: 'cm2', label: 'CM2 — Contribution Margin', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'subtotal' },
-  { key: 'cm2Pct', label: 'CM2 %', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'percent' },
-
+  { key: 'cm3', label: 'CONTRIBUTION MARGIN (CM3)', section: 'ADVERTISING FEES', kind: 'subtotal', note: '⭐ the number to manage the channel on' },
+  { key: 'cm3Pct', label: 'CM3 %', section: 'ADVERTISING FEES', kind: 'percent' },
 
   {
     key: 'allocatedOverheadsUsd', label: '(−) Allocated Fixed Expenses', section: 'FIXED EXPENSES',
     kind: 'input',
     note: "this channel's share of the company's own fixed costs — entered on Fixed Expenses, split by sales contribution",
   },
-  { key: 'cm3', label: 'NET PROFIT (CM3)', section: 'FIXED EXPENSES', kind: 'subtotal' },
-  { key: 'cm3Pct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
+  { key: 'cm4', label: 'NET PROFIT (CM4)', section: 'FIXED EXPENSES', kind: 'subtotal' },
+  { key: 'cm4Pct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
+
+  // Amazon's own bottom line, and the check against it. Not a rung of the
+  // ladder: Amazon strikes it before anything about the goods and after a
+  // per-unit cost typed into Seller Central that is not this company's cost
+  // accounting. That is why the fees used to sit above the landed cost here,
+  // and why this channel's CM1 meant something no other channel's did.
+  { key: 'netProceedsUsd', label: 'Net proceeds total', section: 'MEMO — NET PROCEEDS', kind: 'subtotal' },
+  // Sponsored Brands and Display are billed outside this report, so Amazon's
+  // own Net proceeds cannot know about them. Adding them back is what keeps
+  // the two figures comparable once that spend starts.
+  { key: 'adsNotBilledByAmazonUsd', label: 'Add back: advertising Amazon does not bill in this report', section: 'MEMO — NET PROCEEDS', kind: 'input', hideWhenZero: true, note: 'Reconciliation' },
+  { key: 'sheetSellerCostUsd', label: 'Per-unit cost typed into Seller Central', section: 'MEMO — NET PROCEEDS', kind: 'input', hideWhenZero: true, note: 'Amazon nets this off its own Net proceeds. It is not this company’s cost of goods — that comes from the cost sheet, on the landed cost above — so it is here for the reconciliation and in no margin.' },
+  { key: 'sheetNetProceedsUsd', label: 'Net proceeds per Amazon export', section: 'MEMO — NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
+  { key: 'netProceedsDiffUsd', label: 'Difference', section: 'MEMO — NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
 ]
 
 /**
@@ -187,7 +193,6 @@ export function computeAmazonUsaPnl(facts: AmazonUsaPnlFacts): NativeLineValues 
     AMAZON_USA_FEE_COLUMNS.filter((c) => c.group === group && counts(c)).reduce((sum, c) => sum + fee(c.id), 0)
 
   const totalMarketplaceChargesUsd = sumGroup('marketplace') + unmappedFeesUsd
-  const cm1 = facts.netSalesUsd - totalMarketplaceChargesUsd
 
   // Sponsored Products comes across in the export; Sponsored Brands and
   // Display are typed in because Amazon bills them outside this report. All
@@ -204,8 +209,20 @@ export function computeAmazonUsaPnl(facts: AmazonUsaPnlFacts): NativeLineValues 
   const sheetSellerCostUsd = (facts.sheetCogsUsd ?? 0) + (facts.sheetMiscCostUsd ?? 0)
   const netProceedsUsd = facts.netSalesUsd - totalMarketplaceChargesUsd - totalAdvertisingUsd - sheetSellerCostUsd
 
+  // The goods first, then the marketplace, then advertising — the ladder
+  // every channel is read on. Amazon's export nets its charges before it
+  // mentions a cost of goods, and following that order gave this statement a
+  // CM1 that meant "after Amazon's charges" while the P&L's gross profit for
+  // the same month meant "after the goods". Net profit is the same figure
+  // either way, with one exception stated on the memo below: the per-unit
+  // cost typed into Seller Central is no longer deducted in any margin,
+  // because this company's cost of goods comes from its own cost sheet and
+  // counting both would charge the goods twice the month that sheet is
+  // complete. It is $12.30 of September.
   const totalLandedCostUsd = facts.cogsUsd + facts.freightUsd + facts.exportDocsUsd + facts.usImportDutyUsd
-  const cm2 = netProceedsUsd - totalLandedCostUsd
+  const cm1 = facts.netSalesUsd - totalLandedCostUsd
+  const cm2 = cm1 - totalMarketplaceChargesUsd
+  const cm3 = cm2 - totalAdvertisingUsd
 
 
   const values: NativeLineValues = {
@@ -215,8 +232,8 @@ export function computeAmazonUsaPnl(facts: AmazonUsaPnlFacts): NativeLineValues 
 
     totalMarketplaceChargesUsd: known(-totalMarketplaceChargesUsd),
     unmappedFeesUsd: -unmappedFeesUsd,
-    cm1: known(cm1),
-    cm1Pct: known(facts.netSalesUsd !== 0 ? (cm1 / facts.netSalesUsd) * 100 : 0),
+    cm2: known(cm2),
+    cm2Pct: known(facts.netSalesUsd !== 0 ? (cm2 / facts.netSalesUsd) * 100 : 0),
     totalAdvertisingUsd: known(-totalAdvertisingUsd),
     sponsoredBrandsUsd: -facts.sponsoredBrandsUsd,
     sponsoredDisplayDspUsd: -facts.sponsoredDisplayDspUsd,
@@ -234,13 +251,15 @@ export function computeAmazonUsaPnl(facts: AmazonUsaPnlFacts): NativeLineValues 
     exportDocsUsd: -facts.exportDocsUsd,
     usImportDutyUsd: -facts.usImportDutyUsd,
     totalLandedCostUsd: -totalLandedCostUsd,
-    cm2: known(cm2),
-    cm2Pct: known(facts.netSalesUsd !== 0 ? (cm2 / facts.netSalesUsd) * 100 : 0),
+    cm1: known(cm1),
+    cm1Pct: known(facts.netSalesUsd !== 0 ? (cm1 / facts.netSalesUsd) * 100 : 0),
+    cm3: known(cm3),
+    cm3Pct: known(facts.netSalesUsd !== 0 ? (cm3 / facts.netSalesUsd) * 100 : 0),
     // Filled in by applyAmazonUsaOtherCosts once the month's allocation is
-    // known. Until then Net Profit is CM2.
+    // known. Until then Net Profit is CM3.
     allocatedOverheadsUsd: 0,
-    cm3: known(cm2),
-    cm3Pct: known(facts.netSalesUsd !== 0 ? (cm2 / facts.netSalesUsd) * 100 : 0),
+    cm4: known(cm3),
+    cm4Pct: known(facts.netSalesUsd !== 0 ? (cm3 / facts.netSalesUsd) * 100 : 0),
   }
   // Each fee column on its own line, negated so a charge reads as a cost and a
   // credit (a reimbursement, a referral refund) reads as income.
@@ -272,12 +291,12 @@ export function applyAmazonUsaOtherCosts(
   netSalesUsd: number,
 ): NativeLineValues {
   const otherCostsUsd = fxRate > 0 ? otherCostsInr / fxRate : 0
-  const cm3 = computed.cm2 - otherCostsUsd
+  const cm4 = computed.cm3 - otherCostsUsd
   return {
     ...computed,
     allocatedOverheadsUsd: -otherCostsUsd,
-    cm3,
-    cm3Pct: netSalesUsd !== 0 ? (cm3 / netSalesUsd) * 100 : 0,
+    cm4,
+    cm4Pct: netSalesUsd !== 0 ? (cm4 / netSalesUsd) * 100 : 0,
   }
 }
 
@@ -314,14 +333,22 @@ export function amazonUsaToCanonicalBuckets(facts: AmazonUsaPnlFacts, fxRate = N
     discounts: 0,
     returns: inr(facts.grossSalesUsd - facts.netSalesUsd),
     otherRevenueAdj: 0,
-    cogs: inr(facts.cogsUsd + (facts.sheetCogsUsd ?? 0)),
+    // Freight, documentation and duty go in with the goods, not in a shipping
+    // bucket below the line: what a unit cost landed in the USA is what it
+    // cost. It is the treatment Nykaa's inbound freight already gets, and it
+    // is what makes the statement's Total Landed Cost and the P&L's gross
+    // profit the same deduction. Amazon's own per-unit cost entry is left
+    // out: this company's cost of goods comes from its cost sheet, and
+    // counting Amazon's typed-in figure as well would charge the goods twice
+    // the month that sheet is complete.
+    cogs: inr(facts.cogsUsd + facts.freightUsd + facts.exportDocsUsd + facts.usImportDutyUsd),
     marketplaceCommission: inr(byBucket('marketplaceCommission')),
     fulfilment: inr(byBucket('fulfilment')),
-    shipping: inr(facts.freightUsd + facts.exportDocsUsd + facts.usImportDutyUsd),
+    shipping: 0,
     collectionFees: 0,
     rtoCharges: 0,
     returnCharges: inr(byBucket('returnCharges')),
-    otherMarketplaceCharges: inr(byBucket('otherMarketplaceCharges') + unmapped + (facts.sheetMiscCostUsd ?? 0)),
+    otherMarketplaceCharges: inr(byBucket('otherMarketplaceCharges') + unmapped),
     ads: inr(byBucket('ads') + facts.sponsoredBrandsUsd + facts.sponsoredDisplayDspUsd),
     performanceMarketing: 0,
     otherMarketing: 0,

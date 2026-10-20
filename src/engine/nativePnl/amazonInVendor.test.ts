@@ -179,6 +179,7 @@ describe('amazonInVendorToCanonicalBuckets', () => {
     const lines = computeSubtotals(amazonInVendorToCanonicalBuckets(MONTHS.september, COGS, 100000))
     expect(lines.netSales).toBeCloseTo(native.netRevenue, 2)
     expect(lines.grossProfit).toBeCloseTo(native.cm1, 2)
+    expect(lines.channelMargin).toBeCloseTo(native.cm2, 2)
     expect(lines.contributionProfit).toBeCloseTo(native.cm3, 2)
   })
 

@@ -54,9 +54,11 @@ const NOT_A_CHARGE: Record<string, string> = {
     'Same reason as listDiscount — a promotion is a price decision. It is on the statement, under its own heading, where it reads as what it is.',
   'nykaa.nykaaFundedCoupon':
     'The part of the discount Nykaa pays for itself, added back. Not a charge in either direction.',
+  'nykaa.marketplaceCharges':
+    'The rung, not a charge: Nykaa\u2019s margin and the discount it charges back are both deducted above the revenue line, because Nykaa buys the goods rather than selling them for us. The line reads nil and says why, so CM2 is struck on this statement as on every other.',
   ...Object.fromEntries(
     ['flipkart.otherCosts', 'nykaa.otherCosts', 'amazon_in.otherCosts', 'amazon_in_export.otherCosts',
-      'meesho.overheads', 'amazon_us.allocatedOverheadsUsd']
+      'meesho.overheads', 'blinkit.overheads', 'amazon_us.allocatedOverheadsUsd']
       .map((ref) => [
         ref,
         'Our own salaries, rent and software, shared out by this channel’s share of sales. The marketplace neither charges it nor knows about it.',

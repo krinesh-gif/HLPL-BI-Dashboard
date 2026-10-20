@@ -768,22 +768,28 @@ export interface SwiggyInstamartPnlFacts {
   /** Swiggy's trade margin on that GMV, and the terms it was taken from:
    * 25%, inclusive, on MRP, proved line by line on purchase order
    * FC5PO365689. Stored with the month so a change of terms cannot restate a
-   * closed one. */
-  marginInr: number
-  marginPct: number
-  /** GMV less that margin: what we invoice Swiggy, GST included. */
-  invoiceValueInr: number
+   * closed one.
+   *
+   * Optional because every month on file predates it: those rows carry no
+   * margin at all, and a reader has to treat its absence as nothing deducted
+   * rather than as NaN. They need their sales reports uploading again. */
+  marginInr?: number
+  marginPct?: number
+  /** GMV less that margin: what we invoice Swiggy, GST included. Absent on a
+   * month stored before the margin was computed. */
+  invoiceValueInr?: number
   /** The tax inside the invoice value, at each item's own rate from the
    * Product Master. The sales report states no rate. */
   outputGst: number
   /** Item codes with no GST rate in the Product Master, whose tax fell back
    * to the rate on Swiggy's purchase order — or to the standing rate where
    * no order names them. Named so the gap is nameable rather than silent. */
-  gstFallbackSkus: string[]
+  gstFallbackSkus?: string[]
   /** Marketing contribution charged for the month: 10% of MRP sales, for the
-   * first six months from launch. Zero outside that window. */
-  marketingContributionInr: number
-  marketingContributionPct: number
+   * first six months from launch. Zero outside that window, and absent on a
+   * month stored before it was computed. */
+  marketingContributionInr?: number
+  marketingContributionPct?: number
   /** The invoice value less GST — the basis every other channel's margins
    * are on. */
   gmvExGst: number
