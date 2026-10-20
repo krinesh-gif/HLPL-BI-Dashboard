@@ -40,7 +40,7 @@ export const SWIGGY_LINE_DEFS: NativeLineDef[] = [
     note: 'At each item’s own rate from the Product Master, which is what decides the rate across every channel. The sales report states none; where the Master has none either, the rate on purchase order FC5PO365689 stands in and the upload names those codes.' },
   { key: 'netRevenue', label: 'NET REVENUE (ex-GST)', section: 'REVENUE', kind: 'subtotal' },
 
-  { key: 'cogs', label: '(−) COGS', section: 'COST OF GOODS SOLD', kind: 'input',
+  { key: 'cogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'input',
     note: 'Priced from the Product Master at the month’s cost, through the SKU mapping for Swiggy’s own item codes' },
   { key: 'grossProfit', label: 'Gross Profit (after COGS)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'grossMarginPct', label: 'Gross Margin %', section: 'COST OF GOODS SOLD', kind: 'percent' },

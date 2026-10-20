@@ -113,7 +113,7 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
   { key: 'sheetNetProceedsUsd', label: 'Net proceeds per Amazon export', section: 'NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
   { key: 'netProceedsDiffUsd', label: 'Difference', section: 'NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
 
-  { key: 'cogsUsd', label: '(−) COGS', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input' },
+  { key: 'cogsUsd', label: 'Total COGS', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input' },
   { key: 'cogsPricedUsd', label: 'Priced from the cost sheet', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', memoOf: 'cogsUsd', hideWhenZero: true },
   { key: 'cogsEstimatedUsd', label: 'Estimated — no cost on file for these SKUs', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', memoOf: 'cogsUsd', hideWhenZero: true },
   { key: 'freightUsd', label: 'India → USA Air Freight', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input' },

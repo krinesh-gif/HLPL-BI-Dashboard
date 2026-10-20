@@ -52,7 +52,7 @@ export const MEESHO_LINE_DEFS: NativeLineDef[] = [
   { key: 'cogsUnitsSold', label: 'COGS — units sold', section: 'COST OF GOODS SOLD', kind: 'input' },
   { key: 'cogsRtoWriteOff', label: 'COGS — RTO write-off (unsaleable)', section: 'COST OF GOODS SOLD', kind: 'input' },
   { key: 'cogsReturnWriteOff', label: 'COGS — customer return write-off (unsaleable)', section: 'COST OF GOODS SOLD', kind: 'input' },
-  { key: 'totalCogs', label: '(−) COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'totalCogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'grossProfit', label: 'GROSS PROFIT', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'grossMarginPct', label: 'Gross Margin %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 

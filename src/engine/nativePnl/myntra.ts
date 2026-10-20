@@ -80,7 +80,7 @@ export const MYNTRA_LINE_DEFS: NativeLineDef[] = [
   { key: 'netRevenueExGst', label: 'NET REVENUE (ex-GST)', section: 'YOUR MARGIN', kind: 'subtotal', note: '⭐ denominator for every %' },
   { key: 'cogsPriced', label: 'COGS — priced SKUs', section: 'YOUR MARGIN', kind: 'input' },
   { key: 'cogsUnpriced', label: 'COGS — unpriced SKUs (est.)', section: 'YOUR MARGIN', kind: 'input', note: '⚠ estimate — goes to zero once every SKU is priced' },
-  { key: 'totalCogs', label: '(−) COGS', section: 'YOUR MARGIN', kind: 'subtotal' },
+  { key: 'totalCogs', label: 'Total COGS', section: 'YOUR MARGIN', kind: 'subtotal' },
   { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'YOUR MARGIN', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'YOUR MARGIN', kind: 'percent' },
   { key: 'cm2', label: 'CHANNEL MARGIN (CM2)', section: 'YOUR MARGIN', kind: 'subtotal', note: 'Earnings on Platform, less GST and what the goods cost' },

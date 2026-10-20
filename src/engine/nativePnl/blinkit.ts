@@ -67,7 +67,7 @@ export const BLINKIT_LINE_DEFS: NativeLineDef[] = [
 
   { key: 'adsSpend', label: '(−) Advertising', section: 'PROFIT', kind: 'input', fee: 'advertising', hideWhenZero: true,
     note: 'From Blinkit’s own campaign report — the Estimated Budget Consumed column, summed over the month. Billed separately from the payout, so it is not in the ladder above.' },
-  { key: 'cogs', label: '(−) COGS', section: 'PROFIT', kind: 'input',
+  { key: 'cogs', label: 'Total COGS', section: 'PROFIT', kind: 'input',
     note: 'From the cost sheet, for the units Blinkit sold' },
   { key: 'grossProfit', label: 'Gross Profit (after COGS)', section: 'PROFIT', kind: 'subtotal' },
   { key: 'grossMarginPct', label: 'Gross Margin %', section: 'PROFIT', kind: 'percent' },

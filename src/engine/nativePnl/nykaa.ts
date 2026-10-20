@@ -97,7 +97,7 @@ export const NYKAA_LINE_DEFS: NativeLineDef[] = [
   },
   { key: 'cogsPriced', label: 'COGS — priced SKUs', section: 'COST OF GOODS SOLD', kind: 'input' },
   { key: 'cogsUnpriced', label: 'COGS — unpriced SKUs (est.)', section: 'COST OF GOODS SOLD', kind: 'input', note: '⚠ estimate — goes to zero once every SKU is mapped and priced' },
-  { key: 'totalCogs', label: '(−) COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'totalCogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 

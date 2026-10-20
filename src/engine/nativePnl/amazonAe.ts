@@ -36,7 +36,7 @@ export const AMAZON_AE_LINE_DEFS: NativeLineDef[] = [
     note: 'Amazon’s own bottom line for the month, taken from the export rather than computed' },
   { key: 'feePct', label: 'Amazon’s take %', section: 'WHAT AMAZON TOOK', kind: 'percent' },
 
-  { key: 'cogs', label: '(−) COGS', section: 'PROFIT', kind: 'input',
+  { key: 'cogs', label: 'Total COGS', section: 'PROFIT', kind: 'input',
     note: 'Priced from the Product Master at the month’s cost, converted from rupees at the month’s rate' },
   { key: 'grossProfit', label: 'Gross Profit (after COGS)', section: 'PROFIT', kind: 'subtotal' },
   { key: 'grossMarginPct', label: 'Gross Margin %', section: 'PROFIT', kind: 'percent' },

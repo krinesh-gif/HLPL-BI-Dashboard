@@ -26,7 +26,7 @@ import type { NativeLineDef } from './types'
  * Allocated company overheads". Reading two channels side by side, that looks
  * like two different figures.
  *
- * The owner settled it: `(−) COGS` and `(−) Allocated Fixed Expenses`.
+ * The owner settled it: `Total COGS` and `(−) Allocated Fixed Expenses`.
  * This holds the statements to it, because a name only stays settled if
  * something checks.
  */
@@ -48,7 +48,7 @@ const CHANNELS: { channel: string; defs: NativeLineDef[] }[] = [
 /** The line each channel deducts the cost of the goods on, and the line it
  * deducts its share of the month's fixed expenses on. */
 const AGREED: { keys: string[]; label: string }[] = [
-  { keys: ['totalCogs', 'cogs', 'cogsUsd'], label: '(−) COGS' },
+  { keys: ['totalCogs', 'cogs', 'cogsUsd'], label: 'Total COGS' },
   { keys: ['otherCosts', 'overheads', 'allocatedOverheadsUsd'], label: '(−) Allocated Fixed Expenses' },
 ]
 

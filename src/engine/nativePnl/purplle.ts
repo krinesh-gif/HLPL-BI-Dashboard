@@ -47,7 +47,7 @@ export const PURPLLE_LINE_DEFS: NativeLineDef[] = [
   { key: 'purplleRealisationPct', label: 'Purplle’s own margin after that', section: 'MEMO — PURPLLE’S SHOP FLOOR', kind: 'percent',
     note: 'What Purplle keeps of the MRP once it has discounted — its 31% less the price off it funded' },
 
-  { key: 'cogs', label: '(−) COGS', section: 'COST OF GOODS SOLD', kind: 'input',
+  { key: 'cogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'input',
     note: 'Priced from the Product Master at the month’s cost, through the SKU mapping for Purplle’s own codes' },
   { key: 'grossProfit', label: 'Gross Profit (after COGS)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'grossMarginPct', label: 'Gross Margin %', section: 'COST OF GOODS SOLD', kind: 'percent' },

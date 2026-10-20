@@ -112,7 +112,7 @@ export const AMAZON_IN_SELLER_EXPORT_LINE_DEFS: NativeLineDef[] = [
 
   { key: 'cogsPriced', label: 'COGS — priced from the cost sheet', section: 'COST OF GOODS SOLD', kind: 'input' },
   { key: 'cogsUnpriced', label: 'COGS — SKUs with no cost on file (est.)', section: 'COST OF GOODS SOLD', kind: 'input', note: '⚠ estimate — goes to zero once every MSKU is linked to a SKU', hideWhenZero: true },
-  { key: 'totalCogs', label: '(−) COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'totalCogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm2', label: 'CONTRIBUTION MARGIN (CM2)', section: 'COST OF GOODS SOLD', kind: 'subtotal', note: '⭐ the number to manage this half on' },
   { key: 'cm2Pct', label: 'CM2 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 
