@@ -31,11 +31,11 @@ import type { NativeLineDef, NativeLineValues } from './types'
 export const PURPLLE_LINE_DEFS: NativeLineDef[] = [
   { key: 'mrpValue', label: 'MRP value of what sold', section: 'REVENUE', kind: 'input',
     note: 'What the units Purplle sold this month list at' },
-  { key: 'margin', label: 'Less: Purplle margin', section: 'REVENUE', kind: 'input',
+  { key: 'margin', label: '(−) Purplle margin', section: 'REVENUE', kind: 'input',
     note: 'Basic Product Margin from the margin sheet — 31%, inclusive, on MRP, taken on invoice. Inclusive means nothing is added for GST. It is deducted here rather than below gross profit because it was never our revenue: we invoice MRP less the margin.' },
   { key: 'invoiceValue', label: 'INVOICE VALUE (what we bill Purplle)', section: 'REVENUE', kind: 'subtotal',
     note: 'MRP less the margin, GST included — the channel’s revenue' },
-  { key: 'outputGst', label: 'Less: Output GST', section: 'REVENUE', kind: 'input',
+  { key: 'outputGst', label: '(−) Output GST', section: 'REVENUE', kind: 'input',
     note: 'On what we invoice, at each product’s own rate from the Product Master, which is what decides the rate across every channel. Where the Master has none yet, the rate stated on Purplle’s file stands in and the upload names those codes.' },
   { key: 'netRevenue', label: 'NET REVENUE (ex-GST)', section: 'REVENUE', kind: 'subtotal' },
 
@@ -47,17 +47,17 @@ export const PURPLLE_LINE_DEFS: NativeLineDef[] = [
   { key: 'purplleRealisationPct', label: 'Purplle’s own margin after that', section: 'MEMO — PURPLLE’S SHOP FLOOR', kind: 'percent',
     note: 'What Purplle keeps of the MRP once it has discounted — its 31% less the price off it funded' },
 
-  { key: 'cogs', label: 'Less: COGS', section: 'COST OF GOODS SOLD', kind: 'input',
+  { key: 'cogs', label: '(−) COGS', section: 'COST OF GOODS SOLD', kind: 'input',
     note: 'Priced from the Product Master at the month’s cost, through the SKU mapping for Purplle’s own codes' },
   { key: 'grossProfit', label: 'Gross Profit (after COGS)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'grossMarginPct', label: 'Gross Margin %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 
 
-  { key: 'marketing', label: 'Less: Advertising (MI)', section: 'PROFIT', kind: 'input', fee: 'advertising',
+  { key: 'marketing', label: '(−) Advertising (MI)', section: 'PROFIT', kind: 'input', fee: 'advertising',
     note: 'Purplle’s marketing charge, which is 5% of the month’s MRP: April writes it once above the table under a "Marketing" label, June as an unnamed column of the same 5% per row. It is not on the margin sheet, where every line but the 31% is blank — so check it against Purplle’s invoice.' },
   { key: 'contribution', label: 'Contribution (after advertising)', section: 'PROFIT', kind: 'subtotal' },
   { key: 'contributionPct', label: 'Contribution %', section: 'PROFIT', kind: 'percent' },
-  { key: 'overheads', label: 'Less: Allocated Fixed Expenses', section: 'PROFIT', kind: 'input',
+  { key: 'overheads', label: '(−) Allocated Fixed Expenses', section: 'PROFIT', kind: 'input',
     note: 'This channel’s share of the month’s fixed expenses, by its share of sales' },
   { key: 'ebitda', label: 'EBITDA', section: 'PROFIT', kind: 'subtotal' },
   { key: 'ebitdaPct', label: 'EBITDA %', section: 'PROFIT', kind: 'percent' },

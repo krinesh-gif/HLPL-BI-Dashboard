@@ -88,7 +88,7 @@ const feeLineDefs = (group: AmazonUsaFeeColumn['group'], section: string): Nativ
 
 export const AMAZON_IN_SELLER_EXPORT_LINE_DEFS: NativeLineDef[] = [
   { key: 'grossSales', label: 'Gross Sales (ex-GST)', section: 'SALES', kind: 'input', note: 'What the month sold, before returns' },
-  { key: 'returns', label: 'Less: Returns and refunds', section: 'SALES', kind: 'input' },
+  { key: 'returns', label: '(−) Returns and refunds', section: 'SALES', kind: 'input' },
   { key: 'netSales', label: 'NET SALES (ex-GST)', section: 'SALES', kind: 'subtotal', note: '⭐ denominator for every %' },
 
   { key: 'totalMarketplaceCharges', label: 'Total Amazon charges', section: 'AMAZON CHARGES', kind: 'subtotal', isGroupHead: true, group: 'AMAZON CHARGES' },
@@ -97,7 +97,7 @@ export const AMAZON_IN_SELLER_EXPORT_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm1', label: 'CM1 — after Amazon charges', section: 'AMAZON CHARGES', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'AMAZON CHARGES', kind: 'percent' },
 
-  { key: 'totalAdvertising', label: 'Less: Advertising', section: 'ADVERTISING', kind: 'subtotal', isGroupHead: true, group: 'ADVERTISING', hideWhenZero: true },
+  { key: 'totalAdvertising', label: '(−) Advertising', section: 'ADVERTISING', kind: 'subtotal', isGroupHead: true, group: 'ADVERTISING', hideWhenZero: true },
   ...feeLineDefs('advertising', 'ADVERTISING'),
   {
     key: 'channelAds', label: 'Campaign spend, from the ads reports', section: 'ADVERTISING', kind: 'input',
@@ -112,11 +112,11 @@ export const AMAZON_IN_SELLER_EXPORT_LINE_DEFS: NativeLineDef[] = [
 
   { key: 'cogsPriced', label: 'COGS — priced from the cost sheet', section: 'COST OF GOODS SOLD', kind: 'input' },
   { key: 'cogsUnpriced', label: 'COGS — SKUs with no cost on file (est.)', section: 'COST OF GOODS SOLD', kind: 'input', note: '⚠ estimate — goes to zero once every MSKU is linked to a SKU', hideWhenZero: true },
-  { key: 'totalCogs', label: 'Less: COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'totalCogs', label: '(−) COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm2', label: 'CONTRIBUTION MARGIN (CM2)', section: 'COST OF GOODS SOLD', kind: 'subtotal', note: '⭐ the number to manage this half on' },
   { key: 'cm2Pct', label: 'CM2 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 
-  { key: 'otherCosts', label: 'Less: Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input' },
+  { key: 'otherCosts', label: '(−) Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input' },
   { key: 'cm3', label: 'NET PROFIT (CM3)', section: 'FIXED EXPENSES', kind: 'subtotal' },
   { key: 'cm3Pct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
 

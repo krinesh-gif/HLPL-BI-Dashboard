@@ -568,7 +568,7 @@ const ALLOCATED_COST_KEYS = ['otherCosts', 'overheads', 'allocatedOverheadsUsd']
  * it when a channel charge is in it too.
  *
  * A native statement has one line for everything below contribution, and it
- * is called "Less: Allocated Fixed Expenses" on every channel — a name the
+ * is called "(−) Allocated Fixed Expenses" on every channel — a name the
  * owner settled so that two statements side by side could be read as the
  * same figure. A channel charge is not an allocated fixed expense: it is
  * Flipkart's own NextGen fee, billed to Flipkart. Folded into that line

@@ -36,14 +36,14 @@ import type { NativeLineDef, NativeLineValues } from './types'
  */
 export const NYKAA_LINE_DEFS: NativeLineDef[] = [
   { key: 'grossSalesMrp', label: 'Gross Sales (at MRP)', section: 'SALES — AT MRP', kind: 'input' },
-  { key: 'returnsMrp', label: 'Less: Returns (at MRP)', section: 'SALES — AT MRP', kind: 'input' },
+  { key: 'returnsMrp', label: '(−) Returns (at MRP)', section: 'SALES — AT MRP', kind: 'input' },
   { key: 'netSalesMrp', label: 'NET SALES AT MRP', section: 'SALES — AT MRP', kind: 'subtotal', note: 'what Nykaa owes against, before its margin' },
 
   { key: 'commissionPct', label: "Nykaa's margin, % of MRP", section: "NYKAA'S MARGIN", kind: 'percent' },
-  { key: 'commission', label: "Less: Nykaa commission on MRP", section: "NYKAA'S MARGIN", kind: 'input', fee: 'commission' },
+  { key: 'commission', label: "(−) Nykaa commission on MRP", section: "NYKAA'S MARGIN", kind: 'input', fee: 'commission' },
   { key: 'netRealisationInclGst', label: 'NET REALISATION (incl. GST)', section: "NYKAA'S MARGIN", kind: 'subtotal', note: 'what Nykaa pays us' },
 
-  { key: 'outputGst', label: 'Less: Output GST', section: 'REVENUE', kind: 'input', note: 'MRP is tax-inclusive, so the realisation is too' },
+  { key: 'outputGst', label: '(−) Output GST', section: 'REVENUE', kind: 'input', note: 'MRP is tax-inclusive, so the realisation is too' },
   {
     key: 'invoiceRevenueExGst', label: 'INVOICE REVENUE (ex-GST)', section: 'REVENUE', kind: 'subtotal',
     note: 'what the invoice is worth before the discount is charged back',
@@ -54,11 +54,11 @@ export const NYKAA_LINE_DEFS: NativeLineDef[] = [
   },
 
   {
-    key: 'listDiscount', label: 'Less: Discount off MRP (listed price)', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
+    key: 'listDiscount', label: '(−) Discount off MRP (listed price)', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
     kind: 'input', hideWhenZero: true, note: 'Σ (final_mrp − final_subtotal) — what the goods are listed at, below their printed price',
   },
   {
-    key: 'promoDiscount', label: 'Less: Promotions, coupons and cart rules', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
+    key: 'promoDiscount', label: '(−) Promotions, coupons and cart rules', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
     kind: 'input', hideWhenZero: true, note: 'Σ (final_subtotal − final_sp) — run on top of the listed price',
   },
   {
@@ -91,21 +91,21 @@ export const NYKAA_LINE_DEFS: NativeLineDef[] = [
   },
 
   {
-    key: 'inboundFreight', label: 'Less: Freight to Nykaa warehouse', section: 'COST OF GOODS SOLD',
+    key: 'inboundFreight', label: '(−) Freight to Nykaa warehouse', section: 'COST OF GOODS SOLD',
     kind: 'input', hideWhenZero: true,
     note: 'net units × the rate card entered for the month — a rupee or two a unit, and six thousand units a month',
   },
   { key: 'cogsPriced', label: 'COGS — priced SKUs', section: 'COST OF GOODS SOLD', kind: 'input' },
   { key: 'cogsUnpriced', label: 'COGS — unpriced SKUs (est.)', section: 'COST OF GOODS SOLD', kind: 'input', note: '⚠ estimate — goes to zero once every SKU is mapped and priced' },
-  { key: 'totalCogs', label: 'Less: COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'totalCogs', label: '(−) COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 
-  { key: 'nykaaAds', label: 'Less: Nykaa Ads / MI', section: 'ADVERTISING', kind: 'input', fee: 'advertising', note: 'Manual entry — billed by invoice, not reported' },
+  { key: 'nykaaAds', label: '(−) Nykaa Ads / MI', section: 'ADVERTISING', kind: 'input', fee: 'advertising', note: 'Manual entry — billed by invoice, not reported' },
   { key: 'cm2', label: 'CONTRIBUTION MARGIN (CM2)', section: 'ADVERTISING', kind: 'subtotal', note: '⭐ the number to manage the channel on' },
   { key: 'cm2Pct', label: 'CM2 %', section: 'ADVERTISING', kind: 'percent' },
 
-  { key: 'otherCosts', label: 'Less: Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input' },
+  { key: 'otherCosts', label: '(−) Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input' },
   { key: 'cm3', label: 'NET PROFIT (CM3)', section: 'FIXED EXPENSES', kind: 'subtotal' },
   { key: 'cm3Pct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
 

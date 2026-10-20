@@ -53,7 +53,7 @@ export function channelChargesByChannel(
  * One label for the charges behind a figure: "NextGen Fees, Smart Assist".
  *
  * The canonical P&L has a line of its own for them. A channel's native
- * statement does not — it shows one "Less: Allocated Fixed Expenses" line
+ * statement does not — it shows one "(−) Allocated Fixed Expenses" line
  * where the canonical P&L shows the whole opex breakdown — so on that
  * statement a charge lands inside a line whose name says it is the allocated
  * share of head office, which a direct charge is precisely not. The figure is

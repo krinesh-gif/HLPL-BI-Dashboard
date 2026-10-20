@@ -41,18 +41,18 @@ export const MEESHO_LINE_DEFS: NativeLineDef[] = [
     // Its own line rather than folded into returns: a cancellation happens
     // before the parcel moves, so it is a different problem from one that comes
     // back, and burying it in the return rate would hide the cancellation rate.
-    key: 'cancellations', label: 'Less: Cancellations (incl. GST)', section: 'REVENUE', kind: 'input',
+    key: 'cancellations', label: '(−) Cancellations (incl. GST)', section: 'REVENUE', kind: 'input',
     note: 'Billed in gross by the file, which writes no return against them',
   },
-  { key: 'salesReturns', label: 'Less: Sales Returns & RTO (incl. GST)', section: 'REVENUE', kind: 'input' },
+  { key: 'salesReturns', label: '(−) Sales Returns & RTO (incl. GST)', section: 'REVENUE', kind: 'input' },
   { key: 'netSalesInclGst', label: 'Net Sales (incl. GST)', section: 'REVENUE', kind: 'subtotal' },
-  { key: 'outputGst', label: 'Less: Output GST on sales', section: 'REVENUE', kind: 'input' },
+  { key: 'outputGst', label: '(−) Output GST on sales', section: 'REVENUE', kind: 'input' },
   { key: 'netRevenue', label: 'NET REVENUE (ex-GST)', section: 'REVENUE', kind: 'subtotal' },
 
   { key: 'cogsUnitsSold', label: 'COGS — units sold', section: 'COST OF GOODS SOLD', kind: 'input' },
   { key: 'cogsRtoWriteOff', label: 'COGS — RTO write-off (unsaleable)', section: 'COST OF GOODS SOLD', kind: 'input' },
   { key: 'cogsReturnWriteOff', label: 'COGS — customer return write-off (unsaleable)', section: 'COST OF GOODS SOLD', kind: 'input' },
-  { key: 'totalCogs', label: 'Less: COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'totalCogs', label: '(−) COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'grossProfit', label: 'GROSS PROFIT', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'grossMarginPct', label: 'Gross Margin %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 
@@ -87,7 +87,7 @@ export const MEESHO_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm4', label: 'CONTRIBUTION MARGIN 4 (after adjustments)', section: 'PLATFORM ADJUSTMENTS', kind: 'subtotal' },
   { key: 'cm4Pct', label: 'CM4 %', section: 'PLATFORM ADJUSTMENTS', kind: 'percent' },
 
-  { key: 'overheads', label: 'Less: Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input' },
+  { key: 'overheads', label: '(−) Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input' },
   { key: 'ebitda', label: 'CHANNEL EBITDA', section: 'FIXED EXPENSES', kind: 'subtotal' },
   { key: 'ebitdaPct', label: 'EBITDA %', section: 'FIXED EXPENSES', kind: 'percent' },
 

@@ -50,28 +50,28 @@ export const EMPTY_VENDOR_COGS: VendorCogs = { priced: 0, unpriced: 0, uncostedA
 
 export const AMAZON_IN_VENDOR_LINE_DEFS: NativeLineDef[] = [
   { key: 'netShippedGms', label: 'Retail value realised by RK World', section: 'SALES', kind: 'input', note: 'Ex-GST — the tax is charged on top of this' },
-  { key: 'tradeMargin', label: 'Less: trade margin to RK World', section: 'SALES', kind: 'input' },
+  { key: 'tradeMargin', label: '(−) trade margin to RK World', section: 'SALES', kind: 'input' },
   { key: 'marginAchievedPct', label: 'Margin achieved', section: 'SALES', kind: 'percent', note: 'Of the retail value, which is what the contract is on' },
   { key: 'marginClosedPct', label: 'Margin contracted', section: 'SALES', kind: 'percent', note: 'Renegotiated: 31% to June, 32% from August' },
   { key: 'invoiceValue', label: 'NET REVENUE (ex-GST)', section: 'SALES', kind: 'subtotal', note: 'What RK World pays, and the denominator for every %' },
 
   { key: 'cogsPriced', label: 'COGS — priced ASINs', section: 'COST OF GOODS SOLD', kind: 'input' },
   { key: 'cogsUnpriced', label: 'COGS — unpriced ASINs (est.)', section: 'COST OF GOODS SOLD', kind: 'input', note: '⚠ estimate — goes to zero once every ASIN is linked to a SKU' },
-  { key: 'totalCogs', label: 'Less: COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'totalCogs', label: '(−) COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 
-  { key: 'contraCogs', label: 'Less: contra-COGS margin support', section: 'AMAZON CHARGES', kind: 'input', fee: 'otherFees', note: 'The shortfall against the contracted margin, billed back after the invoices' },
-  { key: 'ixd', label: 'Less: inward cross-dock (IXD)', section: 'AMAZON CHARGES', kind: 'input', fee: 'fulfilment', note: 'A flat rate on every unit unpacked at the warehouse — not on units sold' },
+  { key: 'contraCogs', label: '(−) contra-COGS margin support', section: 'AMAZON CHARGES', kind: 'input', fee: 'otherFees', note: 'The shortfall against the contracted margin, billed back after the invoices' },
+  { key: 'ixd', label: '(−) inward cross-dock (IXD)', section: 'AMAZON CHARGES', kind: 'input', fee: 'fulfilment', note: 'A flat rate on every unit unpacked at the warehouse — not on units sold' },
   { key: 'totalCharges', label: 'Total Amazon charges', section: 'AMAZON CHARGES', kind: 'subtotal' },
   { key: 'cm2', label: 'CHANNEL MARGIN (CM2)', section: 'AMAZON CHARGES', kind: 'subtotal', note: 'Is this wholesale relationship worth having?' },
   { key: 'cm2Pct', label: 'CM2 %', section: 'AMAZON CHARGES', kind: 'percent' },
 
-  { key: 'ads', label: 'Less: Allocated advertising', section: 'ADVERTISING', kind: 'input', fee: 'advertising', note: 'A share of Amazon India’s spend — one account lifts both halves' },
+  { key: 'ads', label: '(−) Allocated advertising', section: 'ADVERTISING', kind: 'input', fee: 'advertising', note: 'A share of Amazon India’s spend — one account lifts both halves' },
   { key: 'cm3', label: 'CONTRIBUTION MARGIN (CM3)', section: 'ADVERTISING', kind: 'subtotal', note: '⭐ the number to manage this on' },
   { key: 'cm3Pct', label: 'CM3 %', section: 'ADVERTISING', kind: 'percent' },
 
-  { key: 'otherCosts', label: 'Less: Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input' },
+  { key: 'otherCosts', label: '(−) Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input' },
   { key: 'cm4', label: 'NET PROFIT (CM4)', section: 'FIXED EXPENSES', kind: 'subtotal' },
   { key: 'cm4Pct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
 

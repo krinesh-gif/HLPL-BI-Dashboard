@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { amountTone } from './amountTone'
-import { PNL_ROWS } from '@/engine/multiMonthPnl'
+import { DEDUCTION_MARK, PNL_ROWS } from '@/engine/multiMonthPnl'
 
 describe('amountTone', () => {
   it('paints money coming in green', () => {
@@ -25,11 +25,11 @@ describe('P&L row signs', () => {
   /**
    * The colour rule is only honest if a deduction is shown negative. These
    * rows hold positive magnitudes — `cogs` is what the goods cost — so without
-   * a sign the table would print "Less: COGS" in green.
+   * a sign the table would print "(−) COGS" in green.
    */
-  it('marks every "Less:" row as a deduction', () => {
+  it('marks every deduction row with a sign', () => {
     for (const row of PNL_ROWS) {
-      if (row.label.startsWith('Less:')) {
+      if (row.label.startsWith(DEDUCTION_MARK)) {
         expect(row.sign, `${row.key} is a deduction but has no sign`).toBe(-1)
       }
     }
@@ -37,7 +37,7 @@ describe('P&L row signs', () => {
 
   it('leaves revenue, subtotals and percentages positive', () => {
     for (const row of PNL_ROWS) {
-      if (!row.label.startsWith('Less:')) {
+      if (!row.label.startsWith(DEDUCTION_MARK)) {
         expect(row.sign ?? 1, `${row.key} should not be signed`).toBe(1)
       }
     }

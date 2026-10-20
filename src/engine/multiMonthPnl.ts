@@ -56,10 +56,29 @@ export interface PnlRowDef {
    * Deduction lines hold a positive magnitude — `cogs` is what the goods cost,
    * not minus what they cost — because that is what the engine sums. On screen
    * they are money leaving, so they are printed negative. Without this, a P&L
-   * that colours negatives red would print "Less: COGS" in green.
+   * that colours negatives red would print "(−) COGS" in green.
    */
   sign?: 1 | -1
 }
+
+/**
+ * How a deduction is marked, on this report and on every channel's own
+ * statement.
+ *
+ * It read "Less: " and is now "(−) " — the owner's call, and a good one in a
+ * table: the mark is two characters instead of five, so the particulars
+ * column is narrower, and it reads as arithmetic rather than as a word that
+ * has to be translated into one.
+ *
+ * The character is U+2212 MINUS SIGN, not a hyphen: it is drawn at the same
+ * width and height as a digit, so it sits level with the figures beside it.
+ *
+ * Exported because the sign rule is checked against it — a deduction line
+ * must carry `sign: -1` or the table would print money leaving in green —
+ * and a test that hard-coded the word would pass for the wrong reason the
+ * next time the mark changes.
+ */
+export const DEDUCTION_MARK = '(−)'
 
 const sum = (lines: PnlLineValues, keys: (keyof PnlLineValues)[]): number =>
   keys.reduce((acc, k) => acc + (lines[k] ?? 0), 0)
@@ -87,8 +106,8 @@ const ebitda = (l: PnlLineValues) => l.ebitda ?? 0
  * uses this same set, so the reports are directly comparable. */
 export const PNL_ROWS: PnlRowDef[] = [
   { key: 'grossSales', label: 'Gross Sales', kind: 'input', value: (l) => l.grossSales ?? 0, total: (t) => t.grossSales ?? 0 },
-  { key: 'discounts', label: 'Less: Discounts', kind: 'input', indent: true, value: (l) => l.discounts ?? 0, total: (t) => t.discounts ?? 0, sign: -1 },
-  { key: 'returns', label: 'Less: Returns', kind: 'input', indent: true, value: (l) => l.returns ?? 0, total: (t) => t.returns ?? 0, sign: -1 },
+  { key: 'discounts', label: '(−) Discounts', kind: 'input', indent: true, value: (l) => l.discounts ?? 0, total: (t) => t.discounts ?? 0, sign: -1 },
+  { key: 'returns', label: '(−) Returns', kind: 'input', indent: true, value: (l) => l.returns ?? 0, total: (t) => t.returns ?? 0, sign: -1 },
   // Output GST is collected on the sale and paid onward, so it was never
   // revenue and Net Sales is stated after it. It had no row of its own, which
   // meant the revenue block did not add up on screen: Myntra's July read
@@ -100,15 +119,15 @@ export const PNL_ROWS: PnlRowDef[] = [
   // particulars column on every view — costing a month or a channel column
   // of screen on a table that is read by scanning across. The full name is
   // on hover.
-  { key: 'otherRevenueAdj', label: 'Less: GST & Adjustments', note: 'Output GST and other revenue adjustments', kind: 'input', indent: true, value: (l) => l.otherRevenueAdj ?? 0, total: (t) => t.otherRevenueAdj ?? 0, sign: -1 },
+  { key: 'otherRevenueAdj', label: '(−) GST & Adjustments', note: 'Output GST and other revenue adjustments', kind: 'input', indent: true, value: (l) => l.otherRevenueAdj ?? 0, total: (t) => t.otherRevenueAdj ?? 0, sign: -1 },
   { key: 'netSales', label: 'Net Sales', kind: 'subtotal', value: (l) => l.netSales ?? 0, total: (t) => t.netSales ?? 0 },
 
-  { key: 'cogs', label: 'Less: COGS', kind: 'input', indent: true, value: (l) => l.cogs ?? 0, total: (t) => t.cogs ?? 0, sign: -1 },
+  { key: 'cogs', label: '(−) COGS', kind: 'input', indent: true, value: (l) => l.cogs ?? 0, total: (t) => t.cogs ?? 0, sign: -1 },
   { key: 'grossProfit', label: 'Gross Profit', kind: 'subtotal', value: grossProfit, total: grossProfit },
   { key: 'grossMarginPct', label: 'Gross Margin %', kind: 'percent', value: marginOf(grossProfit), total: marginOf(grossProfit) },
 
-  { key: 'marketplaceCosts', label: 'Less: Marketplace Fees', kind: 'input', indent: true, value: (l) => sum(l, MARKETPLACE_COST_KEYS), total: (t) => sum(t, MARKETPLACE_COST_KEYS), sign: -1 },
-  { key: 'marketing', label: 'Less: Advertising (MI)', kind: 'input', indent: true, value: (l) => sum(l, MARKETING_KEYS), total: (t) => sum(t, MARKETING_KEYS), sign: -1 },
+  { key: 'marketplaceCosts', label: '(−) Marketplace Fees', kind: 'input', indent: true, value: (l) => sum(l, MARKETPLACE_COST_KEYS), total: (t) => sum(t, MARKETPLACE_COST_KEYS), sign: -1 },
+  { key: 'marketing', label: '(−) Advertising (MI)', kind: 'input', indent: true, value: (l) => sum(l, MARKETING_KEYS), total: (t) => sum(t, MARKETING_KEYS), sign: -1 },
   { key: 'contribution', label: 'Contribution', kind: 'subtotal', value: contribution, total: contribution },
   { key: 'contributionMarginPct', label: 'Contribution Margin %', kind: 'percent', value: marginOf(contribution), total: marginOf(contribution) },
 
@@ -118,8 +137,8 @@ export const PNL_ROWS: PnlRowDef[] = [
   // Expenses. It had no row at all, which left the one channel that carries
   // it unable to add up: September read a contribution of 2,13,793, fixed
   // expenses, and then an EBITDA 25,000 lower than the two of them give.
-  { key: 'channelCharges', label: 'Less: Channel Charges', kind: 'input', indent: true, hideWhenEmpty: true, value: (l) => l.channelCharges ?? 0, total: (t) => t.channelCharges ?? 0, sign: -1 },
-  { key: 'fixedExpenses', label: 'Less: Fixed Expenses', kind: 'input', indent: true, value: (l) => sum(l, FIXED_EXPENSE_KEYS), total: (t) => sum(t, FIXED_EXPENSE_KEYS), sign: -1 },
+  { key: 'channelCharges', label: '(−) Channel Charges', kind: 'input', indent: true, hideWhenEmpty: true, value: (l) => l.channelCharges ?? 0, total: (t) => t.channelCharges ?? 0, sign: -1 },
+  { key: 'fixedExpenses', label: '(−) Fixed Expenses', kind: 'input', indent: true, value: (l) => sum(l, FIXED_EXPENSE_KEYS), total: (t) => sum(t, FIXED_EXPENSE_KEYS), sign: -1 },
   { key: 'ebitda', label: 'EBITDA', kind: 'subtotal', value: ebitda, total: ebitda },
   { key: 'ebitdaMarginPct', label: 'EBITDA Margin %', kind: 'percent', value: marginOf(ebitda), total: marginOf(ebitda) },
 ]

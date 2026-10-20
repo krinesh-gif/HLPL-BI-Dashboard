@@ -40,7 +40,7 @@ describe('the summed lines are one figure under one name', () => {
     const row = PNL_ROWS.find((r) => r.key === pnlKey)
     // The P&L prefixes a deduction, the MIS does not — that difference is the
     // report's own convention. Everything after it has to match.
-    expect(row?.label).toBe(`Less: ${misLabel}`)
+    expect(row?.label).toBe(`(−) ${misLabel}`)
   })
 
   it.each(AGREED)('$misLabel adds up the same on both', ({ pnlKey, misLabel }) => {
@@ -56,7 +56,7 @@ describe('the summed lines are one figure under one name', () => {
 
   it('names each figure once, so neither report offers two of them', () => {
     for (const { misLabel } of AGREED) {
-      expect(PNL_ROWS.filter((r) => r.label === `Less: ${misLabel}`)).toHaveLength(1)
+      expect(PNL_ROWS.filter((r) => r.label === `(−) ${misLabel}`)).toHaveLength(1)
       expect(misRows.filter((r) => r.particular === misLabel)).toHaveLength(1)
     }
   })

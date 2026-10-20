@@ -84,7 +84,7 @@ const DEFAULT_NESTED = new Set(
 
 export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
   { key: 'grossSalesUsd', label: 'Gross Sales', section: 'REVENUE', kind: 'input' },
-  { key: 'refundsReturnsUsd', label: 'Less: Return', section: 'REVENUE', kind: 'input' },
+  { key: 'refundsReturnsUsd', label: '(−) Return', section: 'REVENUE', kind: 'input' },
   { key: 'netSalesUsd', label: 'Net Sales', section: 'REVENUE', kind: 'subtotal' },
 
   { key: 'totalMarketplaceChargesUsd', label: 'Marketplace Charges', section: 'MARKETPLACE CHARGES', kind: 'subtotal', isGroupHead: true, group: 'MARKETPLACE CHARGES' },
@@ -113,7 +113,7 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
   { key: 'sheetNetProceedsUsd', label: 'Net proceeds per Amazon export', section: 'NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
   { key: 'netProceedsDiffUsd', label: 'Difference', section: 'NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
 
-  { key: 'cogsUsd', label: 'Less: COGS', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input' },
+  { key: 'cogsUsd', label: '(−) COGS', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input' },
   { key: 'cogsPricedUsd', label: 'Priced from the cost sheet', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', memoOf: 'cogsUsd', hideWhenZero: true },
   { key: 'cogsEstimatedUsd', label: 'Estimated — no cost on file for these SKUs', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', memoOf: 'cogsUsd', hideWhenZero: true },
   { key: 'freightUsd', label: 'India → USA Air Freight', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input' },
@@ -125,7 +125,7 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
 
 
   {
-    key: 'allocatedOverheadsUsd', label: 'Less: Allocated Fixed Expenses', section: 'FIXED EXPENSES',
+    key: 'allocatedOverheadsUsd', label: '(−) Allocated Fixed Expenses', section: 'FIXED EXPENSES',
     kind: 'input',
     note: "this channel's share of the company's own fixed costs — entered on Fixed Expenses, split by sales contribution",
   },

@@ -75,15 +75,15 @@ export function amazonInSellerBuckets(facts: AmazonInSellerPnlFacts): Record<Set
 
 export const AMAZON_IN_SELLER_LINE_DEFS: NativeLineDef[] = [
   { key: 'grossSales', label: 'Gross Sales (ex-GST)', section: 'SALES', kind: 'input', note: 'Principal and shipping charged, as settled' },
-  { key: 'returns', label: 'Less: Returns and refunds', section: 'SALES', kind: 'input' },
-  { key: 'promotions', label: 'Less: Seller-funded promotions', section: 'SALES', kind: 'input', note: 'Coupons, rebates and the shipping we absorb' },
+  { key: 'returns', label: '(−) Returns and refunds', section: 'SALES', kind: 'input' },
+  { key: 'promotions', label: '(−) Seller-funded promotions', section: 'SALES', kind: 'input', note: 'Coupons, rebates and the shipping we absorb' },
   { key: 'netSales', label: 'NET SALES (ex-GST)', section: 'SALES', kind: 'subtotal', note: '⭐ denominator for every %' },
 
-  { key: 'commission', label: 'Less: Commission', section: 'AMAZON FEES', kind: 'input', fee: 'commission' },
-  { key: 'closingFee', label: 'Less: Fixed closing fee', section: 'AMAZON FEES', kind: 'input', fee: 'fixedFee' },
-  { key: 'fbaFees', label: 'Less: FBA pick, pack, weight and storage', section: 'AMAZON FEES', kind: 'input', fee: 'fulfilment', hideWhenZero: true },
-  { key: 'shippingFees', label: 'Less: Easy Ship postage', section: 'AMAZON FEES', kind: 'input', fee: 'shipping', hideWhenZero: true, note: 'Net of the reversals Amazon credits back' },
-  { key: 'unrecognised', label: 'Less: Charges this build does not recognise', section: 'AMAZON FEES', kind: 'input', fee: 'otherFees', hideWhenZero: true, note: '⚠ a new Amazon description — counted so the month still ties, but not yet named' },
+  { key: 'commission', label: '(−) Commission', section: 'AMAZON FEES', kind: 'input', fee: 'commission' },
+  { key: 'closingFee', label: '(−) Fixed closing fee', section: 'AMAZON FEES', kind: 'input', fee: 'fixedFee' },
+  { key: 'fbaFees', label: '(−) FBA pick, pack, weight and storage', section: 'AMAZON FEES', kind: 'input', fee: 'fulfilment', hideWhenZero: true },
+  { key: 'shippingFees', label: '(−) Easy Ship postage', section: 'AMAZON FEES', kind: 'input', fee: 'shipping', hideWhenZero: true, note: 'Net of the reversals Amazon credits back' },
+  { key: 'unrecognised', label: '(−) Charges this build does not recognise', section: 'AMAZON FEES', kind: 'input', fee: 'otherFees', hideWhenZero: true, note: '⚠ a new Amazon description — counted so the month still ties, but not yet named' },
   { key: 'totalFees', label: 'Total Amazon fees', section: 'AMAZON FEES', kind: 'subtotal' },
   { key: 'feesPctOfSales', label: 'Fees, % of net sales', section: 'AMAZON FEES', kind: 'percent' },
 
@@ -92,15 +92,15 @@ export const AMAZON_IN_SELLER_LINE_DEFS: NativeLineDef[] = [
 
   { key: 'cogsPriced', label: 'COGS — priced SKUs', section: 'COST OF GOODS SOLD', kind: 'input' },
   { key: 'cogsUnpriced', label: 'COGS — unpriced SKUs (est.)', section: 'COST OF GOODS SOLD', kind: 'input', hideWhenZero: true, note: '⚠ estimate — goes to zero once every SKU is mapped and priced' },
-  { key: 'totalCogs', label: 'Less: COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'totalCogs', label: '(−) COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 
-  { key: 'ads', label: 'Less: Advertising', section: 'ADVERTISING', kind: 'input', fee: 'advertising', note: 'Sponsored Products — billed separately, not in the settlement' },
+  { key: 'ads', label: '(−) Advertising', section: 'ADVERTISING', kind: 'input', fee: 'advertising', note: 'Sponsored Products — billed separately, not in the settlement' },
   { key: 'cm2', label: 'CONTRIBUTION MARGIN (CM2)', section: 'ADVERTISING', kind: 'subtotal', note: '⭐ the number to manage the channel on' },
   { key: 'cm2Pct', label: 'CM2 %', section: 'ADVERTISING', kind: 'percent' },
 
-  { key: 'otherCosts', label: 'Less: Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input' },
+  { key: 'otherCosts', label: '(−) Allocated Fixed Expenses', section: 'FIXED EXPENSES', kind: 'input' },
   { key: 'cm3', label: 'NET PROFIT (CM3)', section: 'FIXED EXPENSES', kind: 'subtotal' },
   { key: 'cm3Pct', label: 'Net Profit %', section: 'FIXED EXPENSES', kind: 'percent' },
 

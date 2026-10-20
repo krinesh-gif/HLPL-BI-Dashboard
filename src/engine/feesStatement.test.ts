@@ -355,8 +355,8 @@ describe('buildChannelFeesStatement, on a channel with more than one statement',
     native: {
       lineDefs: [
         { key: 'netRevenue', label: 'NET REVENUE (ex-GST)', section: 'SALES', kind: 'subtotal' as const },
-        { key: 'contraCogs', label: 'Less: contra-COGS margin support', section: 'AMAZON CHARGES', kind: 'input' as const, fee: 'otherFees' as const },
-        { key: 'ixd', label: 'Less: inward cross-dock (IXD)', section: 'AMAZON CHARGES', kind: 'input' as const, fee: 'fulfilment' as const },
+        { key: 'contraCogs', label: '(−) contra-COGS margin support', section: 'AMAZON CHARGES', kind: 'input' as const, fee: 'otherFees' as const },
+        { key: 'ixd', label: '(−) inward cross-dock (IXD)', section: 'AMAZON CHARGES', kind: 'input' as const, fee: 'fulfilment' as const },
       ],
       values: { netRevenue: 1199291.82, contraCogs: -50000, ixd: -7776 },
       currency: 'INR' as const,
