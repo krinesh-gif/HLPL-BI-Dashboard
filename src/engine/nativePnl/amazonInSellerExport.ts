@@ -91,13 +91,13 @@ export const AMAZON_IN_SELLER_EXPORT_LINE_DEFS: NativeLineDef[] = [
   { key: 'returns', label: '(−) Returns and refunds', section: 'SALES', kind: 'input' },
   { key: 'netSales', label: 'NET SALES (ex-GST)', section: 'SALES', kind: 'subtotal', note: '⭐ denominator for every %' },
 
-  { key: 'totalMarketplaceCharges', label: 'Total Amazon charges', section: 'AMAZON CHARGES', kind: 'subtotal', isGroupHead: true, group: 'AMAZON CHARGES' },
+  { key: 'totalMarketplaceCharges', label: 'Total Amazon Charges', section: 'AMAZON CHARGES', kind: 'subtotal', isGroupHead: true, group: 'AMAZON CHARGES' },
   ...feeLineDefs('marketplace', 'AMAZON CHARGES'),
   { key: 'unmappedFees', label: 'Fee columns not yet named', section: 'AMAZON CHARGES', kind: 'input', fee: 'otherFees', group: 'AMAZON CHARGES', hideWhenZero: true, note: 'Amazon sent a fee block with no heading — counted here rather than dropped or guessed at' },
   { key: 'cm1', label: 'CM1 — after Amazon charges', section: 'AMAZON CHARGES', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'AMAZON CHARGES', kind: 'percent' },
 
-  { key: 'totalAdvertising', label: '(−) Advertising', section: 'ADVERTISING', kind: 'subtotal', isGroupHead: true, group: 'ADVERTISING', hideWhenZero: true },
+  { key: 'totalAdvertising', label: 'Total Advertising', section: 'ADVERTISING', kind: 'subtotal', isGroupHead: true, group: 'ADVERTISING', hideWhenZero: true },
   ...feeLineDefs('advertising', 'ADVERTISING'),
   {
     key: 'channelAds', label: 'Campaign spend, from the ads reports', section: 'ADVERTISING', kind: 'input',
@@ -109,10 +109,10 @@ export const AMAZON_IN_SELLER_EXPORT_LINE_DEFS: NativeLineDef[] = [
   { key: 'netProceeds', label: 'Net proceeds, from the fees read here', section: 'NET PROCEEDS', kind: 'subtotal' },
   { key: 'sheetNetProceeds', label: 'Net proceeds per Amazon’s own column', section: 'NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
   { key: 'netProceedsDiff', label: 'Difference', section: 'NET PROCEEDS', kind: 'input', note: 'Reconciliation — anything here is a charge in the file this build has not read' },
+  { key: 'totalCogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal', group: 'cogs', isGroupHead: true },
 
-  { key: 'cogsPriced', label: 'COGS — priced from the cost sheet', section: 'COST OF GOODS SOLD', kind: 'input' },
-  { key: 'cogsUnpriced', label: 'COGS — SKUs with no cost on file (est.)', section: 'COST OF GOODS SOLD', kind: 'input', note: '⚠ estimate — goes to zero once every MSKU is linked to a SKU', hideWhenZero: true },
-  { key: 'totalCogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+  { key: 'cogsPriced', label: 'COGS — priced from the cost sheet', section: 'COST OF GOODS SOLD', kind: 'input', group: 'cogs' },
+  { key: 'cogsUnpriced', label: 'COGS — SKUs with no cost on file (est.)', section: 'COST OF GOODS SOLD', kind: 'input', note: '⚠ estimate — goes to zero once every MSKU is linked to a SKU', hideWhenZero: true, group: 'cogs' },
   { key: 'cm2', label: 'CONTRIBUTION MARGIN (CM2)', section: 'COST OF GOODS SOLD', kind: 'subtotal', note: '⭐ the number to manage this half on' },
   { key: 'cm2Pct', label: 'CM2 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 

@@ -87,7 +87,7 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
   { key: 'refundsReturnsUsd', label: '(−) Return', section: 'REVENUE', kind: 'input' },
   { key: 'netSalesUsd', label: 'Net Sales', section: 'REVENUE', kind: 'subtotal' },
 
-  { key: 'totalMarketplaceChargesUsd', label: 'Marketplace Charges', section: 'MARKETPLACE CHARGES', kind: 'subtotal', isGroupHead: true, group: 'MARKETPLACE CHARGES' },
+  { key: 'totalMarketplaceChargesUsd', label: 'Total Marketplace Charges', section: 'MARKETPLACE CHARGES', kind: 'subtotal', isGroupHead: true, group: 'MARKETPLACE CHARGES' },
   ...feeLineDefs('marketplace', 'MARKETPLACE CHARGES', DEFAULT_NESTED),
   { key: 'unmappedFeesUsd', label: 'Fee columns not yet mapped', section: 'MARKETPLACE CHARGES', kind: 'input', fee: 'otherFees', group: 'MARKETPLACE CHARGES', hideWhenZero: true, note: 'New Amazon column — check the import warnings' },
 
@@ -97,7 +97,7 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
   { key: 'cm1', label: 'CM1 — After Marketplace Charges', section: 'CM1', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'CM1', kind: 'percent' },
 
-  { key: 'totalAdvertisingUsd', label: 'Advertising Fees', section: 'ADVERTISING FEES', kind: 'subtotal', isGroupHead: true, group: 'ADVERTISING FEES' },
+  { key: 'totalAdvertisingUsd', label: 'Total Advertising', section: 'ADVERTISING FEES', kind: 'subtotal', isGroupHead: true, group: 'ADVERTISING FEES' },
   ...feeLineDefs('advertising', 'ADVERTISING FEES', DEFAULT_NESTED),
   // Amazon does not report these two in the Product Profitability export, so
   // they are typed in monthly. Zero today; the lines are here so the spend
@@ -112,14 +112,14 @@ export const AMAZON_USA_LINE_DEFS: NativeLineDef[] = [
   { key: 'adsNotBilledByAmazonUsd', label: 'Add back: advertising Amazon does not bill in this report', section: 'NET PROCEEDS', kind: 'input', hideWhenZero: true, note: 'Reconciliation' },
   { key: 'sheetNetProceedsUsd', label: 'Net proceeds per Amazon export', section: 'NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
   { key: 'netProceedsDiffUsd', label: 'Difference', section: 'NET PROCEEDS', kind: 'input', note: 'Reconciliation' },
+  { key: 'totalLandedCostUsd', label: 'Total Landed Cost', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'subtotal', group: 'COST OF GOODS & INBOUND LOGISTICS', isGroupHead: true },
 
-  { key: 'cogsUsd', label: 'Total COGS', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input' },
-  { key: 'cogsPricedUsd', label: 'Priced from the cost sheet', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', memoOf: 'cogsUsd', hideWhenZero: true },
-  { key: 'cogsEstimatedUsd', label: 'Estimated — no cost on file for these SKUs', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', memoOf: 'cogsUsd', hideWhenZero: true },
-  { key: 'freightUsd', label: 'India → USA Air Freight', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input' },
-  { key: 'exportDocsUsd', label: 'Export Documentation & Handling', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', note: 'Manual entry' },
-  { key: 'usImportDutyUsd', label: 'US Import Duty & Clearance', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', note: 'Manual entry' },
-  { key: 'totalLandedCostUsd', label: 'Total Landed Cost', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'subtotal' },
+  { key: 'cogsUsd', label: 'Total COGS', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', group: 'COST OF GOODS & INBOUND LOGISTICS' },
+  { key: 'cogsPricedUsd', label: 'Priced from the cost sheet', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', memoOf: 'cogsUsd', hideWhenZero: true, group: 'COST OF GOODS & INBOUND LOGISTICS' },
+  { key: 'cogsEstimatedUsd', label: 'Estimated — no cost on file for these SKUs', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', memoOf: 'cogsUsd', hideWhenZero: true, group: 'COST OF GOODS & INBOUND LOGISTICS' },
+  { key: 'freightUsd', label: 'India → USA Air Freight', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', group: 'COST OF GOODS & INBOUND LOGISTICS' },
+  { key: 'exportDocsUsd', label: 'Export Documentation & Handling', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', note: 'Manual entry', group: 'COST OF GOODS & INBOUND LOGISTICS' },
+  { key: 'usImportDutyUsd', label: 'US Import Duty & Clearance', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', note: 'Manual entry', group: 'COST OF GOODS & INBOUND LOGISTICS' },
   { key: 'cm2', label: 'CM2 — Contribution Margin', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'subtotal' },
   { key: 'cm2Pct', label: 'CM2 %', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'percent' },
 

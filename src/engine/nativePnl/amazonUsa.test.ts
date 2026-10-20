@@ -169,9 +169,9 @@ describe('every line on the statement is a real column', () => {
     expect(feeLabels.slice().sort()).toEqual(AMAZON_USA_FEE_COLUMNS.map((c) => c.header).sort())
   })
 
-  it('groups the charges under the two collapsible heads', () => {
+  it('opens each cost block on its total, with the charges behind it', () => {
     const heads = AMAZON_USA_LINE_DEFS.filter((d) => d.isGroupHead)
-    expect(heads.map((d) => d.label)).toEqual(['Marketplace Charges', 'Advertising Fees'])
+    expect(heads.map((d) => d.label)).toEqual(['Total Marketplace Charges', 'Total Advertising', 'Total Landed Cost'])
     for (const h of heads) expect(h.group).toBe(h.section)
   })
 })
@@ -282,7 +282,7 @@ describe('when the file does not show a column nested inside another', () => {
   })
 })
 
-describe('Advertising Fees is all three placements', () => {
+describe('Total Advertising is all three placements', () => {
   it('is the export’s Sponsored Products column alone when nothing else is spent', () => {
     expect(computeAmazonUsaPnl(july()).totalAdvertisingUsd).toBeCloseTo(-3466.76, 4)
   })
@@ -326,9 +326,9 @@ describe('CM1 sits between the marketplace and advertising', () => {
     expect(computeAmazonUsaPnl(july({ sponsoredBrandsUsd: 5000 })).cm1).toBeCloseTo(v.cm1, 4)
   })
 
-  it('appears above the Advertising Fees head on the statement', () => {
+  it('appears above the Total Advertising head on the statement', () => {
     const labels = AMAZON_USA_LINE_DEFS.map((d) => d.label)
-    expect(labels.indexOf('CM1 — After Marketplace Charges')).toBeLessThan(labels.indexOf('Advertising Fees'))
+    expect(labels.indexOf('CM1 — After Marketplace Charges')).toBeLessThan(labels.indexOf('Total Advertising'))
     expect(labels.indexOf('Marketplace Charges')).toBeLessThan(labels.indexOf('CM1 — After Marketplace Charges'))
   })
 })

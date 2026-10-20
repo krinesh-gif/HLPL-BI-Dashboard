@@ -52,23 +52,19 @@ export const NYKAA_LINE_DEFS: NativeLineDef[] = [
     key: 'invoiceRealisationPctOfMrp', label: 'Invoice realisation, % of MRP', section: 'REVENUE', kind: 'percent',
     note: "52.54% at 38% margin and 18% GST — the 'Cost to Nykaa' line of the agreement's margin table",
   },
+  {
+    key: 'customerDiscount', label: 'Net Customer Discount Recovered', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
+    kind: 'subtotal', note: 'charged by debit note, raised without GST — so no input credit comes back on it', group: 'discount', isGroupHead: true },
 
   {
     key: 'listDiscount', label: '(−) Discount off MRP (listed price)', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
-    kind: 'input', hideWhenZero: true, note: 'Σ (final_mrp − final_subtotal) — what the goods are listed at, below their printed price',
-  },
+    kind: 'input', hideWhenZero: true, note: 'Σ (final_mrp − final_subtotal) — what the goods are listed at, below their printed price', group: 'discount' },
   {
     key: 'promoDiscount', label: '(−) Promotions, coupons and cart rules', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
-    kind: 'input', hideWhenZero: true, note: 'Σ (final_subtotal − final_sp) — run on top of the listed price',
-  },
+    kind: 'input', hideWhenZero: true, note: 'Σ (final_subtotal − final_sp) — run on top of the listed price', group: 'discount' },
   {
     key: 'nykaaFundedCoupon', label: 'Add back: coupons Nykaa funds itself', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
-    kind: 'input', hideWhenZero: true, note: 'COUPON_NYKAA_FUNDED in the Cart Rule file — the one slice Nykaa absorbs',
-  },
-  {
-    key: 'customerDiscount', label: 'Customer discount recovered by Nykaa', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
-    kind: 'subtotal', note: 'charged by debit note, raised without GST — so no input credit comes back on it',
-  },
+    kind: 'input', hideWhenZero: true, note: 'COUPON_NYKAA_FUNDED in the Cart Rule file — the one slice Nykaa absorbs', group: 'discount' },
   {
     key: 'discountPctOfMrp', label: 'Discount, % of net MRP', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
     kind: 'percent', note: 'how far below MRP the channel actually trades',
@@ -89,15 +85,14 @@ export const NYKAA_LINE_DEFS: NativeLineDef[] = [
     key: 'realisationPctOfMrp', label: 'Realisation, % of MRP (ex-GST)', section: 'NET REVENUE', kind: 'percent',
     note: 'what a rupee of MRP is finally worth to us, after both the margin and the discount',
   },
+  { key: 'totalCogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal', group: 'cogs', isGroupHead: true },
 
   {
     key: 'inboundFreight', label: '(−) Freight to Nykaa warehouse', section: 'COST OF GOODS SOLD',
     kind: 'input', hideWhenZero: true,
-    note: 'net units × the rate card entered for the month — a rupee or two a unit, and six thousand units a month',
-  },
-  { key: 'cogsPriced', label: 'COGS — priced SKUs', section: 'COST OF GOODS SOLD', kind: 'input' },
-  { key: 'cogsUnpriced', label: 'COGS — unpriced SKUs (est.)', section: 'COST OF GOODS SOLD', kind: 'input', note: '⚠ estimate — goes to zero once every SKU is mapped and priced' },
-  { key: 'totalCogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
+    note: 'net units × the rate card entered for the month — a rupee or two a unit, and six thousand units a month', group: 'cogs' },
+  { key: 'cogsPriced', label: 'COGS — priced SKUs', section: 'COST OF GOODS SOLD', kind: 'input', group: 'cogs' },
+  { key: 'cogsUnpriced', label: 'COGS — unpriced SKUs (est.)', section: 'COST OF GOODS SOLD', kind: 'input', note: '⚠ estimate — goes to zero once every SKU is mapped and priced', group: 'cogs' },
   { key: 'cm1', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
   { key: 'cm1Pct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
 

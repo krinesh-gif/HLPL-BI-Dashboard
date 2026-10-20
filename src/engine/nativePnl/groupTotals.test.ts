@@ -1,7 +1,33 @@
 import { describe, expect, it } from 'vitest'
 import type { FlipkartPnlFacts } from '@/data/models'
+import { AMAZON_AE_LINE_DEFS } from './amazonAe'
+import { AMAZON_IN_SELLER_LINE_DEFS } from './amazonInSeller'
+import { AMAZON_IN_SELLER_EXPORT_LINE_DEFS } from './amazonInSellerExport'
+import { AMAZON_IN_VENDOR_LINE_DEFS } from './amazonInVendor'
+import { AMAZON_USA_LINE_DEFS } from './amazonUsa'
+import { BLINKIT_LINE_DEFS } from './blinkit'
 import { FLIPKART_LINE_DEFS, computeFlipkartPnl } from './flipkart'
+import { MEESHO_LINE_DEFS } from './meesho'
+import { MYNTRA_LINE_DEFS } from './myntra'
+import { NYKAA_LINE_DEFS } from './nykaa'
+import { PURPLLE_LINE_DEFS } from './purplle'
+import { SWIGGY_LINE_DEFS } from './swiggyInstamart'
 import type { NativeLineDef, NativeLineValues } from './types'
+
+const STATEMENTS: { channel: string; defs: NativeLineDef[] }[] = [
+  { channel: 'flipkart', defs: FLIPKART_LINE_DEFS },
+  { channel: 'myntra', defs: MYNTRA_LINE_DEFS },
+  { channel: 'nykaa', defs: NYKAA_LINE_DEFS },
+  { channel: 'meesho', defs: MEESHO_LINE_DEFS },
+  { channel: 'blinkit', defs: BLINKIT_LINE_DEFS },
+  { channel: 'amazon_in_seller', defs: AMAZON_IN_SELLER_LINE_DEFS },
+  { channel: 'amazon_in_seller_export', defs: AMAZON_IN_SELLER_EXPORT_LINE_DEFS },
+  { channel: 'amazon_in_vendor', defs: AMAZON_IN_VENDOR_LINE_DEFS },
+  { channel: 'amazon_us', defs: AMAZON_USA_LINE_DEFS },
+  { channel: 'amazon_ae', defs: AMAZON_AE_LINE_DEFS },
+  { channel: 'purplle', defs: PURPLLE_LINE_DEFS },
+  { channel: 'swiggy_instamart', defs: SWIGGY_LINE_DEFS },
+]
 
 /**
  * A total opens the block and its charges sit under it, one click away.
@@ -68,5 +94,48 @@ describe('a total is the sum of the charges it hides', () => {
   it('leaves the credit outside the fees it is not one of', () => {
     // Rewards & SPF moves the margin below the total, not the total itself.
     expect(FLIPKART_LINE_DEFS.find((d) => d.key === 'rewardsSpf')?.group).toBeUndefined()
+  })
+})
+
+/**
+ * The shape of the bargain, on every statement.
+ *
+ * Grouping moves no money — it reorders the lines and tags them — so what
+ * can go wrong is structural: a total with nothing behind it, a block whose
+ * charges sit above the figure they add to, two heads claiming one group.
+ * Each of those reads as a broken statement rather than a wrong one, and
+ * each is invisible until someone opens the block.
+ */
+describe('every collapsible block is well formed', () => {
+  it.each(STATEMENTS)('$channel opens each block on its total', ({ defs }) => {
+    const groups = [...new Set(defs.map((d) => d.group).filter((g): g is string => Boolean(g)))]
+    for (const group of groups) {
+      const members = defs.filter((d) => d.group === group)
+      const heads = members.filter((d) => d.isGroupHead)
+      expect(heads, `${group} should have exactly one head`).toHaveLength(1)
+      expect(members[0].isGroupHead, `${group} should open on its total`).toBe(true)
+      expect(members.length, `${group} hides nothing`).toBeGreaterThan(1)
+    }
+  })
+
+  it.each(STATEMENTS)('$channel leaves no head without a group to head', ({ defs }) => {
+    for (const d of defs.filter((x) => x.isGroupHead)) {
+      expect(d.group, `${d.key} is a head with no group`).toBeTruthy()
+    }
+  })
+
+  /**
+   * "Total …" where the block sums charges of one kind, "Net …" where it
+   * nets credits against them. The head is the only line of a closed block,
+   * so its name is the whole label a reader gets.
+   */
+  it.each(STATEMENTS)('$channel names every total block Total… or Net…', ({ defs }) => {
+    for (const head of defs.filter((d) => d.isGroupHead)) {
+      expect(head.label, `${head.key}`).toMatch(/^(Total|Net) /)
+    }
+  })
+
+  it('covers every statement the app renders', () => {
+    expect(STATEMENTS).toHaveLength(12)
   })
 })

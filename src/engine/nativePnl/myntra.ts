@@ -54,7 +54,7 @@ export const MYNTRA_LINE_DEFS: NativeLineDef[] = [
   { key: 'nodPaid', label: 'NOD Paid', section: 'SETTLEMENT', kind: 'input', fee: 'otherFees', hideWhenZero: true },
   { key: 'nodDeducted', label: 'NOD Deducted', section: 'SETTLEMENT', kind: 'input', fee: 'otherFees', hideWhenZero: true },
   {
-    key: 'rewardsAndBenefits', label: 'Rewards & Other Benefits', section: 'SETTLEMENT',
+    key: 'rewardsAndBenefits', label: 'Total Rewards & Other Benefits', section: 'SETTLEMENT',
     kind: 'subtotal', group: 'rewards', isGroupHead: true,
   },
   { key: 'sjitIncentive', label: '• SJIT Incentive', section: 'SETTLEMENT', kind: 'input', fee: 'otherFees', group: 'rewards' },
@@ -69,7 +69,7 @@ export const MYNTRA_LINE_DEFS: NativeLineDef[] = [
   { key: 'bankSettlementSettled', label: 'Bank Settlement (Settled)', section: 'SETTLEMENT', kind: 'input' },
   { key: 'bankSettlementUnsettled', label: 'Bank Settlement (Unsettled)', section: 'SETTLEMENT', kind: 'input' },
   {
-    key: 'inputTaxCredits', label: 'Input Tax Credits', section: 'SETTLEMENT',
+    key: 'inputTaxCredits', label: 'Total Input Tax Credits', section: 'SETTLEMENT',
     kind: 'subtotal', group: 'itc', isGroupHead: true,
   },
   { key: 'inputTaxCreditsGstTcs', label: '• GST + TCS', section: 'SETTLEMENT', kind: 'input', group: 'itc' },
