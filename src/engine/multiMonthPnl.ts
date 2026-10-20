@@ -124,7 +124,11 @@ export const PNL_ROWS: PnlRowDef[] = [
 
   { key: 'cogs', label: '(−) COGS', kind: 'input', indent: true, value: (l) => l.cogs ?? 0, total: (t) => t.cogs ?? 0, sign: -1 },
   { key: 'grossProfit', label: 'Gross Profit', kind: 'subtotal', value: grossProfit, total: grossProfit },
-  { key: 'grossMarginPct', label: 'Gross Margin %', kind: 'percent', value: marginOf(grossProfit), total: marginOf(grossProfit) },
+  // Named twice because it is one figure: net revenue less the cost of the
+  // goods is the gross margin here and CM1 on every channel's own statement,
+  // and a reader moving between the two screens should not have to work that
+  // out. `flipkartTieOut.test.ts` holds the two to the same number.
+  { key: 'grossMarginPct', label: 'Gross Margin % (CM1 %)', kind: 'percent', value: marginOf(grossProfit), total: marginOf(grossProfit) },
 
   { key: 'marketplaceCosts', label: '(−) Marketplace Fees', kind: 'input', indent: true, value: (l) => sum(l, MARKETPLACE_COST_KEYS), total: (t) => sum(t, MARKETPLACE_COST_KEYS), sign: -1 },
   { key: 'marketing', label: '(−) Advertising (MI)', kind: 'input', indent: true, value: (l) => sum(l, MARKETING_KEYS), total: (t) => sum(t, MARKETING_KEYS), sign: -1 },
@@ -246,17 +250,25 @@ export function buildMultiMonthPnl(
 
 export type QuickPeriod = 'current' | 'previous' | '3m' | '6m' | '12m' | 'fy' | 'all'
 
-export const QUICK_PERIODS: { key: QuickPeriod; label: string }[] = [
+/**
+ * `code` is what the control shows, `label` what it means on hover.
+ *
+ * They are a row of buttons rather than a menu: there are seven of them, a
+ * reader switches between them constantly, and a menu hides six of the seven
+ * behind a click. Two characters each is enough once the full name is one
+ * hover away.
+ */
+export const QUICK_PERIODS: { key: QuickPeriod; code: string; label: string }[] = [
   // Not "Current Month": a quick period ends on the newest finished month, so
   // on the 17th of October this is September. Calling it the current month
-  // would be the dropdown telling the reader something untrue.
-  { key: 'current', label: 'Latest Month' },
-  { key: 'previous', label: 'Month Before' },
-  { key: '3m', label: 'Last 3 Months' },
-  { key: '6m', label: 'Last 6 Months' },
-  { key: '12m', label: 'Last 12 Months' },
-  { key: 'fy', label: 'Current FY' },
-  { key: 'all', label: 'All Months' },
+  // would be the control telling the reader something untrue.
+  { key: 'current', code: 'LM', label: 'Last Month' },
+  { key: 'previous', code: 'PM', label: 'The Month Before' },
+  { key: '3m', code: '3M', label: 'Last 3 Months' },
+  { key: '6m', code: '6M', label: 'Last 6 Months' },
+  { key: '12m', code: '12M', label: 'Last 12 Months' },
+  { key: 'fy', code: 'CFY', label: 'Current Financial Year' },
+  { key: 'all', code: 'All', label: 'Every Month On File' },
 ]
 
 /**

@@ -6,7 +6,7 @@ import { ComparisonBarChart } from '@/components/charts/ComparisonBarChart'
 import { BUSINESS_CHANNELS, channelLabel, type BusinessChannelId } from '@/config/channels'
 import { formatCurrencyCompact, formatCurrencyFull, formatPercent, monthLabel, currencyName } from '@/lib/format'
 import { exportRowsToCsv } from '@/lib/exportCsv'
-import { QUICK_PERIODS, type QuickPeriod } from '@/engine/multiMonthPnl'
+import { QUICK_PERIODS } from '@/engine/multiMonthPnl'
 import { NativePnlTable } from '@/components/pnl/NativePnlTable'
 import { amountTone } from '@/components/pnl/amountTone'
 import { pnlSnapshotStart } from './pnlSnapshotStart'
@@ -185,25 +185,34 @@ export function PnlPage() {
           </div>
         )}
 
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-[var(--ink-3)]">Quick select</span>
-          <select
-            value={r.period.mode === 'quick' ? r.period.quick : 'custom'}
-            onChange={(e) => {
-              const v = e.target.value
-              if (v === 'custom') r.setPeriod({ ...r.period, mode: 'custom' })
-              else r.setPeriod({ ...r.period, mode: 'quick', quick: v as QuickPeriod })
-            }}
-            className="cursor-pointer rounded-full border border-[var(--line-2)] bg-[var(--surface)] px-3.5 py-1.5 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
-          >
-            {QUICK_PERIODS.map((p) => (
-              <option key={p.key} value={p.key}>{p.label}</option>
-            ))}
-            {/* Picking From/To directly puts the period into custom mode; the
-                option is here so the control still shows what is selected. */}
-            <option value="custom">Custom range</option>
-          </select>
-        </label>
+        {/* A row of buttons, not a menu: a reader switches period constantly
+            and a menu hides six of the seven behind a click. Each is two or
+            three characters with the full name on hover. Picking From/To puts
+            the period into custom mode, where none of them is pressed. */}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-[var(--ink-3)]">Period</span>
+          <div className="flex rounded-full border border-[var(--line)] bg-[var(--surface-2)] p-0.5">
+            {QUICK_PERIODS.map((p) => {
+              const on = r.period.mode === 'quick' && r.period.quick === p.key
+              return (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => r.setPeriod({ ...r.period, mode: 'quick', quick: p.key })}
+                  aria-pressed={on}
+                  title={p.label}
+                  className={`rounded-full px-3 py-1.5 text-sm font-medium tabular-nums transition-colors ${
+                    on
+                      ? 'bg-[var(--accent)] text-[var(--accent-ink)]'
+                      : 'text-[var(--ink-3)] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  {p.code}
+                </button>
+              )
+            })}
+          </div>
+        </div>
 
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium text-[var(--ink-3)]">From</span>

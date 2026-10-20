@@ -132,7 +132,17 @@ export function flipkartToCanonicalBuckets(facts: FlipkartPnlFacts): PnlLineValu
     marketplaceCommission: facts.commissionFee,
     fulfilment: facts.pickPackFee,
     shipping: facts.forwardShippingFee + facts.reverseShippingFee,
-    collectionFees: facts.collectionFee,
+    // The fixed fee belongs here with the collection fee: both are flat
+    // per-order charges, and Amazon's fixed closing fee is already bucketed
+    // this way, so the two channels' Marketplace Fees mean the same thing.
+    //
+    // It was in no bucket at all. The statement deducted it inside Total
+    // Marketplace Fees and the P&L never saw it, so Flipkart's September read
+    // 2,76,032 of fees against the statement's 3,72,564, and its contribution
+    // came out 81,600 above the statement's CM3. Across Apr-Sep the P&L was
+    // missing 4,83,916 of real Flipkart cost, and the company's EBITDA was
+    // overstated by the same amount.
+    collectionFees: facts.collectionFee + facts.fixedFee,
     rtoCharges: 0,
     returnCharges: 0,
     otherMarketplaceCharges: facts.storageFee + facts.recallFee + facts.otherMarketplaceFees - facts.rewardsSpf,
