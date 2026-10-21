@@ -17,6 +17,35 @@ describe('which month an archive covers', () => {
   it('says nothing rather than guessing when no cycle is named', () => {
     expect(blinkitMonthFromPaths(['stuff/Payout Breakup.xlsx'], 'payout.zip')).toBeNull()
   })
+
+  /**
+   * Blinkit used to name these with the month alone, and the owner has
+   * archives going back through that name — `payout_sheet_2025-12` is
+   * December 2025. Both names are read, so neither era of file has to be
+   * renamed by hand before it can be uploaded.
+   */
+  describe('the older name, the month on its own', () => {
+    it('reads the month out of it', () => {
+      expect(blinkitMonthFromPaths([], 'payout_sheet_2025-12.zip')).toBe('2025-12')
+      expect(blinkitMonthFromPaths(['payout_sheet_2026-03/Payout Breakup.xlsx'])).toBe('2026-03')
+    })
+
+    it('does not mistake the start of a cycle for a month of its own', () => {
+      // The first four groups of "2026-08-01 To 2026-08-31" read as a bare
+      // month if nothing stops them. Here they agree, so the test is that a
+      // cycle whose folder and file disagree is settled by the cycle.
+      expect(blinkitMonthFromPaths(
+        ['payout_sheet_2026-08-01 To 2026-08-31/Payout Breakup.xlsx'],
+        'payout_sheet_2025-12.zip',
+      )).toBe('2026-08')
+    })
+
+    it('is not fooled by a number that is not a month', () => {
+      expect(blinkitMonthFromPaths([], 'invoice_2026-47.zip')).toBeNull()
+      expect(blinkitMonthFromPaths([], 'ref_2026-00.zip')).toBeNull()
+      expect(blinkitMonthFromPaths([], 'id_123456-07.zip')).toBeNull()
+    })
+  })
 })
 
 /**

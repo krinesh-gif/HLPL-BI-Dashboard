@@ -163,10 +163,35 @@ function labelKey(v: unknown): string {
   return clean(v).toLowerCase().replace(/\(rs\)/g, ' ').replace(/[().]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
-/** yyyy-mm from the archive's own folder, which names the cycle it covers. */
+/**
+ * yyyy-mm from the archive's own folder, which names the cycle it covers.
+ *
+ * Blinkit has named these two ways and the owner has archives in both, so
+ * both are read:
+ *
+ *   payout_sheet_2026-08-01 To 2026-08-31   the cycle, start and end
+ *   payout_sheet_2025-12                    the month alone, the older name
+ *
+ * The cycle is looked for across every candidate before the bare month is,
+ * rather than taking whichever turns up first. A full date range says which
+ * month it is without any reading-in; a bare `2025-12` is the same claim
+ * made with less, and where an archive carries both it is the range that
+ * should settle it.
+ *
+ * The bare form is matched only where no day follows, so the `2026-08` inside
+ * `2026-08-01` cannot be mistaken for a month on its own, and only on 01–12,
+ * so a serial number that happens to read `2026-47` is not a month either.
+ */
 export function blinkitMonthFromPaths(paths: string[], fallbackName = ''): string | null {
-  for (const candidate of [...paths, fallbackName]) {
+  const candidates = [...paths, fallbackName]
+
+  for (const candidate of candidates) {
     const m = /(\d{4})-(\d{2})-\d{2}\s*[_ ]?to[_ ]?\s*\d{4}-\d{2}-\d{2}/i.exec(candidate)
+    if (m) return `${m[1]}-${m[2]}`
+  }
+
+  for (const candidate of candidates) {
+    const m = /(?:^|[^\d])(20\d{2})-(0[1-9]|1[0-2])(?![\d-])/.exec(candidate)
     if (m) return `${m[1]}-${m[2]}`
   }
   return null
@@ -264,7 +289,8 @@ export async function normalizeBlinkitPayoutZip(
   const month = blinkitMonthFromPaths(paths, archiveName)
   if (!month) {
     throw new Error(
-      'Could not tell which month this archive covers. Its folder should be named like "payout_sheet_2026-08-01 To 2026-08-31".',
+      'Could not tell which month this archive covers. Its folder or file should be named like ' +
+      '"payout_sheet_2026-08-01 To 2026-08-31", or like "payout_sheet_2025-12" as the older archives were.',
     )
   }
 
