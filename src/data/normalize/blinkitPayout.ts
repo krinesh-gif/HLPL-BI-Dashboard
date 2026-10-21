@@ -80,7 +80,11 @@ const PAYOUT_LINES: { labels: string[]; field: keyof BlinkitPnlFacts; cost: bool
   { labels: ['customer return charge', 'return charge'], field: 'customerReturnCharge', cost: true },
   { labels: ['gst on customer return charges', 'gst on return charges'], field: 'customerReturnChargeGst', cost: true },
   { labels: ['tcs charge'], field: 'tcs', cost: true },
-  { labels: ['tds charge 194o & q'], field: 'tds', cost: true },
+  // Blinkit has written this line two ways. The newer archives say "TDS
+  // Charge (194O & Q)"; the older single-workbook statements say "TDS Charge
+  // (194O)". Both are the same deduction, and reading only one left ₹5.33 of
+  // June 2025 out of the statement and out of its own reconciliation.
+  { labels: ['tds charge 194o & q', 'tds charge 194o'], field: 'tds', cost: true },
 
   { labels: ['upfront storage charge'], field: 'upfrontStorage', cost: true },
   { labels: ['gst on upfront storage charge'], field: 'upfrontStorageGst', cost: true },
@@ -197,6 +201,30 @@ export function blinkitMonthFromPaths(paths: string[], fallbackName = ''): strin
   return null
 }
 
+/**
+ * The month from the statement's own "Payout Cycle", which the Note sheet
+ * writes as `01-Jun-2025 to 30-Jun-2025`.
+ *
+ * The single-workbook statements have no folder to name the cycle, and a
+ * file can be renamed by whoever downloaded it. This is the archive saying
+ * which month it is in its own words, so it is read rather than inferred.
+ */
+export function blinkitMonthFromCycle(books: Record<string, RawSheet>[]): string | null {
+  for (const book of books) {
+    for (const grid of Object.values(book)) {
+      for (const row of grid) {
+        const label = row.findIndex((c) => labelKey(c).startsWith('payout cycle'))
+        if (label < 0) continue
+        for (const cell of row.slice(label + 1)) {
+          const start = blinkitOrderDate(clean(cell).split(/\s+to\s+/i)[0])
+          if (start) return start.slice(0, 7)
+        }
+      }
+    }
+  }
+  return null
+}
+
 /** Rows of a sheet as objects, given the index of its header row. */
 function records(sheet: RawSheet, headerRow: number): Record<string, string>[] {
   const header = (sheet[headerRow] ?? []).map((h) => clean(h))
@@ -284,18 +312,54 @@ export async function normalizeBlinkitPayoutZip(
   archiveName = '',
 ): Promise<BlinkitPayoutResult> {
   const entries = await unzip(zipBytes)
-  const paths = entries.map((e) => e.path)
-
-  const month = blinkitMonthFromPaths(paths, archiveName)
-  if (!month) {
-    throw new Error(
-      'Could not tell which month this archive covers. Its folder or file should be named like ' +
-      '"payout_sheet_2026-08-01 To 2026-08-31", or like "payout_sheet_2025-12" as the older archives were.',
-    )
-  }
-
   // Every workbook, by the sheets inside it rather than by what it is called.
   const books = entries.map((e) => workbookSheetsFromBytes(e.bytes))
+  return readBlinkitPayout(books, blinkitPayoutMonth(books, entries.map((e) => e.path), archiveName), importId)
+}
+
+/**
+ * The same statement as a single workbook, which is how Blinkit published it
+ * before it published a zip.
+ *
+ * `payout_sheet_2025-06.xlsx` holds every sheet the archive splits across six
+ * workbooks — Payout Breakup, Forward Orders, Daily Ageing and the rest — so
+ * once the sheets are in hand there is nothing different to read. Only
+ * getting them differs, and which month it is: there are no folder names to
+ * take it from, so it comes from the Note sheet's own payout cycle, with the
+ * file name behind it.
+ */
+export function normalizeBlinkitPayoutWorkbook(
+  bytes: ArrayBuffer | Uint8Array,
+  importId: string,
+  fileName = '',
+): BlinkitPayoutResult {
+  const book = workbookSheetsFromBytes(bytes)
+  return readBlinkitPayout([book], blinkitPayoutMonth([book], [], fileName), importId)
+}
+
+/** The cycle from the folders, else the statement's own Note sheet, else the
+ * file name. The archive states it in more than one place and any of them
+ * will do; none of them is a guess. */
+function blinkitPayoutMonth(
+  books: Record<string, RawSheet>[],
+  paths: string[],
+  fileName: string,
+): string | null {
+  return blinkitMonthFromPaths(paths, fileName) ?? blinkitMonthFromCycle(books)
+}
+
+function readBlinkitPayout(
+  books: Record<string, RawSheet>[],
+  month: string | null,
+  importId: string,
+): BlinkitPayoutResult {
+  if (!month) {
+    throw new Error(
+      'Could not tell which month this statement covers. Its folder or file should be named like ' +
+      '"payout_sheet_2026-08-01 To 2026-08-31", or like "payout_sheet_2025-12" as the older ones were — ' +
+      'or its Note sheet should state the payout cycle.',
+    )
+  }
   const sheetNames = [...new Set(books.flatMap((b) => Object.keys(b)))]
   /** The first sheet in the archive with this name, wherever it was filed —
    * and whatever the workbook punctuated it as. */

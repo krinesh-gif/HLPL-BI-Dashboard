@@ -1,14 +1,29 @@
 import type { AdsRecord } from '@/data/models'
+import type { ParsedSheet } from '@/lib/csvParse'
 import { getField, headersPresent, type NormalizeResult } from './types'
 
 /**
  * Blinkit's campaign report.
  *
  * One row per campaign, per targeting value, per reporting date. The money
- * is in "Estimated Budget Consumed" — column R, and the only spend figure in
- * the file. Summed over the month it is what Blinkit advertising cost, and
- * it reaches the P&L the way every other platform's does: as ad records,
- * which `marketingFromAds` turns into the month's Advertising (MI).
+ * is in "Estimated Budget Consumed" — the only spend figure in the file.
+ * Summed it is what Blinkit advertising cost, and it reaches the P&L the way
+ * every other platform's does: as ad records, which `marketingFromAds` turns
+ * into the month's Advertising (MI).
+ *
+ * TWO SHEETS, AND BOTH ARE THE SPEND. The workbook separates the two things
+ * Blinkit sells — Product Listing ads and Product Recommendation ads — onto
+ * a sheet each, and each has its own Estimated Budget Consumed column. Only
+ * the first sheet was read, so every month reported a fraction of what was
+ * spent: April 2026 came to ₹16.80. The owner found it.
+ *
+ * Every sheet carrying that column is read now and the sheet's own name goes
+ * on each row as its ad program. That is not decoration: the two sheets can
+ * state the same campaign on the same date for the same targeting value, and
+ * the program is part of what identifies an ad row — without it the second
+ * sheet's row is a duplicate of the first's and is dropped on insert, which
+ * would have left this half fixed. It also gives the spend-by-product split
+ * the Ads pages already know how to show.
  *
  * Downloaded as `.xls` and actually a modern workbook, which the spreadsheet
  * reader already handles.
@@ -41,6 +56,17 @@ export function detectBlinkitAdsReport(headers: string[]): boolean {
     headersPresent(headers, COLUMNS.campaign) &&
     headersPresent(headers, COLUMNS.impressions)
   )
+}
+
+/**
+ * The sheets of the workbook that are campaign rows.
+ *
+ * By their columns rather than by their names, because the names are
+ * Blinkit's to change and the columns are what the figures live in. A sheet
+ * of notes or a pivot alongside them is left out.
+ */
+export function blinkitAdsSheets(sheets: ParsedSheet[]): ParsedSheet[] {
+  return sheets.filter((s) => detectBlinkitAdsReport(s.headers))
 }
 
 function num(raw: unknown): number {
@@ -76,9 +102,28 @@ export interface BlinkitAdsResult extends NormalizeResult {
   /** The months the file covers. More than one is not an error; it is worth
    * saying, because the spend then lands in more than one P&L. */
   months: string[]
+  /**
+   * The channel-months this upload states in full, cleared before its rows
+   * are inserted.
+   *
+   * A campaign report is the whole of the period it was downloaded for, so
+   * re-uploading a month should restate it rather than add to it. Relying on
+   * the row key alone was enough while the key never moved; adding the ad
+   * program to it — which the two sheets need — changes what a row is, so
+   * the rows already stored under the old key would have sat beside the new
+   * ones and counted twice.
+   */
+  replaces: { channel: string; months: string[] }[]
 }
 
-export function normalizeBlinkitAdsReport(rows: Record<string, string>[], importId: string): BlinkitAdsResult {
+export function normalizeBlinkitAdsReport(
+  rows: Record<string, string>[],
+  importId: string,
+  /** Which of Blinkit's ad products these rows are — the sheet's own name.
+   * Part of a row's identity, so the same campaign on the same day under two
+   * products is two rows rather than one overwriting the other. */
+  program?: string,
+): BlinkitAdsResult {
   const adsRecords: AdsRecord[] = []
   const invalidRows: NormalizeResult['invalidRows'] = []
   const warnings: string[] = []
@@ -105,6 +150,7 @@ export function normalizeBlinkitAdsReport(rows: Record<string, string>[], import
       channel: 'blinkit',
       campaign: campaign || getField(row, COLUMNS.campaignId) || 'Blinkit campaign',
       keyword: getField(row, COLUMNS.targetingValue) || undefined,
+      program,
       impressions: num(getField(row, COLUMNS.impressions)),
       // Blinkit publishes neither. Stored as zero because the record has
       // nowhere else to put them, and declared as omitted in `ADS_CHANNELS`
@@ -130,5 +176,77 @@ export function normalizeBlinkitAdsReport(rows: Record<string, string>[], import
     'those are shown as unmeasured rather than zero.',
   )
 
-  return { adsRecords, totalSpend, months, validRecords: [], totalRows: rows.length, invalidRows, warnings }
+  return {
+    adsRecords, totalSpend, months, validRecords: [], totalRows: rows.length, invalidRows, warnings,
+    replaces: replacesFor(months),
+  }
+}
+
+/** Blinkit is one channel, so the months it covers are the whole scope. */
+function replacesFor(months: string[]): { channel: string; months: string[] }[] {
+  return months.length > 0 ? [{ channel: 'blinkit', months }] : []
+}
+
+const rupees = (n: number) =>
+  `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+/**
+ * The whole workbook: every sheet of campaign rows, added together.
+ *
+ * This is what an upload goes through. Reading one sheet of a two-sheet
+ * workbook does not fail or warn — it simply reports less money — so the
+ * warning names each sheet and what it contributed, which is the only way a
+ * reader can tell a sheet was missed.
+ */
+export function normalizeBlinkitAdsWorkbook(sheets: ParsedSheet[], importId: string): BlinkitAdsResult {
+  const campaignSheets = blinkitAdsSheets(sheets)
+  if (campaignSheets.length === 0) {
+    return {
+      adsRecords: [], totalSpend: 0, months: [], validRecords: [], totalRows: 0, invalidRows: [], replaces: [],
+      warnings: ['No sheet in this workbook has an "Estimated Budget Consumed" column, so there is no spend to read.'],
+    }
+  }
+
+  const parts = campaignSheets.map((sheet) => ({
+    sheet,
+    result: normalizeBlinkitAdsReport(sheet.rows, importId, sheet.sheetName),
+  }))
+
+  const adsRecords = parts.flatMap((p) => p.result.adsRecords)
+  const totalSpend = parts.reduce((sum, p) => sum + p.result.totalSpend, 0)
+  const totalRows = parts.reduce((sum, p) => sum + p.result.totalRows, 0)
+  const invalidRows = parts.flatMap((p) => p.result.invalidRows)
+  const months = [...new Set(adsRecords.map((r) => r.date.slice(0, 7)))].sort()
+
+  const warnings: string[] = []
+  if (months.length > 1) {
+    warnings.push(
+      `This report covers ${months.length} months (${months.join(', ')}), so its spend is split across them rather ` +
+      'than counted in one.',
+    )
+  }
+  warnings.push(
+    `${rupees(totalSpend)} of Blinkit advertising, from the Estimated Budget Consumed column of ` +
+    `${campaignSheets.length} sheet(s): ` +
+    parts.map((p) => `${p.sheet.sheetName} ${rupees(p.result.totalSpend)}`).join(', ') +
+    '. Blinkit’s report carries no clicks or orders, so those are shown as unmeasured rather than zero.',
+  )
+  const skipped = sheets.filter((s) => !campaignSheets.includes(s))
+  if (skipped.length > 0) {
+    warnings.push(
+      `${skipped.length} other sheet(s) were left out, having no Estimated Budget Consumed column: ` +
+      `${skipped.map((s) => s.sheetName).join(', ')}.`,
+    )
+  }
+  if (months.length > 0) {
+    warnings.push(
+      `${months.join(', ')} is replaced outright by this file. A campaign report is the whole of the period it was ` +
+      'downloaded for, so re-uploading a month restates it rather than adding to it.',
+    )
+  }
+
+  return {
+    adsRecords, totalSpend, months, validRecords: [], totalRows, invalidRows, warnings,
+    replaces: replacesFor(months),
+  }
 }

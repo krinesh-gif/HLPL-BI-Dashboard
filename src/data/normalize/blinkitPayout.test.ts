@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
-import { blinkitMonthFromPaths, blinkitOrderDate, detectBlinkitPayoutArchive, normalizeBlinkitPayoutZip } from './blinkitPayout'
+import {
+  blinkitMonthFromCycle, blinkitMonthFromPaths, blinkitOrderDate, detectBlinkitPayoutArchive,
+  normalizeBlinkitPayoutWorkbook, normalizeBlinkitPayoutZip,
+} from './blinkitPayout'
 
 const ARCHIVE = '/root/.claude/uploads/f24a295e-093a-5385-9288-97acefc06862/6e71377f-payout_sheet_2026-08-01_To_2026-08-31.zip'
 const APRIL = '/root/.claude/uploads/f24a295e-093a-5385-9288-97acefc06862/b8c06a89-payout_sheet_2026-04-01_To_2026-04-30.zip'
@@ -225,5 +228,62 @@ describe.skipIf(!existsSync(APRIL))('the owner’s April 2026 payout archive', (
     // pre-GRN losses, credit and debit notes. Every one is nil, so none is
     // reported; the first one to carry an amount will be.
     expect(r.unknownPayoutRows).toEqual([])
+  })
+})
+
+/**
+ * Before Blinkit published a month as a zip of workbooks it published it as
+ * one workbook, with the same sheets inside. `payout_sheet_2025-06.xlsx` is
+ * June 2025, and these are the owner's own figures, read off the file.
+ */
+const OLD_WORKBOOK = '/root/.claude/uploads/f24a295e-093a-5385-9288-97acefc06862/e2a12b3a-payout_sheet_2025-06.xlsx'
+
+describe('the payout cycle the statement names itself', () => {
+  it('reads it off the Note sheet', () => {
+    expect(blinkitMonthFromCycle([{ Note: [['Payout Cycle', '01-Jun-2025 to 30-Jun-2025']] }])).toBe('2025-06')
+    expect(blinkitMonthFromCycle([{ Note: [['Payout Cycle', '01-Apr-2026 to 30-Apr-2026']] }])).toBe('2026-04')
+  })
+
+  it('says nothing where no sheet names one', () => {
+    expect(blinkitMonthFromCycle([{ Note: [['Remarks', 'something else']] }])).toBeNull()
+  })
+})
+
+describe.skipIf(!existsSync(OLD_WORKBOOK))('the owner’s June 2025 statement, one workbook', () => {
+  const run = () => normalizeBlinkitPayoutWorkbook(readFileSync(OLD_WORKBOOK), 'test-import', 'payout_sheet_2025-06.xlsx')
+
+  it('is recognised by its sheets', () => {
+    expect(detectBlinkitPayoutArchive([
+      'Note', 'Payout Breakup', 'Forward Orders', 'Daily Ageing', 'Ads',
+    ])).toBe(true)
+  })
+
+  it('reads the month and the statement', () => {
+    const r = run()
+    expect(r.facts.month).toBe('2025-06')
+    expect(r.facts.customerPayable).toBeCloseTo(6214, 2)
+    expect(r.facts.commission).toBeCloseTo(124.28, 2)
+    expect(r.facts.shipping).toBeCloseTo(750, 2)
+    expect(r.facts.netPayoutPerFile).toBeCloseTo(3523.66, 2)
+  })
+
+  /**
+   * Blinkit writes this line two ways. The archives say "TDS Charge (194O &
+   * Q)" and this one says "TDS Charge (194O)", and reading only the first
+   * left ₹5.33 out of the statement — and out of its own reconciliation,
+   * which came to ₹3528.99 against the file's ₹3523.66.
+   */
+  it('reads the TDS line under the name this file gives it', () => {
+    const r = run()
+    expect(r.facts.tds).toBeCloseTo(5.33, 2)
+    expect(r.unknownPayoutRows).toEqual([])
+    expect(r.checks.find((c) => c.name.startsWith('The statement adds up'))?.passed).toBe(true)
+  })
+
+  it('ties the orders behind it to the statement', () => {
+    const r = run()
+    for (const name of ['Customer payable matches', 'Commission matches', 'Shipping matches']) {
+      expect(r.checks.find((c) => c.name.startsWith(name))?.passed).toBe(true)
+    }
   })
 })

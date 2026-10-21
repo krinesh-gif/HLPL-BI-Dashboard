@@ -20,7 +20,7 @@ import { detectMeeshoOrderPaymentsSheet, normalizeMeeshoOrderPayments } from '@/
 import { detectSkuMapWorkbook, normalizeSkuMapWorkbook } from '@/data/normalize/skuMapWorkbook'
 import { detectAmazonAdsSponsoredProductsReport, normalizeAmazonAdsSponsoredProductsReport } from '@/data/normalize/amazonAdsSponsoredProducts'
 import { detectAmazonAdsSpendByMonth, normalizeAmazonAdsSpendByMonth } from '@/data/normalize/amazonAdsSpendByMonth'
-import { detectBlinkitAdsReport, normalizeBlinkitAdsReport } from '@/data/normalize/blinkitAdsReport'
+import { detectBlinkitAdsReport, normalizeBlinkitAdsReport, normalizeBlinkitAdsWorkbook } from '@/data/normalize/blinkitAdsReport'
 import { detectMyntraAdsReport, normalizeMyntraAdsReport } from '@/data/normalize/myntraAdsReport'
 import { detectFlipkartAdsReport, normalizeFlipkartAdsReport } from '@/data/normalize/flipkartAdsReport'
 import { detectFlipkartGoogleAdsReport, flipkartGoogleAdsPeriodFromName, flipkartGoogleAdsWholeMonth, normalizeFlipkartGoogleAdsReport } from '@/data/normalize/flipkartGoogleAdsReport'
@@ -38,7 +38,7 @@ import {
 import {
   detectNykaaCartRuleSheet, detectNykaaComboSheet, detectNykaaSalesSheet, normalizeNykaaWorkbook,
 } from '@/data/normalize/nykaaSalesWorkbook'
-import { normalizeBlinkitPayoutZip } from '@/data/normalize/blinkitPayout'
+import { detectBlinkitPayoutArchive, normalizeBlinkitPayoutWorkbook, normalizeBlinkitPayoutZip } from '@/data/normalize/blinkitPayout'
 import { detectNykaaMarketingInvoice, parseNykaaMarketingInvoice } from '@/data/normalize/nykaaMarketingInvoice'
 import { detectNykaaDiscountDebitNote, parseNykaaDiscountDebitNote } from '@/data/normalize/nykaaDiscountDebitNote'
 import { detectAmazonSettlementReport, normalizeAmazonSettlement } from '@/data/normalize/amazonSellerSettlement'
@@ -350,8 +350,17 @@ export function UploadReportsPage() {
       return buildPreview({ ...base, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
     }
     if (kind === 'blinkit_ads') {
-      const r = normalizeBlinkitAdsReport(parsed.rows, importId)
-      return buildPreview({ ...base, totalRows: r.totalRows, validRecords: [], adsRecords: r.adsRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
+      // Every sheet of the workbook, not the first one. Blinkit puts Product
+      // Listing ads on one and Product Recommendation ads on another, and
+      // reading one reported a fraction of the month's spend. A .csv has no
+      // sheets, so it falls back to the rows it has.
+      const r = parsed.sheets
+        ? normalizeBlinkitAdsWorkbook(parsed.sheets, importId)
+        : normalizeBlinkitAdsReport(parsed.rows, importId)
+      return buildPreview({
+        ...base, totalRows: r.totalRows, validRecords: [], adsRecords: r.adsRecords,
+        invalidCount: r.invalidRows.length, warnings: r.warnings, adsReplaces: r.replaces,
+      })
     }
     if (kind === 'myntra_ads') {
       // The spend goes in as ads records, like every platform's. The rest of
@@ -650,6 +659,19 @@ export function UploadReportsPage() {
       }
 
       const parsed = await parseSpreadsheetFile(file)
+
+      // Before Blinkit published a month as a zip it published it as one
+      // workbook, with every sheet the archive now splits up. Recognised by
+      // those sheets rather than by a column, because the first sheet of the
+      // older statement is a Note and carries none of the report's own.
+      if (parsed.sheets && detectBlinkitPayoutArchive(parsed.sheets.map((s) => s.sheetName))) {
+        const r = normalizeBlinkitPayoutWorkbook(await file.arrayBuffer(), importId, file.name)
+        return { id, fileName: file.name, status: 'ready', preview: await buildPreview({
+          fileName: file.name, reportKind: 'blinkit_payout_archive', totalRows: r.totalRows,
+          validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings,
+          blinkitFacts: r.facts,
+        }) }
+      }
 
       // Product Profitability is one report with one set of column names in
       // every marketplace, and the download is named with a random string, so

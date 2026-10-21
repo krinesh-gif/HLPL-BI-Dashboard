@@ -4,6 +4,26 @@ import * as XLSX from 'xlsx'
 export interface ParsedFile {
   headers: string[]
   rows: Record<string, string>[]
+  /**
+   * Every sheet of a workbook, where the file was one.
+   *
+   * `headers` and `rows` above are the first sheet, which is what almost
+   * every report is. Some are not: Blinkit's campaign export puts Product
+   * Listing ads on one sheet and Product Recommendation ads on another, both
+   * with an Estimated Budget Consumed column, and reading the first alone
+   * reported a fraction of the month's spend.
+   *
+   * Filled for .xlsx/.xls and absent for a .csv, which has one sheet by
+   * definition. It costs almost nothing: the workbook is fully parsed to read
+   * the first sheet anyway, so this is a walk over cells already in memory.
+   */
+  sheets?: ParsedSheet[]
+}
+
+export interface ParsedSheet {
+  sheetName: string
+  headers: string[]
+  rows: Record<string, string>[]
 }
 
 export function parseCsvFile(file: File): Promise<ParsedFile> {
@@ -19,16 +39,14 @@ export function parseCsvFile(file: File): Promise<ParsedFile> {
   })
 }
 
-export async function parseXlsxFile(file: File): Promise<ParsedFile> {
-  const buffer = await file.arrayBuffer()
-  const workbook = XLSX.read(buffer, { type: 'array' })
-  const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
+/** One sheet as headers and rows of text. */
+function sheetAsRows(sheet: XLSX.WorkSheet): { headers: string[]; rows: Record<string, string>[] } {
   // `sheet_to_json` hands back each cell in its own type, so a numeric column
   // arrives as numbers however this is annotated. Every normalizer reads a
   // cell as text — trimming it, stripping a currency symbol — and a number
   // has no `.replace`, which is what "e.replace is not a function" was: a
   // Blinkit ads report whose columns are almost all numeric.
-  const parsed = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, { defval: '' })
+  const parsed = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' })
   const rows: Record<string, string>[] = parsed.map((row) =>
     Object.fromEntries(Object.entries(row).map(([k, v]) => [k, v === null || v === undefined ? '' : String(v)])),
   )
@@ -38,12 +56,23 @@ export async function parseXlsxFile(file: File): Promise<ParsedFile> {
   // by. Only where the sheet has none does the header row itself stand in,
   // so a report with its columns and no data is still recognised as the
   // report it is rather than as nothing at all.
-  const headerRow = XLSX.utils.sheet_to_json<unknown[]>(firstSheet, { header: 1, blankrows: false })[0] ?? []
+  const headerRow = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, blankrows: false })[0] ?? []
   const headers = rows.length > 0
     ? Object.keys(rows[0])
     : headerRow.map((h) => (h === null || h === undefined ? '' : String(h))).filter((h) => h !== '')
 
   return { headers, rows }
+}
+
+export async function parseXlsxFile(file: File): Promise<ParsedFile> {
+  const buffer = await file.arrayBuffer()
+  const workbook = XLSX.read(buffer, { type: 'array' })
+  const sheets: ParsedSheet[] = workbook.SheetNames.map((sheetName) => ({
+    sheetName,
+    ...sheetAsRows(workbook.Sheets[sheetName]),
+  }))
+  const first = sheets[0] ?? { headers: [], rows: [] }
+  return { headers: first.headers, rows: first.rows, sheets }
 }
 
 export function parseSpreadsheetFile(file: File): Promise<ParsedFile> {

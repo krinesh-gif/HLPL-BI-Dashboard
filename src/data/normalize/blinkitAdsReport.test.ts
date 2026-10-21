@@ -4,7 +4,11 @@ import { workbookSheetsFromBytes } from '@/lib/csvParse'
 import { adsSpendFor } from '@/engine/adsSpend'
 import { marketingFromAds } from '@/engine/marketing'
 import { adsRecordKey } from './dedupKeys'
-import { blinkitAdsDate, detectBlinkitAdsReport, normalizeBlinkitAdsReport } from './blinkitAdsReport'
+import {
+  blinkitAdsDate, blinkitAdsSheets, detectBlinkitAdsReport, normalizeBlinkitAdsReport,
+  normalizeBlinkitAdsWorkbook,
+} from './blinkitAdsReport'
+import type { ParsedSheet } from '@/lib/csvParse'
 
 const REPORT = '/root/.claude/uploads/f24a295e-093a-5385-9288-97acefc06862/2da2ae53-Report_2026-05-01_to_2026-05-31.xls'
 const APRIL_REPORT = '/root/.claude/uploads/f24a295e-093a-5385-9288-97acefc06862/cc50fdff-Report_2026-04-01_to_2026-04-30.xls'
@@ -185,5 +189,111 @@ describe.skipIf(!existsSync(APRIL_REPORT))('the owner’s April 2026 Blinkit cam
 
   it('puts the whole ₹16.80 into April’s P&L', () => {
     expect(marketingFromAds(read().adsRecords, '2026-04', []).blinkit?.ads).toBeCloseTo(16.8, 2)
+  })
+})
+
+/**
+ * Blinkit sells two things and puts each on its own sheet — PRODUCT_LISTING
+ * and PRODUCT_RECOMMENDATION — with an Estimated Budget Consumed column on
+ * both. Only the first was ever read, so a month reported a fraction of what
+ * it cost and said nothing about the rest. The owner found it.
+ */
+describe('a workbook with both of Blinkit’s ad products', () => {
+  const sheet = (sheetName: string, spends: [string, string][]): ParsedSheet => ({
+    sheetName,
+    headers: HEADERS,
+    rows: spends.map(([date, spend]) => row({
+      Date: date, 'Campaign Name': 'Rosemary-KT', 'Targeting Value': 'rosemary oil',
+      Impressions: '100', 'Estimated Budget Consumed': spend,
+    })),
+  })
+
+  const workbook = [
+    sheet('PRODUCT_LISTING', [['05-04-2026', '10.00'], ['11-04-2026', '6.80']]),
+    sheet('PRODUCT_RECOMMENDATION', [['05-04-2026', '2450.00'], ['11-04-2026', '1300.00']]),
+  ]
+
+  it('adds every sheet’s spend, not the first one’s', () => {
+    const r = normalizeBlinkitAdsWorkbook(workbook, 'i')
+    expect(r.totalSpend).toBeCloseTo(3766.8, 2)
+    // What reading the first sheet alone would have reported.
+    expect(normalizeBlinkitAdsReport(workbook[0].rows, 'i').totalSpend).toBeCloseTo(16.8, 2)
+  })
+
+  it('says what each sheet contributed, since a missed one is silent', () => {
+    const r = normalizeBlinkitAdsWorkbook(workbook, 'i')
+    const said = r.warnings.join(' ')
+    expect(said).toContain('PRODUCT_LISTING ₹16.80')
+    expect(said).toContain('PRODUCT_RECOMMENDATION ₹3,750.00')
+  })
+
+  /**
+   * The two sheets state the same campaign, date and targeting value. Without
+   * the ad product on the row they are the same row, and the second is
+   * dropped as a duplicate on insert — which would have left this half fixed
+   * and looking fixed.
+   */
+  it('keeps the two products apart as rows', () => {
+    const r = normalizeBlinkitAdsWorkbook(workbook, 'i')
+    expect(r.adsRecords).toHaveLength(4)
+    expect(new Set(r.adsRecords.map((x) => x.program))).toEqual(
+      new Set(['PRODUCT_LISTING', 'PRODUCT_RECOMMENDATION']),
+    )
+    expect(new Set(r.adsRecords.map(adsRecordKey)).size).toBe(4)
+  })
+
+  /**
+   * Adding the ad product changed what identifies a row, so rows already
+   * stored under the old key would have sat beside the new ones rather than
+   * being replaced by them. The upload states the months it covers so they
+   * are cleared first.
+   */
+  it('restates the months it covers rather than adding to them', () => {
+    expect(normalizeBlinkitAdsWorkbook(workbook, 'i').replaces).toEqual([
+      { channel: 'blinkit', months: ['2026-04'] },
+    ])
+  })
+
+  it('leaves out a sheet that is not campaign rows', () => {
+    const notes: ParsedSheet = { sheetName: 'Notes', headers: ['A'], rows: [{ A: 'x' }] }
+    expect(blinkitAdsSheets([...workbook, notes]).map((x) => x.sheetName))
+      .toEqual(['PRODUCT_LISTING', 'PRODUCT_RECOMMENDATION'])
+    expect(normalizeBlinkitAdsWorkbook([...workbook, notes], 'i').warnings.join(' '))
+      .toContain('left out')
+  })
+
+  it('says so rather than throwing when no sheet carries the column', () => {
+    const r = normalizeBlinkitAdsWorkbook([{ sheetName: 'Notes', headers: ['A'], rows: [{ A: 'x' }] }], 'i')
+    expect(r.totalSpend).toBe(0)
+    expect(r.adsRecords).toHaveLength(0)
+    expect(r.warnings.join(' ')).toContain('no spend to read')
+  })
+
+  /**
+   * The owner's April and May downloads have one sheet each, PRODUCT_LISTING,
+   * and ₹16.80 and ₹12.10 in them. Reading them as a workbook has to give
+   * exactly what reading the one sheet gave, or this fix would have moved a
+   * month that was already right.
+   */
+  describe.skipIf(!existsSync(APRIL_REPORT))('the owner’s own one-sheet downloads', () => {
+    const asSheets = (path: string): ParsedSheet[] =>
+      Object.entries(workbookSheetsFromBytes(readFileSync(path))).map(([sheetName, grid]) => {
+        const headers = (grid[0] ?? []).map((h) => String(h ?? ''))
+        return {
+          sheetName,
+          headers,
+          rows: grid.slice(1).map((r) => Object.fromEntries(headers.map((h, i) => [h, String(r[i] ?? '')]))),
+        }
+      })
+
+    it('reads April as ₹16.80, the one sheet it has', () => {
+      const sheets = asSheets(APRIL_REPORT)
+      expect(sheets.map((x) => x.sheetName)).toEqual(['PRODUCT_LISTING'])
+      expect(normalizeBlinkitAdsWorkbook(sheets, 'i').totalSpend).toBeCloseTo(16.8, 2)
+    })
+
+    it('reads May as ₹12.10', () => {
+      expect(normalizeBlinkitAdsWorkbook(asSheets(REPORT), 'i').totalSpend).toBeCloseTo(12.1, 2)
+    })
   })
 })
