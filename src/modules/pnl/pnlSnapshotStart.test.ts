@@ -4,14 +4,22 @@ import { pnlSnapshotStart } from './pnlSnapshotStart'
 const start = (query: string) => pnlSnapshotStart(new URLSearchParams(query))
 
 describe('what a snapshot link asks for', () => {
-  it('carries the view, period, basis and currency it was made with', () => {
-    expect(start('view=meesho&from=2026-03&to=2026-08&basis=settlement&cur=INR')).toEqual({
+  it('carries the view, period and currency it was made with', () => {
+    expect(start('view=meesho&from=2026-03&to=2026-08&cur=INR')).toEqual({
       view: 'meesho',
       period: { mode: 'custom', quick: '6m', from: '2026-03', to: '2026-08' },
-      meeshoBasis: 'settlement',
       amazonInHalf: 'both',
       currencyView: 'INR',
     })
+  })
+
+  it('ignores the basis a link made before the toggle was removed carries', () => {
+    // Meesho was readable on order date or payment date, and the choice
+    // travelled in the link. The company reads order date, as it does every
+    // other channel, so an old link reports that month's trading rather than
+    // being refused — the parameter is simply not there to be read.
+    expect(start('view=meesho&basis=settlement')).not.toHaveProperty('meeshoBasis')
+    expect(start('view=meesho&basis=settlement').view).toBe('meesho')
   })
 
   it('carries which of Amazon India\u2019s two businesses it was taken on', () => {
@@ -41,11 +49,10 @@ describe('what a snapshot link asks for', () => {
     expect(start('from=2026-08&to=2026-03').period).toBeUndefined()
   })
 
-  it('defaults the basis to order date and a channel to its own currency', () => {
-    // Order basis is what a month's trading is judged on, and a channel's own
-    // statement reads in the currency it is settled in.
-    expect(start('')).toMatchObject({ meeshoBasis: 'order', currencyView: 'native' })
-    expect(start('basis=nonsense&cur=nonsense')).toMatchObject({ meeshoBasis: 'order', currencyView: 'native' })
+  it('defaults a channel to its own currency', () => {
+    // A channel's own statement reads in the currency it is settled in.
+    expect(start('')).toMatchObject({ currencyView: 'native' })
+    expect(start('cur=nonsense')).toMatchObject({ currencyView: 'native' })
   })
 
   it('still understands a link made before the toggle was generalised', () => {

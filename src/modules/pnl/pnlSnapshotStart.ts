@@ -32,7 +32,7 @@ const isAmazonInHalf = (v: string | null): v is AmazonInHalf =>
 
 export function pnlSnapshotStart(
   params: URLSearchParams,
-): Required<Pick<PnlReportStart, 'view' | 'meeshoBasis' | 'amazonInHalf' | 'currencyView'>> & { period?: PnlPeriod } {
+): Required<Pick<PnlReportStart, 'view' | 'amazonInHalf' | 'currencyView'>> & { period?: PnlPeriod } {
   const viewParam = params.get('view')
   const from = params.get('from')
   const to = params.get('to')
@@ -45,8 +45,6 @@ export function pnlSnapshotStart(
       : range
         ? { mode: 'custom', quick: '6m', from: range.from, to: range.to }
         : undefined,
-    // The screen calls it "Payment date"; the value behind it is 'settlement'.
-    meeshoBasis: params.get('basis') === 'settlement' ? 'settlement' : 'order',
     // Which of Amazon India's two businesses the link was taken on. Anything
     // else means the channel, which is what every other screen reports.
     amazonInHalf: isAmazonInHalf(params.get('half')) ? (params.get('half') as AmazonInHalf) : 'both',

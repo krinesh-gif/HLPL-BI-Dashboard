@@ -22,7 +22,7 @@ import {
   tradedMonths,
   type QuickPeriod,
 } from '@/engine/multiMonthPnl'
-import type { PnlBasis, PnlLineValues } from '@/data/models'
+import type { PnlLineValues } from '@/data/models'
 
 /** Master Company, or one business channel. */
 export type PnlView = 'master' | BusinessChannelId
@@ -49,7 +49,6 @@ export interface PnlPeriod {
 export interface PnlReportStart {
   view?: PnlView
   period?: PnlPeriod
-  meeshoBasis?: PnlBasis
   amazonInHalf?: AmazonInHalf
   currencyView?: ChannelCurrencyView
 }
@@ -64,9 +63,6 @@ export function usePnlReport(start: PnlReportStart = {}) {
   const currentMonth = toMonthKey(new Date().toISOString().slice(0, 10))
 
   const [view, setView] = useState<PnlView>(start.view ?? 'master')
-  // Meesho carries both an order-date and a payment-date statement. Order
-  // basis is the default: it is what a month's trading is judged on.
-  const [meeshoBasis, setMeeshoBasis] = useState<PnlBasis>(start.meeshoBasis ?? 'order')
   // Amazon India is wholesale to RK World and a marketplace under one name.
   // The channel — both halves added — is what opens, because that is the
   // Amazon India every other screen reports; the halves are there to be read
@@ -109,7 +105,7 @@ export function usePnlReport(start: PnlReportStart = {}) {
 
     /** One month's P&L lines for the selected view, in `displayCurrency`. */
     const linesFor = (m: string): PnlLineValues => {
-      const inputs = { ...forMonth(m), meeshoBasis, currencyView, amazonInHalf: halfForView }
+      const inputs = { ...forMonth(m), currencyView, amazonInHalf: halfForView }
       if (view === 'master') {
         const views = buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, m, inputs)
         return buildMasterPnl(views.map((v) => v.canonical), m).lines
@@ -142,7 +138,7 @@ export function usePnlReport(start: PnlReportStart = {}) {
     const latestMonth = traded[traded.length - 1] ?? months[months.length - 1] ?? month
     const latestChannelViews =
       view === 'master'
-        ? buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, latestMonth, { ...forMonth(latestMonth), meeshoBasis, currencyView, amazonInHalf: 'both' })
+        ? buildAllChannelPnlViews(BUSINESS_CHANNEL_IDS, latestMonth, { ...forMonth(latestMonth), currencyView, amazonInHalf: 'both' })
         : []
     const channelBreakdown = latestChannelViews
       .map((v) => ({ channel: v.channel, netSales: v.canonical.lines.netSales ?? 0 }))
@@ -201,11 +197,11 @@ export function usePnlReport(start: PnlReportStart = {}) {
     let missingStatementNote: string | null = null
     if (view !== 'master') {
       for (let i = months.length - 1; i >= 0; i--) {
-        const built = buildChannelPnlView(view, months[i], { ...forMonth(months[i]), meeshoBasis, currencyView, amazonInHalf: halfForView })
+        const built = buildChannelPnlView(view, months[i], { ...forMonth(months[i]), currencyView, amazonInHalf: halfForView })
         if (built.native) { native = built.native; nativeNotes = built.notes; nativeMonth = months[i]; break }
       }
       if (!native) {
-        const built = buildChannelPnlView(view, latestMonth, { ...forMonth(latestMonth), meeshoBasis, currencyView, amazonInHalf: halfForView })
+        const built = buildChannelPnlView(view, latestMonth, { ...forMonth(latestMonth), currencyView, amazonInHalf: halfForView })
         missingStatementNote = built.notes[0] ?? null
       }
     }
@@ -215,7 +211,6 @@ export function usePnlReport(start: PnlReportStart = {}) {
     return {
       view, setView,
       missingStatementNote,
-      meeshoBasis, setMeeshoBasis,
       amazonInHalf, setAmazonInHalf,
       // Offered only where there are two halves on file to read apart, and
       // labelled with what each one is of the channel over this period.
@@ -241,7 +236,7 @@ export function usePnlReport(start: PnlReportStart = {}) {
       latestMonth,
     }
   }, [
-    view, meeshoBasis, amazonInHalf, currencyView, period, month, currentMonth,
+    view, amazonInHalf, currencyView, period, month, currentMonth,
     monthsWithData, hasBothAmazonInHalves, pnlInputs, forMonth, fxRates,
   ])
 }

@@ -1,5 +1,5 @@
 import type { BusinessChannelId } from '@/config/channels'
-import type { PnlBasis, PnlLineValues } from '@/data/models'
+import type { PnlLineValues } from '@/data/models'
 import { DEFAULT_FX_INR, type FxRatesInr } from '@/data/fxRates'
 import { computeSubtotals } from './subtotals'
 import { amazonAeToCanonicalBuckets } from './nativePnl/amazonAe'
@@ -42,9 +42,8 @@ export function statementNetSales(
   month: string,
   facts: ChannelFactsStore,
   fxRate: FxRatesInr = DEFAULT_FX_INR,
-  meeshoBasis: PnlBasis = 'order',
 ): number | null {
-  return statementRevenue(channel, month, facts, fxRate, meeshoBasis)?.netSales ?? null
+  return statementRevenue(channel, month, facts, fxRate)?.netSales ?? null
 }
 
 /** The revenue lines of a channel's statement, in rupees. */
@@ -60,9 +59,8 @@ export function statementRevenue(
   month: string,
   facts: ChannelFactsStore,
   fxRate: FxRatesInr = DEFAULT_FX_INR,
-  meeshoBasis: PnlBasis = 'order',
 ): StatementRevenue | null {
-  const buckets = statementBuckets(channel, month, facts, fxRate, meeshoBasis)
+  const buckets = statementBuckets(channel, month, facts, fxRate)
   if (!buckets) return null
   const lines = computeSubtotals(buckets)
   return {
@@ -96,7 +94,6 @@ interface StatementScope {
   month: string
   facts: ChannelFactsStore
   fxRate: FxRatesInr
-  meeshoBasis: PnlBasis
 }
 
 const forMonth = <T extends { month: string }>(list: T[] | undefined, month: string): T | undefined =>
@@ -115,9 +112,13 @@ const STATEMENT_READERS: Record<BusinessChannelId, (scope: StatementScope) => Pn
     const f = forMonth(facts.nykaaFacts, month)
     return f ? nykaaToCanonicalBuckets(f) : null
   },
-  meesho: ({ facts, month, meeshoBasis }) => {
+  // Meesho's report is stored on both of the calendars it can be cut on, and
+  // the company reads the order basis: the month a sale was made is the month
+  // it is judged in, here as on every other channel. The payment-basis rows
+  // stay in the table as the record of the file, unread.
+  meesho: ({ facts, month }) => {
     const f = facts.meeshoFacts.find(
-      (x) => x.month === month && x.basis === meeshoBasis && x.schemaVersion === 3,
+      (x) => x.month === month && x.basis === 'order' && x.schemaVersion === 3,
     )
     return f ? meeshoToCanonicalBuckets(f) : null
   },
@@ -171,9 +172,8 @@ function statementBuckets(
   month: string,
   facts: ChannelFactsStore,
   fxRate: FxRatesInr,
-  meeshoBasis: PnlBasis,
 ): PnlLineValues | null {
-  return STATEMENT_READERS[channel]({ month, facts, fxRate, meeshoBasis })
+  return STATEMENT_READERS[channel]({ month, facts, fxRate })
 }
 
 function addBuckets(a: PnlLineValues, b: PnlLineValues): PnlLineValues {

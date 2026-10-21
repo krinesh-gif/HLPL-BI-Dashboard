@@ -160,23 +160,31 @@ describe('the three-way COGS split survives the recompute', () => {
 })
 
 /**
- * Order rows are bucketed by order date. Pairing them with a settlement month
- * would price August's settlement using August's *orders* — a different set of
- * rows entirely, since a July order settles in August. The imported figure,
- * which the normalizer bucketed on payment date, is the only correct one there.
+ * The upload stores Meesho's month on both of the calendars it can be cut on:
+ * the month each order was placed, and the month Meesho paid for it. The
+ * company reads the first, as it reads every other channel — a month's
+ * trading is what was sold in it — and the payment-basis rows stay in the
+ * table as the record of the file.
+ *
+ * This is the test that says the second set cannot reach a statement. The two
+ * rows below are for the same month and state different money, so a reader
+ * that picked the wrong one would be plainly wrong rather than subtly so.
  */
-describe('the settlement basis keeps its imported cost', () => {
-  it('does not recompute a settlement month from order-date rows', () => {
-    const settlement = makeMeeshoFacts({
+describe('Meesho is read on the order basis', () => {
+  it('ignores the payment-basis row stored for the same month', () => {
+    const payment = makeMeeshoFacts({
       month: '2026-08', basis: 'settlement', grossSalesInclGst: 30000, cogsUnitsSold: 5000, unitsDispatched: 100,
     })
     const base = inputs([{ sku: 'SKU001', effectiveFrom: '2026-08', cogs: 99, source: 'cost-sheet' }], records)
-    const view = buildChannelPnlView('meesho', '2026-08', {
-      ...base,
-      facts: { ...base.facts, meeshoFacts: [...base.facts.meeshoFacts, settlement] },
-      meeshoBasis: 'settlement',
-    })
-    expect(view.native?.values.cogsUnitsSold).toBe(-5000)
+    const built = (meeshoFacts: typeof base.facts.meeshoFacts) =>
+      buildChannelPnlView('meesho', '2026-08', { ...base, facts: { ...base.facts, meeshoFacts } })
+
+    const asStored = built(base.facts.meeshoFacts)
+    const withPaymentRow = built([...base.facts.meeshoFacts, payment])
+
+    expect(withPaymentRow.native?.values.cogsUnitsSold).toBe(asStored.native?.values.cogsUnitsSold)
+    expect(withPaymentRow.native?.values.cogsUnitsSold).not.toBe(-5000)
+    expect(withPaymentRow.canonical.lines.netSales).toBe(asStored.canonical.lines.netSales)
   })
 })
 

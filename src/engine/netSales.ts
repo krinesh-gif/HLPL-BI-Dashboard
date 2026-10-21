@@ -5,7 +5,7 @@ import { toMonthKey } from '@/lib/format'
 import { nykaaRevenue } from './nativePnl/nykaa'
 import { statementRevenue } from './channelNetSales'
 import type { ChannelFactsStore } from './channelFactsStore'
-import type { CanonicalSalesRecord, PnlBasis } from '@/data/models'
+import type { CanonicalSalesRecord } from '@/data/models'
 
 /**
  * THE central Net Sales calculation.
@@ -193,13 +193,11 @@ export function settlementBasisNetSales(
   month: string,
   facts: ChannelFacts,
   fxRate: FxRatesInr = DEFAULT_FX_INR,
-  meeshoBasis: PnlBasis = 'order',
 ): NetSalesFigure | null {
   if (channel === 'meesho') {
-    // Meesho now carries both bases. Which one is authoritative is the
-    // caller's choice; order basis is the default because it is what a
-    // month's trading is judged on.
-    const f = facts.meeshoFacts.find((x) => x.month === month && x.basis === meeshoBasis && x.schemaVersion === 3)
+    // The order basis, as everywhere: a month's trading is what was sold in
+    // it. The file is stored on both calendars and only this one is read.
+    const f = facts.meeshoFacts.find((x) => x.month === month && x.basis === 'order' && x.schemaVersion === 3)
     if (!f) return null
     const netSales =
       f.grossSalesInclGst - f.cancellationsInclGst - f.salesReturnsInclGst - f.outputGstOnSales
@@ -220,9 +218,7 @@ export function settlementBasisNetSales(
       marketplaceFee: f.otherMarketplaceFees,
       shippingCost: f.forwardShipping + f.returnShipping,
       basis: 'settlement',
-      sourceLabel: meeshoBasis === 'order'
-        ? 'Meesho order report (order basis)'
-        : 'Meesho order report (settlement basis)',
+      sourceLabel: 'Meesho order report (order basis)',
     }
   }
 
@@ -299,7 +295,7 @@ export function settlementBasisNetSales(
   // because each carries something this cannot — Nykaa's MRP basis, Meesho's
   // unit and order counts — and a statement that states money but no units
   // leaves those to the order rows, as it always has.
-  const revenue = statementRevenue(channel, month, facts, fxRate, meeshoBasis)
+  const revenue = statementRevenue(channel, month, facts, fxRate)
   if (revenue) {
     return {
       ...EMPTY_FIGURE,
@@ -326,13 +322,11 @@ export interface NetSalesScope {
   month: string
   facts: ChannelFacts
   fxRate?: FxRatesInr
-  /** Which calendar Meesho's months are cut on. Ignored by other channels. */
-  meeshoBasis?: PnlBasis
   /**
    * Narrows to one uploaded report within the channel — Seller Central alone,
    * say. Used only by the drill-down: management figures never pass it.
    *
-   * Narrowing forces the order basis, because a settlement report covers the
+   * Narrowing drops the statement, because a settlement report covers the
    * whole channel and cannot be attributed to one of its sources.
    */
   source?: SalesSourceId
@@ -364,7 +358,7 @@ export function netSalesForChannelMonth(scope: NetSalesScope): NetSalesFigure {
   // settled total for one of its sources.
   const settlement = scope.source
     ? null
-    : settlementBasisNetSales(scope.channel, scope.month, scope.facts, fxRate, scope.meeshoBasis ?? 'order')
+    : settlementBasisNetSales(scope.channel, scope.month, scope.facts, fxRate)
 
   if (!settlement) return order
 

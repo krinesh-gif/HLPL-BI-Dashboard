@@ -1,5 +1,4 @@
 import type { BusinessChannelId } from '@/config/channels'
-import type { PnlBasis } from '@/data/models'
 import type {
   AmazonInSkuFeeFacts,
   AmazonInSellerPnlFacts,
@@ -532,8 +531,6 @@ export interface ChannelPnlViewInputs {
   /** Effective-dated costs and combo recipes. Optional so a caller with
    * neither still gets a P&L, costed from the Product Master as before. */
   cogs?: CogsInputs
-  /** Which calendar Meesho's months are cut on. Defaults to order basis. */
-  meeshoBasis?: PnlBasis
   /** Which of Amazon India's two businesses to report. Defaults to the whole
    * channel, so a caller that knows nothing about the split still gets both. */
   amazonInHalf?: AmazonInHalf
@@ -1421,19 +1418,19 @@ function buildChannelPnlStatement(channel: BusinessChannelId, month: string, inp
   }
 
   if (channel === 'meesho') {
-    const basis = inputs.meeshoBasis ?? 'order'
-    // A month stored under the older, thinner shape is treated as absent
-    // rather than rendered as if it were complete — a half-read P&L is worse
-    // than an obviously missing one.
+    // The order basis, as on every other channel: the month a sale was made
+    // is the month it is judged in. A month stored under the older, thinner
+    // shape is treated as absent rather than rendered as if it were complete
+    // — a half-read P&L is worse than an obviously missing one.
     const imported = inputs.facts.meeshoFacts.find(
-      (f) => f.month === month && f.basis === basis && f.schemaVersion === 3,
+      (f) => f.month === month && f.basis === 'order' && f.schemaVersion === 3,
     )
     if (imported) {
       // COGS is recomputed from order rows at the month's effective cost
       // where those rows exist, since the imported figure was priced at
       // whatever the Product Master held on upload day. The three-way split
       // is preserved, and only the order basis can be recomputed.
-      const recomputed = basis === 'order' ? recomputedMeeshoCogs(month, imported, inputs) : null
+      const recomputed = recomputedMeeshoCogs(month, imported, inputs)
       const facts =
         recomputed && !('note' in recomputed)
           ? {

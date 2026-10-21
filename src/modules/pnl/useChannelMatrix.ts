@@ -6,7 +6,7 @@ import { buildMasterPnl, computeSubtotals } from '@/engine/pnl'
 import { buildPnlColumns, isEmptyPnlColumn } from '@/engine/multiMonthPnl'
 import { usePnlInputs } from '@/engine/usePnlInputs'
 import { latestFinishedMonth } from '@/lib/format'
-import type { PnlBasis, PnlLineValues } from '@/data/models'
+import type { PnlLineValues } from '@/data/models'
 
 /**
  * One month, every channel side by side.
@@ -40,15 +40,9 @@ export function useChannelMatrix() {
   const [chosenMonth, setMonth] = useState<string | null>(null)
   const month = chosenMonth ?? latest
 
-  // Meesho alone carries two statements for the same orders. Order basis is
-  // the default here as it is everywhere else: it is what a month's trading
-  // earned, and this report is about a month's trading.
-  const [meeshoBasis, setMeeshoBasis] = useState<PnlBasis>('order')
-
   return useMemo(() => {
     const inputs = {
       ...forMonth(month),
-      meeshoBasis,
       // Rupees, always. The columns sit beside each other and are added up at
       // the end of the row, so a dollar column would make the row meaningless.
       currencyView: 'INR' as const,
@@ -78,7 +72,6 @@ export function useChannelMatrix() {
       month,
       setMonth,
       monthsWithData,
-      meeshoBasis, setMeeshoBasis,
       channels: columns.map((c) => c.channel),
       table,
       // The same month built the way the P&L screen builds it, so the page can
@@ -89,5 +82,5 @@ export function useChannelMatrix() {
       // channel.
       absent: views.filter((v) => isEmptyPnlColumn(v.canonical.lines)).map((v) => v.channel),
     }
-  }, [month, meeshoBasis, monthsWithData, forMonth])
+  }, [month, monthsWithData, forMonth])
 }
