@@ -10,7 +10,7 @@ import { usePnlInputs } from '@/engine/usePnlInputs'
 import { useFilterStore } from '@/store/filterStore'
 import { ADS_CHANNELS, ADS_CHANNEL_MAP, isAdsChannel, type AdsChannelId } from '@/config/adsChannels'
 import { addMonths, formatCurrencyCompact, formatCurrencyFull, formatNumber, formatPercent, monthLabel } from '@/lib/format'
-import { adsSpendByProgram, adsSpendFor, tacos, type AdsProgramSpend } from '@/engine/adsSpend'
+import { acosOf, adsSpendByProgram, adsSpendFor, measuredSpendOf, roasOf, tacos, type AdsProgramSpend } from '@/engine/adsSpend'
 import { netSalesForChannelMonth } from '@/engine/netSales'
 import { ManualAdSpendForm } from './ManualAdSpendForm'
 import { MyntraAdsDepth } from './MyntraAdsDepth'
@@ -77,7 +77,7 @@ export function AdsChannelPage() {
     if (!def) return null
     // An Amazon account billed in dirhams or dollars is converted at the
     // month's own rate, so every figure on this page is rupees.
-    const figure = adsSpendFor(channel, month, adsRecords, manualAdSpend, fxRatesForMonth(month, fxRates))
+    const figure = adsSpendFor(channel, month, adsRecords, manualAdSpend, fxRatesForMonth(month, fxRates), pnlFacts)
     const netSales = netSalesForChannelMonth({
       records: salesRecords, channel, month,
       facts: pnlFacts,
@@ -85,7 +85,7 @@ export function AdsChannelPage() {
 
     const trend = Array.from({ length: TREND_MONTHS }, (_, i) => {
       const m = addMonths(month, i - (TREND_MONTHS - 1))
-      const f = adsSpendFor(channel, m, adsRecords, manualAdSpend, fxRatesForMonth(m, fxRates))
+      const f = adsSpendFor(channel, m, adsRecords, manualAdSpend, fxRatesForMonth(m, fxRates), pnlFacts)
       return {
         month: monthLabel(m),
         spend: f.spend,
@@ -95,7 +95,7 @@ export function AdsChannelPage() {
         // A nil return and an unmeasured one are different statements, and on
         // one chart with the spend a false nil drags the whole axis down to
         // meet it.
-        roas: f.adSales !== null && f.spend > 0 ? f.adSales / f.spend : null,
+        roas: roasOf(f),
       }
     })
 
@@ -116,11 +116,15 @@ export function AdsChannelPage() {
   }
 
   const { figure, netSales, trend, programs } = data
-  const roas = figure.adSales !== null && figure.spend > 0 ? figure.adSales / figure.spend : null
-  const acos = figure.adSales !== null && figure.adSales > 0 ? (figure.spend / figure.adSales) * 100 : null
+  // Measured against the campaign report's own spend where the billed figure
+  // came from the statement: the sales and clicks were counted beside that
+  // spend, on that calendar, so dividing by anything else states a return
+  // neither source claims.
+  const roas = roasOf(figure)
+  const acos = acosOf(figure)
   const ctr = figure.impressions !== null && figure.impressions > 0 && figure.clicks !== null
     ? (figure.clicks / figure.impressions) * 100 : null
-  const cpc = figure.clicks !== null && figure.clicks > 0 ? figure.spend / figure.clicks : null
+  const cpc = figure.clicks !== null && figure.clicks > 0 ? measuredSpendOf(figure) / figure.clicks : null
   const cvr = figure.clicks !== null && figure.clicks > 0 && figure.adOrders !== null
     ? (figure.adOrders / figure.clicks) * 100 : null
 
@@ -147,7 +151,13 @@ export function AdsChannelPage() {
       )}
 
       <KPIGrid>
-        <KPICard label="Ad Spend" value={figure.spend === 0 ? '—' : formatCurrencyCompact(figure.spend)} note={figure.sourceLabel} />
+        <KPICard
+          label="Ad Spend"
+          value={figure.spend === 0 ? '—' : formatCurrencyCompact(figure.spend)}
+          note={figure.reportedSpend === null
+            ? figure.sourceLabel
+            : `${figure.sourceLabel} · campaign report ${formatCurrencyFull(figure.reportedSpend)}`}
+        />
         <KPICard label="Ad Sales" value={figure.adSales === null ? '—' : formatCurrencyCompact(figure.adSales)} />
         <KPICard label="ROAS" value={roas === null ? '—' : `${roas.toFixed(2)}x`} />
         <KPICard label="ACOS" value={acos === null ? '—' : formatPercent(acos)} />

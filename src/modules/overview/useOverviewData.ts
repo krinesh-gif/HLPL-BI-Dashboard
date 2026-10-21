@@ -77,7 +77,7 @@ export function useOverviewData() {
     // by hand rather than uploaded. The engine does both, and it is the same
     // engine the Ads pages and the P&L read, so the front page cannot
     // disagree with them.
-    const adsFigures = adsSpendForMonth(month, adsRecords, manualAdSpend, undefined, fxRatesForMonth(month, fxRates))
+    const adsFigures = adsSpendForMonth(month, adsRecords, manualAdSpend, undefined, fxRatesForMonth(month, fxRates), pnlFacts)
     const adsTotals = totalAdsSpend(adsFigures)
     const totalAdSpend = adsTotals.spend
     const acos = adsTotals.acos ?? 0

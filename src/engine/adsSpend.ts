@@ -4,25 +4,41 @@ import { channelOfSource } from '@/config/channels'
 import type { AdsRecord, ManualAdSpend } from '@/data/models'
 import { DEFAULT_FX_INR, type FxRatesInr } from '@/data/fxRates'
 import { adsAmountInr } from './adsAmounts'
+import { statementAdSpend } from './channelNetSales'
+import type { ChannelFactsStore } from './channelFactsStore'
 import { toMonthKey } from '@/lib/format'
 
 /**
  * What a channel spent on advertising in a month, and where that figure came
  * from.
  *
- * Two sources can supply it and they must not be added together — that would
- * double-count a month where both exist. The uploaded report wins, because it
- * is the platform's own measurement and carries impressions, clicks and
- * attributed sales that a hand-entered total cannot. A manual figure fills the
- * gap where no report exists, which is the normal case for a platform that
- * bills by invoice.
+ * Three sources can supply it and they must not be added together — that would
+ * double-count a month where more than one exists.
  *
- * Whichever is used, the screen says so. A manually entered number and a
- * measured one deserve different confidence, and a reader who cannot tell them
- * apart will treat both as measured.
+ * The channel's own statement wins. Where a marketplace bills advertising
+ * inside the statement it settles on, that is the money it actually took, and
+ * it is what the P&L charges: showing anything else here left two screens
+ * reporting different advertising for the same month, which is how this was
+ * found.
+ *
+ * An uploaded campaign report comes next. It is the platform's measurement of
+ * what the campaigns did, and it is the only source of attributed sales,
+ * impressions and clicks — so where a statement supplies the spend and a
+ * report exists beside it, the report still supplies those, and its own spend
+ * is kept as `reportedSpend` rather than thrown away. The two are cut
+ * differently, the statement on the billing cycle and the report on campaign
+ * dates, so they disagree month to month while agreeing over a period, and a
+ * reader is owed both figures rather than one of them silently.
+ *
+ * A manual figure fills the gap where neither exists, which is the normal case
+ * for a platform that bills by invoice.
+ *
+ * Whichever is used, the screen says so. A hand-entered number, a billed one
+ * and a measured one deserve different confidence, and a reader who cannot
+ * tell them apart will treat all three as measured.
  */
 
-export type AdsSpendSource = 'report' | 'manual' | 'none'
+export type AdsSpendSource = 'statement' | 'report' | 'manual' | 'none'
 
 export interface AdsSpendFigure {
   channel: AdsChannelId
@@ -35,6 +51,17 @@ export interface AdsSpendFigure {
   impressions: number | null
   clicks: number | null
   source: AdsSpendSource
+  /**
+   * The campaign report's own spend, where one was uploaded beside a statement
+   * that disagrees with it. Null when there is no report, or when the report
+   * is itself the source.
+   *
+   * ROAS and ACOS are measured against this rather than against the billed
+   * spend: the attributed sales were measured beside this spend, and dividing
+   * them by a figure cut on a different calendar states a return neither
+   * source claims.
+   */
+  reportedSpend: number | null
   /**
    * True where the month's report states what was spent and nothing else.
    *
@@ -55,13 +82,14 @@ export interface AdsSpendFigure {
 const EMPTY = (channel: AdsChannelId, month: string): AdsSpendFigure => ({
   channel, month, spend: 0,
   adSales: null, adOrders: null, impressions: null, clicks: null,
-  source: 'none', costOnly: false, sourceLabel: 'No data',
+  source: 'none', costOnly: false, sourceLabel: 'No data', reportedSpend: null,
 })
 
 /**
  * The authoritative ad spend for one channel and month.
  *
- * Priority: an uploaded report, else a manual monthly value, else nothing.
+ * Priority: what the channel's statement billed, else an uploaded campaign
+ * report, else a manual monthly value, else nothing.
  */
 export function adsSpendFor(
   channel: AdsChannelId,
@@ -71,12 +99,47 @@ export function adsSpendFor(
   /** The month's rates, for an account billed in dirhams or dollars. Every
    * figure here is rupees, as the rest of the app's are. */
   fx: FxRatesInr = DEFAULT_FX_INR,
+  /** The statements, so a channel that bills advertising inside its own can
+   * report what it was actually charged. Required rather than optional: a
+   * caller that forgets it gets a figure the P&L disagrees with, silently,
+   * which is the whole fault this parameter exists to fix. */
+  facts: ChannelFactsStore = NO_STATEMENTS,
 ): AdsSpendFigure {
+  const billed = statementAdSpend(channel, month, facts, fx)
+
   const reported = adsRecords.filter(
     (r) => channelOfSource(r.channel) === channel && toMonthKey(r.date) === month,
   )
 
-  if (reported.length > 0) {
+  const fromReport = reported.length > 0 ? reportFigure() : null
+  if (billed !== null) {
+    return {
+      ...(fromReport ?? EMPTY(channel, month)),
+      spend: billed,
+      // Only when the report has a different figure to offer; the same number
+      // twice is noise.
+      reportedSpend: fromReport && Math.abs(fromReport.spend - billed) >= 1 ? fromReport.spend : null,
+      source: 'statement',
+      sourceLabel: 'Charged in the statement',
+    }
+  }
+  if (fromReport) return fromReport
+
+  const manual = manualEntries.find((e) => e.channel === channel && e.month === month)
+  if (manual) {
+    return {
+      ...EMPTY(channel, month),
+      spend: manual.amount,
+      source: 'manual',
+      costOnly: true,
+      sourceLabel: manual.fileName ? `Entered manually — ${manual.fileName}` : 'Entered manually',
+      manualEntry: manual,
+    }
+  }
+
+  return EMPTY(channel, month)
+
+  function reportFigure(): AdsSpendFigure {
     // Money is converted; impressions and clicks are counts and are not.
     const sum = (pick: (r: AdsRecord) => number) => reported.reduce((s, r) => s + pick(r), 0)
     const sumMoney = (pick: (r: AdsRecord) => number) =>
@@ -103,22 +166,34 @@ export function adsSpendFor(
       source: 'report',
       costOnly,
       sourceLabel: costOnly ? 'Monthly cost report' : 'Ads report',
+      reportedSpend: null,
     }
   }
+}
 
-  const manual = manualEntries.find((e) => e.channel === channel && e.month === month)
-  if (manual) {
-    return {
-      ...EMPTY(channel, month),
-      spend: manual.amount,
-      source: 'manual',
-      costOnly: true,
-      sourceLabel: manual.fileName ? `Entered manually — ${manual.fileName}` : 'Entered manually',
-      manualEntry: manual,
-    }
-  }
+/** For a caller with no statements to hand. Every screen passes the real ones. */
+const NO_STATEMENTS: ChannelFactsStore = { flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [] }
 
-  return EMPTY(channel, month)
+/**
+ * The spend a figure's ROAS and ACOS are measured against.
+ *
+ * The campaign report's own, where the billed spend came from somewhere else:
+ * the attributed sales were counted beside that spend and on that calendar.
+ */
+export function measuredSpendOf(f: AdsSpendFigure): number {
+  return f.reportedSpend ?? f.spend
+}
+
+/** Return on ad spend, or null where nothing measured it. */
+export function roasOf(f: AdsSpendFigure): number | null {
+  const spend = measuredSpendOf(f)
+  return f.adSales !== null && spend > 0 ? f.adSales / spend : null
+}
+
+/** Advertising cost of sale, as a percentage, or null where nothing measured it. */
+export function acosOf(f: AdsSpendFigure): number | null {
+  const spend = measuredSpendOf(f)
+  return f.adSales !== null && f.adSales > 0 ? (spend / f.adSales) * 100 : null
 }
 
 /** Every ads channel's figure for a month, for the overview table. */
@@ -128,8 +203,9 @@ export function adsSpendForMonth(
   manualEntries: ManualAdSpend[],
   channels: AdsChannelId[] = ADS_CHANNEL_IDS,
   fx: FxRatesInr = DEFAULT_FX_INR,
+  facts: ChannelFactsStore = NO_STATEMENTS,
 ): AdsSpendFigure[] {
-  return channels.map((c) => adsSpendFor(c, month, adsRecords, manualEntries, fx))
+  return channels.map((c) => adsSpendFor(c, month, adsRecords, manualEntries, fx, facts))
 }
 
 /**
@@ -191,6 +267,8 @@ export interface AdsTotals {
   acos: number | null
   /** True when any part of the total was entered by hand. */
   includesManual: boolean
+  /** True when a channel's billed spend differs from its campaign report's. */
+  hasBilledDifference: boolean
 }
 
 export function totalAdsSpend(figures: AdsSpendFigure[]): AdsTotals {
@@ -207,12 +285,15 @@ export function totalAdsSpend(figures: AdsSpendFigure[]): AdsTotals {
     // understate ROAS and overstate ACOS.
     roas: adSales !== null && measuredSpend(figures) > 0 ? adSales / measuredSpend(figures) : null,
     acos: adSales !== null && adSales > 0 ? (measuredSpend(figures) / adSales) * 100 : null,
+    // True where any channel's billed spend differs from what its campaign
+    // report measured, so the screen can say why the two do not divide out.
+    hasBilledDifference: figures.some((f) => f.reportedSpend !== null),
     includesManual: figures.some((f) => f.source === 'manual'),
   }
 }
 
 function measuredSpend(figures: AdsSpendFigure[]): number {
-  return figures.filter((f) => f.adSales !== null).reduce((s, f) => s + f.spend, 0)
+  return figures.filter((f) => f.adSales !== null).reduce((s, f) => s + measuredSpendOf(f), 0)
 }
 
 /** TACOS: total advertising spend as a share of the business's net sales. */

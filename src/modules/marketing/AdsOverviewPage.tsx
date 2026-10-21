@@ -9,7 +9,7 @@ import { usePnlInputs } from '@/engine/usePnlInputs'
 import { useFilterStore } from '@/store/filterStore'
 import { ADS_CHANNELS } from '@/config/adsChannels'
 import { formatCurrencyCompact, formatCurrencyFull, formatPercent, monthLabel } from '@/lib/format'
-import { adsSpendForMonth, tacos, totalAdsSpend } from '@/engine/adsSpend'
+import { acosOf, adsSpendForMonth, roasOf, tacos, totalAdsSpend } from '@/engine/adsSpend'
 import { netSalesForMonth } from '@/engine/netSales'
 import { exportRowsToCsv } from '@/lib/exportCsv'
 
@@ -24,7 +24,7 @@ export function AdsOverviewPage() {
   const { month } = useFilterStore()
 
   const { figures, totals, netSales } = useMemo(() => {
-    const figures = adsSpendForMonth(month, adsRecords, manualAdSpend, undefined, fxRatesForMonth(month, fxRates))
+    const figures = adsSpendForMonth(month, adsRecords, manualAdSpend, undefined, fxRatesForMonth(month, fxRates), pnlFacts)
     return {
       figures,
       totals: totalAdsSpend(figures),
@@ -41,8 +41,9 @@ export function AdsOverviewPage() {
         Channel: label(f.channel),
         Spend: Math.round(f.spend),
         'Ad Sales': f.adSales === null ? '' : Math.round(f.adSales),
-        ROAS: f.adSales !== null && f.spend > 0 ? Number((f.adSales / f.spend).toFixed(2)) : '',
-        'ACOS %': f.adSales !== null && f.adSales > 0 ? Number(((f.spend / f.adSales) * 100).toFixed(1)) : '',
+        'Campaign report spend': f.reportedSpend === null ? '' : Math.round(f.reportedSpend),
+        ROAS: roasOf(f) === null ? '' : Number(roasOf(f)!.toFixed(2)),
+        'ACOS %': acosOf(f) === null ? '' : Number(acosOf(f)!.toFixed(1)),
         Source: f.sourceLabel,
       })),
     )
@@ -93,20 +94,30 @@ export function AdsOverviewPage() {
                 <td className="px-3 py-2 font-medium text-[var(--ink)]">{label(f.channel)}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-[var(--ink)]">
                   {f.spend === 0 ? '—' : formatCurrencyFull(f.spend)}
+                  {/* The campaign report's own figure, where it differs. The
+                      two are cut differently — the statement on the billing
+                      cycle, the report on campaign dates — and a reader who
+                      has the report open is owed the number in it rather than
+                      being left to wonder which of the two is broken. */}
+                  {f.reportedSpend !== null && (
+                    <div className="text-[11px] font-normal text-[var(--ink-3)]">
+                      report: {formatCurrencyFull(f.reportedSpend)}
+                    </div>
+                  )}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">
                   {f.adSales === null ? <span className="text-xs italic text-[var(--ink-3)]">not measured</span> : formatCurrencyFull(f.adSales)}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">
-                  {f.adSales !== null && f.spend > 0 ? `${(f.adSales / f.spend).toFixed(2)}x` : '—'}
+                  {roasOf(f) === null ? '—' : `${roasOf(f)!.toFixed(2)}x`}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">
-                  {f.adSales !== null && f.adSales > 0 ? formatPercent((f.spend / f.adSales) * 100) : '—'}
+                  {acosOf(f) === null ? '—' : formatPercent(acosOf(f)!)}
                 </td>
                 <td className="px-3 py-2">
                   <span
                     className={`rounded-full border px-2 py-0.5 text-xs ${
-                      f.source === 'report'
+                      f.source === 'report' || f.source === 'statement'
                         ? 'border-[color-mix(in_oklab,var(--good)_35%,transparent)] bg-[color-mix(in_oklab,var(--good)_10%,transparent)] text-[var(--good-ink)]'
                         : f.source === 'manual'
                           ? 'border-[color-mix(in_oklab,var(--warning)_35%,transparent)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] text-[var(--ink-2)]'
@@ -142,6 +153,16 @@ export function AdsOverviewPage() {
           </tfoot>
         </table>
       </div>
+
+      {totals.hasBilledDifference && (
+        <p className="text-xs text-[var(--ink-3)]">
+          Where a marketplace bills advertising inside the statement it settles on — Flipkart's Ads and Google Ads lines, Amazon
+          USA's Sponsored Products charge — that billed figure is the spend shown, because it is the money the platform took and
+          it is what the P&amp;L charges. The campaign report below it is the platform's own measurement, cut on campaign dates
+          rather than on the billing cycle, so the two differ month to month while agreeing over a period. ROAS and ACOS are
+          measured against the report's spend, since the attributed sales were counted beside it.
+        </p>
+      )}
 
       {totals.includesManual && (
         <p className="text-xs text-[var(--ink-3)]">

@@ -176,6 +176,42 @@ function statementBuckets(
   return STATEMENT_READERS[channel]({ month, facts, fxRate })
 }
 
+/**
+ * What the channel's own statement charges for advertising this month, in
+ * rupees — or null where the statement does not state any.
+ *
+ * Some marketplaces bill advertising inside the statement they settle on:
+ * Flipkart's workbook has a Flipkart Ads line and a Google Ads line, Amazon
+ * USA's export has a Sponsored Products charge per SKU. That is the figure
+ * the P&L charges, because it is the money the platform actually took. The
+ * campaign report is a different thing — the platform's measurement of what
+ * the campaigns did — and it is cut on campaign dates rather than on the
+ * billing cycle, so the two disagree by a month's worth either way while
+ * agreeing over a period.
+ *
+ * Read through the same canonical buckets the P&L is built from, so a channel
+ * that starts carrying advertising in its statement is picked up here without
+ * this module learning its name. Every marketing bucket counts: Flipkart's
+ * Google Ads is performance marketing rather than marketplace advertising,
+ * and the two are one line on the P&L.
+ *
+ * Zero reads as "this statement does not carry advertising" and returns null.
+ * Most statements have no such column at all, and a zero that outranked a real
+ * campaign report would wipe out the spend on every one of them.
+ */
+export function statementAdSpend(
+  channel: BusinessChannelId,
+  month: string,
+  facts: ChannelFactsStore,
+  fxRate: FxRatesInr = DEFAULT_FX_INR,
+): number | null {
+  const buckets = statementBuckets(channel, month, facts, fxRate)
+  if (!buckets) return null
+  const total =
+    (buckets.ads ?? 0) + (buckets.performanceMarketing ?? 0) + (buckets.otherMarketing ?? 0)
+  return total === 0 ? null : total
+}
+
 function addBuckets(a: PnlLineValues, b: PnlLineValues): PnlLineValues {
   const out: PnlLineValues = { ...a }
   for (const [key, value] of Object.entries(b) as [keyof PnlLineValues, number | undefined][]) {
