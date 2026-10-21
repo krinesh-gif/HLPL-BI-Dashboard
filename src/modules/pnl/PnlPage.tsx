@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { PageShell } from '@/components/layout/PageShell'
+import { HeaderIconAction, DownloadIcon, SnapshotIcon } from '@/components/ui/HeaderIconAction'
 import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { ComparisonBarChart } from '@/components/charts/ComparisonBarChart'
 import { BUSINESS_CHANNELS, channelLabel, type BusinessChannelId } from '@/config/channels'
@@ -35,7 +36,6 @@ export function PnlPage() {
     ...(r.period.mode === 'quick' ? { period: r.period.quick } : {}),
     from: r.months[0] ?? r.latestMonth,
     to: r.months[r.months.length - 1] ?? r.latestMonth,
-    basis: r.meeshoBasis,
     half: r.amazonInHalf,
     cur: r.displayCurrency,
   }).toString()
@@ -76,12 +76,10 @@ export function PnlPage() {
       // Carries whatever is on screen into the snapshot, so the link reports
       // the same view, period, basis and currency the reader was looking at.
       headerActions={
-        <Link
-          to={{ pathname: '/pnl/snapshot', search }}
-          className="rounded-[var(--radius-control)] border border-[var(--line-2)] px-3 py-1.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--surface-hover)]"
-        >
-          Snapshot
-        </Link>
+        <div className="flex items-center gap-2">
+          <HeaderIconAction label="Export CSV" icon={DownloadIcon} onClick={handleExport} />
+          <HeaderIconAction label="Snapshot" icon={SnapshotIcon} to={{ pathname: '/pnl/snapshot', search }} />
+        </div>
       }
     >
       {/* ---- Header controls ------------------------------------------- */}
@@ -122,29 +120,6 @@ export function PnlPage() {
                   }`}
                 >
                   {c.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {r.view === 'meesho' && (
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-[var(--ink-3)]">Basis</span>
-            <div className="flex rounded-md border border-[var(--line-2)] bg-[var(--surface)] p-0.5">
-              {([
-                { key: 'order', label: 'Order date' },
-                { key: 'settlement', label: 'Payment date' },
-              ] as const).map((b) => (
-                <button
-                  key={b.key}
-                  type="button"
-                  onClick={() => r.setMeeshoBasis(b.key)}
-                  className={`rounded px-3 py-1 text-sm font-medium transition ${
-                    r.meeshoBasis === b.key ? 'bg-[var(--accent)] text-[var(--accent-ink)]' : 'text-[var(--ink-2)] hover:bg-[var(--surface-hover)]'
-                  }`}
-                >
-                  {b.label}
                 </button>
               ))}
             </div>
@@ -240,15 +215,6 @@ export function PnlPage() {
           </select>
         </label>
 
-        <button
-          type="button"
-          onClick={handleExport}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-[var(--line-2)] px-3.5 py-1.5 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--ink)]"
-        >
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8"
-            strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg>
-          Export CSV
-        </button>
       </div>
 
       {/* ---- The report -------------------------------------------------- */}
@@ -351,27 +317,16 @@ export function PnlPage() {
 
       {r.view === 'meesho' && (
         <p className="rounded-md border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--ink-2)]">
-          {r.meeshoBasis === 'order' ? (
-            <>
-              <strong>Order-date basis.</strong> Every order counted in the month the customer placed it — what a month's trading
-              earned. Use this for trading, marketing and SKU decisions.
-            </>
-          ) : (
-            <>
-              <strong>Payment-date basis.</strong> Every order counted in the month Meesho paid for it — what the bank saw. Use this
-              for cash and reconciliation.
-            </>
-          )}{' '}
-          The same orders sit behind both; they differ because a payment run settles a great deal of the previous month's trading.
-          Neither is more correct than the other.
+          <strong>Order-date basis.</strong> Every order counted in the month the customer placed it — what a month's trading
+          earned, which is how every other channel here is read. Meesho's file also states the month it paid for each order;
+          those rows are kept as the record of the file and are not what this statement reports.
         </p>
       )}
 
       {r.view === 'meesho' && !r.native && (
         <p className="rounded-md border border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-[color-mix(in_oklab,var(--warning)_12%,transparent)] px-3 py-2 text-xs text-[var(--ink)]">
-          <strong>No Meesho statement stored for this period yet</strong>, so the figures above come from order rows alone and the
-          Order date / Payment date toggle has nothing to switch between. Upload the aggregated payment workbook (Payments ▸ Order
-          Payments) on Upload Reports — one upload produces both statements.
+          <strong>No Meesho statement stored for this period yet</strong>, so the figures above come from order rows alone. Upload
+          the aggregated payment workbook (Payments ▸ Order Payments) on Upload Reports, and the statement replaces them.
         </p>
       )}
 
