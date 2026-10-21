@@ -543,6 +543,8 @@ export interface ChannelPnlViewInputs {
   fxRate?: FxRatesInr
   /** Rupees of India→USA freight per unit shipped, for this month. */
   freightPerUnitInr?: number
+  /** India→UAE air freight for the month, rupees per unit shipped. */
+  uaeFreightPerUnitInr?: number
   /** Rupees a unit from our warehouse to Nykaa's, for the month being read. */
   nykaaFreightPerUnitInr?: number
   /** Rupees to pack one parcel, for the month being read. Meesho's statement
@@ -1255,6 +1257,10 @@ function buildChannelPnlStatement(channel: BusinessChannelId, month: string, inp
       // stated. In rupees here, because the marketing roll-up has already
       // brought the dirhams across at this month's rate.
       const adsInr = inputs.marketing[channel]?.ads ?? 0
+      // The airway bill, priced when the statement is read: net units shipped
+      // at the month's own rate, so correcting the rate restates the months
+      // it should and leaves a closed month on the rate it was closed at.
+      const freightInr = (inputs.uaeFreightPerUnitInr ?? 0) * (facts.netUnitsSoldQty ?? 0)
 
       const notes: string[] = []
       // Said on the statement, not only at upload: anyone reading the P&L in
@@ -1264,6 +1270,13 @@ function buildChannelPnlStatement(channel: BusinessChannelId, month: string, inp
         'the Net proceeds Amazon states — and not a breakdown. A download carrying the fee columns will split it ' +
         'without changing any of these totals.',
       )
+      if (inputs.uaeFreightPerUnitInr === undefined || inputs.uaeFreightPerUnitInr === 0) {
+        notes.push(
+          `⚠ No India→UAE freight rate is entered for ${month}, so the landed cost above is the goods alone and ` +
+          'this channel reads better than it is. Enter the month\'s air freight per unit on Monthly Inputs — the ' +
+          'US rate is not a stand-in, being a different carrier over a different distance.',
+        )
+      }
       if (recomputed && recomputed.uncostedUnits > 0) {
         const shown = recomputed.uncostedSkus.slice(0, 8).join(', ')
         const rest = recomputed.uncostedSkus.length - 8
@@ -1279,7 +1292,10 @@ function buildChannelPnlStatement(channel: BusinessChannelId, month: string, inp
         canonical: {
           channel, month,
           lines: computeSubtotals(
-            withAllocatedOpex(amazonAeToCanonicalBuckets(facts, rate, cogsInr, adsInr), inputs, channel, month),
+            withAllocatedOpex(
+              amazonAeToCanonicalBuckets(facts, rate, cogsInr, adsInr, freightInr),
+              inputs, channel, month,
+            ),
           ),
         },
         native: (() => {
@@ -1288,6 +1304,7 @@ function buildChannelPnlStatement(channel: BusinessChannelId, month: string, inp
             rate !== 0 ? cogsInr / rate : 0,
             rate !== 0 ? otherCostsInr / rate : 0,
             rate !== 0 ? adsInr / rate : 0,
+            rate !== 0 ? freightInr / rate : 0,
           )
           const showInr = inputs.currencyView === 'INR'
           return {

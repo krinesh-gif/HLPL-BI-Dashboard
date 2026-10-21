@@ -26,7 +26,7 @@ function view(
 }
 
 const HAS_EVERYTHING = {
-  fxUsd: true, fxAed: true, freightIndiaUsa: true,
+  fxUsd: true, fxAed: true, freightIndiaUsa: true, freightIndiaUae: true,
   nykaaInboundFreight: true, packaging: true, nykaaConfirmedDiscount: true,
 }
 

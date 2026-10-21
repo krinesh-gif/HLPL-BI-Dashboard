@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { AmazonAePnlFacts, PurpllePnlFacts, SwiggyInstamartPnlFacts } from '@/data/models'
 import { computeSubtotals } from '../subtotals'
-import { amazonAeToCanonicalBuckets, computeAmazonAePnl } from './amazonAe'
+import { AMAZON_AE_LINE_DEFS, amazonAeToCanonicalBuckets, amazonAeValuesInInr, computeAmazonAePnl } from './amazonAe'
+import { groupTotalsAgree } from './groupTotals.test'
 import { computePurpllePnl, purplleToCanonicalBuckets } from './purplle'
 import { computeSwiggyInstamartPnl, swiggyInstamartToCanonicalBuckets } from './swiggyInstamart'
 
@@ -120,6 +121,64 @@ describe('Amazon UAE: the statement and the P&L tell the same story', () => {
   it('strikes the same CM2 and CM3', () => {
     expect(canonical.channelMargin).toBeCloseTo(native.channelMargin, 6)
     expect(canonical.contributionProfit).toBeCloseTo(native.contribution, 6)
+  })
+
+  /**
+   * The airway bill to Dubai, on the same footing as the one to the USA.
+   *
+   * It is a rupee cost against a dirham statement and a rupee roll-up, and
+   * the two have to charge the same freight: a conversion applied on one side
+   * only is a cost that exists on one report and not the other.
+   */
+  it('charges the freight in with the goods, on both reports', () => {
+    const FREIGHT = 1_200
+    const native = computeAmazonAePnl(AMAZON_AE, COGS, 0, ADS, FREIGHT)
+    const canonical = computeSubtotals(amazonAeToCanonicalBuckets(AMAZON_AE, 1, COGS, ADS, FREIGHT))
+
+    expect(native.freight).toBeCloseTo(-FREIGHT, 6)
+    expect(native.totalLandedCost).toBeCloseTo(-(COGS + FREIGHT), 6)
+    // Inside CM1, not below it: a unit that had to be flown to Dubai cost
+    // what it cost to have there.
+    expect(native.grossProfit).toBeCloseTo(AMAZON_AE.netSalesAed - COGS - FREIGHT, 6)
+    expect(canonical.grossProfit).toBeCloseTo(native.grossProfit, 6)
+    expect(canonical.cogs).toBeCloseTo(COGS + FREIGHT, 6)
+    expect(canonical.shipping ?? 0).toBe(0)
+  })
+
+  it('does not confuse the freight with the advertising', () => {
+    // The two are adjacent arguments on both functions, and a month's ads
+    // charged as freight reads as a cost of the goods: same bottom line, CM1
+    // and CM2 both wrong, and nothing on the page to say so.
+    const swapped = computeAmazonAePnl(AMAZON_AE, COGS, 0, 1_200, ADS)
+    const right = computeAmazonAePnl(AMAZON_AE, COGS, 0, ADS, 1_200)
+    expect(swapped.ebitda).toBeCloseTo(right.ebitda, 6)
+    expect(swapped.grossProfit).not.toBeCloseTo(right.grossProfit, 2)
+    expect(right.ads).toBeCloseTo(-ADS, 6)
+    expect(right.freight).toBeCloseTo(-1_200, 6)
+
+    const canonical = amazonAeToCanonicalBuckets(AMAZON_AE, 1, COGS, ADS, 1_200)
+    expect(canonical.ads).toBeCloseTo(ADS, 6)
+    expect(canonical.cogs).toBeCloseTo(COGS + 1_200, 6)
+  })
+
+  it('carries every money line into the rupee view, margins included', () => {
+    // The rupee view converts from a hand-kept list of keys, and the ladder
+    // work added CM2 and CM3 without it — so two margins printed in dirhams
+    // against rupee figures, a quarter of their size, with nothing saying so.
+    const aed = computeAmazonAePnl(AMAZON_AE, COGS, 0, ADS, 1_200)
+    const inr = amazonAeValuesInInr(aed, 23.5)
+    for (const def of AMAZON_AE_LINE_DEFS) {
+      if (def.kind === 'percent' || def.kind === 'count') {
+        expect(inr[def.key], def.key).toBeCloseTo(aed[def.key] ?? 0, 6)
+      } else if ((aed[def.key] ?? 0) !== 0) {
+        expect(inr[def.key], def.key).toBeCloseTo((aed[def.key] ?? 0) * 23.5, 6)
+      }
+    }
+  })
+
+  it('shows the landed cost adding up to the figure it hides', () => {
+    const native = computeAmazonAePnl(AMAZON_AE, COGS, 0, ADS, 1_200)
+    expect(groupTotalsAgree(AMAZON_AE_LINE_DEFS, native)).toEqual([])
   })
 
   it('keeps Amazon’s own bottom line on the statement as a memo', () => {

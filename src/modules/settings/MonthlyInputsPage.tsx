@@ -98,6 +98,16 @@ export function MonthlyInputsPage() {
       clear: (m) => removeFreightRate(m, 'india_usa'),
     },
     {
+      key: 'uaeFreight', label: 'India → UAE freight', unit: '₹/unit', step: '0.01',
+      hint: "The month's inbound air freight to Dubai divided by the units it carried. No fallback: a different "
+        + 'carrier over a different distance from the US lane, so an unentered month carries no freight rather than '
+        + "borrowing the US rate.",
+      entered: (m) => (freightRateForMonth(m, freightRates, 'india_uae').entered
+        ? freightRateForMonth(m, freightRates, 'india_uae').perUnitInr : undefined),
+      save: (m, v) => saveFreightRate({ month: m, lane: 'india_uae', perUnitInr: v }),
+      clear: (m) => removeFreightRate(m, 'india_uae'),
+    },
+    {
       key: 'nykaaFreight', label: 'HLPL → Nykaa freight', unit: '₹/unit', step: '0.01',
       hint: 'From the carrier rate card. Charged on the units Nykaa sold in the month.',
       entered: (m) => (freightRateForMonth(m, freightRates, 'nykaa_inbound').entered

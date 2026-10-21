@@ -4,6 +4,7 @@ import { requireSection, requireSession } from './_lib/auth.js'
 import { isNonEmptyString, json, jsonTagged, notModified, readJson } from './_lib/http.js'
 import type { CostVersion } from '../src/data/costVersions.js'
 import { BUSINESS_CHANNEL_IDS } from '../src/config/channels.js'
+import { FREIGHT_LANE_IDS, type FreightLane } from '../src/data/freightLanes.js'
 
 interface SaveBody {
   versions?: unknown
@@ -126,8 +127,10 @@ interface FxRateInput {
   note?: string
 }
 
-const FREIGHT_LANES = ['india_usa', 'nykaa_inbound'] as const
-type FreightLane = (typeof FREIGHT_LANES)[number]
+// The same list the app renders from. It was a second copy here, and the
+// lane added for Amazon UAE reached the app without reaching this check, so
+// the rate could be typed in and the save came back refused.
+const FREIGHT_LANES = FREIGHT_LANE_IDS
 
 interface FreightRateInput { month: string; lane?: FreightLane; perUnitInr: number; note?: string }
 
@@ -455,7 +458,7 @@ export async function POST(request: Request): Promise<Response> {
   if (body && body.freightRates !== undefined) {
     if (!isFreightRateArray(body.freightRates)) {
       return json(
-        { error: 'Expected { freightRates: [{ month: "yyyy-mm", lane?: "india_usa"|"nykaa_inbound", perUnitInr: number >= 0, note? }] }.' },
+        { error: `Expected { freightRates: [{ month: "yyyy-mm", lane?: ${FREIGHT_LANE_IDS.map((l) => `"${l}"`).join('|')}, perUnitInr: number >= 0, note? }] }.` },
         400,
       )
     }

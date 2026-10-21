@@ -1,27 +1,26 @@
 import { NATIVE_PNL_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
+import { DEFAULT_FREIGHT_LANE, type FreightLane } from './freightLanes'
+
+export { DEFAULT_FREIGHT_LANE }
+export type { FreightLane }
 
 /**
  * Freight lanes priced per unit.
  *
- * `india_usa` is the airway bill behind Amazon USA. `nykaa_inbound` is the
- * trip from our own warehouse to Nykaa's, which is a rate-card cost of a rupee
- * or two a unit — small per unit, and on a month of six thousand units not
- * small at all.
+ * `india_usa` and `india_uae` are the airway bills behind the two export
+ * marketplaces. `nykaa_inbound` is the trip from our own warehouse to
+ * Nykaa's, which is a rate-card cost of a rupee or two a unit — small per
+ * unit, and on a month of six thousand units not small at all.
  *
  * They are separate lanes rather than one rate because they are separate
  * negotiations that move independently, and a single figure would have quietly
  * repriced one channel whenever the other's carrier changed.
  */
-export type FreightLane = 'india_usa' | 'nykaa_inbound'
-
 export const FREIGHT_LANES: { id: FreightLane; label: string; hint: string }[] = [
   { id: 'india_usa', label: 'India → USA (air freight)', hint: 'Inbound to Amazon USA, per unit shipped' },
+  { id: 'india_uae', label: 'India → UAE (air freight)', hint: 'Inbound to Amazon UAE, per unit shipped' },
   { id: 'nykaa_inbound', label: 'HLPL warehouse → Nykaa warehouse', hint: 'Per unit, from the carrier rate card' },
 ]
-
-/** The lane a rate with no lane on it belongs to: every rate entered before
- * lanes existed was the airway bill. */
-export const DEFAULT_FREIGHT_LANE: FreightLane = 'india_usa'
 
 /**
  * What it costs to move one unit down a lane, in the month it moved.
@@ -67,10 +66,13 @@ export interface ResolvedFreightRate {
  * back and says so, rather than borrowing a neighbour's.
  *
  * Only the India→USA lane has a fallback worth having: it has been running
- * long enough for a standing figure to mean something. An unentered Nykaa
- * month falls back to zero, because inventing a rate card would put a cost on
- * the P&L that nobody agreed to — and a zero that says it is a zero is easy to
- * spot, where a plausible guess is not.
+ * long enough for a standing figure to mean something. An unentered Nykaa or
+ * UAE month falls back to zero, because inventing a rate card would put a
+ * cost on the P&L that nobody agreed to — and a zero that says it is a zero
+ * is easy to spot, where a plausible guess is not. The UAE lane in particular
+ * has no standing figure to borrow: it is a different carrier, a different
+ * distance and a different weight break from the US one, so taking the US
+ * rate would be a number dressed as a fact.
  */
 export function freightRateForMonth(
   month: string,

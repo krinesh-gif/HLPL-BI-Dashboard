@@ -80,6 +80,7 @@ export function usePnlInputs(): {
         marketing: marketingFromAds(adsRecords, month, manualAdSpend, fxRatesForMonth(month, fxRates)),
         fxRate: fxRatesForMonth(month, fxRates),
         freightPerUnitInr: freightRateValue(month, freightRates, 'india_usa'),
+        uaeFreightPerUnitInr: freightRateValue(month, freightRates, 'india_uae'),
         nykaaFreightPerUnitInr: freightRateValue(month, freightRates, 'nykaa_inbound'),
         packagingPerShipmentInr: packagingRateValue(month, packagingRates),
         confirmedNykaaDiscount: nykaaDiscountForMonth(month, nykaaDiscounts)?.amountInr,

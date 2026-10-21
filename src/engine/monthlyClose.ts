@@ -98,6 +98,7 @@ export interface MonthlyCloseInput {
     fxUsd: boolean
     fxAed: boolean
     freightIndiaUsa: boolean
+    freightIndiaUae: boolean
     nykaaInboundFreight: boolean
     packaging: boolean
     nykaaConfirmedDiscount: boolean
@@ -205,6 +206,14 @@ export function buildMonthlyClose(input: MonthlyCloseInput): MonthlyClose {
       id: 'freight-usa', severity: 'warning', channel: 'amazon_us',
       title: `No India→USA freight rate for ${input.month}`,
       detail: 'Units shipped to the US carry no delivery cost without it, so Amazon USA reads better than it is.',
+      path: '/settings/monthly-inputs', actionLabel: 'Enter the rate',
+    })
+  }
+  if (needsAed && !input.has.freightIndiaUae) {
+    warnings.push({
+      id: 'freight-uae', severity: 'warning', channel: 'amazon_ae',
+      title: `No India→UAE freight rate for ${input.month}`,
+      detail: 'Units shipped to Dubai carry no delivery cost without it, so Amazon UAE reads better than it is.',
       path: '/settings/monthly-inputs', actionLabel: 'Enter the rate',
     })
   }

@@ -46,6 +46,7 @@ export function useMonthlyClose(month?: string): MonthlyClose & { monthOptions: 
         fxUsd: fxRateForMonth(active, store.fxRates).entered,
         fxAed: fxRateForMonth(active, store.fxRates, 'AEDINR').entered,
         freightIndiaUsa: freightRateForMonth(active, store.freightRates, 'india_usa').entered,
+        freightIndiaUae: freightRateForMonth(active, store.freightRates, 'india_uae').entered,
         nykaaInboundFreight: freightRateForMonth(active, store.freightRates, 'nykaa_inbound').entered,
         packaging: packagingRateForMonth(active, store.packagingRates).entered,
         nykaaConfirmedDiscount: nykaaDiscountForMonth(active, store.nykaaDiscounts) !== undefined,

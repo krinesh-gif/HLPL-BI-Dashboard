@@ -29,10 +29,17 @@ export const AMAZON_AE_LINE_DEFS: NativeLineDef[] = [
     note: 'Sales less Amazon’s net-of-returns figure' },
   { key: 'netSales', label: 'NET SALES', section: 'REVENUE', kind: 'subtotal' },
 
-  { key: 'cogs', label: 'Total COGS', section: 'COST OF GOODS SOLD', kind: 'input',
+  // What a unit cost landed in Dubai: the goods and the airway bill that put
+  // them there. Amazon USA's statement has had this shape since the US lane
+  // was priced; the UAE lane was shipping against no freight cost at all, so
+  // this channel's CM1 read as though the stock had arrived by itself.
+  { key: 'totalLandedCost', label: 'Total Landed Cost', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'subtotal', group: 'landed', isGroupHead: true },
+  { key: 'cogs', label: 'Total COGS', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', group: 'landed',
     note: 'Priced from the Product Master at the month’s cost, converted from rupees at the month’s rate' },
-  { key: 'grossProfit', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS SOLD', kind: 'subtotal' },
-  { key: 'grossMarginPct', label: 'CM1 %', section: 'COST OF GOODS SOLD', kind: 'percent' },
+  { key: 'freight', label: 'India → UAE Air Freight', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'input', group: 'landed',
+    note: 'Net units shipped × the rate entered for the month on Monthly Inputs. There is no formula for it in Amazon’s reports — they know what sold, not what the airway bill cost — so an unentered month carries no freight and says so rather than borrowing the US rate.' },
+  { key: 'grossProfit', label: 'GROSS MARGIN (CM1)', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'subtotal' },
+  { key: 'grossMarginPct', label: 'CM1 %', section: 'COST OF GOODS & INBOUND LOGISTICS', kind: 'percent' },
 
   { key: 'amazonFees', label: '(−) Amazon fees', section: 'MARKETPLACE CHARGES', kind: 'input',
     fee: 'otherFees',
@@ -94,6 +101,17 @@ export function computeAmazonAePnl(
    * every other channel is, rather than among what Amazon took.
    */
   adsAed = 0,
+  /**
+   * The month's inbound air freight, in dirhams.
+   *
+   * Net units shipped times the India→UAE rate entered for the month, priced
+   * when the statement is read rather than frozen at import, so a corrected
+   * rate restates the months it should and a closed month keeps the rate it
+   * was closed on. Zero where no rate is entered: a cost nobody has stated
+   * is better read as absent than guessed from the US lane, which is a
+   * different carrier over a different distance.
+   */
+  freightAed = 0,
 ): NativeLineValues {
   const netSales = facts.netSalesAed
   const amazonFees = amazonAeFeesTaken(facts)
@@ -102,7 +120,8 @@ export function computeAmazonAePnl(
   // own export strikes its proceeds before COGS, which is why CM1 here used
   // to be net proceeds less the goods: a figure no other statement showed and
   // the P&L never agreed with. The bottom line is unchanged either way.
-  const grossProfit = netSales - cogsAed
+  const totalLandedCost = cogsAed + freightAed
+  const grossProfit = netSales - totalLandedCost
   const channelMargin = grossProfit - amazonFees
   const contribution = channelMargin - adsAed
   const ebitda = contribution - overheadsAed
@@ -117,6 +136,8 @@ export function computeAmazonAePnl(
     // nothing sold did not have a take of nothing.
     feePct: netSales !== 0 ? (amazonFees / netSales) * 100 : 0,
     cogs: -cogsAed,
+    freight: -freightAed,
+    totalLandedCost: -totalLandedCost,
     grossProfit,
     grossMarginPct: netSales !== 0 ? (grossProfit / netSales) * 100 : 0,
     channelMargin,
@@ -154,6 +175,16 @@ export function amazonAeToCanonicalBuckets(
    * records, which the marketing roll-up has converted at this month's
    * rate. Zero where the caller only wants the revenue lines. */
   adsInr = 0,
+  /** Inbound air freight for the month, in rupees. It goes in with the goods,
+   * not in a shipping bucket below the line: what a unit cost landed in Dubai
+   * is what it cost. Amazon USA's freight and Nykaa's inbound trip are
+   * bucketed the same way, so one channel's CM1 means what another's does.
+   *
+   * Last, and after advertising, because `adsInr` was the fourth argument
+   * before this existed: inserting it ahead swapped the two at every call
+   * site, which charged a month's advertising as freight and its freight as
+   * advertising — same bottom line, two wrong margins. */
+  freightInr = 0,
 ): PnlLineValues {
   const aed = (v: number) => v * rateInrPerAed
   return {
@@ -161,7 +192,7 @@ export function amazonAeToCanonicalBuckets(
     discounts: 0,
     returns: aed(facts.grossSalesAed - facts.netSalesAed),
     otherRevenueAdj: 0,
-    cogs: cogsInr,
+    cogs: cogsInr + freightInr,
     marketplaceCommission: 0,
     fulfilment: 0,
     shipping: 0,
@@ -178,10 +209,19 @@ export function amazonAeToCanonicalBuckets(
 /** The money lines, for restating the statement in rupees. Listed rather than
  * inferred: a percentage is a ratio and does not move, and a unit count is
  * not money — converting 241 units at the month's rate would report 5,801. */
-const MONEY_LINES = [
-  'grossSales', 'returns', 'netSales', 'amazonFees', 'netProceeds',
-  'cogs', 'grossProfit', 'ads', 'overheads', 'ebitda',
-]
+/**
+ * Every line that holds money, taken from the statement itself.
+ *
+ * It was a hand-kept list, and the ladder work added CM2 and CM3 without
+ * adding them here — so the rupee view of this statement printed two margins
+ * still in dirhams, a quarter of their real size, with nothing to say they
+ * were. A list that has to be remembered is a list that will be forgotten.
+ * Percentages and unit counts are the same number in any currency; everything
+ * else converts.
+ */
+const MONEY_LINES = AMAZON_AE_LINE_DEFS
+  .filter((d) => d.kind === 'input' || d.kind === 'subtotal')
+  .map((d) => d.key)
 
 /**
  * The same statement read in rupees.
