@@ -64,7 +64,7 @@ export function NativePnlTable({
 
   return (
     <div className="overflow-hidden overflow-x-auto rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
-      <table className="w-full text-sm">
+      <table className="w-full text-[13px]">
         <tbody>
           {rows.map(({ def, showSectionHeader }) => {
             const value = values[def.key] ?? 0
@@ -75,7 +75,7 @@ export function NativePnlTable({
               <Fragment key={def.key}>
                 {showSectionHeader && !collapsible && (
                   <tr className="bg-[var(--surface-2)]">
-                    <td colSpan={2} className="px-5 py-2.5 text-[12px] font-semibold text-[var(--ink-2)]">
+                    <td colSpan={2} className="px-4 py-1.5 text-[12px] font-semibold text-[var(--ink-2)]">
                       {def.section}
                     </td>
                   </tr>
@@ -90,7 +90,7 @@ export function NativePnlTable({
                 >
                   <td
                     className={clsx(
-                      'px-5 py-2.5',
+                      'px-4 py-1.5',
                       def.kind === 'input' && 'pl-8 text-[var(--ink-2)]',
                       def.kind === 'percent' && 'pl-8 text-[var(--ink-3)] italic',
                       parentKeys.has(def.key) && 'font-semibold text-[var(--ink)]',
@@ -152,7 +152,7 @@ export function NativePnlTable({
                   </td>
                   <td
                     className={clsx(
-                      'px-5 py-2.5 text-right tabular-nums',
+                      'px-4 py-1.5 text-right tabular-nums',
                       // Green for money in, red for money out. A memo line
                       // keeps its grey: it is already inside the line above,
                       // and colouring it would make it look like it counts.
