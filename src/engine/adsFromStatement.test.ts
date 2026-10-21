@@ -212,11 +212,30 @@ describe('a report that measures some things and not others', () => {
  * advertising. A ceiling rather than a measurement — see `paidShare` — and
  * null where nothing attributes anything, because a channel that measures
  * nothing is not a channel that sold nothing through ads.
+ *
+ * The owner caught the first version of this reporting 111% paid, which no
+ * share can be. It divided gross attributed sales by net sales — two
+ * different sales. These are the owner's own September figures on the one
+ * basis a platform attributes on.
  */
 describe('paid against organic', () => {
-  it('is the attributed share of net sales', () => {
-    expect(paidShare(942_039.72, 1_422_406)).toBeCloseTo(66.23, 2)
-    expect(paidShare(1_576_675.8, 1_414_973)).toBeCloseTo(111.43, 2)
+  it('is the attributed share of gross sales', () => {
+    // Flipkart: ₹15,76,676 attributed of ₹17,45,467 gross.
+    expect(paidShare(1_576_675.8, 1_745_467)).toBeCloseTo(90.33, 2)
+    // Amazon India, both halves: ₹9,42,040 of ₹19,16,990.
+    expect(paidShare(942_039.72, 1_916_990)).toBeCloseTo(49.14, 2)
+    // Myntra: ₹1,58,693 of ₹6,56,895.
+    expect(paidShare(158_692.9, 656_895)).toBeCloseTo(24.16, 2)
+  })
+
+  /**
+   * The fault itself, kept as a test. Net sales is after returns and GST and
+   * attributed sales is before both, so dividing one by the other produces a
+   * share above 100 on a channel that advertises heavily.
+   */
+  it('is not the share of net sales, which is what went wrong', () => {
+    expect(paidShare(1_576_675.8, 1_414_973)).toBeGreaterThan(100)
+    expect(paidShare(1_576_675.8, 1_745_467)).toBeLessThan(100)
   })
 
   it('declines to answer where nothing was attributed', () => {

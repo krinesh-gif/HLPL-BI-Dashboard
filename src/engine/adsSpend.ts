@@ -305,32 +305,33 @@ function measuredSpend(figures: AdsSpendFigure[]): number {
 }
 
 /**
- * The share of a channel's sales the platform credits to its advertising,
- * and what is left over.
+ * The share of a channel's sales the platform credits to its own
+ * advertising. What is left is the organic share.
  *
- * Two warnings belong with every figure this produces, which is why they are
- * written here rather than left to whoever reads it.
+ * BOTH SIDES HAVE TO BE THE SAME SALES, and the first version of this was
+ * not: it divided attributed sales by *net* sales and reported Flipkart's
+ * September as 111% paid, which is not a share of anything. A platform
+ * attributes the order as the customer placed it — gross, before returns
+ * and including GST — so the denominator is gross sales on that same basis.
+ * The same month is 90.3% of ₹17,45,467 gross rather than 111.4% of
+ * ₹14,14,973 net.
  *
- * It is attribution, not causation. A platform credits a sale to an ad when
- * the buyer saw or clicked one inside its attribution window, whether or not
- * the ad is why they bought. Someone who was going to buy anyway and passed
- * an ad on the way counts as paid. So this is the upper bound of what
- * advertising did, and "organic" below it is the floor.
+ * Above 100% now means something is wrong rather than something expected,
+ * so it is left showing rather than clamped: a platform crediting itself
+ * with more than the channel sold is worth seeing, and a figure quietly
+ * pinned at 100% would hide it.
  *
- * And the two sides are measured differently. Attributed sales are gross —
- * what the order was worth at the time, before returns and usually including
- * GST — while net sales is after both. A channel can therefore be credited
- * with more than it netted, and Amazon India in September is: ₹9.42 lakh
- * attributed against ₹14.22 lakh of net sales is 66%, but the same month's
- * marketplace half alone nets ₹2.23 lakh. Nothing is wrong with either
- * figure; they are answers to different questions.
+ * It is still attribution and not causation. A platform credits a sale when
+ * the buyer saw or clicked an ad inside its attribution window, whether or
+ * not the ad is why they bought — so this is the ceiling of what
+ * advertising did, and the organic share below it is the floor.
  *
- * Null where the channel's report attributes no sales at all. Organic cannot
- * be inferred from an unmeasured channel: not knowing what advertising did
- * is not the same as knowing it did nothing.
+ * Null where the channel's report attributes no sales at all. Organic
+ * cannot be inferred from an unmeasured channel: not knowing what
+ * advertising did is not the same as knowing it did nothing.
  */
-export function paidShare(adSales: number | null, netSales: number): number | null {
-  return adSales === null || netSales <= 0 ? null : (adSales / netSales) * 100
+export function paidShare(adSales: number | null, grossSales: number): number | null {
+  return adSales === null || grossSales <= 0 ? null : (adSales / grossSales) * 100
 }
 
 /** TACOS: total advertising spend as a share of the business's net sales. */
