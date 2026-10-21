@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AdsRecord, AmazonUsaPnlFacts, FlipkartPnlFacts, MyntraPnlFacts } from '@/data/models'
 import type { ChannelFactsStore } from './channelFactsStore'
-import { acosOf, adsSpendFor, adsSpendForMonth, measuredSpendOf, roasOf, totalAdsSpend } from './adsSpend'
+import { acosOf, adsSpendFor, adsSpendForMonth, measuredSpendOf, paidShare, roasOf, totalAdsSpend } from './adsSpend'
 import { marketingFromAds } from './marketing'
 import { statementAdSpend } from './channelNetSales'
 
@@ -172,5 +172,58 @@ describe('the P&L is left exactly as it was', () => {
   it('rolls marketing up from the reports, untouched by any of this', () => {
     const marketing = marketingFromAds([record()], '2026-08', [])
     expect(marketing.flipkart?.ads).toBeCloseTo(342_832.8, 3)
+  })
+})
+
+/**
+ * Amazon's monthly report states the account's cost and the sales it
+ * attributes, and no impressions or clicks at all. Zero impressions beside
+ * ₹2.1 lakh of spend reads as a campaign that never served, which is a
+ * different and alarming claim, so a count that is zero on every row of a
+ * month is reported as not measured.
+ */
+describe('a report that measures some things and not others', () => {
+  const monthly: AdsRecord = {
+    date: '2026-09-01', channel: 'amazon_in_seller', campaign: 'acct',
+    impressions: 0, clicks: 0, spend: 212_876.1, adSales: 942_039.72, adOrders: 0, importId: 'i',
+  }
+
+  it('reports the sales it has and the counts it does not', () => {
+    const f = adsSpendFor('amazon_in', '2026-09', [monthly], [], undefined, EMPTY)
+
+    expect(f.adSales).toBeCloseTo(942_039.72, 2)
+    expect(roasOf(f)).toBeCloseTo(942_039.72 / 212_876.1, 6)
+    expect(acosOf(f)).toBeCloseTo((212_876.1 / 942_039.72) * 100, 6)
+    expect(f.impressions).toBeNull()
+    expect(f.clicks).toBeNull()
+    expect(f.adOrders).toBeNull()
+  })
+
+  it('leaves a real count alone', () => {
+    const f = adsSpendFor('flipkart', '2026-08', [record()], [], undefined, EMPTY)
+    expect(f.impressions).toBe(100_000)
+    expect(f.clicks).toBe(2_000)
+    expect(f.adOrders).toBe(900)
+  })
+})
+
+/**
+ * What share of a channel's sales the platform credits to its own
+ * advertising. A ceiling rather than a measurement — see `paidShare` — and
+ * null where nothing attributes anything, because a channel that measures
+ * nothing is not a channel that sold nothing through ads.
+ */
+describe('paid against organic', () => {
+  it('is the attributed share of net sales', () => {
+    expect(paidShare(942_039.72, 1_422_406)).toBeCloseTo(66.23, 2)
+    expect(paidShare(1_576_675.8, 1_414_973)).toBeCloseTo(111.43, 2)
+  })
+
+  it('declines to answer where nothing was attributed', () => {
+    expect(paidShare(null, 1_000_000)).toBeNull()
+  })
+
+  it('declines to answer where there were no sales to divide', () => {
+    expect(paidShare(500, 0)).toBeNull()
   })
 })

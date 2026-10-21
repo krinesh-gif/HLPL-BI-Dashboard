@@ -31,15 +31,22 @@ import { getField, headersPresent, type RowIssue } from './types'
  * replaced outright on import rather than added to: both state the whole
  * month, so adding one to the other would count it twice.
  *
- * Two things neither shape carries, and both matter:
+ * WHAT IT CARRIES BESIDE THE COST. `Sales` is the revenue Amazon attributes
+ * to the advertising, and it is read: with it a month has ROAS and ACOS, and
+ * the share of the channel's sales that advertising is credited with. It was
+ * being dropped on import, which is why Amazon India showed a spend and then
+ * "not measured" beside it on a file that measured it. `Units sold` is not
+ * read — nothing here reports advertised units, and an orders column it is
+ * not, since an order can carry several.
+ *
+ * Two things it does not carry, and both matter:
  *
  *  1. NO AD PRODUCT. There is no column saying whether the spend was
  *     Sponsored Products, Brands or Display, so it lands unsplit. The
  *     per-product reports are what that split comes from.
- *  2. NO IMPRESSIONS, CLICKS OR ATTRIBUTED SALES. The cost is all it states.
- *     The P&L wants exactly that — it is what the month cost — but ROAS,
- *     ACOS, CTR and CPC cannot be computed from it, and a month imported from
- *     here alone shows spend and nothing to divide by.
+ *  2. NO IMPRESSIONS OR CLICKS. CTR, CPC and CVR cannot be computed from it,
+ *     and a month imported from here alone has nothing to divide by for
+ *     those.
  *
  * THE YEAR. The month-per-row shape states it in its own column, which ends
  * the guessing. The campaign-level export does not: its Month column is a
@@ -61,6 +68,7 @@ const COLUMNS = {
   marketplace: ['advertised product marketplace'],
   currency: ['budget currency'],
   cost: ['total cost'],
+  sales: ['sales', 'total sales', 'attributed sales'],
 }
 
 /** What an account's figures are denominated in, where the app knows the
@@ -259,6 +267,8 @@ export function normalizeAmazonAdsSpendByMonth(
 
     const spend = money(getField(row, COLUMNS.cost))
     if (spend === 0) zeroCost++
+    // Amazon's attribution, in the same currency as the cost beside it.
+    const adSales = money(getField(row, COLUMNS.sales))
 
     const asin = unarmour(getField(row, COLUMNS.asin))
     const record: AdsRecord = {
@@ -270,18 +280,22 @@ export function normalizeAmazonAdsSpendByMonth(
       campaign: subject,
       sku: asin === '' ? undefined : asin,
       asin: asin === '' ? undefined : asin,
+      // Not in this report. Left at zero, which the reader turns into "not
+      // measured" rather than into a CTR of nothing.
       impressions: 0,
       clicks: 0,
       spend,
-      adSales: 0,
+      adSales,
       adOrders: 0,
       currency: rowCurrency,
       importId,
     }
     const key = adsRecordKey(record)
     const seen = byKey.get(key)
-    if (seen) seen.spend += spend
-    else byKey.set(key, record)
+    if (seen) {
+      seen.spend += spend
+      seen.adSales += adSales
+    } else byKey.set(key, record)
   })
 
   const adsRecords = [...byKey.values()]
@@ -316,11 +330,16 @@ export function normalizeAmazonAdsSpendByMonth(
         'year before.',
       )
     }
-    warnings.push(
-      'Each of those months is replaced outright by this file, because this report states the whole month. ' +
-      'Anything already stored for them from the per-product campaign reports is removed, including the ' +
-      'impressions, clicks and attributed sales those carried — this report states cost only, so ROAS and ACOS ' +
-      'cannot be worked out from it.',
+    const attributed = adsRecords.reduce((sum, r) => sum + r.adSales, 0)
+    warnings.push(attributed > 0
+      ? 'Each of those months is replaced outright by this file, because this report states the whole month. ' +
+        'Anything already stored for them from the per-product campaign reports is removed, including the ' +
+        `impressions and clicks those carried. ${symbol}${attributed.toFixed(2)} of attributed sales comes from ` +
+        'this file, so ROAS and ACOS are worked out from it; CTR and CPC still need the per-product reports.'
+      : 'Each of those months is replaced outright by this file, because this report states the whole month. ' +
+        'Anything already stored for them from the per-product campaign reports is removed, including the ' +
+        'impressions, clicks and attributed sales those carried — this file states no sales, so ROAS and ACOS ' +
+        'cannot be worked out from it.',
     )
     for (const c of currencies) {
       if (c === 'INR') continue

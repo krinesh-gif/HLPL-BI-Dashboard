@@ -156,13 +156,21 @@ export function adsSpendFor(
     // campaign report. Judged on the month's rows rather than on which reader
     // wrote them, so it holds whatever the file was called.
     const costOnly = spend !== 0 && adSales === 0 && impressions === 0 && clicks === 0
+    // A count that is zero on every row of a month is a column the file did
+    // not carry, not a month nobody clicked on: Amazon's monthly report
+    // states cost and attributed sales and no impressions at all, and "0
+    // impressions" beside ₹2.1 lakh of spend reads as a campaign that never
+    // served rather than as a figure this file never had. Money is left
+    // alone — a report that measures sales and attributes none of them to
+    // the month is saying something, and saying it as zero.
+    const counted = (total: number) => (total === 0 ? null : total)
     return {
       channel, month,
       spend,
       adSales: costOnly ? null : adSales,
-      adOrders: omitted.has('adOrders') || costOnly ? null : sum((r) => r.adOrders),
-      impressions: costOnly ? null : impressions,
-      clicks: omitted.has('clicks') || costOnly ? null : clicks,
+      adOrders: omitted.has('adOrders') || costOnly ? null : counted(sum((r) => r.adOrders)),
+      impressions: costOnly ? null : counted(impressions),
+      clicks: omitted.has('clicks') || costOnly ? null : counted(clicks),
       source: 'report',
       costOnly,
       sourceLabel: costOnly ? 'Monthly cost report' : 'Ads report',
@@ -294,6 +302,35 @@ export function totalAdsSpend(figures: AdsSpendFigure[]): AdsTotals {
 
 function measuredSpend(figures: AdsSpendFigure[]): number {
   return figures.filter((f) => f.adSales !== null).reduce((s, f) => s + measuredSpendOf(f), 0)
+}
+
+/**
+ * The share of a channel's sales the platform credits to its advertising,
+ * and what is left over.
+ *
+ * Two warnings belong with every figure this produces, which is why they are
+ * written here rather than left to whoever reads it.
+ *
+ * It is attribution, not causation. A platform credits a sale to an ad when
+ * the buyer saw or clicked one inside its attribution window, whether or not
+ * the ad is why they bought. Someone who was going to buy anyway and passed
+ * an ad on the way counts as paid. So this is the upper bound of what
+ * advertising did, and "organic" below it is the floor.
+ *
+ * And the two sides are measured differently. Attributed sales are gross —
+ * what the order was worth at the time, before returns and usually including
+ * GST — while net sales is after both. A channel can therefore be credited
+ * with more than it netted, and Amazon India in September is: ₹9.42 lakh
+ * attributed against ₹14.22 lakh of net sales is 66%, but the same month's
+ * marketplace half alone nets ₹2.23 lakh. Nothing is wrong with either
+ * figure; they are answers to different questions.
+ *
+ * Null where the channel's report attributes no sales at all. Organic cannot
+ * be inferred from an unmeasured channel: not knowing what advertising did
+ * is not the same as knowing it did nothing.
+ */
+export function paidShare(adSales: number | null, netSales: number): number | null {
+  return adSales === null || netSales <= 0 ? null : (adSales / netSales) * 100
 }
 
 /** TACOS: total advertising spend as a share of the business's net sales. */

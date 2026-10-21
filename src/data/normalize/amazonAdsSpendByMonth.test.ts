@@ -311,3 +311,58 @@ describe('an account billed in something other than rupees', () => {
     expect(r.warnings[0]).toContain('₹100.00')
   })
 })
+
+/**
+ * The owner's own September file, header for header and figure for figure.
+ *
+ * It carries `Sales` and `Units sold` beside the cost, and the importer was
+ * reading the cost alone — so Amazon India showed ₹2,12,876 of spend with
+ * "not measured" beside it on a report that had measured ₹9,42,039.72.
+ */
+describe('the Sales column this report carries', () => {
+  const OWNERS_HEADERS = ['Year', 'Month', 'Advertiser account ID', 'Budget currency', 'Total cost', 'Sales', 'Units sold']
+  const ownersRow = (over: Record<string, string> = {}) => ({
+    Year: '2026',
+    Month: '9',
+    'Advertiser account ID': '="amzn1.ads-account.g.6oc6amdel479kw11ke0o0aucn"',
+    'Budget currency': 'INR',
+    'Total cost': '212876.10',
+    Sales: '942039.72',
+    'Units sold': '3566',
+    ...over,
+  })
+
+  it('is still read as this report', () => {
+    expect(detectAmazonAdsSpendByMonth(OWNERS_HEADERS)).toBe(true)
+  })
+
+  it('reads the attributed sales beside the cost', () => {
+    const r = normalizeAmazonAdsSpendByMonth([ownersRow()], 'i')
+    expect(r.adsRecords).toHaveLength(1)
+    expect(r.adsRecords[0].spend).toBeCloseTo(212_876.1, 2)
+    expect(r.adsRecords[0].adSales).toBeCloseTo(942_039.72, 2)
+    expect(r.adsRecords[0].date).toBe('2026-09-01')
+    expect(r.adsRecords[0].channel).toBe('amazon_in_seller')
+  })
+
+  it('says the month now has a ROAS to work out', () => {
+    const r = normalizeAmazonAdsSpendByMonth([ownersRow()], 'i')
+    expect(r.warnings.join(' ')).toMatch(/942039\.72 of attributed sales/)
+    expect(r.warnings.join(' ')).not.toMatch(/ROAS and ACOS\s+cannot be worked out/)
+  })
+
+  it('still says so where the file attributes nothing', () => {
+    const r = normalizeAmazonAdsSpendByMonth([ownersRow({ Sales: '0' })], 'i')
+    expect(r.adsRecords[0].adSales).toBe(0)
+    expect(r.warnings.join(' ')).toMatch(/cannot be worked out/)
+  })
+
+  it('adds the sales up where a month arrives on more than one row', () => {
+    const r = normalizeAmazonAdsSpendByMonth(
+      [ownersRow(), ownersRow({ 'Total cost': '100.00', Sales: '500.00' })], 'i',
+    )
+    expect(r.adsRecords).toHaveLength(1)
+    expect(r.adsRecords[0].spend).toBeCloseTo(212_976.1, 2)
+    expect(r.adsRecords[0].adSales).toBeCloseTo(942_539.72, 2)
+  })
+})

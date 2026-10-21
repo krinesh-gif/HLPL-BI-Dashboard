@@ -9,8 +9,8 @@ import { usePnlInputs } from '@/engine/usePnlInputs'
 import { useFilterStore } from '@/store/filterStore'
 import { ADS_CHANNELS } from '@/config/adsChannels'
 import { formatCurrencyCompact, formatCurrencyFull, formatPercent, monthLabel } from '@/lib/format'
-import { acosOf, adsSpendForMonth, roasOf, tacos, totalAdsSpend } from '@/engine/adsSpend'
-import { netSalesForMonth } from '@/engine/netSales'
+import { acosOf, adsSpendForMonth, paidShare, roasOf, tacos, totalAdsSpend } from '@/engine/adsSpend'
+import { netSalesForChannelMonth, netSalesForMonth } from '@/engine/netSales'
 import { exportRowsToCsv } from '@/lib/exportCsv'
 
 /**
@@ -23,12 +23,34 @@ export function AdsOverviewPage() {
   const { inputs: { facts: pnlFacts } } = usePnlInputs()
   const { month } = useFilterStore()
 
-  const { figures, totals, netSales } = useMemo(() => {
-    const figures = adsSpendForMonth(month, adsRecords, manualAdSpend, undefined, fxRatesForMonth(month, fxRates), pnlFacts)
+  const { figures, totals, netSales, netSalesOf, paidTotals } = useMemo(() => {
+    const fx = fxRatesForMonth(month, fxRates)
+    const figures = adsSpendForMonth(month, adsRecords, manualAdSpend, undefined, fx, pnlFacts)
+    // Each channel's own net sales, read the way the P&L reads it — the
+    // statement where there is one, the order rows otherwise — so the share
+    // below is measured against the same revenue every other screen reports.
+    const netSalesOf = new Map(figures.map((f) => [
+      f.channel,
+      netSalesForChannelMonth({ records: salesRecords, channel: f.channel, month, facts: pnlFacts, fxRate: fx }).netSales,
+    ]))
+    // Only the channels whose report attributes sales. Counting a channel
+    // that measures nothing as wholly organic would invent the answer: not
+    // knowing what advertising did is not knowing it did nothing.
+    const measured = figures.filter((f) => f.adSales !== null)
+    const paidSales = measured.reduce((sum, f) => sum + (f.adSales ?? 0), 0)
+    const measuredNetSales = measured.reduce((sum, f) => sum + (netSalesOf.get(f.channel) ?? 0), 0)
     return {
       figures,
+      netSalesOf,
       totals: totalAdsSpend(figures),
       netSales: netSalesForMonth(salesRecords, month, pnlFacts).netSales,
+      paidTotals: {
+        channels: measured.length,
+        paidSales,
+        netSales: measuredNetSales,
+        organicSales: Math.max(measuredNetSales - paidSales, 0),
+        paidPct: paidShare(measured.length > 0 ? paidSales : null, measuredNetSales),
+      },
     }
   }, [adsRecords, manualAdSpend, salesRecords, pnlFacts, month, fxRates])
 
@@ -44,6 +66,10 @@ export function AdsOverviewPage() {
         'Campaign report spend': f.reportedSpend === null ? '' : Math.round(f.reportedSpend),
         ROAS: roasOf(f) === null ? '' : Number(roasOf(f)!.toFixed(2)),
         'ACOS %': acosOf(f) === null ? '' : Number(acosOf(f)!.toFixed(1)),
+        'Net Sales': Math.round(netSalesOf.get(f.channel) ?? 0),
+        'Paid share %': paidShare(f.adSales, netSalesOf.get(f.channel) ?? 0) === null
+          ? ''
+          : Number(paidShare(f.adSales, netSalesOf.get(f.channel) ?? 0)!.toFixed(1)),
         Source: f.sourceLabel,
       })),
     )
@@ -63,6 +89,13 @@ export function AdsOverviewPage() {
         <KPICard label="ROAS" value={totals.roas === null ? '—' : `${totals.roas.toFixed(2)}x`} />
         <KPICard label="ACOS" value={totals.acos === null ? '—' : formatPercent(totals.acos)} />
         <KPICard label="TACOS" value={companyTacos === null ? '—' : formatPercent(companyTacos)} note="Ad spend ÷ company net sales" />
+        <KPICard
+          label="Paid share"
+          value={paidTotals.paidPct === null ? '—' : formatPercent(paidTotals.paidPct)}
+          note={paidTotals.channels === 0
+            ? 'No channel attributes sales this month'
+            : `Organic ${formatPercent(Math.max(100 - paidTotals.paidPct!, 0))} · across the ${paidTotals.channels} channel${paidTotals.channels === 1 ? '' : 's'} that measure it`}
+        />
       </KPIGrid>
 
       <div className="flex justify-end">
@@ -84,6 +117,7 @@ export function AdsOverviewPage() {
               <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Ad Sales</th>
               <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">ROAS</th>
               <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">ACOS</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Paid share</th>
               <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Source</th>
               <th className="px-3 py-2" />
             </tr>
@@ -113,6 +147,14 @@ export function AdsOverviewPage() {
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">
                   {acosOf(f) === null ? '—' : formatPercent(acosOf(f)!)}
+                </td>
+                {/* What share of this channel's net sales the platform
+                    credits to its advertising. The rest is not proved
+                    organic — it is what advertising was not credited with. */}
+                <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">
+                  {paidShare(f.adSales, netSalesOf.get(f.channel) ?? 0) === null
+                    ? '—'
+                    : formatPercent(paidShare(f.adSales, netSalesOf.get(f.channel) ?? 0)!)}
                 </td>
                 <td className="px-3 py-2">
                   <span
@@ -148,11 +190,27 @@ export function AdsOverviewPage() {
               <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">
                 {totals.acos === null ? '—' : formatPercent(totals.acos)}
               </td>
+              <td className="px-3 py-2 text-right tabular-nums text-[var(--ink-2)]">
+                {paidTotals.paidPct === null ? '—' : formatPercent(paidTotals.paidPct)}
+              </td>
               <td colSpan={2} />
             </tr>
           </tfoot>
         </table>
       </div>
+
+      {paidTotals.paidPct !== null && (
+        <p className="text-xs text-[var(--ink-3)]">
+          <strong className="text-[var(--ink-2)]">Paid share</strong> is what the platform credits to its own advertising:
+          {' '}{formatCurrencyFull(paidTotals.paidSales)} of {formatCurrencyFull(paidTotals.netSales)} in net sales across the
+          {' '}{paidTotals.channels} channel{paidTotals.channels === 1 ? '' : 's'} that measure it, leaving
+          {' '}{formatCurrencyFull(paidTotals.organicSales)} not credited to an ad. Read it as a ceiling rather than a
+          measurement. A platform counts a sale as paid when the buyer saw or clicked an ad inside its attribution window,
+          whether or not the ad is why they bought; and attributed sales are gross, before returns and usually including GST,
+          while net sales is after both — so a channel can be credited with more than it netted. Channels with no attribution
+          are left out rather than counted as organic: not knowing what advertising did is not knowing it did nothing.
+        </p>
+      )}
 
       {totals.hasBilledDifference && (
         <p className="text-xs text-[var(--ink-3)]">

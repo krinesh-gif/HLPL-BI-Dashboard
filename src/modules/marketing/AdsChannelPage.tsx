@@ -174,11 +174,12 @@ export function AdsChannelPage() {
 
       {/* Dashes with no explanation read as a reporting failure. This is a
           choice about which file is uploaded, so the page says which. */}
-      {figure.costOnly && figure.source === 'report' && (
+      {figure.source === 'report' && figure.impressions === null && (
         <div className="rounded-lg border border-[var(--line)] bg-[var(--surface-2)] p-3 text-xs text-[var(--ink-2)]">
-          This month comes from the monthly cost report, which states what every ad product cost and nothing else.
-          The spend is the figure the P&L charges. ROAS, ACOS, CTR and CPC need the per-product campaign reports —
-          Sponsored Products, Brands and Display — which carry impressions, clicks and attributed sales.
+          This month comes from Amazon's monthly report, which states what the account cost
+          {figure.adSales === null
+            ? ' and nothing else. The spend is the figure the P&L charges. ROAS, ACOS, CTR and CPC need the per-product campaign reports — Sponsored Products, Brands and Display — which carry impressions, clicks and attributed sales.'
+            : ' and what it sold. The spend is the figure the P&L charges and ROAS and ACOS follow from it; CTR, CPC and CVR need the per-product campaign reports — Sponsored Products, Brands and Display — which are the ones carrying impressions and clicks.'}
         </div>
       )}
 
