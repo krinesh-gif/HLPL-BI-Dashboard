@@ -3,6 +3,7 @@ import { channelLabel, type BusinessChannelId } from '@/config/channels'
 import { formatCurrencyFull, formatPercent, monthLabel, currencyName } from '@/lib/format'
 import { amountTone } from '@/components/pnl/amountTone'
 import { usePrintOnOpen } from '@/lib/usePrintOnOpen'
+import { usePrintPageSize } from '@/lib/usePrintPageSize'
 import { usePnlReport } from './usePnlReport'
 import { pnlSnapshotStart } from './pnlSnapshotStart'
 
@@ -10,6 +11,13 @@ export function PnlSnapshotPage() {
   const [params] = useSearchParams()
 
   const r = usePnlReport(pnlSnapshotStart(params))
+
+  // Six month columns, a total, and a label column long enough for
+  // "Contribution Margin %" do not fit a portrait sheet at a readable size.
+  // Said here, for the whole document, rather than as a named page on the
+  // card: a page name is a page break, and everything not named gets a sheet
+  // of its own — which is the blank page this used to print.
+  usePrintPageSize('size: A4 landscape; margin: 10mm')
 
   // Snapshot is one click, not two: the dialog opens once the statement is on
   // the page. Waiting for a row is what keeps a blank sheet out of the PDF.
@@ -61,7 +69,6 @@ export function PnlSnapshotPage() {
             <div>Hivefy Lifestyle Pvt Ltd</div>
             <div className="mt-1">
               Taken on {takenOn} · {currencyName(r.displayCurrency)}
-              {r.view === 'meesho' && ` · ${r.meeshoBasis === 'settlement' ? 'payment' : 'order'} date basis`}
               {/* Which business, where the channel has two. A wholesale half
                   printed without saying so reads as the whole of Amazon
                   India, and it is two thirds of it. */}

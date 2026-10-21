@@ -165,18 +165,13 @@ h1, h2, h3 { letter-spacing: -0.011em; }
     margin: 12mm;
   }
 
-  /* The P&L is a wide table — six month columns, a total, and a label column
-     long enough for "Contribution Margin %". Portrait either clips it or
-     shrinks it past reading. A named page turns that one snapshot sideways
-     without turning the channel snapshot sideways with it. */
-  @page landscape {
-    size: A4 landscape;
-    margin: 10mm;
-  }
-
-  .pnl-snapshot {
-    page: landscape;
-  }
+  /* The P&L snapshot prints sideways, and asks for it itself — see
+     `usePrintPageSize`. A named page (`@page landscape` with `page:
+     landscape` on the card) is the obvious way to turn one screen and not
+     the others, and it printed a blank sheet after the statement: a page
+     name is a page break, so every box that is not the card — down to an
+     empty div a browser extension leaves at the end of <body> — belongs to
+     the unnamed page and is given a page of its own. */
 
   /* One landscape page is a promise the snapshot makes in its own subtitle,
      and at screen leading it could not keep it. A landscape sheet at a 10mm
@@ -204,6 +199,37 @@ h1, h2, h3 { letter-spacing: -0.011em; }
   .pnl-snapshot > div:last-child {
     break-after: avoid-page;
     margin-bottom: 0;
+  }
+
+  /* The Channel P&L has no second copy of itself to print: Snapshot prints
+     the page where it stands. On screen its table is as wide as its content
+     and the card scrolls sideways; paper has nowhere to scroll, so the widths
+     that hold the columns apart on a monitor are let go and the table is
+     allowed to be the width of the sheet. The rows tighten as the snapshot's
+     do, and the card's own border and shadow come off — on paper they are a
+     box drawn around the only thing on the page. */
+  .pnl-sheet {
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .pnl-sheet table {
+    min-width: 0;
+    line-height: 1.2;
+    /* Measured in Chromium at the printable width: the table is 999px of the
+       1047px sheet, and every row the statement can show comes to 690px of
+       the 718px it has. A step up to 9.5px still fits the width and runs 75px
+       over the page. */
+    font-size: 9px;
+  }
+
+  .pnl-sheet th,
+  .pnl-sheet td {
+    min-width: 0;
+    padding-top: 1.5px;
+    padding-bottom: 1.5px;
+    padding-left: 4px;
+    padding-right: 4px;
   }
 
   :root {

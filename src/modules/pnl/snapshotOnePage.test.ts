@@ -48,4 +48,33 @@ describe('the P&L snapshot fits the page it promises', () => {
     expect(print).toMatch(/\.pnl-snapshot table \{\s*line-height: 1\.25;/)
     expect(print).toMatch(/\.pnl-snapshot tbody td \{\s*padding-top: 2px;/)
   })
+
+  /**
+   * Fitting the page is not the same as printing one page, and the second
+   * one is what the reader sees. A named page — `@page landscape` with
+   * `page: landscape` on the card — turned the snapshot sideways and printed
+   * a blank sheet after it, because a page name is a page break: every box
+   * that is not the card belongs to the unnamed page and is given a page of
+   * its own. An empty div left at the end of <body> by a browser extension
+   * is enough, which is why it showed on the owner's machine and not on a
+   * clean one. Measured in Chromium: the snapshot alone printed one page,
+   * and one zero-height div after it printed two.
+   *
+   * So the stylesheet has one page, and the screen that wants a different
+   * sheet asks for it for the whole document while it is open.
+   */
+  it('prints on one page name, so nothing else can claim a sheet', () => {
+    const css = readFileSync(new URL('../../index.css', import.meta.url), 'utf8')
+    // Comments go first: this is written about in one of them, and a comment
+    // that explains the trap must not read as the trap.
+    const rules = css.replace(/\/\*[\s\S]*?\*\//g, '')
+    // `@page` with a name after it, and the `page:` property that selects one.
+    expect(rules).not.toMatch(/@page\s+[\w-]/)
+    expect(rules).not.toMatch(/\bpage:\s*[\w-]+;/)
+  })
+
+  it('asks for the landscape sheet from the page itself', () => {
+    const tsx = readFileSync(new URL('./PnlSnapshotPage.tsx', import.meta.url), 'utf8')
+    expect(tsx).toMatch(/usePrintPageSize\('size: A4 landscape; margin: 10mm'\)/)
+  })
 })
