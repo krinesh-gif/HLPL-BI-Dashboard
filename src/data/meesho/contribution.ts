@@ -26,6 +26,21 @@ export const CONTRIBUTION_FIELDS = [
   'unclassifiedSettlement', 'unclassifiedRows',
 ] as const satisfies readonly (keyof MeeshoContribution)[]
 
+/**
+ * And every field, not merely real ones.
+ *
+ * `satisfies` proves each name above is a field that exists. It cannot prove
+ * the reverse, which is the direction that loses money: a field added to the
+ * facts and not added here is zeroed by `emptyContribution` and never summed
+ * by `addContribution`, so it reads as nothing on every month built from
+ * events. Flipkart's fixed fee went missing exactly that way — deducted on
+ * the statement, in no bucket, 4,83,916 rupees of real cost invisible for six
+ * months. This fails the build instead, naming the field it is waiting for.
+ */
+type FieldsNotSummed = Exclude<keyof MeeshoContribution, (typeof CONTRIBUTION_FIELDS)[number]>
+const _everyFieldIsSummed: FieldsNotSummed extends never ? true : FieldsNotSummed = true
+void _everyFieldIsSummed
+
 export function emptyContribution(): MeeshoContribution {
   const zeroed = {} as MeeshoContribution
   for (const field of CONTRIBUTION_FIELDS) zeroed[field] = 0
