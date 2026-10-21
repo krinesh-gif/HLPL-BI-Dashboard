@@ -5,6 +5,7 @@ import { ChannelMark } from '@/components/ui/ChannelMark'
 import { TrendLineChart } from '@/components/charts/TrendLineChart'
 import { BUSINESS_CHANNEL_MAP, type BusinessChannelId } from '@/config/channels'
 import { formatCurrencyCompact, formatCurrencyFull, formatNumber, formatPercent, monthLabel, currencyName } from '@/lib/format'
+import { usePrintOnOpen } from '@/lib/usePrintOnOpen'
 import { useChannelData } from './useChannelData'
 
 /**
@@ -33,6 +34,10 @@ export function ChannelSnapshotPage() {
   const month = useFilterStore((s) => s.month)
   const setMonth = useFilterStore((s) => s.setMonth)
   const { salesRecords } = useDataStore()
+
+  // One click, as on the company snapshot. The month's own figures are the
+  // signal that there is something to print rather than a blank card.
+  usePrintOnOpen(d.currentFacts.netSales !== 0 || d.currentFacts.units !== 0)
 
   const months = [...new Set(salesRecords.map((r) => r.orderDate.slice(0, 7)))].filter(Boolean).sort().reverse()
   const takenOn = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })

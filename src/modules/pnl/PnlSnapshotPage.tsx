@@ -2,6 +2,7 @@ import { useSearchParams, Link } from 'react-router-dom'
 import { channelLabel, type BusinessChannelId } from '@/config/channels'
 import { formatCurrencyFull, formatPercent, monthLabel, currencyName } from '@/lib/format'
 import { amountTone } from '@/components/pnl/amountTone'
+import { usePrintOnOpen } from '@/lib/usePrintOnOpen'
 import { usePnlReport } from './usePnlReport'
 import { pnlSnapshotStart } from './pnlSnapshotStart'
 
@@ -9,6 +10,10 @@ export function PnlSnapshotPage() {
   const [params] = useSearchParams()
 
   const r = usePnlReport(pnlSnapshotStart(params))
+
+  // Snapshot is one click, not two: the dialog opens once the statement is on
+  // the page. Waiting for a row is what keeps a blank sheet out of the PDF.
+  usePrintOnOpen(r.table.rows.length > 0)
 
   const title = r.view === 'master' ? 'Master Company P&L' : `${channelLabel(r.view as BusinessChannelId)} P&L`
   const takenOn = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -41,7 +46,7 @@ export function PnlSnapshotPage() {
         </button>
       </div>
       <p className="mb-4 text-xs text-[var(--ink-3)] print:hidden">
-        Prints on one landscape page. This is the full statement — costs, margins and all — so it is for accounts,
+        The print dialog opens on its own; Save as PDF reopens it. Prints on one landscape page. This is the full statement — costs, margins and all — so it is for accounts,
         finance and founders, not for a marketplace manager.
       </p>
 

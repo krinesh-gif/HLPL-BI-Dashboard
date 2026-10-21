@@ -7,9 +7,12 @@ export function AppLayout() {
   const { loading, error, loadState } = useDataStore()
 
   return (
-    <div className="flex h-screen bg-[var(--plane)]">
+    // `h-screen` is the viewport on screen and nothing on paper: a box as
+    // tall as a monitor, printed, is a sheet and a bit. It is let go in print
+    // so the page is as tall as what is on it.
+    <div className="flex h-screen bg-[var(--plane)] print:block print:h-auto">
       <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto print:block print:overflow-visible">
         {/* Rendering pages while the shared dataset is still loading — or after
             it failed — would show zeroes that look like real figures. */}
         {loading ? (

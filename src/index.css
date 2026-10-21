@@ -178,6 +178,34 @@ h1, h2, h3 { letter-spacing: -0.011em; }
     page: landscape;
   }
 
+  /* One landscape page is a promise the snapshot makes in its own subtitle,
+     and at screen leading it could not keep it. A landscape sheet at a 10mm
+     margin is 190mm of printable height, about 718px; the statement runs to
+     25 rows, and at 26px a row the table alone is 650px before the heading,
+     the channel breakdown and the footnote. A full month tipped two or three
+     rows and the footer onto a second sheet — which is the blank page after
+     the statement, the tail of a table with nothing else on it.
+
+     Paper gets tighter rows than a screen does. The figures, the wording and
+     the column widths are untouched; only the space between the lines gives,
+     which takes a full statement to about 610px and leaves a sheet's worth of
+     headroom for the months still to come. */
+  .pnl-snapshot table {
+    line-height: 1.25;
+  }
+
+  .pnl-snapshot tbody td {
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+
+  /* Nothing after the statement, so a stray margin cannot start a sheet of
+     its own. */
+  .pnl-snapshot > div:last-child {
+    break-after: avoid-page;
+    margin-bottom: 0;
+  }
+
   :root {
     /* Paper is white. A snapshot taken while the dashboard is in dark mode
        must not print a black page. */
