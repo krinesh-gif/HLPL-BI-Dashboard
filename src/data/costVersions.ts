@@ -158,3 +158,86 @@ function previousMonth(yyyyMm: string): string {
   const d = new Date(y, (m ?? 1) - 2, 1)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
+
+// ---------------------------------------------------------------------------
+// What is live right now
+// ---------------------------------------------------------------------------
+
+/**
+ * One SKU's cost as a P&L for `month` would read it, with its provenance.
+ *
+ * The Cost Master screen used to list only uploaded versions, which meant that
+ * with no cost sheet on file it showed nothing at all — while every P&L in the
+ * system was costing stock off the Product Master baseline. The costs being
+ * used have to be on the screen whether or not anybody has uploaded a sheet.
+ */
+export interface LiveCost {
+  sku: string
+  productName: string
+  category: string
+  /** The cost in force in the month asked about; null when nothing covers it. */
+  cogs: number | null
+  /** From the Product Master; null for a SKU only a cost sheet has mentioned. */
+  mrp: number | null
+  source: CostVersion['source'] | null
+  /** The month that cost took effect — BASELINE_EFFECTIVE_FROM for a baseline. */
+  effectiveFrom: string | null
+  fileName?: string
+  /** Uploaded versions for this SKU, the Product Master baseline excluded. */
+  uploadedVersions: number
+  /** False for a SKU that only a cost sheet has mentioned. */
+  inProductMaster: boolean
+}
+
+export function liveCosts(skuMaster: SkuMaster[], versions: CostVersion[], month: string): LiveCost[] {
+  const index = buildCostIndex(versions, skuMaster)
+  const master = new Map(skuMaster.map((s) => [s.sku, s]))
+  const uploaded = indexCostVersions(versions)
+  // A SKU a cost sheet names but the Product Master does not still has a live
+  // cost, so it belongs on the screen rather than being quietly dropped.
+  const skus = [...new Set([...master.keys(), ...uploaded.keys()])]
+
+  return skus
+    .map((sku) => {
+      const product = master.get(sku)
+      const live = costVersionForMonth(sku, month, index)
+      return {
+        sku,
+        productName: product?.productName || sku,
+        category: product?.category || '',
+        cogs: live?.cogs ?? null,
+        mrp: product ? product.mrp : null,
+        source: live?.source ?? null,
+        effectiveFrom: live?.effectiveFrom ?? null,
+        fileName: live?.fileName,
+        uploadedVersions: uploaded.get(sku)?.length ?? 0,
+        inProductMaster: product !== undefined,
+      }
+    })
+    .sort((a, b) => a.sku.localeCompare(b.sku))
+}
+
+export interface LiveCostSummary {
+  skus: number
+  costed: number
+  uncosted: number
+  /** Costed off an uploaded cost sheet (or a manual entry) in this month. */
+  fromCostSheet: number
+  /** Still costed off the Product Master baseline in this month. */
+  fromProductMaster: number
+  lowest: number | null
+  highest: number | null
+}
+
+export function summariseLiveCosts(rows: LiveCost[]): LiveCostSummary {
+  const costs = rows.map((r) => r.cogs).filter((c): c is number => c !== null)
+  return {
+    skus: rows.length,
+    costed: costs.length,
+    uncosted: rows.length - costs.length,
+    fromCostSheet: rows.filter((r) => r.source === 'cost-sheet' || r.source === 'manual').length,
+    fromProductMaster: rows.filter((r) => r.source === 'sku-master').length,
+    lowest: costs.length > 0 ? Math.min(...costs) : null,
+    highest: costs.length > 0 ? Math.max(...costs) : null,
+  }
+}

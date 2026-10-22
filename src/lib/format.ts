@@ -188,3 +188,21 @@ export function ytdMonthKeys(yyyyMm: string): string[] {
   }
   return keys
 }
+
+/**
+ * A per-unit cost, with paise.
+ *
+ * A monthly total rounds to the rupee without anybody caring, but a unit cost
+ * does not: ₹19.85 shown as ₹20 is 0.8% added to the cost of every unit sold,
+ * and the owner reconciles these against a supplier invoice that carries the
+ * paise. Whole rupees stay whole so a column of costs does not read as
+ * "₹50.00" all the way down.
+ */
+export function formatUnitCost(value: number): string {
+  if (!Number.isFinite(value)) return '—'
+  const paise = Math.round(value * 100)
+  return `₹${(paise / 100).toLocaleString('en-IN', {
+    minimumFractionDigits: paise % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`
+}

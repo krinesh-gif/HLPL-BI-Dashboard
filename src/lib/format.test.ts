@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fiscalYearLabel, formatCurrencyCompact, formatCurrencyFull, formatPercent, ytdMonthKeys } from './format'
+import { fiscalYearLabel, formatCurrencyCompact, formatCurrencyFull, formatPercent, formatUnitCost, ytdMonthKeys } from './format'
 
 describe('formatCurrencyCompact', () => {
   it('formats crores and lakhs for INR', () => {
@@ -59,5 +59,24 @@ describe('ytdMonthKeys', () => {
       '2025-04', '2025-05', '2025-06', '2025-07', '2025-08', '2025-09',
       '2025-10', '2025-11', '2025-12', '2026-01', '2026-02',
     ])
+  })
+})
+
+describe('formatUnitCost', () => {
+  it('keeps the paise a unit cost actually carries', () => {
+    // Real costs from the Product Master. Rounding 19.85 to ₹20 adds 0.8% to
+    // the cost of every unit sold.
+    expect(formatUnitCost(19.85)).toBe('₹19.85')
+    expect(formatUnitCost(35.55)).toBe('₹35.55')
+    expect(formatUnitCost(24.9)).toBe('₹24.90')
+  })
+
+  it('leaves a whole-rupee cost whole', () => {
+    expect(formatUnitCost(201)).toBe('₹201')
+    expect(formatUnitCost(1200)).toBe('₹1,200')
+  })
+
+  it('has nothing to show for a value that is not a number', () => {
+    expect(formatUnitCost(Number.NaN)).toBe('—')
   })
 })

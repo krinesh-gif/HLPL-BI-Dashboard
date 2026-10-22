@@ -3,7 +3,7 @@ import { PageShell } from '@/components/layout/PageShell'
 import { useDataStore } from '@/store/dataStore'
 import { useFilterStore } from '@/store/filterStore'
 import { parseSpreadsheetFile } from '@/lib/csvParse'
-import { addMonths, formatCurrencyFull, formatPercent, monthLabel } from '@/lib/format'
+import { addMonths, formatPercent, formatUnitCost, monthLabel } from '@/lib/format'
 import {
   buildCostIndex,
   cogsForMonth,
@@ -18,6 +18,7 @@ import {
   productNamesFromCostSheet,
   type CostSheetResult,
 } from '@/data/normalize/costSheet'
+import { LiveCostsPanel } from './LiveCostsPanel'
 
 interface Staged extends CostSheetResult {
   fileName: string
@@ -32,7 +33,7 @@ function monthOptions(anchor: string): string[] {
 
 export function CostSheetPage() {
   const { skuMaster, costVersions, saveCostVersions, removeCostVersion } = useDataStore()
-  const { month } = useFilterStore()
+  const { month, setMonth } = useFilterStore()
 
   const [effectiveFrom, setEffectiveFrom] = useState(month)
   const [staged, setStaged] = useState<Staged | null>(null)
@@ -106,10 +107,18 @@ export function CostSheetPage() {
 
   return (
     <PageShell
-      title="Cost Sheet"
-      subtitle="Upload new costs with the month they take effect. Closed months keep the cost they were closed at."
+      title="Cost Master"
+      subtitle="Every SKU's live cost, and new costs with the month they take effect. Closed months keep the cost they were closed at."
       showFilters={false}
     >
+      <LiveCostsPanel
+        skuMaster={skuMaster}
+        versions={costVersions}
+        month={month}
+        months={monthOptions(month)}
+        onMonthChange={setMonth}
+      />
+
       <section className="rounded-[var(--radius-card)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-card)] p-4">
         <h3 className="text-sm font-semibold text-[var(--ink)]">Upload a cost sheet</h3>
         <p className="mt-1 text-sm text-[var(--ink-2)]">
@@ -262,9 +271,9 @@ function StagedReview({
                   </td>
                   <td className="px-3 py-1.5 text-xs text-[var(--ink-2)]">{monthLabel(c.effectiveFrom)}</td>
                   <td className="px-3 py-1.5 text-right tabular-nums text-[var(--ink-3)]">
-                    {c.previousCogs === null ? <span className="text-xs italic text-[var(--ink-3)]">new</span> : formatCurrencyFull(c.previousCogs)}
+                    {c.previousCogs === null ? <span className="text-xs italic text-[var(--ink-3)]">new</span> : formatUnitCost(c.previousCogs)}
                   </td>
-                  <td className="px-3 py-1.5 text-right font-medium tabular-nums text-[var(--ink)]">{formatCurrencyFull(c.newCogs)}</td>
+                  <td className="px-3 py-1.5 text-right font-medium tabular-nums text-[var(--ink)]">{formatUnitCost(c.newCogs)}</td>
                   <td
                     className={`px-3 py-1.5 text-right tabular-nums ${
                       c.changePct === null ? 'text-[var(--ink-3)]' : Math.abs(c.changePct) > 25 ? 'font-semibold text-[var(--critical-ink)]' : 'text-[var(--ink-2)]'
@@ -318,8 +327,8 @@ function CostHistory({
         <div>
           <h3 className="text-sm font-semibold text-[var(--ink)]">Cost history</h3>
           <p className="mt-0.5 text-sm text-[var(--ink-2)]">
-            Every uploaded cost and the month it took effect. The cost shown for {monthLabel(month)} is what every P&amp;L for that month
-            uses.
+            Only SKUs an uploaded cost sheet has touched — the full live list is at the top of this page. Every version here shows the
+            month it took effect, and the cost for {monthLabel(month)} is what every P&amp;L for that month uses.
           </p>
         </div>
         <input
@@ -355,14 +364,14 @@ function CostHistory({
                     <div className="text-xs text-[var(--ink-3)]">{r.productName}</div>
                   </td>
                   <td className="px-3 py-2 text-right font-medium tabular-nums text-[var(--ink)]">
-                    {r.currentCost === null ? <span className="text-xs italic text-[var(--ink-2)]">no cost on file</span> : formatCurrencyFull(r.currentCost)}
+                    {r.currentCost === null ? <span className="text-xs italic text-[var(--ink-2)]">no cost on file</span> : formatUnitCost(r.currentCost)}
                   </td>
                   <td className="px-3 py-2">
                     <ul className="space-y-1">
                       {r.versions.map((v) => (
                         <li key={v.effectiveFrom} className="flex items-center gap-2 text-xs">
                           <span className="w-20 shrink-0 text-[var(--ink-3)]">{monthLabel(v.effectiveFrom)}→</span>
-                          <span className="w-20 shrink-0 font-medium tabular-nums text-[var(--ink)]">{formatCurrencyFull(v.cogs)}</span>
+                          <span className="w-20 shrink-0 font-medium tabular-nums text-[var(--ink)]">{formatUnitCost(v.cogs)}</span>
                           {v.fileName && <span className="truncate text-[var(--ink-3)]">{v.fileName}</span>}
                           <button
                             type="button"

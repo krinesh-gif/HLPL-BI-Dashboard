@@ -5,6 +5,8 @@ import {
   costVersionForMonth,
   describeCostChanges,
   indexCostVersions,
+  liveCosts,
+  summariseLiveCosts,
   type CostVersion,
 } from './costVersions'
 import type { SkuMaster } from './models'
@@ -119,5 +121,62 @@ describe('previewing what a cost sheet would change', () => {
     )
     expect(changes[0].previousCogs).toBeNull()
     expect(changes[0].changePct).toBeNull()
+  })
+})
+
+describe('the costs live in a month', () => {
+  it('lists every SKU in the Product Master, even with no cost sheet uploaded', () => {
+    // The state the owner's database is actually in: 49 costed SKUs and an
+    // empty cost_versions table. A screen that showed only uploaded versions
+    // showed nothing while every P&L was costing stock off these numbers.
+    const rows = liveCosts(skuMaster, [], '2026-09')
+    expect(rows.map((r) => r.sku)).toEqual(['SKU001', 'SKU002'])
+    expect(rows[0]).toMatchObject({ cogs: 50, source: 'sku-master', productName: 'Rosemary 15 ml', mrp: 299 })
+  })
+
+  it('prefers the uploaded cost once its month arrives, and names the file it came from', () => {
+    const versions = [version({ sku: 'SKU001', effectiveFrom: '2026-08', cogs: 55, fileName: 'costs-aug.xlsx' })]
+    expect(liveCosts(skuMaster, versions, '2026-07')[0]).toMatchObject({ cogs: 50, source: 'sku-master' })
+    expect(liveCosts(skuMaster, versions, '2026-08')[0]).toMatchObject({
+      cogs: 55,
+      source: 'cost-sheet',
+      effectiveFrom: '2026-08',
+      fileName: 'costs-aug.xlsx',
+      uploadedVersions: 1,
+    })
+  })
+
+  it('reports a SKU with no cost as having none rather than as costing nothing', () => {
+    const uncosted = [...skuMaster, { ...skuMaster[0], sku: 'SKU003', productName: 'New', cogs: 0 }]
+    const row = liveCosts(uncosted, [], '2026-09').find((r) => r.sku === 'SKU003')
+    expect(row?.cogs).toBeNull()
+    expect(row?.source).toBeNull()
+  })
+
+  it('still shows a SKU that only a cost sheet knows about', () => {
+    const rows = liveCosts(skuMaster, [version({ sku: 'SKU777', effectiveFrom: '2026-01', cogs: 12 })], '2026-09')
+    const row = rows.find((r) => r.sku === 'SKU777')
+    expect(row).toMatchObject({ cogs: 12, inProductMaster: false, productName: 'SKU777', mrp: null })
+  })
+
+  it('summarises what is costed, from where, and the spread', () => {
+    const rows = liveCosts(
+      [...skuMaster, { ...skuMaster[0], sku: 'SKU003', productName: 'New', cogs: 0 }],
+      [version({ sku: 'SKU001', effectiveFrom: '2026-08', cogs: 55 })],
+      '2026-09',
+    )
+    expect(summariseLiveCosts(rows)).toEqual({
+      skus: 3,
+      costed: 2,
+      uncosted: 1,
+      fromCostSheet: 1,
+      fromProductMaster: 1,
+      lowest: 55,
+      highest: 80,
+    })
+  })
+
+  it('has no range to report when nothing is costed', () => {
+    expect(summariseLiveCosts([])).toMatchObject({ skus: 0, costed: 0, lowest: null, highest: null })
   })
 })
