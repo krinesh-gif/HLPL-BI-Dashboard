@@ -53,12 +53,25 @@ export interface CogsResult {
  * it, no matter how many times the cost has changed since — so re-opening a
  * closed month shows the same margin it showed when it was closed.
  */
-export function cogsForRecords(
-  records: CanonicalSalesRecord[],
+/**
+ * What one unit of a channel's code costs in `month`, or null when nothing on
+ * file can say.
+ *
+ * Exported because the SKU × Channel margin screen has to cost a unit the same
+ * way the P&L costs it. A second resolver written beside this one is how a
+ * product comes to show one margin on the statement and another on the screen
+ * that ranks it, and the figure that gets acted on is whichever was opened
+ * last. Callers share this one and cannot disagree.
+ *
+ * The returned function memoises, so resolution is per SKU rather than per
+ * row: a channel with tens of thousands of order lines has only a few hundred
+ * distinct codes.
+ */
+export function unitCostResolver(
   skuMaster: SkuMaster[],
   month: string,
   inputs: CogsInputs = {},
-): CogsResult {
+): (sku: string) => number | null {
   const costFor = (sku: string): number | undefined => {
     if (inputs.costIndex) {
       const versioned = cogsForMonth(sku, month, inputs.costIndex)
@@ -75,10 +88,8 @@ export function cogsForRecords(
     costFor,
   }
 
-  // Resolution is per SKU, not per row: a channel with tens of thousands of
-  // order lines has only a few hundred distinct codes.
   const unitCost = new Map<string, number | null>()
-  const resolve = (sku: string): number | null => {
+  return (sku: string): number | null => {
     const cached = unitCost.get(sku)
     if (cached !== undefined) return cached
 
@@ -90,6 +101,15 @@ export function cogsForRecords(
     unitCost.set(sku, value)
     return value
   }
+}
+
+export function cogsForRecords(
+  records: CanonicalSalesRecord[],
+  skuMaster: SkuMaster[],
+  month: string,
+  inputs: CogsInputs = {},
+): CogsResult {
+  const resolve = unitCostResolver(skuMaster, month, inputs)
 
   let cogs = 0
   let costedUnits = 0

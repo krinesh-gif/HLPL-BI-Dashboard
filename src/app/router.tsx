@@ -56,6 +56,7 @@ export const router = createHashRouter([
       { path: 'marketing/ads', element: page(() => import('@/modules/marketing/AdsOverviewPage'), 'AdsOverviewPage') },
       { path: 'marketing/ads/:adsChannelId', element: page(() => import('@/modules/marketing/AdsChannelPage'), 'AdsChannelPage') },
       { path: 'products/sku-analytics', element: page(() => import('@/modules/products/SkuAnalyticsPage'), 'SkuAnalyticsPage') },
+      { path: 'products/profitability', element: page(() => import('@/modules/products/SkuProfitabilityPage'), 'SkuProfitabilityPage') },
       { path: 'products/master', element: page(() => import('@/modules/products/ProductMasterPage'), 'ProductMasterPage') },
       { path: 'products/sku-mapping', element: page(() => import('@/modules/products/SkuMappingPage'), 'SkuMappingPage') },
       { path: 'products/cost-sheet', element: page(() => import('@/modules/products/CostSheetPage'), 'CostSheetPage') },
