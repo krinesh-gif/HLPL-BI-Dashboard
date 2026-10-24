@@ -33,6 +33,11 @@ export type SalesSourceId =
   | 'purplle'
   | 'blinkit'
   | 'swiggy_instamart'
+  | 'snapdeal'
+  | 'pharmeasy'
+  | 'tata_1mg'
+  | 'firstcry'
+  | 'walmart_us'
 
 /** What management sees. */
 export type BusinessChannelId =
@@ -46,6 +51,11 @@ export type BusinessChannelId =
   | 'purplle'
   | 'blinkit'
   | 'swiggy_instamart'
+  | 'snapdeal'
+  | 'pharmeasy'
+  | 'tata_1mg'
+  | 'firstcry'
+  | 'walmart_us'
 
 /**
  * Retained as the name for a stored row's key, because that is what every
@@ -85,6 +95,11 @@ export const BUSINESS_CHANNELS: BusinessChannelDef[] = [
   { id: 'purplle', label: 'Purplle', currency: 'INR' },
   { id: 'blinkit', label: 'Blinkit', currency: 'INR' },
   { id: 'swiggy_instamart', label: 'Swiggy Instamart', currency: 'INR' },
+  { id: 'snapdeal', label: 'Snapdeal', currency: 'INR' },
+  { id: 'pharmeasy', label: 'PharmEasy', currency: 'INR' },
+  { id: 'tata_1mg', label: 'Tata 1mg', currency: 'INR' },
+  { id: 'firstcry', label: 'FirstCry', currency: 'INR' },
+  { id: 'walmart_us', label: 'Walmart USA', currency: 'USD' },
 ]
 
 /** Every report the system accepts, and which channel it belongs to. */
@@ -100,6 +115,11 @@ export const SALES_SOURCES: SalesSourceDef[] = [
   { id: 'purplle', channel: 'purplle', label: 'Purplle', currency: 'INR', sellerType: 'marketplace' },
   { id: 'blinkit', channel: 'blinkit', label: 'Blinkit', currency: 'INR', sellerType: 'marketplace' },
   { id: 'swiggy_instamart', channel: 'swiggy_instamart', label: 'Swiggy Instamart', currency: 'INR', sellerType: 'marketplace' },
+  { id: 'snapdeal', channel: 'snapdeal', label: 'Snapdeal', currency: 'INR', sellerType: 'marketplace' },
+  { id: 'pharmeasy', channel: 'pharmeasy', label: 'PharmEasy', currency: 'INR', sellerType: 'marketplace' },
+  { id: 'tata_1mg', channel: 'tata_1mg', label: 'Tata 1mg', currency: 'INR', sellerType: 'marketplace' },
+  { id: 'firstcry', channel: 'firstcry', label: 'FirstCry', currency: 'INR', sellerType: 'marketplace' },
+  { id: 'walmart_us', channel: 'walmart_us', label: 'Walmart USA', currency: 'USD', sellerType: 'marketplace' },
 ]
 
 export const BUSINESS_CHANNEL_MAP: Record<BusinessChannelId, BusinessChannelDef> = Object.fromEntries(
@@ -169,6 +189,14 @@ export const DEFAULT_ALLOCATION_WEIGHTS: Record<BusinessChannelId, number> = {
   // started trading a standing slice of overhead would be inventing a cost.
   blinkit: 0,
   swiggy_instamart: 0,
+  // Same reasoning: these five opened in August and are measured from their
+  // own order rows, so their real share is computed from sales the moment
+  // there are any.
+  snapdeal: 0,
+  pharmeasy: 0,
+  tata_1mg: 0,
+  firstcry: 0,
+  walmart_us: 0,
 }
 
 // ---------------------------------------------------------------------------

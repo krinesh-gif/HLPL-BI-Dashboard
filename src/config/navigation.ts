@@ -44,6 +44,11 @@ export const NAVIGATION: NavSection[] = [
       { label: 'Purplle', path: '/channels/purplle' },
       { label: 'Blinkit', path: '/channels/blinkit' },
       { label: 'Swiggy Instamart', path: '/channels/swiggy_instamart' },
+      { label: 'Snapdeal', path: '/channels/snapdeal' },
+      { label: 'PharmEasy', path: '/channels/pharmeasy' },
+      { label: 'Tata 1mg', path: '/channels/tata_1mg' },
+      { label: 'FirstCry', path: '/channels/firstcry' },
+      { label: 'Walmart USA', path: '/channels/walmart_us' },
     ],
   },
   {

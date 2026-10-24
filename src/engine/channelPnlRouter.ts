@@ -1476,11 +1476,14 @@ function buildChannelPnlStatement(channel: BusinessChannelId, month: string, inp
     ? generic
     : { ...generic, lines: computeSubtotals({ ...generic.lines, channelCharges: ownCharges }) }
   const source = NATIVE_STATEMENT_SOURCE[channel]
+  const salesOnly = SALES_REPORT_ONLY[channel]
   return {
     channel, month, canonical,
     notes: source
       ? [`No settlement report is stored for ${channelLabel(channel)} in ${month}, so this is built from the order rows instead. Its Gross Sales will not tie to the ${source}. Upload that report for the month to replace it.`]
-      : [],
+      : salesOnly
+        ? [`${channelLabel(channel)} is read for ${month} from its ${salesOnly}, which states nothing the channel charged. So this statement runs to net sales and what ${channelLabel(channel)} took is missing from it, not zero. A payout statement from them would fill those lines in.`]
+        : [],
   }
 }
 
@@ -1497,6 +1500,23 @@ const NATIVE_STATEMENT_SOURCE: Partial<Record<BusinessChannelId, string>> = {
   amazon_in: 'settlement report',
   purplle: 'monthly sales file',
   swiggy_instamart: 'monthly sales report',
+}
+
+/**
+ * The channels that send a sales report and no settlement at all.
+ *
+ * Distinct from the map above, and the distinction is the point: there, a
+ * statement exists and this month's is missing, so the note asks for it.
+ * Here no settlement is published to ask for, and the note has to say the
+ * other thing — that the charges line is empty because nothing states them,
+ * which is not the same as the channel being free.
+ */
+const SALES_REPORT_ONLY: Partial<Record<BusinessChannelId, string>> = {
+  snapdeal: 'order report',
+  pharmeasy: 'monthly sales report',
+  tata_1mg: 'monthly sales register',
+  firstcry: 'monthly Sales Data file',
+  walmart_us: 'item performance export',
 }
 
 export function buildAllChannelPnlViews(channels: BusinessChannelId[], month: string, inputs: ChannelPnlViewInputs): ChannelPnlView[] {

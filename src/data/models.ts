@@ -37,6 +37,19 @@ export interface CanonicalSalesRecord {
   shippingCost: number
   marketplaceFee: number
   tax: number
+  /**
+   * True when `grossSales` already includes this tax — output GST inside the
+   * price the shopper paid, which is collected on a sale and owed onward.
+   *
+   * Two different things get written to `tax`. Amazon's order report states
+   * the item tax beside a price that excludes it, so it is a charge on top.
+   * The channels whose gross is an MRP stated the other way round: the GST is
+   * inside the price and is already out of `netSales`. Without this flag the
+   * P&L takes the second kind out twice — once in the derived returns line
+   * and once as a marketplace charge — and a channel's EBITDA comes out short
+   * by exactly its GST.
+   */
+  taxInGross?: boolean
   status: 'completed' | 'returned' | 'rto' | 'cancelled' | 'pending'
   currency: 'INR' | 'USD' | 'AED'
   /** Original uploaded row, untouched, keyed by original header names. */

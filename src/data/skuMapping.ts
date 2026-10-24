@@ -272,6 +272,39 @@ export function resolveCogs(channelSku: string, tables: MappingTables): CostReso
 }
 
 /**
+ * The channel code as the SKU map spells it, where a file spells it
+ * differently in a way that carries no meaning.
+ *
+ * `resolveCogs` and `resolveGstPct` compare codes exactly, which is right:
+ * a cost resolved by a fuzzy match is a cost nobody chose. But some channels
+ * write the same code with underscores where the map has slashes — Snapdeal
+ * sends `C2_EO_PEPPERMINT_ROSEMARY_15` for the `C2/EO/PEPPERMINT_ROSEMARY/15`
+ * already in the map — and leaving those unresolved would have taxed a
+ * month's sales at nothing and costed them at zero, which is a worse answer
+ * than reading the separator.
+ *
+ * So this says only that two codes are the same code written two ways, by
+ * the same `normalizeSkuCode` the mapping screen matches on. It resolves
+ * nothing itself: the caller hands the answer back to the ordinary
+ * resolvers, which still decide whether the map or the Product Master knows
+ * that code. Null means neither holds this code under another spelling.
+ *
+ * The map is searched before the Product Master, because a code the owner
+ * has mapped by hand is a decision and a code that merely looks like a
+ * master SKU is a resemblance.
+ */
+export function mappedCodeFor(channelSku: string, tables: MappingTables): string | null {
+  if (tables.mappings.some((m) => m.channelSku === channelSku)) return channelSku
+  if (tables.skuMaster.some((s) => s.sku === channelSku)) return channelSku
+  const target = normalizeSkuCode(channelSku)
+  if (target === '') return null
+  const mapped = tables.mappings.find((m) => normalizeSkuCode(m.channelSku) === target)
+  if (mapped) return mapped.channelSku
+  const master = tables.skuMaster.find((s) => normalizeSkuCode(s.sku) === target)
+  return master ? master.sku : null
+}
+
+/**
  * The GST rate a marketplace code is sold at, followed through the SKU map.
  *
  * Returned as a fraction (0.18, 0.05, 0), because that is what a tax

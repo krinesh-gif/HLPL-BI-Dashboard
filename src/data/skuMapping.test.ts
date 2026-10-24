@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeSkuCode, resolveCogs, resolveGstPct, type MappingTables } from './skuMapping'
+import { mappedCodeFor, normalizeSkuCode, resolveCogs, resolveGstPct, type MappingTables } from './skuMapping'
 import type { SkuMaster } from './models'
 
 const sku = (s: string, cogs: number): SkuMaster => ({
@@ -143,5 +143,44 @@ describe('resolveGstPct', () => {
     // needs a per-component value this does not have.
     expect(resolveGstPct('C2/Pair', tables({ ...base, skuMaster: [taxed('AO/A', 18), taxed('AO/B', 5)] }))).toBeNull()
     expect(resolveGstPct('C2/Pair', tables({ ...base, skuMaster: [taxed('AO/A', 18), taxed('AO/B', undefined)] }))).toBeNull()
+  })
+})
+
+describe('the same code written two ways', () => {
+  const tables = {
+    skuMaster: [
+      { sku: 'AO/Shmp/Rosemary/200', productName: 'Rosemary Shampoo', category: 'Hair Care', brand: 'AO',
+        cogs: 54.5, mrp: 349, gstPct: 5, launchDate: '2025-04-01', status: 'active' as const,
+        leadTimeDays: 21, safetyStock: 0 },
+    ],
+    mappings: [
+      { channelSku: 'C2/EO/PEPPERMINT_ROSEMARY/15', internalSku: 'C2/EO/PEPPERMINT_ROSEMARY/15',
+        kind: 'COMBO' as const, source: 'manual' as const, verified: true },
+    ],
+    comboComponents: [],
+  }
+
+  it('finds the map entry a channel writes with underscores', () => {
+    // Snapdeal's spelling of a code the owner has already mapped.
+    expect(mappedCodeFor('C2_EO_PEPPERMINT_ROSEMARY_15', tables)).toBe('C2/EO/PEPPERMINT_ROSEMARY/15')
+  })
+
+  it('finds the Product Master code too, when the map has no entry', () => {
+    expect(mappedCodeFor('AO_Shmp_Rosemary_200', tables)).toBe('AO/Shmp/Rosemary/200')
+  })
+
+  it('prefers the map over a master code that merely looks similar', () => {
+    const both = {
+      ...tables,
+      mappings: [{ channelSku: 'AO_Shmp_Rosemary_200', internalSku: 'AO/Shmp/Rosemary/300',
+        kind: 'SINGLE' as const, source: 'manual' as const, verified: true }],
+    }
+    // A mapping is a decision; a resemblance is not.
+    expect(mappedCodeFor('AO_Shmp_Rosemary_200', both)).toBe('AO_Shmp_Rosemary_200')
+  })
+
+  it('says nothing for a code neither table knows', () => {
+    expect(mappedCodeFor('01_AO_EO_Rosemary_15', tables)).toBeNull()
+    expect(mappedCodeFor('', tables)).toBeNull()
   })
 })

@@ -63,6 +63,9 @@ export function useChannelData(channel: BusinessChannelId, source?: SalesSourceI
       myntra: myntraFacts ?? [], nykaa: nykaaFacts ?? [], blinkit: blinkitFacts ?? [],
       amazon_in: [], purplle: purplleFacts ?? [], amazon_ae: amazonAeFacts ?? [],
       swiggy_instamart: swiggyInstamartFacts ?? [],
+      // Sales reports only, so every month they have is a month of order
+      // rows — already counted above.
+      snapdeal: [], pharmeasy: [], tata_1mg: [], firstcry: [], walmart_us: [],
     }
     // Narrowing to one report inside a channel rules the settlement months
     // out: a settlement covers the whole channel, not one of its reports.

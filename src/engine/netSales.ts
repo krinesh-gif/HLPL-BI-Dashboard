@@ -68,6 +68,9 @@ export interface NetSalesFigure {
   marketplaceFee: number
   shippingCost: number
   tax: number
+  /** The part of `tax` that is output GST inside `grossSales`, and so is
+   * already out of net sales rather than a charge of its own. */
+  taxInGross: number
   basis: NetSalesBasis
   /** Which report this came from, for display next to the number. */
   sourceLabel: string
@@ -88,6 +91,7 @@ export const EMPTY_FIGURE: NetSalesFigure = {
   marketplaceFee: 0,
   shippingCost: 0,
   tax: 0,
+  taxInGross: 0,
   basis: 'order',
   sourceLabel: 'No data',
   currency: 'INR',
@@ -159,6 +163,7 @@ export function orderBasisNetSales(
     figure.marketplaceFee += r.marketplaceFee * rate
     figure.shippingCost += r.shippingCost * rate
     figure.tax += r.tax * rate
+    if (r.taxInGross) figure.taxInGross += r.tax * rate
   }
 
   return figure
@@ -375,6 +380,7 @@ export function netSalesForChannelMonth(scope: NetSalesScope): NetSalesFigure {
     marketplaceFee: order.marketplaceFee,
     shippingCost: order.shippingCost,
     tax: order.tax,
+    taxInGross: order.taxInGross,
   }
 }
 
@@ -397,6 +403,7 @@ export function addFigures(a: NetSalesFigure, b: NetSalesFigure): NetSalesFigure
     marketplaceFee: a.marketplaceFee + b.marketplaceFee,
     shippingCost: a.shippingCost + b.shippingCost,
     tax: a.tax + b.tax,
+    taxInGross: a.taxInGross + b.taxInGross,
     basis: bothSettled ? 'settlement' : 'order',
     sourceLabel: bothSettled ? 'Settlement reports' : 'Mixed sources',
     currency: 'INR',

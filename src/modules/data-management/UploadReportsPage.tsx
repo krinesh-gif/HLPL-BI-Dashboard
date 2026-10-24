@@ -35,6 +35,11 @@ import { detectPurplleSalesReport, normalizePurplleSalesReport } from '@/data/no
 import {
   detectSwiggyInstamartReport, normalizeSwiggyInstamartReport,
 } from '@/data/normalize/swiggyInstamartSalesReport'
+import { detectSnapdealOrdersReport, normalizeSnapdealOrdersReport } from '@/data/normalize/snapdealOrdersReport'
+import { detectPharmeasySalesReport, normalizePharmeasySalesReport } from '@/data/normalize/pharmeasySalesReport'
+import { detectTata1mgSalesReport, normalizeTata1mgSalesReport } from '@/data/normalize/tata1mgSalesReport'
+import { detectFirstcrySalesReport, normalizeFirstcrySalesReport } from '@/data/normalize/firstcrySalesReport'
+import { detectWalmartUsItemReport, normalizeWalmartUsItemReport } from '@/data/normalize/walmartUsItemReport'
 import {
   detectNykaaCartRuleSheet, detectNykaaComboSheet, detectNykaaSalesSheet, normalizeNykaaWorkbook,
 } from '@/data/normalize/nykaaSalesWorkbook'
@@ -87,6 +92,11 @@ type ReportKind =
   | 'amazon_in_vendor_ixd'
   | 'amazon_in_vendor_claim'
   | 'blinkit_payout_archive'
+  | 'snapdeal_orders'
+  | 'pharmeasy_sales'
+  | 'tata_1mg_sales'
+  | 'firstcry_sales'
+  | 'walmart_us_items'
 
 const REPORT_LABELS: Record<ReportKind, string> = {
   blinkit_payout_archive: 'Blinkit — Monthly Payout Sheet (zip)',
@@ -117,6 +127,11 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   meesho_settlement_json: 'Meesho — Settlement Data (JSON)',
   amazon_ads_sponsored_products: 'Amazon Ads — Sponsored Products Campaign Report',
   amazon_ads_monthly_cost: 'Amazon Ads — cost by month (every ad product)',
+  snapdeal_orders: 'Snapdeal — Order Report',
+  pharmeasy_sales: 'PharmEasy — Monthly Sales Report',
+  tata_1mg_sales: 'Tata 1mg — Monthly Sales Register',
+  firstcry_sales: 'FirstCry — Monthly Sales Data',
+  walmart_us_items: 'Walmart USA — Item Performance Export',
 }
 const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   blinkit_payout_archive: 'blinkit',
@@ -142,6 +157,11 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   nykaa_marketing_invoice: 'nykaa',
   nykaa_discount_debit_note: 'nykaa',
   amazon_in_settlement: 'amazon_in_seller',
+  snapdeal_orders: 'snapdeal',
+  pharmeasy_sales: 'pharmeasy',
+  tata_1mg_sales: 'tata_1mg',
+  firstcry_sales: 'firstcry',
+  walmart_us_items: 'walmart_us',
   meesho_order_summary: 'meesho',
   meesho_order_payments: 'meesho',
   meesho_settlement_json: 'meesho',
@@ -344,6 +364,27 @@ export function UploadReportsPage() {
         ...base, totalRows: r.totalRows, validRecords: [], adsRecords: r.adsRecords,
         invalidCount: r.invalidRows.length, warnings: r.warnings, adsReplaces: r.replaces,
       })
+    }
+    if (kind === 'snapdeal_orders') {
+      const r = normalizeSnapdealOrdersReport(parsed.rows, skuMaster, mappings, comboComponents, importId)
+      return buildPreview({ ...base, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
+    }
+    if (kind === 'pharmeasy_sales') {
+      const r = normalizePharmeasySalesReport(parsed.rows, skuMaster, mappings, comboComponents, importId)
+      return buildPreview({ ...base, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
+    }
+    if (kind === 'tata_1mg_sales') {
+      const r = normalizeTata1mgSalesReport(parsed.rows, skuMaster, mappings, comboComponents, importId)
+      return buildPreview({ ...base, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
+    }
+    if (kind === 'firstcry_sales') {
+      const r = normalizeFirstcrySalesReport(parsed.rows, skuMaster, mappings, comboComponents, importId)
+      return buildPreview({ ...base, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
+    }
+    // The month is the uploader's: this export carries no date of its own.
+    if (kind === 'walmart_us_items') {
+      const r = normalizeWalmartUsItemReport(parsed.rows, skuMaster, mappings, comboComponents, month, importId)
+      return buildPreview({ ...base, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
     }
     if (kind === 'meesho_order_summary') {
       const r = normalizeMeeshoOrderSummary(parsed.rows, skuMaster, importId)
@@ -720,6 +761,13 @@ export function UploadReportsPage() {
       else if (detectBlinkitAdsReport(parsed.headers)) kind = 'blinkit_ads'
       else if (detectMyntraAdsReport(parsed.headers)) kind = 'myntra_ads'
       else if (detectFlipkartGoogleAdsReport(parsed.headers)) kind = 'flipkart_google_ads'
+      // The five channels that opened in August. Each sends one flat sales
+      // file a month; none of them sends a settlement.
+      else if (detectSnapdealOrdersReport(parsed.headers)) kind = 'snapdeal_orders'
+      else if (detectPharmeasySalesReport(parsed.headers)) kind = 'pharmeasy_sales'
+      else if (detectTata1mgSalesReport(parsed.headers)) kind = 'tata_1mg_sales'
+      else if (detectFirstcrySalesReport(parsed.headers)) kind = 'firstcry_sales'
+      else if (detectWalmartUsItemReport(parsed.headers)) kind = 'walmart_us_items'
 
       if (!kind) {
         // "Not recognised" on its own starts a conversation that takes a day.
@@ -740,6 +788,11 @@ export function UploadReportsPage() {
         )
       }
 
+      if (kind === 'walmart_us_items') {
+        // One row per item for the whole period, and not a date in the file:
+        // the month has to be said before it can be filed under one.
+        return { id, fileName: file.name, status: 'needs-month', parsed, kind, month: filterMonth }
+      }
       if (kind === 'flipkart_sku_pnl') {
         // This report is a monthly total per SKU with no date column of its
         // own, so it cannot be normalized until someone says which month it is.
@@ -1286,8 +1339,10 @@ function QueueRow({
     ? 'SKU Map & Cost workbook'
     : p
       ? describeReport(p)
-      : item.status === 'needs-month'
-        ? 'Flipkart SKU-level P&L'
+      // Three reports now carry no date of their own, so the label is the
+      // one the detector settled on rather than the only one there used to be.
+      : item.status === 'needs-month' && item.kind
+        ? REPORT_LABELS[item.kind]
         : null
   const months = [
     ...(p?.amazonUsaFacts ? [p.amazonUsaFacts.month] : []),

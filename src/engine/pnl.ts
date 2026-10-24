@@ -154,8 +154,11 @@ export function buildChannelPnl(
   const lines: PnlLineValues = {
     grossSales: facts.grossSales,
     discounts: facts.discounts,
-    returns: facts.returnsValue,
-    otherRevenueAdj: 0,
+    // Output GST inside the gross is not a return. It falls into the derived
+    // returns figure because net sales is already without it, so it is moved
+    // onto the revenue-adjustment line where every native statement shows it.
+    returns: facts.returnsValue - facts.taxInGross,
+    otherRevenueAdj: facts.taxInGross,
     cogs,
     marketplaceCommission: facts.marketplaceFee,
     fulfilment: 0,
@@ -163,7 +166,10 @@ export function buildChannelPnl(
     collectionFees: 0,
     rtoCharges: 0,
     returnCharges: 0,
-    otherMarketplaceCharges: facts.tax,
+    // Only tax charged on top of the price. The GST inside it came out of
+    // revenue above; charging it here as well is how a channel's EBITDA ends
+    // up short by exactly its own GST.
+    otherMarketplaceCharges: facts.tax - facts.taxInGross,
     ads: channelMarketing.ads ?? 0,
     performanceMarketing: channelMarketing.performanceMarketing ?? 0,
     otherMarketing: channelMarketing.otherMarketing ?? 0,

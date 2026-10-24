@@ -134,6 +134,17 @@ const STATEMENT_READERS: Record<BusinessChannelId, (scope: StatementScope) => Pn
     const f = forMonth(facts.swiggyInstamartFacts, month)
     return f ? swiggyInstamartToCanonicalBuckets(f) : null
   },
+  // The five channels that arrived in August send a sales report and nothing
+  // else: no settlement, no payout, no fee file. Their months are measured
+  // from their own order rows, which is what the null says, and they start
+  // carrying their share of the company's fixed expenses the moment those
+  // rows exist. A payout statement from any of them turns this into a reader
+  // like the ones above and nothing else has to change.
+  snapdeal: () => null,
+  pharmeasy: () => null,
+  tata_1mg: () => null,
+  firstcry: () => null,
+  walmart_us: () => null,
   amazon_us: ({ facts, month, fxRate }) => {
     const f = forMonth(facts.amazonUsaFacts, month)
     return f ? amazonUsaToCanonicalBuckets(f, fxRate.USD) : null

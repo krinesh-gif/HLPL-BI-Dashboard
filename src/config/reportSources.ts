@@ -169,6 +169,36 @@ export const REPORT_SOURCES: ReportSource[] = [
     note: 'A sales report, not a settlement: it states nothing Swiggy charged. The trade margin comes from the agreed terms instead.',
   },
   {
+    key: 'snapdeal',
+    label: 'Snapdeal',
+    files: ['The order report, as it downloads from the seller panel (one row per sub-order)'],
+    note: 'An order report, not a settlement: it states nothing Snapdeal charged. Only Delivered rows earn revenue.',
+  },
+  {
+    key: 'pharmeasy',
+    label: 'PharmEasy',
+    files: ['The monthly sales report (one row per order line, with unit_selling_price)'],
+    note: "The trade margin comes off each row's own unit_selling_price. Cancelled rows keep their gross and earn no net.",
+  },
+  {
+    key: 'tata_1mg',
+    label: 'Tata 1mg',
+    files: ['The monthly sales register (one row per bill line, with SALE RATE)'],
+    note: 'An invoice register: every row is a SalesOrder, so it carries no returns and nothing 1mg charged.',
+  },
+  {
+    key: 'firstcry',
+    label: 'FirstCry',
+    files: ['The monthly Sales Data workbook (POID, Quantity, MRP Sales, Net Sales)'],
+    note: '"Net Sales" is the shopper price after discount, not a payout — the file states no commission.',
+  },
+  {
+    key: 'walmart_us',
+    label: 'Walmart USA',
+    files: ['The item performance export from Seller Center (one row per item for the period)'],
+    note: 'In dollars, and it carries no date: set the month on upload. Commission is the gap between GMV and "GMV - commission".',
+  },
+  {
     key: 'catalogue',
     label: 'Catalogue (any month)',
     files: [

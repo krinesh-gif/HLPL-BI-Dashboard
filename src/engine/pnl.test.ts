@@ -114,3 +114,49 @@ describe('buildMasterPnl', () => {
     expect(channelPnls.reduce((sum, p) => sum + (p.lines.fixedExpensesTotal ?? 0), 0)).toBeCloseTo(552739, 6)
   })
 })
+
+describe('output GST inside the price', () => {
+  // A channel whose gross is an MRP: ₹399 including 18% GST, no discount.
+  // Net sales is ₹338.14, and the ₹60.86 of GST is already out of it.
+  const mrpRow = record({
+    channel: 'snapdeal', marketplace: 'snapdeal', sellerType: 'marketplace', quantity: 1,
+    grossSales: 399, discount: 0, netSales: 338.14, tax: 60.86, taxInGross: true,
+    marketplaceFee: 0, shippingCost: 0,
+  })
+
+  it('is shown as a revenue adjustment, not as a return', () => {
+    const pnl = buildChannelPnl([mrpRow], skuMaster, [], 'snapdeal', '2026-06', {})
+    expect(pnl.lines.otherRevenueAdj).toBeCloseTo(60.86, 2)
+    expect(pnl.lines.returns ?? 0).toBeCloseTo(0, 2)
+    expect(pnl.lines.netSales).toBeCloseTo(338.14, 2)
+  })
+
+  it('is not charged a second time below the line', () => {
+    // Taking it out twice is how a channel's EBITDA comes out short by
+    // exactly its own GST.
+    const pnl = buildChannelPnl([mrpRow], skuMaster, [], 'snapdeal', '2026-06', {})
+    expect(pnl.lines.otherMarketplaceCharges ?? 0).toBe(0)
+    expect(pnl.lines.grossProfit).toBeCloseTo(338.14 - 100, 2)
+  })
+
+  it('leaves a tax charged on top of the price where it was', () => {
+    // Amazon's order report states the item tax beside a price that excludes
+    // it, and that one is a charge.
+    const pnl = buildChannelPnl([record({})], skuMaster, [], 'amazon_in', '2026-06', {})
+    expect(pnl.lines.otherMarketplaceCharges).toBe(40)
+    expect(pnl.lines.otherRevenueAdj).toBe(0)
+  })
+
+  it('keeps real returns separate from the GST', () => {
+    // A row that came back: gross billed, nothing earned.
+    const returned = record({
+      channel: 'snapdeal', marketplace: 'snapdeal', sellerType: 'marketplace', orderId: 'o2',
+      quantity: 0, grossSales: 399, discount: 0, netSales: 0, tax: 0, taxInGross: true,
+      returnUnits: 1, status: 'returned', marketplaceFee: 0, shippingCost: 0,
+    })
+    const pnl = buildChannelPnl([mrpRow, returned], skuMaster, [], 'snapdeal', '2026-06', {})
+    expect(pnl.lines.returns).toBeCloseTo(399, 2)
+    expect(pnl.lines.otherRevenueAdj).toBeCloseTo(60.86, 2)
+    expect(pnl.lines.netSales).toBeCloseTo(338.14, 2)
+  })
+})

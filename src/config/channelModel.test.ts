@@ -37,7 +37,7 @@ describe('the management channel list', () => {
     const labels = BUSINESS_CHANNELS.map((c) => c.label)
     expect(labels).toEqual([
       'Amazon India', 'Amazon USA', 'Amazon UAE', 'Flipkart', 'Meesho', 'Myntra', 'Nykaa', 'Purplle', 'Blinkit',
-      'Swiggy Instamart',
+      'Swiggy Instamart', 'Snapdeal', 'PharmEasy', 'Tata 1mg', 'FirstCry', 'Walmart USA',
     ])
     expect(labels.some((l) => /seller|vendor/i.test(l))).toBe(false)
   })
@@ -137,7 +137,9 @@ describe('a channel that is not paid in rupees', () => {
     expect(by('amazon_us')?.currency).toBe('USD')
     expect(by('amazon_ae')?.currency).toBe('AED')
     // Everything else. A new rupee channel needs no FX plumbing at all.
-    expect(BUSINESS_CHANNELS.filter((c) => c.currency !== 'INR').map((c) => c.id)).toEqual(['amazon_us', 'amazon_ae'])
+    expect(by('walmart_us')?.currency).toBe('USD')
+    expect(BUSINESS_CHANNELS.filter((c) => c.currency !== 'INR').map((c) => c.id))
+      .toEqual(['amazon_us', 'amazon_ae', 'walmart_us'])
   })
 
   it('keeps the two Amazon export channels apart', () => {
@@ -154,9 +156,14 @@ describe('reading a channel in its own currency', () => {
   it('offers the toggle to exactly the channels it means something for', () => {
     // A rupee channel has nothing to convert, so showing it a currency switch
     // would be a control that does nothing.
-    expect(BUSINESS_CHANNELS.filter((c) => isForeignChannel(c.id)).map((c) => c.id)).toEqual(['amazon_us', 'amazon_ae'])
+    expect(BUSINESS_CHANNELS.filter((c) => isForeignChannel(c.id)).map((c) => c.id))
+      .toEqual(['amazon_us', 'amazon_ae', 'walmart_us'])
     expect(isForeignChannel('flipkart')).toBe(false)
     expect(isForeignChannel('blinkit')).toBe(false)
+    // Walmart's export is in dollars; the four Indian channels that arrived
+    // with it are not, and need no FX plumbing at all.
+    expect(isForeignChannel('snapdeal')).toBe(false)
+    expect(isForeignChannel('tata_1mg')).toBe(false)
   })
 
   it('names each channel’s own currency, rather than assuming dollars', () => {
