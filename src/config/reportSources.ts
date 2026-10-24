@@ -199,6 +199,12 @@ export const REPORT_SOURCES: ReportSource[] = [
     note: 'In dollars, and it carries no date: set the month on upload. Commission is the gap between GMV and "GMV - commission".',
   },
   {
+    key: 'd2c_website',
+    label: 'D2C Website (Shopify)',
+    files: ['Unicommerce ▸ Sale Orders export, filtered to the Shopify channel'],
+    note: 'Read from Unicommerce, not Shopify: only it knows which orders were delivered and which came back as RTO.',
+  },
+  {
     key: 'catalogue',
     label: 'Catalogue (any month)',
     files: [

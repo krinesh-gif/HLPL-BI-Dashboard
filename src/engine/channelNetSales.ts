@@ -145,6 +145,9 @@ const STATEMENT_READERS: Record<BusinessChannelId, (scope: StatementScope) => Pn
   tata_1mg: () => null,
   firstcry: () => null,
   walmart_us: () => null,
+  // The website's month is its Unicommerce order rows: money and delivery
+  // outcome in one file, which is more than a settlement would give it.
+  d2c_website: () => null,
   amazon_us: ({ facts, month, fxRate }) => {
     const f = forMonth(facts.amazonUsaFacts, month)
     return f ? amazonUsaToCanonicalBuckets(f, fxRate.USD) : null

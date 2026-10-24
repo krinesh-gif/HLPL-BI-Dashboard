@@ -1517,6 +1517,7 @@ const SALES_REPORT_ONLY: Partial<Record<BusinessChannelId, string>> = {
   tata_1mg: 'monthly sales register',
   firstcry: 'monthly Sales Data file',
   walmart_us: 'item performance export',
+  d2c_website: 'Unicommerce Sale Orders export',
 }
 
 export function buildAllChannelPnlViews(channels: BusinessChannelId[], month: string, inputs: ChannelPnlViewInputs): ChannelPnlView[] {

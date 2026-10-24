@@ -38,6 +38,7 @@ export type SalesSourceId =
   | 'tata_1mg'
   | 'firstcry'
   | 'walmart_us'
+  | 'd2c_website'
 
 /** What management sees. */
 export type BusinessChannelId =
@@ -56,6 +57,7 @@ export type BusinessChannelId =
   | 'tata_1mg'
   | 'firstcry'
   | 'walmart_us'
+  | 'd2c_website'
 
 /**
  * Retained as the name for a stored row's key, because that is what every
@@ -100,6 +102,7 @@ export const BUSINESS_CHANNELS: BusinessChannelDef[] = [
   { id: 'tata_1mg', label: 'Tata 1mg', currency: 'INR' },
   { id: 'firstcry', label: 'FirstCry', currency: 'INR' },
   { id: 'walmart_us', label: 'Walmart USA', currency: 'USD' },
+  { id: 'd2c_website', label: 'D2C Website', currency: 'INR' },
 ]
 
 /** Every report the system accepts, and which channel it belongs to. */
@@ -120,6 +123,10 @@ export const SALES_SOURCES: SalesSourceDef[] = [
   { id: 'tata_1mg', channel: 'tata_1mg', label: 'Tata 1mg', currency: 'INR', sellerType: 'marketplace' },
   { id: 'firstcry', channel: 'firstcry', label: 'FirstCry', currency: 'INR', sellerType: 'marketplace' },
   { id: 'walmart_us', channel: 'walmart_us', label: 'Walmart USA', currency: 'USD', sellerType: 'marketplace' },
+  // Sold on our own Shopify store and read from Unicommerce, which is the
+  // only system that knows both what the customer paid and what happened to
+  // the parcel.
+  { id: 'd2c_website', channel: 'd2c_website', label: 'D2C Website', currency: 'INR', sellerType: 'marketplace' },
 ]
 
 export const BUSINESS_CHANNEL_MAP: Record<BusinessChannelId, BusinessChannelDef> = Object.fromEntries(
@@ -197,6 +204,7 @@ export const DEFAULT_ALLOCATION_WEIGHTS: Record<BusinessChannelId, number> = {
   tata_1mg: 0,
   firstcry: 0,
   walmart_us: 0,
+  d2c_website: 0,
 }
 
 // ---------------------------------------------------------------------------

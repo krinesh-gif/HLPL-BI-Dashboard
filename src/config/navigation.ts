@@ -49,6 +49,7 @@ export const NAVIGATION: NavSection[] = [
       { label: 'Tata 1mg', path: '/channels/tata_1mg' },
       { label: 'FirstCry', path: '/channels/firstcry' },
       { label: 'Walmart USA', path: '/channels/walmart_us' },
+      { label: 'D2C Website', path: '/channels/d2c_website' },
     ],
   },
   {

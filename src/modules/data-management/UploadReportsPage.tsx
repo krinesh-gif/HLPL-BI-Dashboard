@@ -40,6 +40,7 @@ import { detectPharmeasySalesReport, normalizePharmeasySalesReport } from '@/dat
 import { detectTata1mgSalesReport, normalizeTata1mgSalesReport } from '@/data/normalize/tata1mgSalesReport'
 import { detectFirstcrySalesReport, normalizeFirstcrySalesReport } from '@/data/normalize/firstcrySalesReport'
 import { detectWalmartUsItemReport, normalizeWalmartUsItemReport } from '@/data/normalize/walmartUsItemReport'
+import { detectUnicommerceSaleOrders, normalizeUnicommerceSaleOrders } from '@/data/normalize/unicommerceSaleOrders'
 import {
   detectNykaaCartRuleSheet, detectNykaaComboSheet, detectNykaaSalesSheet, normalizeNykaaWorkbook,
 } from '@/data/normalize/nykaaSalesWorkbook'
@@ -97,6 +98,7 @@ type ReportKind =
   | 'tata_1mg_sales'
   | 'firstcry_sales'
   | 'walmart_us_items'
+  | 'unicommerce_sale_orders'
 
 const REPORT_LABELS: Record<ReportKind, string> = {
   blinkit_payout_archive: 'Blinkit — Monthly Payout Sheet (zip)',
@@ -132,6 +134,7 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   tata_1mg_sales: 'Tata 1mg — Monthly Sales Register',
   firstcry_sales: 'FirstCry — Monthly Sales Data',
   walmart_us_items: 'Walmart USA — Item Performance Export',
+  unicommerce_sale_orders: 'D2C Website — Unicommerce Sale Orders',
 }
 const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   blinkit_payout_archive: 'blinkit',
@@ -162,6 +165,7 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   tata_1mg_sales: 'tata_1mg',
   firstcry_sales: 'firstcry',
   walmart_us_items: 'walmart_us',
+  unicommerce_sale_orders: 'd2c_website',
   meesho_order_summary: 'meesho',
   meesho_order_payments: 'meesho',
   meesho_settlement_json: 'meesho',
@@ -384,6 +388,10 @@ export function UploadReportsPage() {
     // The month is the uploader's: this export carries no date of its own.
     if (kind === 'walmart_us_items') {
       const r = normalizeWalmartUsItemReport(parsed.rows, skuMaster, mappings, comboComponents, month, importId)
+      return buildPreview({ ...base, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
+    }
+    if (kind === 'unicommerce_sale_orders') {
+      const r = normalizeUnicommerceSaleOrders(parsed.rows, skuMaster, mappings, comboComponents, importId)
       return buildPreview({ ...base, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
     }
     if (kind === 'meesho_order_summary') {
@@ -768,6 +776,8 @@ export function UploadReportsPage() {
       else if (detectTata1mgSalesReport(parsed.headers)) kind = 'tata_1mg_sales'
       else if (detectFirstcrySalesReport(parsed.headers)) kind = 'firstcry_sales'
       else if (detectWalmartUsItemReport(parsed.headers)) kind = 'walmart_us_items'
+      // The website, read from Unicommerce rather than from Shopify.
+      else if (detectUnicommerceSaleOrders(parsed.headers)) kind = 'unicommerce_sale_orders'
 
       if (!kind) {
         // "Not recognised" on its own starts a conversation that takes a day.
