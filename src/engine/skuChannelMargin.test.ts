@@ -305,3 +305,77 @@ describe('a fee charged where nothing shipped', () => {
     expect(lossCause(result.rows[0])).toBe('charge-only')
   })
 })
+
+describe('a wholesale channel, whose order rows are not revenue', () => {
+  // Nykaa buys the goods and sells them on, so its sales file is written at
+  // MRP. September's rows add to ₹28.3 lakh; the statement says ₹8.6 lakh.
+  const salesRecords = [
+    row({ sku: 'AO/LBalm/NonTinted', quantity: 100, netSales: 20000, channel: 'nykaa', marketplace: 'nykaa' }),
+    row({ sku: 'NX/LBalm/BarrierRpr', quantity: 100, netSales: 60000, channel: 'nykaa', marketplace: 'nykaa' }),
+  ]
+  const result = build({ salesRecords, channelNetSales: { nykaa: 24000 } })
+
+  it('states each product on what the statement earned, in proportion to what it sold', () => {
+    const small = result.rows.find((r) => r.sku === 'AO/LBalm/NonTinted')!
+    const large = result.rows.find((r) => r.sku === 'NX/LBalm/BarrierRpr')!
+    expect(small.netSales).toBeCloseTo(6000, 6)
+    expect(large.netSales).toBeCloseTo(18000, 6)
+    expect(small.netSales + large.netSales).toBeCloseTo(24000, 6)
+  })
+
+  it('leaves gross at MRP, which is what it is', () => {
+    expect(result.rows.reduce((t, r) => t + r.grossSales, 0)).toBe(80000)
+  })
+
+  it('says it did so, and what the rows had said', () => {
+    expect(result.rows.every((r) => r.revenueBasis === 'statement')).toBe(true)
+    const nykaa = result.channels.find((c) => c.channel === 'nykaa')!
+    expect(nykaa.revenueScale).toBeCloseTo(0.3, 6)
+    expect(nykaa.rowNetSales).toBe(80000)
+  })
+
+  it('strikes the margin on the real revenue, not on MRP', () => {
+    const large = result.rows.find((r) => r.sku === 'NX/LBalm/BarrierRpr')!
+    // 18,000 earned against 100 units at ₹24.90, not 60,000 against them.
+    expect(large.cm1).toBeCloseTo(18000 - 24.90 * 100, 6)
+  })
+})
+
+describe('a channel whose rows and statement broadly agree', () => {
+  const salesRecords = [
+    row({ sku: 'AO/LBalm/NonTinted', quantity: 100, netSales: 10000, channel: 'flipkart', marketplace: 'flipkart' }),
+  ]
+
+  it('is left on its rows: a half-percent timing gap is not a restatement', () => {
+    const result = build({ salesRecords, channelNetSales: { flipkart: 10050 } })
+    expect(result.rows[0].netSales).toBe(10000)
+    expect(result.rows[0].revenueBasis).toBe('rows')
+    expect(result.channels[0].revenueScale).toBeNull()
+  })
+
+  it('is left on its rows when no statement exists at all', () => {
+    const result = build({ salesRecords })
+    expect(result.rows[0].netSales).toBe(10000)
+    expect(result.rows[0].revenueBasis).toBe('rows')
+  })
+})
+
+describe('fees and ads on a rescaled channel', () => {
+  it('are shared out on the real revenue, not on MRP', () => {
+    const result = build({
+      salesRecords: [
+        row({ sku: 'AO/LBalm/NonTinted', quantity: 100, netSales: 20000, channel: 'nykaa', marketplace: 'nykaa' }),
+        row({ sku: 'NX/LBalm/BarrierRpr', quantity: 100, netSales: 60000, channel: 'nykaa', marketplace: 'nykaa' }),
+      ],
+      channelNetSales: { nykaa: 24000 },
+      channelAds: { nykaa: 4000 },
+    })
+    const small = result.rows.find((r) => r.sku === 'AO/LBalm/NonTinted')!
+    const large = result.rows.find((r) => r.sku === 'NX/LBalm/BarrierRpr')!
+    // A quarter of the revenue carries a quarter of the advertising, which is
+    // the same share either way — but it must be struck after the scaling, or
+    // a later change to the base would silently move it.
+    expect(small.ads).toBeCloseTo(1000, 6)
+    expect(large.ads).toBeCloseTo(3000, 6)
+  })
+})

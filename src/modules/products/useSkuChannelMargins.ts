@@ -33,8 +33,13 @@ export function useSkuChannelMargins(): SkuChannelMarginResult & { month: string
 
     const channelFees: Partial<Record<BusinessChannelId, number>> = {}
     const channelAds: Partial<Record<BusinessChannelId, number>> = {}
+    // The revenue each channel's own statement claims. On a wholesale channel
+    // — Nykaa, Amazon Vendor — this is the figure that matters: the order
+    // rows there are written at MRP and are not revenue at all.
+    const channelNetSales: Partial<Record<BusinessChannelId, number>> = {}
     for (const v of views) {
       const l = v.canonical.lines
+      if (l.netSales !== undefined) channelNetSales[v.channel] = l.netSales
       channelFees[v.channel] =
         (l.marketplaceCommission ?? 0) + (l.fulfilment ?? 0) + (l.shipping ?? 0) +
         (l.collectionFees ?? 0) + (l.rtoCharges ?? 0) + (l.returnCharges ?? 0) +
@@ -55,6 +60,7 @@ export function useSkuChannelMargins(): SkuChannelMarginResult & { month: string
         fx: fxRatesForMonth(month, store.fxRates),
         channelFees,
         channelAds,
+        channelNetSales,
       }),
       month,
       monthsWithData,

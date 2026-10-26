@@ -72,6 +72,12 @@ export interface SkuChannelMargin {
   feeBasis: MarginBasis
   ads: number
   adsBasis: MarginBasis
+  /**
+   * Where this row's net sales came from. `'statement'` means the channel's
+   * own statement disagreed with its order rows and this row was scaled onto
+   * it — true of every wholesale channel, whose rows are written at MRP.
+   */
+  revenueBasis: 'rows' | 'statement'
   /** Null wherever `cogs` is null — an unknown cost poisons every rung below
    * it, and a ladder that quietly drops the unknown reads as a profit. */
   cm1: number | null
@@ -90,6 +96,12 @@ export interface ChannelCoverage {
   cm3: number
   feeBasis: MarginBasis
   adsBasis: MarginBasis
+  /** Set where the rows were scaled onto the statement, and by how much.
+   * Null where the rows were taken as they stand. */
+  revenueScale: number | null
+  /** What the order rows said before scaling, so the size of the difference
+   * is on the screen rather than only its result. */
+  rowNetSales: number
   /** What the statement billed that no row could be matched to, and was
    * therefore shared out by net sales. */
   feeAllocated: number
@@ -130,6 +142,22 @@ export interface SkuChannelInputs {
   channelFees: Partial<Record<BusinessChannelId, number>>
   /** The month's advertising per channel, in rupees, on the same terms. */
   channelAds: Partial<Record<BusinessChannelId, number>>
+  /**
+   * What each channel's own statement says it earned in the month, in rupees.
+   *
+   * Needed because on a wholesale channel the order rows are not revenue.
+   * Nykaa buys the goods and sells them on, so its sales file is written at
+   * MRP: September's rows add to ₹28.3 lakh where the statement — MRP less
+   * Nykaa's 38% margin, less output GST, less the debit note — says ₹8.6
+   * lakh. Ranking products by the first figure reads a wholesale channel at
+   * its retail price and puts every Nykaa SKU near the top of the list at
+   * three times its real worth.
+   *
+   * Where a statement exists and disagrees with the rows, each row's net
+   * sales is scaled onto it, so this screen and the Channel P&L state one
+   * revenue for the month. A channel with no statement is left on its rows.
+   */
+  channelNetSales?: Partial<Record<BusinessChannelId, number>>
 }
 
 interface Bucket {
@@ -274,6 +302,24 @@ export function buildSkuChannelMargins(month: string, inputs: SkuChannelInputs):
   }
 
   for (const [channel, list] of byChannel) {
+    // Put the rows on the statement's revenue before anything is subtracted
+    // from them. Doing it here rather than at the end means the fee and ad
+    // shares below are apportioned on real revenue too, and every rung of
+    // the ladder is struck against the same figure the Channel P&L uses.
+    //
+    // Only a material gap is corrected. Rows and statements always differ a
+    // little — an order placed on the 30th settles next month — and scaling
+    // every channel by a fraction of a percent would make a true figure look
+    // derived for no gain.
+    const rowNetTotal = list.reduce((sum, b) => sum + b.netSales, 0)
+    const statementNet = inputs.channelNetSales?.[channel]
+    const scale =
+      statementNet !== undefined && statementNet > 0 && rowNetTotal > 0 &&
+      Math.abs(rowNetTotal - statementNet) > statementNet * 0.01
+        ? statementNet / rowNetTotal
+        : null
+    if (scale !== null) for (const b of list) b.netSales *= scale
+
     const rowFeeTotal = list.reduce((sum, b) => sum + b.rowFees, 0)
     const statementFee = inputs.channelFees[channel] ?? 0
     // Only the part of the statement the rows do not already account for.
@@ -337,6 +383,7 @@ export function buildSkuChannelMargins(month: string, inputs: SkuChannelInputs):
         returnedUnits: b.returnedUnits,
         grossSales: b.grossSales,
         netSales: b.netSales,
+        revenueBasis: scale === null ? 'rows' : 'statement',
         unitCost,
         cogs,
         fee,
@@ -356,6 +403,8 @@ export function buildSkuChannelMargins(month: string, inputs: SkuChannelInputs):
       cm3: channelCm3,
       feeBasis,
       adsBasis,
+      revenueScale: scale,
+      rowNetSales: rowNetTotal,
       feeAllocated: feeResidual,
       adsAllocated: adsResidual,
       adsUnattributed: adsUnmatched.spend,

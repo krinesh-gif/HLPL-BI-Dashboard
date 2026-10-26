@@ -76,6 +76,7 @@ export function SkuProfitabilityPage() {
     )
   }, [scoped, view, floor, search])
 
+  const scaled = useMemo(() => channels.filter((c) => c.revenueScale !== null), [channels])
   const channelsWithRows = useMemo(
     () => channels.filter((c) => rows.some((r) => r.channel === c.channel)),
     [channels, rows],
@@ -93,6 +94,7 @@ export function SkuProfitabilityPage() {
         'Units that earned': r.earningUnits,
         'Returned / RTO units': r.returnedUnits,
         'Net sales': Math.round(r.netSales),
+        'Revenue basis': r.revenueBasis === 'statement' ? 'channel statement' : 'order rows',
         'Unit cost': r.unitCost ?? '',
         COGS: r.cogs === null ? '' : Math.round(r.cogs),
         CM1: r.cm1 === null ? '' : Math.round(r.cm1),
@@ -172,6 +174,7 @@ export function SkuProfitabilityPage() {
                   <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Channel CM3</th>
                   <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Losing products</th>
                   <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ink-3)]">Lost inside it</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Revenue</th>
                   <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Fees</th>
                   <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ink-3)]">Ads</th>
                 </tr>
@@ -197,6 +200,15 @@ export function SkuProfitabilityPage() {
                       <td className="px-3 py-1.5 text-right tabular-nums">{formatNumber(own.losers)}</td>
                       <td className="px-3 py-1.5 text-right tabular-nums">
                         <Money value={own.losers === 0 ? 0 : own.lostAmount} />
+                      </td>
+                      <td className="px-3 py-1.5 text-xs text-[var(--ink-3)]">
+                        {c.revenueScale === null
+                          ? 'from order rows'
+                          : (
+                            <span className="text-[var(--warning)]">
+                              on statement · rows said {formatCurrencyFull(c.rowNetSales)}
+                            </span>
+                          )}
                       </td>
                       <td className="px-3 py-1.5 text-xs text-[var(--ink-3)]">
                         {c.feeBasis === 'none' ? 'none billed' : c.feeBasis === 'measured' ? 'per line' : c.feeBasis === 'allocated' ? 'shared from statement' : 'part shared'}
@@ -300,6 +312,16 @@ export function SkuProfitabilityPage() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {scaled.length > 0 && (
+          <p className="mt-3 rounded-md border border-[color-mix(in_oklab,var(--warning)_40%,transparent)] bg-[color-mix(in_oklab,var(--warning)_10%,transparent)] px-3 py-2 text-xs text-[var(--ink)]">
+            {scaled.map((c) => channelLabel(c.channel)).join(', ')}{' '}
+            {scaled.length === 1 ? 'sells' : 'sell'} wholesale, so{' '}
+            {scaled.length === 1 ? 'its' : 'their'} sales file is written at MRP and is not revenue. Each product below is
+            stated on what the channel&apos;s own statement earned instead, in proportion to what it sold — so this screen and the
+            Channel P&amp;L state one revenue for the month. The gross column stays at MRP, which is what it is.
+          </p>
         )}
 
         <p className="mt-3 text-xs text-[var(--ink-3)]">
