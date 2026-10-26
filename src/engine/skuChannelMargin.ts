@@ -2,7 +2,7 @@ import type { BusinessChannelId } from '@/config/channels'
 import { channelOfSource } from '@/config/channels'
 import type { AdsRecord, CanonicalSalesRecord, SkuMaster } from '@/data/models'
 import { inrPerUnit, type FxRatesInr, DEFAULT_FX_INR } from '@/data/fxRates'
-import { mappedCodeFor, type ComboComponent, type SkuMapping } from '@/data/skuMapping'
+import { mappedCodeFor, resolveGstPct, type ComboComponent, type SkuMapping } from '@/data/skuMapping'
 import { toMonthKey } from '@/lib/format'
 import { filterByMonth } from './sales'
 import { unitCostResolver, type CogsInputs } from './pnl'
@@ -172,6 +172,9 @@ interface Bucket {
   grossSales: number
   netSales: number
   rowFees: number
+  /** Output GST, as a fraction, from the Product Master. Only used to
+   * restate a wholesale channel's rows; null where the Master has no rate. */
+  gstPct: number | null
 }
 
 /**
@@ -215,6 +218,49 @@ function allocate(total: number, buckets: Bucket[], key: (b: Bucket) => number):
   return share
 }
 
+/**
+ * Share a wholesale channel's real revenue back over its products.
+ *
+ * The rows on a channel like Nykaa are written at MRP, and the statement
+ * says what the month was actually worth. Splitting that statement in
+ * proportion to MRP looks obvious and quietly taxes every product at the
+ * same rate — which this catalogue is not on. Hair oil and shampoo are at
+ * 5% and the rest at 18%, so a shampoo keeps more of its MRP than a
+ * sunscreen does, and an MRP-proportional split hands that difference to
+ * the sunscreen. On Nykaa's September it understated the five 5% lines by
+ * about ₹5,700, roughly a ninth of their revenue, on the one screen whose
+ * job is deciding what to stop selling.
+ *
+ * So the weights are tax-exclusive: each product's MRP net of its own GST.
+ * A product the Product Master has no rate for is weighted at the blend of
+ * the ones it does, so a missing rate neither flatters nor penalises it.
+ * Where every product is on one rate — or none has a rate at all — this is
+ * arithmetically the same as the proportional split it replaces.
+ *
+ * False when there is nothing to split the statement over, in which case
+ * nothing is touched and the channel stays on its rows, labelled as such.
+ */
+function restateOntoStatement(list: Bucket[], statementNet: number): boolean {
+  const rated = list.filter((b) => b.gstPct !== null && b.netSales > 0)
+  const ratedNet = rated.reduce((sum, b) => sum + b.netSales, 0)
+  const blended = ratedNet > 0
+    ? rated.reduce((sum, b) => sum + b.netSales / (1 + b.gstPct!), 0) / ratedNet
+    : 1
+
+  // Signed, so a credit note against an earlier month stays a credit note
+  // rather than being zeroed out of the channel.
+  const weight = (b: Bucket): number =>
+    b.netSales * (b.gstPct === null ? blended : 1 / (1 + b.gstPct))
+  const base = list.reduce((sum, b) => sum + weight(b), 0)
+  // Nothing left to weigh: a month whose credit notes outweigh its sales,
+  // against a statement that says the channel earned. Any split of that is a
+  // fiction, and the flat one turns a credit note into revenue by dividing
+  // by a negative. The rows stay as they are and say so.
+  if (base <= 0) return false
+  for (const b of list) b.netSales = statementNet * (weight(b) / base)
+  return true
+}
+
 export function buildSkuChannelMargins(month: string, inputs: SkuChannelInputs): SkuChannelMarginResult {
   const fx = inputs.fx ?? DEFAULT_FX_INR
   const tables = {
@@ -248,6 +294,7 @@ export function buildSkuChannelMargins(month: string, inputs: SkuChannelInputs):
         productName: m?.productName ?? r.productName ?? sku,
         category: m?.category ?? r.category ?? '',
         units: 0, earningUnits: 0, returnedUnits: 0, grossSales: 0, netSales: 0, rowFees: 0,
+        gstPct: resolveGstPct(r.sku, tables) ?? resolveGstPct(sku, tables),
       }
       buckets.set(key, b)
     }
@@ -313,12 +360,12 @@ export function buildSkuChannelMargins(month: string, inputs: SkuChannelInputs):
     // derived for no gain.
     const rowNetTotal = list.reduce((sum, b) => sum + b.netSales, 0)
     const statementNet = inputs.channelNetSales?.[channel]
-    const scale =
+    const restate =
       statementNet !== undefined && statementNet > 0 && rowNetTotal > 0 &&
       Math.abs(rowNetTotal - statementNet) > statementNet * 0.01
-        ? statementNet / rowNetTotal
-        : null
-    if (scale !== null) for (const b of list) b.netSales *= scale
+    const scale = restate && restateOntoStatement(list, statementNet!)
+      ? statementNet! / rowNetTotal
+      : null
 
     const rowFeeTotal = list.reduce((sum, b) => sum + b.rowFees, 0)
     const statementFee = inputs.channelFees[channel] ?? 0

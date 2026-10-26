@@ -319,8 +319,9 @@ export function SkuProfitabilityPage() {
             {scaled.map((c) => channelLabel(c.channel)).join(', ')}{' '}
             {scaled.length === 1 ? 'sells' : 'sell'} wholesale, so{' '}
             {scaled.length === 1 ? 'its' : 'their'} sales file is written at MRP and is not revenue. Each product below is
-            stated on what the channel&apos;s own statement earned instead, in proportion to what it sold — so this screen and the
-            Channel P&amp;L state one revenue for the month. The gross column stays at MRP, which is what it is.
+            stated on what the channel&apos;s own statement earned instead, shared out by what it sold net of its own GST — so a
+            5% line is not taxed at 18% on the way in, and this screen and the Channel P&amp;L state one revenue for the month.
+            The gross column stays at MRP, which is what it is.
           </p>
         )}
 
