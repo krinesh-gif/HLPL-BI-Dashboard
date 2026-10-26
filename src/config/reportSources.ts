@@ -205,6 +205,18 @@ export const REPORT_SOURCES: ReportSource[] = [
     note: 'Read from Unicommerce, not Shopify: only it knows which orders were delivered and which came back as RTO.',
   },
   {
+    key: 'jiomart',
+    label: 'JioMart',
+    files: ['Seller panel ▸ Reports ▸ sales register (GST) for the month'],
+    note: 'A GST register, so it states the tax exactly. It also carries credit notes against earlier months\' sales, which take revenue off this month. It states no commission at all.',
+  },
+  {
+    key: 'smytten',
+    label: 'Smytten',
+    files: ['Monthly sales report from the brand dashboard'],
+    note: 'The only sales report here that states the commission line by line, so Smytten reads down to a margin after fees. Leave the Total row in — it is recognised and skipped.',
+  },
+  {
     key: 'catalogue',
     label: 'Catalogue (any month)',
     files: [

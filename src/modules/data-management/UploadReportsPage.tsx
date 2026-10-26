@@ -41,6 +41,8 @@ import { detectTata1mgSalesReport, normalizeTata1mgSalesReport } from '@/data/no
 import { detectFirstcrySalesReport, normalizeFirstcrySalesReport } from '@/data/normalize/firstcrySalesReport'
 import { detectWalmartUsItemReport, normalizeWalmartUsItemReport } from '@/data/normalize/walmartUsItemReport'
 import { detectUnicommerceSaleOrders, normalizeUnicommerceSaleOrders } from '@/data/normalize/unicommerceSaleOrders'
+import { detectJiomartSalesRegister, normalizeJiomartSalesRegister } from '@/data/normalize/jiomartSalesRegister'
+import { detectSmyttenSalesReport, normalizeSmyttenSalesReport } from '@/data/normalize/smyttenSalesReport'
 import {
   detectNykaaCartRuleSheet, detectNykaaComboSheet, detectNykaaSalesSheet, normalizeNykaaWorkbook,
 } from '@/data/normalize/nykaaSalesWorkbook'
@@ -99,6 +101,8 @@ type ReportKind =
   | 'firstcry_sales'
   | 'walmart_us_items'
   | 'unicommerce_sale_orders'
+  | 'jiomart_sales'
+  | 'smytten_sales'
 
 const REPORT_LABELS: Record<ReportKind, string> = {
   blinkit_payout_archive: 'Blinkit — Monthly Payout Sheet (zip)',
@@ -135,6 +139,8 @@ const REPORT_LABELS: Record<ReportKind, string> = {
   firstcry_sales: 'FirstCry — Monthly Sales Data',
   walmart_us_items: 'Walmart USA — Item Performance Export',
   unicommerce_sale_orders: 'D2C Website — Unicommerce Sale Orders',
+  jiomart_sales: 'JioMart — sales register',
+  smytten_sales: 'Smytten — monthly sales report',
 }
 const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   blinkit_payout_archive: 'blinkit',
@@ -166,6 +172,8 @@ const REPORT_CHANNEL: Record<ReportKind, ChannelId> = {
   firstcry_sales: 'firstcry',
   walmart_us_items: 'walmart_us',
   unicommerce_sale_orders: 'd2c_website',
+  jiomart_sales: 'jiomart',
+  smytten_sales: 'smytten',
   meesho_order_summary: 'meesho',
   meesho_order_payments: 'meesho',
   meesho_settlement_json: 'meesho',
@@ -392,6 +400,14 @@ export function UploadReportsPage() {
     }
     if (kind === 'unicommerce_sale_orders') {
       const r = normalizeUnicommerceSaleOrders(parsed.rows, skuMaster, mappings, comboComponents, importId)
+      return buildPreview({ ...base, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
+    }
+    if (kind === 'jiomart_sales') {
+      const r = normalizeJiomartSalesRegister(parsed.rows, skuMaster, mappings, comboComponents, importId)
+      return buildPreview({ ...base, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
+    }
+    if (kind === 'smytten_sales') {
+      const r = normalizeSmyttenSalesReport(parsed.rows, skuMaster, mappings, comboComponents, importId)
       return buildPreview({ ...base, totalRows: r.totalRows, validRecords: r.validRecords, invalidCount: r.invalidRows.length, warnings: r.warnings })
     }
     if (kind === 'meesho_order_summary') {
@@ -778,6 +794,9 @@ export function UploadReportsPage() {
       else if (detectWalmartUsItemReport(parsed.headers)) kind = 'walmart_us_items'
       // The website, read from Unicommerce rather than from Shopify.
       else if (detectUnicommerceSaleOrders(parsed.headers)) kind = 'unicommerce_sale_orders'
+      // JioMart and Smytten, which opened after the other five.
+      else if (detectJiomartSalesRegister(parsed.headers)) kind = 'jiomart_sales'
+      else if (detectSmyttenSalesReport(parsed.headers)) kind = 'smytten_sales'
 
       if (!kind) {
         // "Not recognised" on its own starts a conversation that takes a day.

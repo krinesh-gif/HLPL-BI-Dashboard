@@ -1477,13 +1477,16 @@ function buildChannelPnlStatement(channel: BusinessChannelId, month: string, inp
     : { ...generic, lines: computeSubtotals({ ...generic.lines, channelCharges: ownCharges }) }
   const source = NATIVE_STATEMENT_SOURCE[channel]
   const salesOnly = SALES_REPORT_ONLY[channel]
+  const withFees = SALES_REPORT_WITH_FEES[channel]
   return {
     channel, month, canonical,
     notes: source
       ? [`No settlement report is stored for ${channelLabel(channel)} in ${month}, so this is built from the order rows instead. Its Gross Sales will not tie to the ${source}. Upload that report for the month to replace it.`]
       : salesOnly
         ? [`${channelLabel(channel)} is read for ${month} from its ${salesOnly}, which states nothing the channel charged. So this statement runs to net sales and what ${channelLabel(channel)} took is missing from it, not zero. A payout statement from them would fill those lines in.`]
-        : [],
+        : withFees
+          ? [`${channelLabel(channel)} is read for ${month} from its ${withFees}, which states the commission and the GST on it line by line. So this statement does reach a margin after fees, but it is the report's own arithmetic and not a payout statement — nothing here has been reconciled to money received.`]
+          : [],
   }
 }
 
@@ -1518,6 +1521,21 @@ const SALES_REPORT_ONLY: Partial<Record<BusinessChannelId, string>> = {
   firstcry: 'monthly Sales Data file',
   walmart_us: 'item performance export',
   d2c_website: 'Unicommerce Sale Orders export',
+  jiomart: 'sales register',
+}
+
+/**
+ * The sales-report channels whose report does state what the channel took.
+ *
+ * Smytten is the only one so far: its monthly report carries the commission
+ * and the GST on it line by line, so its statement does reach a margin after
+ * fees. It still has no payout statement of its own, and the note has to say
+ * which of those two things is true — telling the reader that nothing the
+ * channel charged is in the figures, when a commission is in every row of
+ * them, would be worse than saying nothing at all.
+ */
+const SALES_REPORT_WITH_FEES: Partial<Record<BusinessChannelId, string>> = {
+  smytten: 'monthly sales report',
 }
 
 export function buildAllChannelPnlViews(channels: BusinessChannelId[], month: string, inputs: ChannelPnlViewInputs): ChannelPnlView[] {

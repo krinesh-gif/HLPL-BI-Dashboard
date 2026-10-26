@@ -39,6 +39,8 @@ export type SalesSourceId =
   | 'firstcry'
   | 'walmart_us'
   | 'd2c_website'
+  | 'jiomart'
+  | 'smytten'
 
 /** What management sees. */
 export type BusinessChannelId =
@@ -58,6 +60,8 @@ export type BusinessChannelId =
   | 'firstcry'
   | 'walmart_us'
   | 'd2c_website'
+  | 'jiomart'
+  | 'smytten'
 
 /**
  * Retained as the name for a stored row's key, because that is what every
@@ -103,6 +107,8 @@ export const BUSINESS_CHANNELS: BusinessChannelDef[] = [
   { id: 'firstcry', label: 'FirstCry', currency: 'INR' },
   { id: 'walmart_us', label: 'Walmart USA', currency: 'USD' },
   { id: 'd2c_website', label: 'D2C Website', currency: 'INR' },
+  { id: 'jiomart', label: 'JioMart', currency: 'INR' },
+  { id: 'smytten', label: 'Smytten', currency: 'INR' },
 ]
 
 /** Every report the system accepts, and which channel it belongs to. */
@@ -127,6 +133,10 @@ export const SALES_SOURCES: SalesSourceDef[] = [
   // only system that knows both what the customer paid and what happened to
   // the parcel.
   { id: 'd2c_website', channel: 'd2c_website', label: 'D2C Website', currency: 'INR', sellerType: 'marketplace' },
+  { id: 'jiomart', channel: 'jiomart', label: 'JioMart', currency: 'INR', sellerType: 'marketplace' },
+  // Smytten bills a commission on every line of its own sales report,
+  // which no other sales-report channel does.
+  { id: 'smytten', channel: 'smytten', label: 'Smytten', currency: 'INR', sellerType: 'marketplace' },
 ]
 
 export const BUSINESS_CHANNEL_MAP: Record<BusinessChannelId, BusinessChannelDef> = Object.fromEntries(
@@ -205,6 +215,8 @@ export const DEFAULT_ALLOCATION_WEIGHTS: Record<BusinessChannelId, number> = {
   firstcry: 0,
   walmart_us: 0,
   d2c_website: 0,
+  jiomart: 0,
+  smytten: 0,
 }
 
 // ---------------------------------------------------------------------------

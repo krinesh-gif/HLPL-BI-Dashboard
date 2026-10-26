@@ -148,6 +148,10 @@ const STATEMENT_READERS: Record<BusinessChannelId, (scope: StatementScope) => Pn
   // The website's month is its Unicommerce order rows: money and delivery
   // outcome in one file, which is more than a settlement would give it.
   d2c_website: () => null,
+  jiomart: () => null,
+  // Smytten's own sales report states the commission on every line, so its
+  // month is measured from those rows and not from a separate statement.
+  smytten: () => null,
   amazon_us: ({ facts, month, fxRate }) => {
     const f = forMonth(facts.amazonUsaFacts, month)
     return f ? amazonUsaToCanonicalBuckets(f, fxRate.USD) : null

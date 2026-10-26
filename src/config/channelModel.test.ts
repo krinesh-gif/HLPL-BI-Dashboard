@@ -38,6 +38,7 @@ describe('the management channel list', () => {
     expect(labels).toEqual([
       'Amazon India', 'Amazon USA', 'Amazon UAE', 'Flipkart', 'Meesho', 'Myntra', 'Nykaa', 'Purplle', 'Blinkit',
       'Swiggy Instamart', 'Snapdeal', 'PharmEasy', 'Tata 1mg', 'FirstCry', 'Walmart USA', 'D2C Website',
+      'JioMart', 'Smytten',
     ])
     expect(labels.some((l) => /seller|vendor/i.test(l))).toBe(false)
   })
