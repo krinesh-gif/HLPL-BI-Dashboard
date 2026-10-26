@@ -217,6 +217,81 @@ describe('Nykaa months imported before the customer discount was modelled', () =
 })
 
 /**
+ * Nykaa's output GST, blended from what the month sold.
+ *
+ * The range is not on one rate — hair oil and shampoo are at 5% and the rest
+ * at 18% — and the statement is built from a single month-total, so the rate
+ * has to come from somewhere. It comes from the order rows and the Product
+ * Master, the same place the COGS is repriced from, which is why correcting a
+ * rate restates the months it should instead of needing a re-upload.
+ */
+describe("Nykaa's output GST follows the month's own product mix", () => {
+  const mixedMaster: SkuMaster[] = [
+    { sku: 'AO/Shmp/Rosemary/200', productName: 'Shampoo', category: 'Hair Care', brand: 'AO', cogs: 70, mrp: 349,
+      launchDate: '2025-01-01', status: 'active', leadTimeDays: 20, safetyStock: 0, gstPct: 5 },
+    { sku: 'AO/SS/BodyLotion', productName: 'Sunscreen', category: 'Skin Care', brand: 'AO', cogs: 120, mrp: 549,
+      launchDate: '2025-01-01', status: 'active', leadTimeDays: 20, safetyStock: 0, gstPct: 18 },
+    { sku: 'AO/Unrated', productName: 'No rate yet', category: 'Skin Care', brand: 'AO', cogs: 40, mrp: 199,
+      launchDate: '2025-01-01', status: 'active', leadTimeDays: 20, safetyStock: 0 },
+  ]
+  const row = (sku: string, net: number): CanonicalSalesRecord => ({
+    orderId: `NYK-${sku}-${net}`, orderDate: '2026-08-10', channel: 'nykaa' as never, marketplace: 'nykaa',
+    sellerType: 'marketplace', sku, productName: sku, category: 'Test', quantity: 1,
+    grossSales: net, discount: 0, netSales: net, returnUnits: 0, rtoUnits: 0, shippingCost: 0,
+    marketplaceFee: 0, tax: 0, status: 'completed', currency: 'INR', importId: 'x',
+  })
+  const view = (records: CanonicalSalesRecord[], master = mixedMaster) => buildChannelPnlView('nykaa', '2026-08', {
+    salesRecords: records, skuMaster: master, fixedExpenses: [], marketing: {},
+    facts: { flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [], nykaaFacts: [legacyNykaaAugust] },
+  })
+
+  const realisation = 2689538 * 0.62
+
+  it('takes less tax out of a month carrying 5% lines than a flat 18% would', () => {
+    const mixed = view([row('AO/Shmp/Rosemary/200', 159131), row('AO/SS/BodyLotion', 2530407)])
+    const flat = -realisation * (18 / 118)
+    expect(mixed.native?.values.outputGst).toBeGreaterThan(flat)
+    // Less tax out is more revenue in. The flat rate was understating the
+    // channel by roughly ten thousand rupees a month, not flattering it.
+    expect((mixed.native?.values.outputGst ?? 0) - flat).toBeGreaterThan(5000)
+    expect(mixed.canonical.lines.netSales).toBeCloseTo(mixed.native!.values.netRevenueExGst, 6)
+  })
+
+  it('leaves a month that is all 18% exactly where it was', () => {
+    const v = view([row('AO/SS/BodyLotion', 2689538)])
+    expect(v.native?.values.outputGst).toBeCloseTo(-realisation * (18 / 118), 2)
+  })
+
+  it('says on the line which rate took the money out', () => {
+    const mixed = view([row('AO/Shmp/Rosemary/200', 159131), row('AO/SS/BodyLotion', 2530407)])
+    expect(mixed.native?.lineDefs.find((d) => d.key === 'outputGst')?.note).toContain("this month's own mix")
+    const flat = view([row('AO/SS/BodyLotion', 2689538)])
+    expect(flat.native?.lineDefs.find((d) => d.key === 'outputGst')?.note).toContain('Taken at 18%')
+  })
+
+  it('names the products it had to assume a rate for', () => {
+    const v = view([row('AO/SS/BodyLotion', 800000), row('AO/Unrated', 200000)])
+    expect(v.notes.some((n) => n.includes('AO/Unrated') && n.includes('no GST rate'))).toBe(true)
+  })
+
+  it('keeps a month that states its own rate, because that is a fact about the month', () => {
+    const stated = buildChannelPnlView('nykaa', '2026-08', {
+      salesRecords: [row('AO/Shmp/Rosemary/200', 2689538)],
+      skuMaster: mixedMaster, fixedExpenses: [], marketing: {},
+      facts: {
+        flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [],
+        nykaaFacts: [{ ...legacyNykaaAugust, outputGstPct: 12 }],
+      },
+    })
+    expect(stated.native?.values.outputGst).toBeCloseTo(-realisation * (12 / 112), 2)
+  })
+
+  it('falls back to the standing rate when no rows are on file to blend', () => {
+    expect(view([]).native?.values.outputGst).toBeCloseTo(-realisation * (18 / 118), 2)
+  })
+})
+
+/**
  * The company's own fixed costs — salaries, rent, software — are entered once
  * and split across channels by their share of the month's sales. Every channel
  * with its own statement deducted that share except Amazon USA, and no channel

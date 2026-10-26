@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  applyNykaaOtherCosts, computeNykaaPnl, nykaaRevenue, nykaaToCanonicalBuckets, NYKAA_LINE_DEFS,
+  applyNykaaOtherCosts, blendedOutputGstPct, computeNykaaPnl, nykaaRevenue, nykaaToCanonicalBuckets,
+  NYKAA_LINE_DEFS,
 } from './nykaa'
 import { computeSubtotals } from '@/engine/pnl'
 import type { NykaaPnlFacts } from '@/data/models'
@@ -63,6 +64,82 @@ describe('nykaaRevenue', () => {
 
   it('handles a nil GST month without dividing by anything', () => {
     expect(nykaaRevenue({ ...AUG, outputGstPct: 0 }).outputGst).toBe(0)
+  })
+})
+
+/**
+ * The catalogue is not on one GST rate: hair oil and shampoo are at 5% and
+ * the rest of the range at 18%. A statement built from one month-total has to
+ * be told one rate, and taking the whole month at 18% removes tax that was
+ * never collected — it understated Nykaa by ₹5,461 to ₹10,357 a month across
+ * April to September 2026, widening as the 5% lines sold better.
+ */
+describe('blending one output-GST rate out of a mixed month', () => {
+  it('reproduces the tax the lines actually carry, not the average of the rates', () => {
+    // September's real shape: 5.63% of net MRP at 5%, the rest at 18%.
+    const lines = [
+      { weight: 159_131, gstPct: 5 },
+      { weight: 2_667_374, gstPct: 18 },
+    ]
+    const blend = blendedOutputGstPct(lines, 18)
+    expect(blend).not.toBeNull()
+
+    const realisation = (159_131 + 2_667_374) * 0.62
+    const perLine = lines.reduce((sum, l) => sum + l.weight * 0.62 * (l.gstPct / (100 + l.gstPct)), 0)
+    const atBlend = realisation * (blend!.pct / (100 + blend!.pct))
+    expect(atBlend).toBeCloseTo(perLine, 2)
+
+    // The weighted mean of the rates is a different number, and applying it
+    // inclusively does not reproduce the tax. It is close enough to look
+    // right and ₹1,083 out on the month, which is why the fractions blend
+    // and the rate is inverted back out of them rather than averaged.
+    const meanRate = lines.reduce((s, l) => s + l.weight * l.gstPct, 0) / (159_131 + 2_667_374)
+    expect(blend!.pct).toBeLessThan(meanRate)
+    expect(realisation * (meanRate / (100 + meanRate))).toBeGreaterThan(perLine)
+  })
+
+  it('leaves a single-rate month exactly where it was', () => {
+    const blend = blendedOutputGstPct([{ weight: 1000, gstPct: 18 }, { weight: 500, gstPct: 18 }], 18)
+    expect(blend!.pct).toBeCloseTo(18, 9)
+    expect(blend!.ratedShare).toBe(1)
+  })
+
+  it('understates nothing: a month with 5% lines blends below 18%', () => {
+    const blend = blendedOutputGstPct([{ weight: 100, gstPct: 5 }, { weight: 900, gstPct: 18 }], 18)
+    expect(blend!.pct).toBeLessThan(18)
+    expect(blend!.pct).toBeGreaterThan(5)
+  })
+
+  it('taxes a product with no rate on file at the standing rate and says how much that was', () => {
+    const blend = blendedOutputGstPct([{ weight: 750, gstPct: 5 }, { weight: 250, gstPct: null }], 18)
+    expect(blend!.ratedShare).toBeCloseTo(0.75, 9)
+    // Dropped instead of defaulted, the unrated quarter would have moved its
+    // revenue onto the 5% rate and shown the month at 5% flat.
+    expect(blend!.pct).toBeGreaterThan(5)
+  })
+
+  it('gives a returns-only or free line no vote on the rate', () => {
+    const blend = blendedOutputGstPct(
+      [{ weight: 1000, gstPct: 18 }, { weight: 0, gstPct: 5 }, { weight: -200, gstPct: 5 }],
+      18,
+    )
+    expect(blend!.pct).toBeCloseTo(18, 9)
+  })
+
+  it('refuses a month with nothing to weigh rather than returning a rate', () => {
+    expect(blendedOutputGstPct([], 18)).toBeNull()
+    expect(blendedOutputGstPct([{ weight: 0, gstPct: 18 }], 18)).toBeNull()
+  })
+
+  it('carries the blended rate through to revenue', () => {
+    const blend = blendedOutputGstPct([{ weight: 159_131, gstPct: 5 }, { weight: 2_667_374, gstPct: 18 }], 18)
+    const flat = nykaaRevenue({ ...AUG, netSalesMrp: 2_826_505 })
+    const blended = nykaaRevenue({ ...AUG, netSalesMrp: 2_826_505, outputGstPct: blend!.pct })
+    expect(blended.outputGst).toBeLessThan(flat.outputGst)
+    // Less tax out is more revenue in: the flat rate was understating the
+    // channel, not flattering it.
+    expect(blended.netRevenueExGst).toBeGreaterThan(flat.netRevenueExGst)
+    expect(flat.outputGst - blended.outputGst).toBeCloseTo(10_357, -2)
   })
 })
 

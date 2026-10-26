@@ -50,7 +50,8 @@ export const NYKAA_LINE_DEFS: NativeLineDef[] = [
   },
   {
     key: 'invoiceRealisationPctOfMrp', label: 'Invoice realisation, % of MRP', section: 'REVENUE', kind: 'percent',
-    note: "52.54% at 38% margin and 18% GST — the 'Cost to Nykaa' line of the agreement's margin table",
+    note: "The agreement's 'Cost to Nykaa' line is 52.54%, struck at a 38% margin and 18% GST. A month carrying "
+      + '5% lines realises a little above it, because less of the realisation is tax.',
   },
   {
     key: 'customerDiscount', label: 'Net Customer Discount Recovered', section: 'CUSTOMER DISCOUNT — CHARGED BACK TO US',
@@ -132,6 +133,58 @@ export function nykaaCommissionPct(facts: NykaaPnlFacts): number {
 
 export function nykaaOutputGstPct(facts: NykaaPnlFacts): number {
   return facts.outputGstPct ?? NYKAA_ASSUMPTIONS.outputGstPct
+}
+
+/**
+ * One equivalent output-GST rate for a month that sold at more than one rate.
+ *
+ * The catalogue is not on a single rate. Hair oil and shampoo are at 5% and
+ * the rest of the range at 18%, so a month's realisation carries a blend, and
+ * charging the whole of it at 18% takes out tax that was never collected.
+ * It understates the channel — on Nykaa it ran between ₹5,500 and ₹10,400 a
+ * month through 2026-04 to 2026-09, and it widens every time the 5% lines
+ * sell better.
+ *
+ * Nykaa's statement is built from one month-total, so the rate has to arrive
+ * as one number. That number is **not** the weighted average of the rates.
+ * The tax is inside the realisation, so each line contributes
+ * `weight × r/(100+r)` — the inclusive fraction — and those are what blend.
+ * Averaging the rates and then applying the average inclusively is a
+ * different sum, and on September it is ₹1,083 out. So the fractions are
+ * blended and the result inverted back to the single rate that reproduces
+ * them: `pct = 100f / (1 − f)`.
+ *
+ * Weights are each line's net sales at MRP, which is what the realisation is
+ * struck on, so a line's share of the tax is its share of the revenue.
+ *
+ * A line whose product carries no rate in the Product Master is weighted at
+ * `fallbackPct` rather than dropped, because dropping it would quietly shift
+ * its revenue onto the rates that are known. `ratedShare` says how much of
+ * the month actually answered, so the caller can name what it had to assume.
+ */
+export function blendedOutputGstPct(
+  lines: readonly { weight: number; gstPct: number | null }[],
+  fallbackPct: number,
+): { pct: number; ratedShare: number } | null {
+  let weight = 0
+  let rated = 0
+  let fraction = 0
+  for (const line of lines) {
+    // A returns-only or zero-value line is not revenue, so it carries no tax
+    // and no vote on the rate. A negative one would pull the blend the wrong
+    // way for the same reason.
+    if (!(line.weight > 0)) continue
+    weight += line.weight
+    const pct = line.gstPct ?? fallbackPct
+    if (line.gstPct !== null) rated += line.weight
+    fraction += line.weight * (pct / (100 + pct))
+  }
+  if (weight <= 0) return null
+  const f = fraction / weight
+  // Only reachable from a nonsense rate, and inverting it would divide by
+  // zero or go negative. Refusing beats returning a rate nothing can use.
+  if (f >= 1) return null
+  return { pct: (100 * f) / (1 - f), ratedShare: rated / weight }
 }
 
 /**

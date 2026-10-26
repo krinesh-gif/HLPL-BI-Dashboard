@@ -13,11 +13,11 @@ import type {
   SkuMaster,
 } from '@/data/models'
 import { channelLabel, channelOfSource, type ChannelCurrencyView } from '@/config/channels'
-import { MEESHO_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
+import { MEESHO_ASSUMPTIONS, NYKAA_ASSUMPTIONS } from '@/config/nativePnlAssumptions'
 import { DEFAULT_FX_INR, inrPerUnit, type FxRatesInr } from '@/data/fxRates'
 import { formatCurrencyFull, toMonthKey } from '@/lib/format'
 import { cogsForMonth } from '@/data/costVersions'
-import { resolveCogs } from '@/data/skuMapping'
+import { resolveCogs, resolveGstPct } from '@/data/skuMapping'
 import { allocateFixedExpensesForMonth } from './allocation'
 import { channelChargesFor, channelChargeSummary, channelChargesTotal } from './channelCharges'
 import {
@@ -38,8 +38,9 @@ import {
   computeSwiggyInstamartPnl, swiggyInstamartToCanonicalBuckets, SWIGGY_LINE_DEFS,
 } from './nativePnl/swiggyInstamart'
 import {
-  applyNykaaOtherCosts, computeNykaaPnl, nykaaDiscountPerSalesFile, nykaaDiscountRecovered,
-  nykaaDiscountWasDerived, nykaaToCanonicalBuckets, NYKAA_LINE_DEFS,
+  applyNykaaOtherCosts, blendedOutputGstPct, computeNykaaPnl, nykaaDiscountPerSalesFile,
+  nykaaDiscountRecovered, nykaaDiscountWasDerived, nykaaOutputGstPct, nykaaToCanonicalBuckets,
+  NYKAA_LINE_DEFS,
 } from './nativePnl/nykaa'
 import {
   AMAZON_IN_SELLER_LINE_DEFS, amazonInSellerToCanonicalBuckets, applyAmazonInSellerOtherCosts,
@@ -434,6 +435,54 @@ function recomputedCogs(
 }
 
 /**
+ * The output-GST rate a wholesale month actually sold at, from its own rows.
+ *
+ * A statement built from one month-total has to be told a single rate, and
+ * the honest one is the blend of what the month sold rather than the top rate
+ * of the range. The rows are the only place that mix exists, which is why
+ * this is struck here, beside the COGS repricing, and not frozen at upload:
+ * correcting a rate in the Product Master then restates the months it should.
+ *
+ * Weighted on net sales at MRP, which is the base the realisation is struck
+ * on. Null when the month has no rows — the statement already says so, and
+ * the standing assumption stands in rather than a rate blended from nothing.
+ */
+function blendedGstFromRows(
+  channel: BusinessChannelId,
+  month: string,
+  inputs: ChannelPnlViewInputs,
+  fallbackPct: number,
+): { pct: number; ratedShare: number; unratedCodes: string[] } | null {
+  const records = inputs.salesRecords.filter(
+    (r) => channelOfSource(r.channel) === channel && toMonthKey(r.orderDate) === month,
+  )
+  if (records.length === 0) return null
+
+  const tables = {
+    skuMaster: inputs.skuMaster,
+    mappings: inputs.cogs?.mappings ?? [],
+    comboComponents: inputs.cogs?.comboComponents ?? [],
+  }
+  const rateOf = new Map<string, number | null>()
+  const unrated = new Set<string>()
+  const lines = records.map((r) => {
+    let rate = rateOf.get(r.sku)
+    if (rate === undefined) {
+      rate = resolveGstPct(r.sku, tables)
+      rateOf.set(r.sku, rate)
+    }
+    if (rate === null && r.netSales > 0) unrated.add(r.sku)
+    // resolveGstPct answers in fractions because that is what a tax
+    // calculation multiplies by; the blend works in percent.
+    return { weight: r.netSales, gstPct: rate === null ? null : rate * 100 }
+  })
+
+  const blend = blendedOutputGstPct(lines, fallbackPct)
+  if (!blend) return null
+  return { ...blend, unratedCodes: [...unrated].sort() }
+}
+
+/**
  * The Nykaa statement's line definitions, with the discount line told to
  * explain where its own figure came from.
  *
@@ -444,18 +493,26 @@ function recomputedCogs(
  * reader scrolls straight past. It belongs on the line it explains.
  */
 function nykaaLineDefsFor(facts: NykaaPnlFacts): NativeLineDef[] {
+  // The rate is not a constant on this range — hair oil and shampoo are at
+  // 5%, the rest at 18% — so the line says which rate took the money out.
+  const gstPct = nykaaOutputGstPct(facts)
+  const gstNote = Math.abs(gstPct - NYKAA_ASSUMPTIONS.outputGstPct) < 0.005
+    ? `MRP is tax-inclusive, so the realisation is too. Taken at ${NYKAA_ASSUMPTIONS.outputGstPct}%.`
+    : `MRP is tax-inclusive, so the realisation is too. Taken at ${gstPct.toFixed(2)}% — this month's own mix of ` +
+      `5% and ${NYKAA_ASSUMPTIONS.outputGstPct}% products, weighted by what each sold, not the top rate of the range.`
+  const withGst = NYKAA_LINE_DEFS.map((d) => (d.key === 'outputGst' ? { ...d, note: gstNote } : d))
   if (facts.confirmedDiscount !== undefined) {
-    return NYKAA_LINE_DEFS.map((d) => (d.key === 'customerDiscount'
+    return withGst.map((d) => (d.key === 'customerDiscount'
       ? { ...d, note: 'Confirmed with Nykaa and entered by hand — this replaces what the sales file implied' }
       : d))
   }
-  if (facts.customerDiscount !== undefined) return NYKAA_LINE_DEFS
+  if (facts.customerDiscount !== undefined) return withGst
   const note = nykaaDiscountWasDerived(facts)
     ? 'Derived from this month\'s own MRP and sale totals, because the month predates this line. Upload the Sales '
       + 'and Cart Rule files again to split it and credit any coupons Nykaa funded.'
     : '⚠ Not established — this month has no record of what shoppers paid, so every margin below is overstated. '
       + 'Re-upload the Nykaa Sales file.'
-  return NYKAA_LINE_DEFS.map((d) => (d.key === 'customerDiscount' ? { ...d, note } : d))
+  return withGst.map((d) => (d.key === 'customerDiscount' ? { ...d, note } : d))
 }
 
 /**
@@ -729,9 +786,17 @@ function buildChannelPnlStatement(channel: BusinessChannelId, month: string, inp
       // the rate it closed on. Charged on net units, matching the freight to
       // the units whose revenue is in this month.
       const inboundFreight = (inputs.nykaaFreightPerUnitInr ?? 0) * imported.netUnits
+      // The range is not on one GST rate — hair oil and shampoo are at 5% and
+      // the rest at 18% — so the rate comes from what this month actually
+      // sold. A month that states its own rate keeps it; that is a fact about
+      // the month and beats anything derived here.
+      const blendedGst = imported.outputGstPct === undefined
+        ? blendedGstFromRows(channel, month, inputs, NYKAA_ASSUMPTIONS.outputGstPct)
+        : null
       const facts: NykaaPnlFacts = {
         ...imported,
         ...(recomputed ? { cogsPriced: recomputed.priced, cogsUnpriced: recomputed.unpriced } : {}),
+        ...(blendedGst ? { outputGstPct: blendedGst.pct } : {}),
         inboundFreight,
         confirmedDiscount: inputs.confirmedNykaaDiscount,
         nykaaAds: imported.nykaaAds || adSpend,
@@ -757,6 +822,16 @@ function buildChannelPnlStatement(channel: BusinessChannelId, month: string, inp
         notes.push(
           `No Nykaa order rows are on file for ${month}, so the statement shows no cost of goods. Re-upload this ` +
           `month's Nykaa Sales file — it is what the cost is priced from.`,
+        )
+      }
+      if (blendedGst && blendedGst.ratedShare < 0.999) {
+        const shown = blendedGst.unratedCodes.slice(0, 8).join(', ')
+        const rest = blendedGst.unratedCodes.length - 8
+        notes.push(
+          `${((1 - blendedGst.ratedShare) * 100).toFixed(1)}% of ${month}'s Nykaa sales is on a product with no GST ` +
+          `rate in the Product Master, so that slice is taxed at the standing ${NYKAA_ASSUMPTIONS.outputGstPct}% rather ` +
+          `than at its own. Enter the rate for ${shown}${rest > 0 ? ` and ${rest} more` : ''} on the Product Master ` +
+          'to take the assumption out of the revenue line.',
         )
       }
       // The discount is the channel's second largest cost and the one most
