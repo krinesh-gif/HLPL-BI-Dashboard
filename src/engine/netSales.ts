@@ -1,6 +1,7 @@
 import type { BusinessChannelId, SalesSourceId } from '@/config/channels'
 import { BUSINESS_CHANNEL_IDS, channelOfSource, channelLabel, sourcesOfChannel } from '@/config/channels'
 import { DEFAULT_FX_INR, inrPerUnit, type FxRatesInr } from '@/data/fxRates'
+import { chargeKind, isChargeSku } from '@/data/chargeRows'
 import { toMonthKey } from '@/lib/format'
 import { nykaaRevenue } from './nativePnl/nykaa'
 import { statementRevenue } from './channelNetSales'
@@ -71,6 +72,23 @@ export interface NetSalesFigure {
   /** The part of `tax` that is output GST inside `grossSales`, and so is
    * already out of net sales rather than a charge of its own. */
   taxInGross: number
+  /**
+   * Fees carried on rows that are a charge rather than a product, split by
+   * what the channel's own description says the charge is.
+   *
+   * Part of `marketplaceFee`, not additional to it. Kept apart because a
+   * charge sold nothing: booking it as commission reports a fee against
+   * revenue that does not exist, and a replacement charge belongs on the
+   * return-charges line.
+   *
+   * Two flat numbers rather than one object, like every other figure on this
+   * type. `EMPTY_FIGURE` is spread to start a new figure, and a spread copies
+   * a nested object by reference — so a nested pair here accumulated into the
+   * shared constant and every figure in the process grew the previous one's
+   * charges. Numbers copy.
+   */
+  chargeFeeReturn: number
+  chargeFeeOther: number
   basis: NetSalesBasis
   /** Which report this came from, for display next to the number. */
   sourceLabel: string
@@ -89,6 +107,8 @@ export const EMPTY_FIGURE: NetSalesFigure = {
   rtoUnits: 0,
   shippedUnits: 0,
   marketplaceFee: 0,
+  chargeFeeReturn: 0,
+  chargeFeeOther: 0,
   shippingCost: 0,
   tax: 0,
   taxInGross: 0,
@@ -133,6 +153,18 @@ export function orderBasisNetSales(
   for (const r of records) {
     if (!countsAsRevenue(r)) continue
     const rate = fx(r, fxRate)
+
+    // A charge row sold nothing. It carries a cost and no revenue, no units
+    // and no order — counted as an order it moved the channel's order count
+    // and every average built on it.
+    if (isChargeSku(r.sku)) {
+      const amount = r.marketplaceFee * rate
+      if (chargeKind(r.productName) === 'return') figure.chargeFeeReturn += amount
+      else figure.chargeFeeOther += amount
+      figure.marketplaceFee += amount
+      figure.shippingCost += r.shippingCost * rate
+      continue
+    }
 
     figure.grossSales += r.grossSales * rate
     figure.discounts += r.discount * rate
@@ -378,6 +410,8 @@ export function netSalesForChannelMonth(scope: NetSalesScope): NetSalesFigure {
     rtoUnits: order.rtoUnits,
     shippedUnits: order.shippedUnits,
     marketplaceFee: order.marketplaceFee,
+    chargeFeeReturn: order.chargeFeeReturn,
+    chargeFeeOther: order.chargeFeeOther,
     shippingCost: order.shippingCost,
     tax: order.tax,
     taxInGross: order.taxInGross,
@@ -401,6 +435,8 @@ export function addFigures(a: NetSalesFigure, b: NetSalesFigure): NetSalesFigure
     rtoUnits: a.rtoUnits + b.rtoUnits,
     shippedUnits: a.shippedUnits + b.shippedUnits,
     marketplaceFee: a.marketplaceFee + b.marketplaceFee,
+    chargeFeeReturn: a.chargeFeeReturn + b.chargeFeeReturn,
+    chargeFeeOther: a.chargeFeeOther + b.chargeFeeOther,
     shippingCost: a.shippingCost + b.shippingCost,
     tax: a.tax + b.tax,
     taxInGross: a.taxInGross + b.taxInGross,

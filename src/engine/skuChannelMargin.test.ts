@@ -292,6 +292,45 @@ describe('a product mostly given away rather than sent back', () => {
   })
 })
 
+/**
+ * The one case that is not a product at all.
+ *
+ * Smytten bills the reverse leg of a replacement as a line with no SKU, which
+ * the reader files under a code of its own. Read as a product it appeared
+ * here losing exactly its own charge — at the top of a list whose whole job
+ * is naming products to stop selling.
+ */
+describe('a charge the channel levied, not a product', () => {
+  const result = build({
+    salesRecords: [
+      row({ sku: 'AO/LBalm/NonTinted', quantity: 100, netSales: 20_000, channel: 'smytten', marketplace: 'smytten' }),
+      row({
+        sku: 'SMYTTEN/CHARGE', quantity: 0, netSales: 0, channel: 'smytten', marketplace: 'smytten',
+        productName: 'Logistics;Order No.5394741; DTO(11675191307884);Replacement 11675191392061 ; Product Is Damaged',
+        marketplaceFee: 143.96,
+      }),
+    ],
+    channelFees: { smytten: 643.96 },
+  })
+
+  it('is not one of the month\'s products', () => {
+    expect(result.rows.map((r) => r.sku)).toEqual(['AO/LBalm/NonTinted'])
+  })
+
+  it('does not become a product losing money', () => {
+    expect(summariseLosses(result.rows).losers).toBe(0)
+  })
+
+  it('still costs what it costs: the channel\'s whole fee reaches the products that sold', () => {
+    // 643.96 billed, 143.96 of it on the charge line. Excluding the charge
+    // must not quietly drop its cost — it falls into the shared fee instead.
+    expect(result.rows[0].fee).toBeCloseTo(643.96, 6)
+    // Shared, and labelled shared: the product's own row states no fee of its
+    // own, and the charge belongs to no product the file names.
+    expect(result.rows[0].feeBasis).toBe('allocated')
+  })
+})
+
 describe('a fee charged where nothing shipped', () => {
   // Myntra bills a few of these each month — a charge against a product that
   // sold in an earlier month, or a cancellation fee.

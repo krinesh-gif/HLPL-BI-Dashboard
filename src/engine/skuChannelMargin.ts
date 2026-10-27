@@ -1,3 +1,4 @@
+import { isChargeSku } from '@/data/chargeRows'
 import type { BusinessChannelId } from '@/config/channels'
 import { channelOfSource } from '@/config/channels'
 import type { AdsRecord, CanonicalSalesRecord, SkuMaster } from '@/data/models'
@@ -283,6 +284,12 @@ export function buildSkuChannelMargins(month: string, inputs: SkuChannelInputs):
   const buckets = new Map<string, Bucket>()
   for (const r of filterByMonth(inputs.salesRecords, month)) {
     if (r.status === 'cancelled') continue
+    // A charge the channel levied is not a product. Left in, it reads as one
+    // losing exactly its own charge, at the top of a list whose whole job is
+    // naming products to stop selling. Its cost is not lost: the channel's
+    // statement still carries it, so it falls into the fee share below and is
+    // spread over the products that did sell, marked shared.
+    if (isChargeSku(r.sku)) continue
     const channel = channelOfSource(r.channel)
     const sku = internal(r.sku)
     const key = `${channel}\u0000${sku}`

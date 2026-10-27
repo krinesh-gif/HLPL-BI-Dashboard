@@ -1,3 +1,4 @@
+import { isChargeSku } from '@/data/chargeRows'
 import { useMemo } from 'react'
 import { useDataStore } from '@/store/dataStore'
 import { distinctCategories, isUncategorized, normalizeCategory, UNCATEGORIZED } from '@/data/categories'
@@ -61,6 +62,8 @@ export function useUncategorized(): UncategorizedWork {
 
     for (const r of salesRecords) {
       if (r.status === 'cancelled') continue
+      // A charge belongs to no category because it is not a product.
+      if (isChargeSku(r.sku)) continue
       totalNetSales += r.netSales
       if (!isUncategorized(categoryFor(r.sku, r.category))) continue
       const bucket = bySku.get(r.sku)

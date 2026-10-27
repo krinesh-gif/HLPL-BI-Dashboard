@@ -20,6 +20,53 @@ function record(overrides: Partial<CanonicalSalesRecord>): CanonicalSalesRecord 
   }
 }
 
+/**
+ * Smytten bills the reverse leg of a replacement inside its sales file —
+ * `Logistics;Order No.5394741; DTO(...);Replacement ... ; Product Is Damaged`
+ * — as a line with no SKU. It is a real cost, so it reaches the P&L; what it
+ * is not is commission, because nothing was sold on that line.
+ */
+describe('a charge the channel levied, inside its sales file', () => {
+  const sale = record({
+    channel: 'smytten', marketplace: 'smytten', sku: 'SKU-1',
+    quantity: 10, grossSales: 4000, discount: 0, netSales: 4000,
+    shippingCost: 0, marketplaceFee: 600, tax: 0,
+  })
+  const replacement = record({
+    orderId: 'smytten-charge-7', channel: 'smytten', marketplace: 'smytten',
+    sku: 'SMYTTEN/CHARGE',
+    productName: 'Logistics;Order No.5394741; DTO(11675191307884);Replacement 11675191392061 ; Product Is Damaged',
+    quantity: 0, grossSales: 0, discount: 0, netSales: 0,
+    shippingCost: 0, marketplaceFee: 143.96, tax: 0,
+  })
+  const pnl = buildChannelPnl([sale, replacement], skuMaster, [], 'smytten', '2026-06', {})
+
+  it('books it as a return charge, not as commission on a sale that never happened', () => {
+    expect(pnl.lines.returnCharges).toBeCloseTo(143.96, 6)
+    expect(pnl.lines.marketplaceCommission).toBeCloseTo(600, 6)
+  })
+
+  it('charges it once: the total cost of the channel is unchanged', () => {
+    const withoutIt = buildChannelPnl([sale], skuMaster, [], 'smytten', '2026-06', {})
+    expect((withoutIt.lines.contributionProfit ?? 0) - (pnl.lines.contributionProfit ?? 0))
+      .toBeCloseTo(143.96, 6)
+  })
+
+  it('earns nothing and sells nothing, so it cannot move revenue or cost of goods', () => {
+    const withoutIt = buildChannelPnl([sale], skuMaster, [], 'smytten', '2026-06', {})
+    expect(pnl.lines.netSales).toBeCloseTo(withoutIt.lines.netSales ?? 0, 6)
+    expect(pnl.lines.cogs).toBeCloseTo(withoutIt.lines.cogs ?? 0, 6)
+  })
+
+  it('puts a charge it cannot name on the line that only says the channel charged it', () => {
+    const storage = { ...replacement, orderId: 'smytten-charge-8', productName: 'Storage fee for June', marketplaceFee: 50 }
+    const withStorage = buildChannelPnl([sale, storage], skuMaster, [], 'smytten', '2026-06', {})
+    expect(withStorage.lines.otherMarketplaceCharges).toBeCloseTo(50, 6)
+    expect(withStorage.lines.returnCharges).toBe(0)
+    expect(withStorage.lines.marketplaceCommission).toBeCloseTo(600, 6)
+  })
+})
+
 describe('computeSubtotals', () => {
   it('computes net sales, gross profit, contribution, and EBITDA correctly', () => {
     const lines = computeSubtotals({

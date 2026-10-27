@@ -3,6 +3,7 @@ import { BUSINESS_CHANNEL_IDS, channelOfSource } from '@/config/channels'
 import { PNL_STRUCTURE } from '@/config/pnlStructure'
 import type { CanonicalSalesRecord, ChannelPnl, FixedExpenseEntry, PnlLineValues, PnlResult, SkuMaster } from '@/data/models'
 import { cogsForMonth, type CostVersionsBySku } from '@/data/costVersions'
+import { isChargeSku } from '@/data/chargeRows'
 import { resolveCogs, type ComboComponent, type SkuMapping } from '@/data/skuMapping'
 import { filterByMonth } from './sales'
 import { orderBasisNetSales } from './netSales'
@@ -119,6 +120,9 @@ export function cogsForRecords(
 
   for (const r of records) {
     if (r.status === 'cancelled') continue
+    // A charge is not a product, so it has no cost to find and does not
+    // belong in the list of SKUs waiting to be priced.
+    if (isChargeSku(r.sku)) continue
     const unit = resolve(r.sku)
     if (unit === null || unit <= 0) {
       uncostedUnits += r.quantity
@@ -180,16 +184,21 @@ export function buildChannelPnl(
     returns: facts.returnsValue - facts.taxInGross,
     otherRevenueAdj: facts.taxInGross,
     cogs,
-    marketplaceCommission: facts.marketplaceFee,
+    // Commission is what the channel took on what it sold, so a charge
+    // levied where nothing sold comes off this line and goes to the one that
+    // names it. Smytten bills the reverse leg of a replacement inside its
+    // sales file; read as commission it was a fee against revenue that does
+    // not exist.
+    marketplaceCommission: facts.marketplaceFee - facts.chargeFeeReturn - facts.chargeFeeOther,
     fulfilment: 0,
     shipping: facts.shippingCost,
     collectionFees: 0,
     rtoCharges: 0,
-    returnCharges: 0,
+    returnCharges: facts.chargeFeeReturn,
     // Only tax charged on top of the price. The GST inside it came out of
     // revenue above; charging it here as well is how a channel's EBITDA ends
     // up short by exactly its own GST.
-    otherMarketplaceCharges: facts.tax - facts.taxInGross,
+    otherMarketplaceCharges: facts.tax - facts.taxInGross + facts.chargeFeeOther,
     ads: channelMarketing.ads ?? 0,
     performanceMarketing: channelMarketing.performanceMarketing ?? 0,
     otherMarketing: channelMarketing.otherMarketing ?? 0,

@@ -1,3 +1,4 @@
+import { isChargeSku } from '@/data/chargeRows'
 import { useMemo, useState } from 'react'
 import { ComparisonBarChart } from '@/components/charts/ComparisonBarChart'
 import { useDataStore } from '@/store/dataStore'
@@ -60,7 +61,9 @@ export function TopProducts({ channel, source }: { channel: BusinessChannelId; s
 
   const rows = useMemo(() => {
     const channelRecords = salesRecords.filter((r) =>
-      source ? r.channel === source : channelOfSource(r.channel) === channel,
+      // A charge the channel levied is not a product and cannot be ranked
+      // against one: it has a cost, no sales and no units.
+      !isChargeSku(r.sku) && (source ? r.channel === source : channelOfSource(r.channel) === channel),
     )
     const current = filterByMonth(channelRecords, month)
     const previous = filterByMonth(channelRecords, addMonths(month, -1))

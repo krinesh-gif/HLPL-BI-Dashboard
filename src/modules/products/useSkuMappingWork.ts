@@ -1,3 +1,4 @@
+import { isChargeSku } from '@/data/chargeRows'
 import { useMemo } from 'react'
 import { useDataStore } from '@/store/dataStore'
 import { deriveComboFromCode, matchInternalSku, resolveCogs, type ComboComponent, type SkuMapping } from '@/data/skuMapping'
@@ -47,6 +48,9 @@ export function useSkuMappingWork(): SkuMappingWork {
     const bySku = new Map<string, { productName: string; orders: number; netSales: number; channels: Set<ChannelId> }>()
     let totalNetSales = 0
     for (const r of salesRecords) {
+      // A charge code has no product behind it to map, so listing it here
+      // sends someone looking for one that does not exist.
+      if (isChargeSku(r.sku)) continue
       totalNetSales += r.netSales
       const existing = bySku.get(r.sku)
       if (existing) {

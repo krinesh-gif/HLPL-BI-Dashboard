@@ -147,6 +147,23 @@ describe('the reverse-logistics charge hidden in the Date column', () => {
     expect(r.warnings.join(' ')).toContain('Wrong Product Received')
   })
 
+  it('says which P&L line it went to, so a new kind of charge gets noticed', () => {
+    const warning = r.warnings.find((w) => w.includes('Wrong Product Received'))!
+    expect(warning).toContain('Return Charges')
+    expect(warning).toContain('reverse leg of a replacement')
+  })
+
+  it('does not call a storage fee a return', () => {
+    const storage = run([
+      row({}),
+      row({ Date: 'Storage fee for August', 'Order ID': '', 'SKU Id': '', Item: '', 'No. of Units': '',
+        'Product GST %': '', 'Invoice Value': '', 'Taxable Value': '', 'Actual Value': '',
+        'Commission Value': 50, 'GST on Comm': 0, 'TCS(0.5%)': 0, 'TDS (0.1%)': 0, 'Net Value': -50 }),
+    ])
+    const warning = storage.warnings.find((w) => w.includes('Storage fee'))!
+    expect(warning).toContain('Other Marketplace Charges')
+  })
+
   it('is dropped, not parked in an arbitrary month, when the file has no sale to date it by', () => {
     const alone = run([row({ Date: description, 'Order ID': '', 'SKU Id': '', Item: '',
       'Commission Value': 125, 'GST on Comm': 22.5, 'Net Value': -147.5 })])

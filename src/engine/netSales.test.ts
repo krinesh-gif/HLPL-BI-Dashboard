@@ -43,6 +43,60 @@ function record(over: Partial<CanonicalSalesRecord> = {}): CanonicalSalesRecord 
 
 const noFacts: ChannelFacts = { flipkartFacts: [], amazonUsaFacts: [], meeshoFacts: [] }
 
+/**
+ * Smytten bills the reverse leg of a replacement inside its sales file: no
+ * SKU, no sale, the description written into the date cell. The reader files
+ * it as a row so the cost reaches the P&L, and from there on it has to stop
+ * behaving like something that was sold.
+ */
+describe('a charge row the channel levied', () => {
+  const charge = (over: Partial<CanonicalSalesRecord> = {}) => record({
+    channel: 'smytten', marketplace: 'smytten',
+    sku: 'SMYTTEN/CHARGE',
+    productName: 'Logistics;Order No.5394741; DTO(11675191307884);Replacement 11675191392061 ; Product Is Damaged',
+    quantity: 0, grossSales: 0, discount: 0, netSales: 0, marketplaceFee: 143.96,
+    ...over,
+  })
+
+  it('is no revenue, no units and — the one that moved a real figure — no order', () => {
+    const f = orderBasisNetSales([record({ grossSales: 300, netSales: 300 }), charge()])
+    expect(f.netSales).toBe(300)
+    expect(f.grossSales).toBe(300)
+    expect(f.units).toBe(1)
+    expect(f.orders).toBe(1)
+    expect(f.shippedUnits).toBe(1)
+  })
+
+  it('still carries its cost, so nothing is lost by excluding it', () => {
+    const f = orderBasisNetSales([charge()])
+    expect(f.marketplaceFee).toBeCloseTo(143.96, 6)
+  })
+
+  it('says which cost it is, so it need not be guessed at downstream', () => {
+    const f = orderBasisNetSales([charge(), charge({ productName: 'Storage fee', marketplaceFee: 50 })])
+    expect(f.chargeFeeReturn).toBeCloseTo(143.96, 6)
+    expect(f.chargeFeeOther).toBeCloseTo(50, 6)
+    // Part of the fee total, not additional to it.
+    expect(f.chargeFeeReturn + f.chargeFeeOther).toBeCloseTo(f.marketplaceFee, 6)
+  })
+
+  it('leaves a channel with no charges reporting none', () => {
+    const f = orderBasisNetSales([record({ marketplaceFee: 40 })])
+    expect(f.chargeFeeReturn).toBe(0)
+    expect(f.chargeFeeOther).toBe(0)
+    expect(f.marketplaceFee).toBe(40)
+  })
+
+  it('does not let one month\'s charges leak into the next figure', () => {
+    // A spread of EMPTY_FIGURE copies a nested object by reference, so a
+    // nested pair here made every figure in the process carry the charges of
+    // the one before it. Two calls, and the second must stand alone.
+    orderBasisNetSales([charge()])
+    const second = orderBasisNetSales([charge()])
+    expect(second.chargeFeeReturn).toBeCloseTo(143.96, 6)
+  })
+})
+
 describe('the Net Sales definition', () => {
   it('keeps the identity net = gross - discounts - returns', () => {
     const f = orderBasisNetSales([

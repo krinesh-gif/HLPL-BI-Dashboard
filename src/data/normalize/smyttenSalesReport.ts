@@ -2,6 +2,9 @@ import type { CanonicalSalesRecord, SkuMaster } from '@/data/models'
 import type { ComboComponent, SkuMapping } from '@/data/skuMapping'
 import { mappedCodeFor } from '@/data/skuMapping'
 import { normalizeCategory } from '@/data/categories'
+import { chargeKind, SMYTTEN_CHARGE_SKU } from '@/data/chargeRows'
+
+export { SMYTTEN_CHARGE_SKU }
 import { getField, headersPresent, type NormalizeResult } from './types'
 
 /**
@@ -66,9 +69,6 @@ export function detectSmyttenSalesReport(headers: string[]): boolean {
     && headersPresent(headers, COLUMNS.netValue)
 }
 
-/** The code a charge that is not a product is filed under, so a real cost
- * reaches the P&L without being mistaken for something that was sold. */
-export const SMYTTEN_CHARGE_SKU = 'SMYTTEN/CHARGE'
 
 function num(raw: string | undefined): number {
   if (raw === undefined) return 0
@@ -272,9 +272,18 @@ export function normalizeSmyttenSalesReport(
   }
   if (charges.length > 0) {
     const total = charges.reduce((sum, c) => sum + c.amount, 0)
+    const returns = charges.filter((c) => chargeKind(c.description) === 'return')
+    const returnTotal = returns.reduce((sum, c) => sum + c.amount, 0)
+    // Named one by one, with where each lands, because these are the only
+    // costs in the file that belong to no product. A charge the description
+    // does not explain goes to Other Marketplace Charges, and saying so is
+    // how a new kind of charge gets noticed instead of absorbed.
     warnings.push(
-      `${inr(total)} of charges with no product against them, kept as a marketplace cost — ` +
-      `${charges.map((c) => c.description).join('; ')}.`,
+      `${inr(total)} of charges with no product against them` +
+      (returnTotal > 0
+        ? `, ${inr(returnTotal)} of it the reverse leg of a replacement and booked to Return Charges`
+        : ', booked to Other Marketplace Charges') +
+      ` — ${charges.map((c) => `${c.description} (${inr(c.amount)})`).join('; ')}.`,
     )
   }
   if (unmapped.size > 0) {
