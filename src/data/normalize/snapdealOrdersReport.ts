@@ -14,11 +14,19 @@ import { getField, headersPresent, type NormalizeResult } from './types'
  *
  * Three things about this file decide how it is read.
  *
- * **`NET PRICE` is what the shopper paid, `MRP` is what the listing struck
- * through.** Neither is a payout: the file states no commission, no shipping
- * charge, no payment fee and no settlement, so what Snapdeal took is not in
- * it. The statement therefore runs from MRP down to net sales and stops, and
- * says so, rather than showing a margin that nothing has been deducted from.
+ * **The price column is what the shopper paid, `MRP` is what the listing
+ * struck through.** Neither is a payout: the file states no commission, no
+ * shipping charge, no payment fee and no settlement, so what Snapdeal took is
+ * not in it. The statement therefore runs from MRP down to net sales and
+ * stops, and says so, rather than showing a margin that nothing has been
+ * deducted from.
+ *
+ * Snapdeal renamed that column between August and September 2026 — `NET
+ * PRICE` became `NET VALUE` — and the export was no longer recognised at all,
+ * because the price is one of the columns that identifies the file. Both
+ * spellings are read. They are the same figure, and the month proves it: the
+ * tinted lip balm is ₹199 under either name, ₹168.64 ex-GST in both months,
+ * and the two codes that only reconcile at 5% are the two 5% products.
  *
  * **The status column is the whole story of whether a sale happened.**
  * August's file has 179 rows Delivered, 41 "As per Shipper Package Returned
@@ -46,19 +54,45 @@ const COLUMNS = {
   status: ['status'],
   sku: ['skucode', 'sku code', 'sku'],
   category: ['productcategory', 'product category'],
-  netPrice: ['net price', 'netprice'],
+  netPrice: ['net price', 'netprice', 'net value', 'netvalue'],
   mrp: ['mrp'],
   taxPct: ['taxpercentage', 'tax percentage'],
 }
 
-/** Columns a file must have for this to be Snapdeal's order report. */
-const REQUIRED = ['subOrderCode', 'sku', 'netPrice', 'status'] as const
+/**
+ * Columns a file must have for this to be Snapdeal's order report.
+ *
+ * The price is deliberately not among them, though the file is useless
+ * without one. It used to be, and when Snapdeal renamed `NET PRICE` to `NET
+ * VALUE` the September export stopped being recognised at all — the upload
+ * rejected a real Snapdeal file outright, with nothing to say about why.
+ * `SUBORDERCODE` beside a `SKUCODE`, a `STATUS` and an `MRP` identifies this
+ * report on its own; no other report read here has a sub-order code. So a
+ * file that is Snapdeal's is read as Snapdeal's, and if the price column is
+ * renamed again the upload says which names it looked for rather than
+ * refusing the file.
+ */
+const REQUIRED = ['subOrderCode', 'sku', 'status', 'mrp'] as const
 
 export function detectSnapdealOrdersReport(headers: string[]): boolean {
   return REQUIRED.every((field) => headersPresent(headers, COLUMNS[field]))
-    // `SUBORDERCODE` beside an `MRP` is what makes this Snapdeal's report
-    // rather than any other list of orders.
-    && headersPresent(headers, COLUMNS.mrp)
+}
+
+/**
+ * A price cell, or null where the file does not state one.
+ *
+ * Distinct from `num`, which answers 0 for anything it cannot read. That is
+ * the right answer for a charge or a tax column and the wrong one for a
+ * price: a row priced at nothing and a row whose price is missing are not
+ * the same month. September's file holds `#N/A` in one price cell — an Excel
+ * error that travelled into the export — and read as zero it becomes a
+ * delivered unit given away free.
+ */
+function priceOrNull(raw: string | undefined): number | null {
+  const text = String(raw ?? '').replace(/[₹,\s]/g, '')
+  if (text === '' || text === '-') return null
+  const n = Number(text)
+  return Number.isFinite(n) ? n : null
 }
 
 function num(raw: string | undefined): number {
@@ -125,6 +159,17 @@ export function normalizeSnapdealOrdersReport(
   const invalidRows: NormalizeResult['invalidRows'] = []
   const warnings: string[] = []
 
+  // Said once, up front, rather than as 200 identical row errors. Snapdeal
+  // has renamed this column once already; if it happens again the upload
+  // names the spellings it knows instead of leaving someone to guess.
+  if (rows.length > 0 && !headersPresent(Object.keys(rows[0]), COLUMNS.netPrice)) {
+    warnings.push(
+      'This Snapdeal file has no price column, so no sale in it can state revenue. The column is read under '
+      + `${COLUMNS.netPrice.map((c) => `"${c.toUpperCase()}"`).join(' or ')} — if Snapdeal has renamed it again, `
+      + 'send the file and the new name is added.',
+    )
+  }
+
   const internalBySku = new Map(mappings.map((m) => [m.channelSku, m.internalSku]))
   const master = new Map(skuMaster.map((s) => [s.sku, s]))
   const mappingTables = { skuMaster, mappings, comboComponents }
@@ -152,8 +197,26 @@ export function normalizeSnapdealOrdersReport(
 
     const status = (field('status') ?? '').trim()
     const outcome = snapdealOutcome(status)
-    const netPrice = num(field('netPrice'))
+    const statedPrice = priceOrNull(field('netPrice'))
     const mrp = num(field('mrp'))
+    // A delivered row with no readable price states no revenue, and every
+    // way of keeping it says something untrue: at zero it is a unit given
+    // away free, an MRP of discount nobody gave, and a returns identity that
+    // reads the whole MRP straight back as a return. September's file has
+    // one — a sunscreen stick at ₹555 of MRP whose price cell is `#N/A`,
+    // an Excel error that travelled into the export. Named here, with its
+    // sub-order and what the cell actually said, so it can be looked up on
+    // the seller panel rather than quietly costing the month a sale.
+    if (statedPrice === null && outcome === 'delivered') {
+      const cell = String(field('netPrice') ?? '').trim()
+      invalidRows.push({
+        rowIndex: index,
+        reason: `No price on delivered sub-order ${field('subOrderCode') ?? '(unknown)'} `
+          + `(${sku}, MRP ${mrp}) — the price cell says "${cell === '' ? '(empty)' : cell}"`,
+      })
+      return
+    }
+    const netPrice = statedPrice ?? 0
     const statedGstPct = num(field('taxPct')) / 100
 
     // Snapdeal writes the code with underscores where the SKU map has

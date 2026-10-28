@@ -50,6 +50,85 @@ describe('recognising the file', () => {
   it('does not claim another marketplace\'s order list', () => {
     expect(detectSnapdealOrdersReport(['order_id', 'sku', 'qty', 'net price'])).toBe(false)
   })
+
+  // Snapdeal renamed the price column between August and September 2026.
+  // Because the price is one of the columns that identifies the file, the
+  // September export stopped being recognised at all — the upload rejected a
+  // real Snapdeal file outright rather than reading it slightly wrong.
+  it('recognises the export after Snapdeal renamed NET PRICE to NET VALUE', () => {
+    const september = HEADERS.map((h) => (h === 'NET PRICE' ? 'NET VALUE' : h))
+    expect(detectSnapdealOrdersReport(september)).toBe(true)
+  })
+
+  // The rename is why: requiring the price column meant a renamed one made a
+  // real Snapdeal file unrecognisable, with nothing on screen to say why.
+  it('still knows its own file if the price column is renamed again', () => {
+    const renamed = HEADERS.map((h) => (h === 'NET PRICE' ? 'SOME NEW NAME' : h))
+    expect(detectSnapdealOrdersReport(renamed)).toBe(true)
+  })
+
+  it('says so, once, rather than failing every row in silence', () => {
+    const { 'NET PRICE': _price, ...noPrice } = row({})
+    const r = run([noPrice])
+    expect(r.warnings.some((w) => w.includes('no price column'))).toBe(true)
+    expect(r.warnings.some((w) => w.includes('"NET PRICE"') && w.includes('"NET VALUE"'))).toBe(true)
+  })
+
+  it('reads the renamed column as the same figure', () => {
+    const august = row({})
+    const { 'NET PRICE': price, ...rest } = august
+    const september = { ...rest, 'NET VALUE': price }
+    expect(run([september]).validRecords[0].netSales)
+      .toBeCloseTo(run([august]).validRecords[0].netSales, 6)
+  })
+})
+
+/**
+ * September's file has one: a sunscreen stick marked Delivered with the price
+ * cell empty. Every way of keeping it states something untrue — at zero it is
+ * a unit given away free, an MRP of discount nobody gave, and a returns
+ * identity that reads the whole MRP back as a return.
+ */
+describe('a delivered row with no price on it', () => {
+  // The real one: `#N/A`, an Excel error that travelled into the export.
+  const r = run([
+    row({}),
+    row({ SUBORDERCODE: '74970496320', SKUCODE: 'AO_Stick_SunScreen_50', 'NET PRICE': '#N/A', MRP: '555', STATUS: 'Delivered' }),
+  ])
+
+  it('is not read as a sale at zero', () => {
+    expect(r.validRecords).toHaveLength(1)
+    expect(r.validRecords.every((x) => x.netSales > 0)).toBe(true)
+  })
+
+  it('names the sub-order so it can be looked up rather than lost', () => {
+    expect(r.invalidRows).toHaveLength(1)
+    expect(r.invalidRows[0].reason).toContain('74970496320')
+    expect(r.invalidRows[0].reason).toContain('AO_Stick_SunScreen_50')
+    // What the cell actually said, so the owner knows whether to fix the
+    // export or type the price in.
+    expect(r.invalidRows[0].reason).toContain('#N/A')
+  })
+
+  it('catches an empty cell the same way', () => {
+    const empty = run([row({ 'NET PRICE': '', STATUS: 'Delivered' })])
+    expect(empty.validRecords).toHaveLength(0)
+    expect(empty.invalidRows[0].reason).toContain('(empty)')
+  })
+
+  it('still reads a genuine zero as a zero', () => {
+    // Nothing is wrong with the cell: it says nought, and that is a figure.
+    const free = run([row({ 'NET PRICE': '0', STATUS: 'Delivered' })])
+    expect(free.invalidRows).toHaveLength(0)
+    expect(free.validRecords[0].netSales).toBe(0)
+  })
+
+  it('leaves a row that earned nothing because it never arrived alone', () => {
+    // Not delivered, so no price is expected and none is missing.
+    const returned = run([row({ 'NET PRICE': '', STATUS: 'Shipment Returned to Origin' })])
+    expect(returned.invalidRows).toHaveLength(0)
+    expect(returned.validRecords).toHaveLength(1)
+  })
 })
 
 describe('the date', () => {
