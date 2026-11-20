@@ -31,6 +31,16 @@ import { getField, headersPresent, type NormalizeResult } from './types'
  * Walmart states, so the commission is the subtraction; it is kept as the
  * marketplace fee rather than being folded into net sales, which keeps the
  * revenue line comparable with every other channel's.
+ *
+ * Walmart restyled this export between August and October 2026. Every header
+ * gained an underscore — `Units Sold` became `Units_Sold`, `Auth Sales`
+ * became `Auth_Sales` — `GMV - Commission` was rewritten as
+ * `GMV_Minus_Commission`, and `Categories` became `Department`. Three of
+ * those are columns that identify the file, so the October export was not
+ * recognised as Walmart's at all. Underscores are now read as spaces for
+ * every report this app reads, and the two genuinely renamed columns are
+ * known under both names. The figures behind them did not change: GMV is
+ * still auth sales less what was cancelled and refunded, to the cent.
  */
 const COLUMNS = {
   itemName: ['item name'],
@@ -41,9 +51,9 @@ const COLUMNS = {
   authSales: ['auth sales'],
   cancelledSales: ['cancelled sales'],
   refundSales: ['refund sales', 'refunded sales'],
-  gmvLessCommission: ['gmv - commission', 'gmv-commission'],
+  gmvLessCommission: ['gmv - commission', 'gmv-commission', 'gmv minus commission'],
   itemId: ['item id'],
-  categories: ['categories'],
+  categories: ['categories', 'department'],
   brand: ['brand'],
   cancelledUnits: ['cancelled units'],
   aur: ['aur'],
@@ -71,6 +81,7 @@ function num(raw: string | undefined): number {
 export interface WalmartNormalizeResult extends NormalizeResult {
   month: string
   totals: {
+    authSales: number
     gmv: number
     cancelled: number
     refunded: number
@@ -97,7 +108,10 @@ export function normalizeWalmartUsItemReport(
   const internalBySku = new Map(mappings.map((m) => [m.channelSku, m.internalSku]))
   const master = new Map(skuMaster.map((s) => [s.sku, s]))
   const unpriced = new Set<string>()
-  const totals = { gmv: 0, cancelled: 0, refunded: 0, commission: 0, netSales: 0, units: 0, orders: 0 }
+  const identityBroken: string[] = []
+  const totals = {
+    authSales: 0, gmv: 0, cancelled: 0, refunded: 0, commission: 0, netSales: 0, units: 0, orders: 0,
+  }
 
   rows.forEach((row, index) => {
     const field = (name: keyof typeof COLUMNS): string | undefined => getField(row, COLUMNS[name])
@@ -112,6 +126,7 @@ export function normalizeWalmartUsItemReport(
     const gmv = num(field('gmv'))
     const cancelled = num(field('cancelledSales'))
     const refunded = num(field('refundSales'))
+    const authSales = num(field('authSales'))
     const lessCommission = num(field('gmvLessCommission'))
     // Walmart states the money after commission rather than the commission,
     // so the charge is the gap. A row with no such column states no charge,
@@ -119,14 +134,32 @@ export function normalizeWalmartUsItemReport(
     const commission = lessCommission > 0 ? Math.max(0, gmv - lessCommission) : 0
     const units = num(field('unitsSold'))
     const orders = num(field('orders'))
-    // What was actually sold: the US has no GST to come out, so this is the
-    // revenue line itself.
-    const netSales = gmv - cancelled - refunded
+    // GMV is already net of what was cancelled and refunded. Walmart's own
+    // columns prove it — `Auth Sales − Cancelled − Refunded == GMV` holds on
+    // every row of every file so far — so Auth Sales is the gross and GMV is
+    // the revenue. The US has no GST to come out, so GMV is the revenue line
+    // itself.
+    //
+    // This read GMV as the gross and took the two off it a second time. It
+    // showed nothing for five months because August and September cancelled
+    // and refunded nothing at all: every row had gross equal to net. October
+    // has one cancellation and one refund, and the double subtraction took
+    // $18.98 off a $611.53 month.
+    const grossSales = authSales > 0 ? authSales : gmv + cancelled + refunded
+    const netSales = gmv
+    // The reconstruction above assumes the identity. If a future export
+    // breaks it — GMV restated as the gross, a column renamed again — the
+    // revenue would be wrong and nothing would say so, which is how this
+    // defect survived five months. So it is checked, per row, and named.
+    if (authSales > 0 && Math.abs(authSales - cancelled - refunded - gmv) > 0.01) {
+      identityBroken.push(sku)
+    }
 
     const internalSku = internalBySku.get(sku) ?? sku
     const product = master.get(internalSku) ?? master.get(sku)
     if (!product) unpriced.add(sku)
 
+    totals.authSales += grossSales
     totals.gmv += gmv
     totals.cancelled += cancelled
     totals.refunded += refunded
@@ -145,11 +178,13 @@ export function normalizeWalmartUsItemReport(
       productName: product?.productName ?? (field('itemName') ?? sku),
       category: normalizeCategory(product?.category ?? field('categories') ?? ''),
       quantity: units,
-      grossSales: gmv,
+      grossSales,
       discount: 0,
       netSales,
       // Walmart reports refunds as money, not as units, so there is no unit
-      // count to put here — saying 1 would be inventing one.
+      // count to put here — saying 1 would be inventing one. `Cancelled
+      // Units` is a count, but a cancelled unit never shipped and never came
+      // back, so it is not a return either.
       returnUnits: 0,
       rtoUnits: 0,
       shippingCost: 0,
@@ -171,11 +206,21 @@ export function normalizeWalmartUsItemReport(
     'header. Check it against the period the Seller Center filter was set to.',
   )
   warnings.push(
-    `${totals.orders} order(s), ${totals.units} unit(s): ${usd(totals.gmv)} of GMV less ${usd(totals.cancelled)} ` +
-    `cancelled and ${usd(totals.refunded)} refunded is ${usd(totals.netSales)} of net sales, with ` +
-    `${usd(totals.commission)} of Walmart commission read as the gap between GMV and "GMV - commission". ` +
+    `${totals.orders} order(s), ${totals.units} unit(s): ${usd(totals.authSales)} authorised less ` +
+    `${usd(totals.cancelled)} cancelled and ${usd(totals.refunded)} refunded is ${usd(totals.netSales)} of GMV, ` +
+    'which is the net sales — Walmart states GMV with both already out of it. ' +
+    `${usd(totals.commission)} of Walmart commission is read as the gap between GMV and "GMV - commission". ` +
     'Figures are stored in dollars and converted at the month\'s rate from Monthly Inputs.',
   )
+  if (identityBroken.length > 0) {
+    const shown = identityBroken.slice(0, 6).join(', ')
+    const rest = identityBroken.length - 6
+    warnings.push(
+      `${identityBroken.length} row(s) do not satisfy Walmart's own identity, auth sales less cancelled less ` +
+      `refunded equals GMV: ${shown}${rest > 0 ? ` and ${rest} more` : ''}. GMV is read as the revenue and auth ` +
+      'sales as the gross, so if Walmart has restated either column these figures need checking before they are used.',
+    )
+  }
   warnings.push(
     'One row per item for the whole period, not per order, so Daily Sales shows Walmart as a single point on the ' +
     'first of the month. Beyond commission the export states no fulfilment, shipping or payment charge and no ' +

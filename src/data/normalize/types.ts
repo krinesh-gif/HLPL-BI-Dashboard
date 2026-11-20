@@ -19,11 +19,24 @@ export interface NormalizeResult {
  * whitespace lets every normalizer's candidate list match the real column
  * name without having to enumerate every formatting variant.
  */
+/**
+ * A column name reduced to what it means, so a report can be recognised
+ * after the marketplace restyles its headers.
+ *
+ * An underscore counts as a space. Marketplaces move between the two
+ * spellings of the same column without telling anyone — Walmart's item
+ * export went from `Units Sold` and `Auth Sales` to `Units_Sold` and
+ * `Auth_Sales`, and because those columns are what identify the file, the
+ * export stopped being recognised at all. A reader that knows `units sold`
+ * now knows `Units_Sold`, `UNITS SOLD` and `Units.Sold` too, and candidates
+ * already written with underscores — `ad_spend`, `campaign_id` — go on
+ * matching, because both sides are reduced the same way.
+ */
 export function normalizeHeaderKey(header: string): string {
   return header
     .toLowerCase()
     .replace(/\([^)]*\)/g, ' ')
-    .replace(/[.:•]/g, ' ')
+    .replace(/[._:•]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }
